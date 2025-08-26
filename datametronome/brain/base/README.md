@@ -1,5 +1,8 @@
 # DataMetronome Brain Base
 
+> **📁 DIRECTORY TYPE**: Internal Infrastructure Code  
+> **🚫 NOT A PYPI PACKAGE** - This is internal code, not a public Python library
+
 Base analytics library for DataMetronome.
 
 ## Overview

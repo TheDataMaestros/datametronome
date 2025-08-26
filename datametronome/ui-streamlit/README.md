@@ -1,5 +1,8 @@
 # DataMetronome Streamlit UI
 
+> **📁 DIRECTORY TYPE**: Standalone Streamlit Application  
+> **🚫 NOT A PYPI PACKAGE** - This is a standalone application, not a Python library
+
 The default Streamlit user interface for the DataMetronome data observability platform.
 
 ## Overview
@@ -16,9 +19,7 @@ The Streamlit UI provides an intuitive, tiered interface for creating and managi
 
 ## Installation
 
-```bash
-pip install datametronome-ui-streamlit
-```
+This is a standalone application. Clone the repository and run it directly:
 
 ## Quick Start
 
@@ -48,7 +49,7 @@ The UI uses environment variables for configuration:
 ```bash
 git clone https://github.com/datametronome/datametronome.git
 cd datametronome/ui-streamlit
-pip install -e ".[dev]"
+pip install -r requirements.txt
 streamlit run datametronome_ui_streamlit/main.py
 ```
 

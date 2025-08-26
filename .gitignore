@@ -301,3 +301,19 @@ docker-compose.override.yml
 # Local development
 .local/
 local/
+
+# UI package files (not a PyPI package)
+ui-streamlit/setup.py
+ui-streamlit/*.egg-info/
+ui-streamlit/dist/
+ui-streamlit/build/
+
+# Non-PyPI package directories (applications/infrastructure)
+podium/setup.py
+podium/*.egg-info/
+podium/dist/
+podium/build/
+brain/base/setup.py
+brain/base/*.egg-info/
+brain/base/dist/
+brain/base/build/

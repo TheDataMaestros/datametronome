@@ -1,5 +1,8 @@
 # DataMetronome Podium API
 
+> **📁 DIRECTORY TYPE**: Standalone FastAPI Backend Service  
+> **🚫 NOT A PYPI PACKAGE** - This is a backend service, not a Python library
+
 The Podium API is the core backend service for DataMetronome, providing data quality monitoring, anomaly detection, and reporting capabilities.
 
 ## 🏗️ Architecture

@@ -1,0 +1,6 @@
+# This directory is NOT a PyPI package
+# It is a standalone FastAPI backend service
+# Do not attempt to publish this to PyPI
+# 
+# This file serves as a clear indicator that this is not meant
+# to be distributed as a Python package via pip
