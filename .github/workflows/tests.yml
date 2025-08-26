@@ -37,19 +37,17 @@ jobs:
           pip install -e ./datametronome/podium
           pip install -e ./datametronome/ui-streamlit
 
-      - name: Run SQLite tests
+      - name: Set Python path
         run: |
-          cd datametronome/pulse/sqlite
-          pytest tests/ -v
+          echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
 
-      - name: Run Core tests
+      - name: Run all tests from root
         run: |
-          cd datametronome/pulse/core
-          pytest tests/ -v
-
-      - name: Run Podium tests
-        run: |
-          cd datametronome/podium
-          pytest tests/ -v
+          python -m pytest datametronome/pulse/sqlite/tests/ -v
+          python -m pytest datametronome/pulse/core/tests/ -v
+          python -m pytest datametronome/podium/tests/ -v
+          python -m pytest datametronome/pulse/postgres/tests/ -v
+          python -m pytest datametronome/pulse/postgres-psycopg3/tests/ -v
+          python -m pytest datametronome/pulse/postgres-sqlalchemy/tests/ -v
 
 
