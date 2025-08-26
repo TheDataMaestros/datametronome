@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="DataPulse icon">
+  <defs>
+    <linearGradient id="wave" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#2e86ab"/>
+      <stop offset="100%" stop-color="#22c55e"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" rx="16" fill="none"/>
+  <path d="M18,24 L54,24 C86,24 106,40 106,64 C106,88 86,96 54,96 L18,96 Z M30,36 L52,36 C76,36 92,48 92,64 C92,80 76,78 52,78 L30,78 Z" fill="#0f1720"/>
+  <path d="M16,108 C24,96 32,96 40,108 S56,120 64,108 80,96 88,108 104,120 112,108" fill="none" stroke="url(#wave)" stroke-width="6" stroke-linecap="round"/>
+</svg>
+

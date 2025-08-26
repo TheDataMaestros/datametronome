@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="DataMetronome icon">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#58a6ff"/>
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" rx="16" fill="none"/>
+  <path d="M18,106 L18,18 L44,62 L70,18 L70,106 L58,106 L58,42 L44,70 L30,42 L30,106 Z" fill="#0f1720"/>
+  <rect x="76" y="20" width="8" height="80" rx="4" transform="rotate(24 80 60)" fill="url(#grad)"/>
+  <circle cx="104" cy="12" r="10" transform="rotate(24 104 12)" fill="#22c55e"/>
+</svg>
+
