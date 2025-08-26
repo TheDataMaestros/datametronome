@@ -1,0 +1,21 @@
+# DataMetronome - CI Test Dependencies Only
+# Local packages are installed separately in development mode
+
+# Core testing framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+pytest-mock>=3.10.0
+
+# Code quality tools
+black>=23.0.0
+isort>=5.12.0
+flake8>=6.0.0
+mypy>=1.5.0
+
+# Additional dependencies that might be needed
+httpx>=0.24.0
+sqlalchemy>=2.0.0
+psycopg[binary]>=3.0.0
+asyncpg>=0.28.0
+redis>=4.5.0
