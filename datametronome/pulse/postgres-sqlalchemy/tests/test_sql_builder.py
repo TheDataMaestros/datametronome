@@ -1,5 +1,5 @@
 import pytest
-from datametronome.pulse.postgres_sqlalchemy.metronome_pulse_postgres_sqlalchemy.sql_builder import (
+from metronome_pulse_postgres_sqlalchemy.sql_builder import (
     PostgresSQLAlchemySQLBuilder,
 )
 

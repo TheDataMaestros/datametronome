@@ -1,9 +1,9 @@
 import pytest
 from datametronome.pulse.core.metronome_pulse_core.base import BaseConnector
 from datametronome.pulse.core.metronome_pulse_core.interfaces import (
-    ReadOnlyConnector,
-    WriteOnlyConnector,
-    ReadWriteConnector,
+    Pulse,
+    Readable,
+    Writable,
 )
 
 
@@ -51,12 +51,12 @@ class TestBaseConnector:
         assert connector.is_connected() is True
 
 
-class TestReadOnlyConnector:
-    """Comprehensive tests for ReadOnlyConnector interface"""
+class TestReadable:
+    """Comprehensive tests for Readable interface"""
     
-    def test_readonly_connector_instantiation(self):
-        """Test that ReadOnlyConnector can be instantiated"""
-        class ConcreteReadOnlyConnector(ReadOnlyConnector):
+    def test_readable_connector_instantiation(self):
+        """Test that Readable can be instantiated"""
+        class ConcreteReadable(Pulse, Readable):
             def connect(self):
                 return True
             

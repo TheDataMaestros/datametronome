@@ -35,6 +35,9 @@ class QueryResult(BaseModel):
     execution_time: float = Field(ge=0.0)
     timestamp: datetime
     metadata: dict[str, Any] | None = None
+    
+    class Config:
+        arbitrary_types_allowed = True  # Allow pandas DataFrame
 
 
 class BaseConnector(ABC):

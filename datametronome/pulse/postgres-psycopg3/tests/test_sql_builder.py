@@ -1,5 +1,5 @@
 import pytest
-from datametronome.pulse.postgres_psycopg3.metronome_pulse_postgres_psycopg3.sql_builder import (
+from metronome_pulse_postgres_psycopg3.sql_builder import (
     PostgresPsycopgSQLBuilder,
 )
 
