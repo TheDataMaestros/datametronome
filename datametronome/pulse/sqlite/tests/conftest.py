@@ -6,6 +6,7 @@ shared across all test modules.
 """
 
 import pytest
+import pytest_asyncio
 import asyncio
 import tempfile
 import os

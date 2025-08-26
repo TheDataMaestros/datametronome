@@ -6,6 +6,7 @@ real-world functionality and data operations.
 """
 
 import pytest
+import pytest_asyncio
 import asyncio
 import tempfile
 import os
@@ -29,7 +30,7 @@ def temp_db_path():
         pass
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def sqlite_pulse(temp_db_path):
     """Create a SQLitePulse instance with temporary database."""
     pulse = SQLitePulse(temp_db_path)
@@ -62,7 +63,7 @@ async def sqlite_pulse(temp_db_path):
     await pulse.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def readonly_pulse(temp_db_path):
     """Create a SQLiteReadonlyPulse instance with temporary database."""
     # First create the database with tables
@@ -96,7 +97,7 @@ async def readonly_pulse(temp_db_path):
     await readonly.close()
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def writeonly_pulse(temp_db_path):
     """Create a SQLiteWriteonlyPulse instance with temporary database."""
     # First create the database with tables
@@ -303,9 +304,9 @@ class TestSQLiteReadonlyPulseIntegration:
         with pytest.raises(Exception):
             await readonly_pulse.query("SELECT * FROM non_existent_table")
         
-        # Test invalid table name in get_table_info
-        with pytest.raises(Exception):
-            await readonly_pulse.get_table_info("non_existent_table")
+        # Test invalid table name in get_table_info (SQLite returns empty list for non-existent tables)
+        table_info = await readonly_pulse.get_table_info("non_existent_table")
+        assert table_info == []
 
 
 class TestSQLiteWriteonlyPulseIntegration:
@@ -321,10 +322,11 @@ class TestSQLiteWriteonlyPulseIntegration:
             {"name": "Bob", "email": "bob@example.com", "active": False}
         ]
         
-        await writeonly_pulse.write(users_data, {
-            "operation": "insert",
-            "table": "users"
-        })
+        # Add table name to each record for writeonly connector
+        users_data_with_table = [
+            {**user, "table": "users"} for user in users_data
+        ]
+        await writeonly_pulse.write(users_data_with_table)
         
         # Verify data was written (using a temporary readonly connection)
         temp_pulse = SQLitePulse(writeonly_pulse.database_path)
