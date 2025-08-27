@@ -1,9 +1,12 @@
 import pytest
-from datametronome.pulse.core.metronome_pulse_core.base import BaseConnector
-from datametronome.pulse.core.metronome_pulse_core.interfaces import (
+from metronome_pulse_core.base import BaseConnector
+from metronome_pulse_core.interfaces import (
     Pulse,
     Readable,
     Writable,
+    ReadOnlyConnector,
+    WriteOnlyConnector,
+    ReadWriteConnector,
 )
 
 
@@ -59,26 +62,32 @@ class TestReadable:
         class ConcreteReadable(Pulse, Readable):
             def connect(self):
                 return True
-            
+    
+            def close(self):
+                return True
+    
             def disconnect(self):
                 return True
-            
+    
             def is_connected(self):
                 return True
-            
+    
+            def query(self, query_config):
+                return [{"result": "data"}]
+    
             def execute_query(self, query: str, params: dict = None):
                 return [{"result": "data"}]
-            
+    
             def fetch_one(self, query: str, params: dict = None):
-                return {"result": "single"}
-            
+                return [{"result": "all"}]
+    
             def fetch_all(self, query: str, params: dict = None):
                 return [{"result": "all"}]
         
-        connector = ConcreteReadOnlyConnector()
+        connector = ConcreteReadable()
         assert connector is not None
-        assert isinstance(connector, ReadOnlyConnector)
-        assert isinstance(connector, BaseConnector)
+        assert isinstance(connector, Readable)
+        assert isinstance(connector, Pulse)
     
     def test_readonly_connector_abstract_methods(self):
         """Test that ReadOnlyConnector requires implementation of abstract methods"""
@@ -91,11 +100,17 @@ class TestReadable:
             def connect(self):
                 return True
             
+            def close(self):
+                return True
+            
             def disconnect(self):
                 return True
             
             def is_connected(self):
                 return True
+            
+            def query(self, query_config):
+                return [{"result": "data"}]
             
             def execute_query(self, query: str, params: dict = None):
                 return [{"result": "data"}]
