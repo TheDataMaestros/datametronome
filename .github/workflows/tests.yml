@@ -25,23 +25,64 @@ jobs:
 
       - name: Install test dependencies
         run: |
+          echo "🔧 Installing test dependencies..."
           python -m pip install --upgrade pip
           pip install -r requirements-ci.txt
+          echo "📦 Test dependencies installed:"
+          pip list | grep -E "(pytest|pytest-|black|isort|flake8|mypy)"
 
       - name: Install packages in development mode
         run: |
+          echo "🔧 Installing packages in development mode..."
           pip install -e ./datametronome/pulse/core
           pip install -e ./datametronome/pulse/sqlite
+          pip install -e ./datametronome/pulse/postgres-psycopg3
+          pip install -e ./datametronome/pulse/postgres-sqlalchemy
           pip install -e ./datametronome/pulse/postgres
           pip install -e ./datametronome/podium
           # UI package doesn't have setup.py, skip for now
+          
+          echo "📦 Installed packages:"
+          pip list | grep metronome
+          
+          echo "🔍 Checking package structure..."
+          echo "📁 Core package setup.py exists:"
+          ls -la datametronome/pulse/core/setup.py || echo "❌ Core setup.py missing"
+          echo "📁 SQLite package setup.py exists:"
+          ls -la datametronome/pulse/sqlite/setup.py || echo "❌ SQLite setup.py missing"
+          echo "📁 Postgres-Psycopg3 package setup.py exists:"
+          ls -la datametronome/pulse/postgres-psycopg3/setup.py || echo "❌ Postgres-Psycopg3 setup.py missing"
+          echo "📁 Postgres-SQLAlchemy package setup.py exists:"
+          ls -la datametronome/pulse/postgres-sqlalchemy/setup.py || echo "❌ Postgres-SQLAlchemy setup.py missing"
+          echo "📁 Postgres package setup.py exists:"
+          ls -la datametronome/pulse/postgres/setup.py || echo "❌ Postgres setup.py missing"
 
       - name: Set Python path
         run: |
+          echo "🔧 Setting Python environment..."
           echo "PYTHONPATH=$PWD" >> $GITHUB_ENV
+          echo "📁 Current directory: $PWD"
+          echo "🐍 Python version: $(python --version)"
+          echo "📦 Python path: $PYTHONPATH"
+          echo "📁 Directory contents:"
+          ls -la
+          echo "📁 datametronome/pulse/ contents:"
+          ls -la datametronome/pulse/
 
       - name: Run all tests
         run: |
+          echo "🧪 Running all tests..."
+          echo "🔍 Testing import capabilities first..."
+          
+          # Test if packages can be imported
+          echo "📦 Testing package imports..."
+          python -c "import metronome_pulse_core; print('✅ Core package imported')" || echo "❌ Core package import failed"
+          python -c "import metronome_pulse_sqlite; print('✅ SQLite package imported')" || echo "❌ SQLite package import failed"
+          python -c "import metronome_pulse_postgres_psycopg3; print('✅ Postgres-Psycopg3 package imported')" || echo "❌ Postgres-Psycopg3 package import failed"
+          python -c "import metronome_pulse_postgres_sqlalchemy; print('✅ Postgres-SQLAlchemy package imported')" || echo "❌ Postgres-SQLAlchemy package import failed"
+          python -c "import metronome_pulse_postgres; print('✅ Postgres package imported')" || echo "❌ Postgres package import failed"
+          
+          echo "🧪 Running pytest with import mode fix..."
           # Run all working packages with import mode fix
           python -m pytest datametronome/pulse/core/tests/ datametronome/pulse/sqlite/tests/ datametronome/pulse/postgres-psycopg3/tests/ datametronome/pulse/postgres-sqlalchemy/tests/ datametronome/pulse/postgres/tests/ -v --import-mode=importlib
           
