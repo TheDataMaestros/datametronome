@@ -1,5 +1,5 @@
 import pytest
-from datametronome.pulse.postgres.metronome_pulse_postgres.sql_builder import PostgresSQLBuilder
+from metronome_pulse_postgres.sql_builder import PostgresSQLBuilder
 
 
 class TestPostgresSQLBuilder:

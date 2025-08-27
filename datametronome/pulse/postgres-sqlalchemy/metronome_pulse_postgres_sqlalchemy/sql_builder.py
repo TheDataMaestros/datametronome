@@ -16,17 +16,23 @@ class PostgresSQLAlchemyBuilder:
         key_columns: list[str],
         num_rows: int,
     ) -> str:
-        """Build a DELETE .. USING (VALUES ...) with named binds (:p1, :p2, ...)."""
+        """Build a DELETE .. USING (VALUES ...) with named binds (:column_row, ...)."""
+        # Parameter validation
+        if target_table is None:
+            raise ValueError("target_table cannot be None")
+        if key_columns is None:
+            raise ValueError("key_columns cannot be None")
+        if len(key_columns) == 0:
+            raise ValueError("key_columns cannot be empty")
         if num_rows <= 0:
             raise ValueError("num_rows must be > 0")
+            
         cols = ", ".join(key_columns)
         tuple_size = len(key_columns)
         value_rows: list[str] = []
-        p = 1
-        for _ in range(num_rows):
-            placeholders = ", ".join([f":p{p+i}" for i in range(tuple_size)])
+        for row_idx in range(num_rows):
+            placeholders = ", ".join([f":{col}_{row_idx}" for col in key_columns])
             value_rows.append(f"({placeholders})")
-            p += tuple_size
         values_sql = ", ".join(value_rows)
         on_clause = " AND ".join([f"t.{c} = v.{c}" for c in key_columns])
         return (

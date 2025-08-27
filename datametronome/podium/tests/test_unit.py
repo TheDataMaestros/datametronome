@@ -11,10 +11,10 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 
 # Import the models and services for unit testing
-from datametronome.podium.datametronome_podium.models.user import User
-from datametronome.podium.datametronome_podium.models.stave import Stave
-from datametronome.podium.datametronome_podium.models.clef import Clef
-from datametronome.podium.datametronome_podium.models.check_run import CheckRun
+from datametronome_podium.models.user import User
+from datametronome_podium.models.stave import Stave
+from datametronome_podium.models.clef import Clef
+from datametronome_podium.models.check_run import CheckRun
 
 
 class TestUserModelUnit:

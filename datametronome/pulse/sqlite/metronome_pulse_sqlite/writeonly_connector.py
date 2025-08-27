@@ -1,7 +1,7 @@
 import sqlite3
 import asyncio
 from pathlib import Path
-from typing import Dict, Any, List, Optional
+# Removed typing imports as requested
 
 from metronome_pulse_core.interfaces import Pulse, Writable
 
@@ -12,7 +12,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
     Business logic and table creation are handled by Podium.
     """
     
-    def __init__(self, database_path: str = "datametronome.db"):
+    def __init__(self, database_path="datametronome.db"):
         self.database_path = database_path
         self.connection = None
     
@@ -40,7 +40,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
         """Check if connected to SQLite."""
         return self.connection is not None
     
-    async def write(self, data: List[Dict[str, Any]], config: Optional[Dict[str, Any]] = None) -> None:
+    async def write(self, data, config=None):
         """Write data to SQLite."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
@@ -62,7 +62,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
         except Exception as e:
             raise RuntimeError(f"Write operation failed: {e}")
     
-    async def _insert_data(self, data: List[Dict[str, Any]]) -> bool:
+    async def _insert_data(self, data):
         """Insert data into tables (tables must already exist from Podium)."""
         try:
             for record in data:
@@ -91,7 +91,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
             self.connection.rollback()
             raise RuntimeError(f"Insert failed: {e}")
     
-    async def _replace_data(self, data: List[Dict[str, Any]]) -> bool:
+    async def _replace_data(self, data):
         """Replace data using delete and insert strategy."""
         try:
             for record in data:
@@ -112,7 +112,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
             self.connection.rollback()
             raise RuntimeError(f"Replace failed: {e}")
     
-    async def _execute_operations(self, operations: List[Dict[str, Any]]) -> bool:
+    async def _execute_operations(self, operations):
         """Execute a list of mixed SQL operations."""
         try:
             for operation in operations:
@@ -141,7 +141,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
             self.connection.rollback()
             raise RuntimeError(f"Operations failed: {e}")
     
-    async def execute(self, sql: str, params: Optional[List[Any]] = None) -> bool:
+    async def execute(self, sql, params=None):
         """Execute raw SQL."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
@@ -159,7 +159,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
             self.connection.rollback()
             raise RuntimeError(f"Execute failed: {e}")
     
-    async def copy_records(self, table_name: str, records: List[Dict[str, Any]]) -> bool:
+    async def copy_records(self, table_name, records):
         """Bulk insert records using SQLite's efficient INSERT."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")

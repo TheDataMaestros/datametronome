@@ -1,0 +1,66 @@
+name: Pulse Postgres-Psycopg3 Package CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'datametronome/pulse/postgres-psycopg3/**'
+      - 'datametronome/pulse/core/**'
+      - '.github/workflows/pulse-postgres-psycopg3.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'datametronome/pulse/postgres-psycopg3/**'
+      - 'datametronome/pulse/core/**'
+      - '.github/workflows/pulse-postgres-psycopg3.yml'
+
+jobs:
+  test:
+    name: Test Postgres-Psycopg3 Package
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-postgres-psycopg3-${{ hashFiles('datametronome/pulse/postgres-psycopg3/**', 'datametronome/pulse/core/**') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-postgres-psycopg3-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov pytest-asyncio pytest-mock
+        pip install pydantic>=2.5.0 pandas>=2.0.0 psycopg[binary]>=3.0.0
+    
+    - name: Install packages in dependency order
+      run: |
+        # Install core package first (dependency)
+        pip install -e ./datametronome/pulse/core --no-deps
+        # Install postgres-psycopg3 package
+        pip install -e ./datametronome/pulse/postgres-psycopg3 --no-deps
+    
+    - name: Run tests
+      run: |
+        cd datametronome/pulse/postgres-psycopg3
+        pytest tests/ -v --cov=metronome_pulse_postgres_psycopg3 --cov-report=xml --cov-report=term-missing
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: datametronome/pulse/postgres-psycopg3/coverage.xml
+        flags: pulse-postgres-psycopg3
+        name: codecov-pulse-postgres-psycopg3
+        fail_ci_if_error: false

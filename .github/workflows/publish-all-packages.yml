@@ -11,14 +11,11 @@ jobs:
     strategy:
       matrix:
         package-dir:
-          - datametronome/brain/base
-          - datametronome/podium
           - datametronome/pulse/core
           - datametronome/pulse/postgres
           - datametronome/pulse/postgres-psycopg3
           - datametronome/pulse/postgres-sqlalchemy
           - datametronome/pulse/sqlite
-          - datametronome/ui-streamlit
     
     steps:
     - uses: actions/checkout@v4

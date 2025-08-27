@@ -29,7 +29,7 @@ setup(
         "Topic :: Scientific/Engineering :: Information Analysis",
         "Topic :: Software Development :: Libraries :: Python Modules",
     ],
-    python_requires=">=3.9",
+    python_requires=">=3.10",
     install_requires=[
         "pandas>=2.0.0",
         "numpy>=1.24.0",
