@@ -31,6 +31,11 @@ class Pulse(ABC):
         """
         pass
     
+    # Alias for backward compatibility
+    async def disconnect(self) -> None:
+        """Disconnect from the data source (alias for close method)."""
+        await self.close()
+    
     @abstractmethod
     async def is_connected(self) -> bool:
         """Check if the connector is currently connected.
@@ -69,6 +74,20 @@ class Readable(ABC):
             Exception: If the query fails
         """
         pass
+    
+    # Additional convenience methods for backward compatibility
+    async def execute_query(self, query: str, params: dict = None) -> list:
+        """Execute a query and return results (alias for query method)."""
+        return await self.query(query)
+    
+    async def fetch_one(self, query: str, params: dict = None) -> dict | None:
+        """Fetch a single result from a query."""
+        results = await self.query(query)
+        return results[0] if results else None
+    
+    async def fetch_all(self, query: str, params: dict = None) -> list:
+        """Fetch all results from a query (alias for query method)."""
+        return await self.query(query)
 
 
 class Writable(ABC):
@@ -96,3 +115,19 @@ class Writable(ABC):
             Exception: If the write operation fails
         """
         pass
+
+
+# Additional interface classes for backward compatibility
+class ReadOnlyConnector(Pulse, Readable):
+    """Interface for read-only connectors (backward compatibility)."""
+    pass
+
+
+class WriteOnlyConnector(Pulse, Writable):
+    """Interface for write-only connectors (backward compatibility)."""
+    pass
+
+
+class ReadWriteConnector(Pulse, Readable, Writable):
+    """Interface for read-write connectors (backward compatibility)."""
+    pass
