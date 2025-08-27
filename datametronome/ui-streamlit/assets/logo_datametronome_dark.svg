@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="920" height="220" viewBox="0 0 920 220" role="img" aria-label="DataMetronome logo (dark)">
+  <defs>
+    <linearGradient id="dm-accent-dark" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#34d399"/>
+      <stop offset="100%" stop-color="#7dd3fc"/>
+    </linearGradient>
+  </defs>
+  <!-- Transparent background (none) -->
+
+  <!-- Monogram M with baton (light text for dark backgrounds) -->
+  <g transform="translate(60,26)">
+    <path d="M0,168 L0,0 L52,94 L104,0 L104,168 L84,168 L84,50 L52,110 L20,50 L20,168 Z" fill="#f8fafc"/>
+    <rect x="118" y="6" width="12" height="156" rx="6" transform="rotate(24 124 84)" fill="url(#dm-accent-dark)"/>
+    <circle cx="174" cy="-4" r="18" transform="rotate(24 174 -4)" fill="#34d399"/>
+  </g>
+
+  <!-- Wordmark -->
+  <g fill="#f8fafc" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial">
+    <text x="300" y="118" font-size="64" font-weight="700">DataMetronome</text>
+    <text x="302" y="150" font-size="18" fill="#9ca3af">Data Quality and Anomaly Detection</text>
+  </g>
+</svg>
+

@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for testing
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: datametronome_test
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./test_data:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d datametronome_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Podium API
+  podium:
+    build:
+      context: .
+      dockerfile: datametronome/podium/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DATAMETRONOME_SECRET_KEY=your-super-secret-key-that-is-at-least-32-characters-long
+      - DATAMETRONOME_DATABASE_URL=sqlite:///./datametronome.db
+      - DATAMETRONOME_DEBUG=true
+      - DATAMETRONOME_HOST=0.0.0.0
+      - DATAMETRONOME_PORT=8000
+    volumes:
+      - ./reports:/app/reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Streamlit UI (optional, for development)
+  ui:
+    build:
+      context: .
+      dockerfile: datametronome/ui-streamlit/Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      - PODIUM_API_BASE=http://podium:8000
+    depends_on:
+      podium:
+        condition: service_healthy
+    volumes:
+      - ./reports:/app/reports
+
+volumes:
+  postgres_data:

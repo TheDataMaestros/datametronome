@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="240" viewBox="0 0 960 240" role="img" aria-label="DataMetronome logo">
+  <defs>
+    <linearGradient id="dm-accent" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#58a6ff"/>
+    </linearGradient>
+  </defs>
+
+
+  <!-- Minimal monogram M with baton -->
+  <g transform="translate(80,30)">
+    <!-- M shape -->
+    <path d="M0,170 L0,0 L52,92 L104,0 L104,170 L84,170 L84,46 L52,104 L20,46 L20,170 Z" fill="#0f1720"/>
+    <!-- Baton (metronome arm) crossing the M -->
+    <rect x="116" y="8" width="12" height="152" rx="6" transform="rotate(24 122 84)" fill="url(#dm-accent)"/>
+    <circle cx="170" cy="-2" r="18" transform="rotate(24 170 -2)" fill="#22c55e"/>
+  </g>
+
+  <!-- Wordmark -->
+  <g fill="#0f1720" font-family="Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Helvetica Neue, Arial">
+    <text x="300" y="120" font-size="64" font-weight="700">DataMetronome</text>
+    <text x="302" y="152" font-size="18" fill="#6b7280">Data Quality and Anomaly Detection</text>
+  </g>
+</svg>
+
+

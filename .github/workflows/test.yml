@@ -1,0 +1,339 @@
+name: DataMetronome Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+env:
+  POSTGRES_HOST: localhost
+  POSTGRES_PORT: 5432
+  POSTGRES_DB: testdb
+  POSTGRES_USER: testuser
+  POSTGRES_PASSWORD: testpass
+  REDIS_HOST: localhost
+  REDIS_PORT: 6379
+
+jobs:
+  # Unit Tests (MOST IMPORTANT - Run First)
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Cache pip dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements*.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-${{ matrix.python-version }}-
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-cov pytest-asyncio pytest-mock
+        pip install -r requirements.txt
+    
+    - name: Run Core Unit Tests
+      run: |
+        cd datametronome/pulse/core
+        pytest tests/ -v --cov=metronome_pulse_core --cov-report=xml --cov-report=term-missing
+    
+    - name: Run Postgres Unit Tests
+      run: |
+        cd datametronome/pulse/postgres
+        pytest tests/ -v --cov=metronome_pulse_postgres --cov-report=xml --cov-report=term-missing
+    
+    - name: Run Postgres-Psycopg3 Unit Tests
+      run: |
+        cd datametronome/pulse/postgres-psycopg3
+        pytest tests/ -v --cov=metronome_pulse_postgres_psycopg3 --cov-report=xml --cov-report=term-missing
+    
+    - name: Run Postgres-SQLAlchemy Unit Tests
+      run: |
+        cd datametronome/pulse/postgres-sqlalchemy
+        pytest tests/ -v --cov=metronome_pulse_postgres_sqlalchemy --cov-report=xml --cov-report=term-missing
+    
+    - name: Run Podium Unit Tests
+      run: |
+        cd datametronome/podium
+        pytest tests/test_unit.py -v --cov=datametronome_podium --cov-report=xml --cov-report=term-missing
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./**/coverage.xml
+        flags: unit-tests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  # Integration Tests (Require Database)
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+          POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7-alpine
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-asyncio pytest-cov pytest-mock
+        pip install asyncpg redis psycopg[binary] sqlalchemy
+        pip install -r requirements.txt
+    
+    - name: Wait for PostgreSQL
+      run: |
+        until pg_isready -h localhost -p 5432 -U testuser; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+    
+    - name: Wait for Redis
+      run: |
+        until redis-cli -h localhost ping; do
+          echo "Waiting for Redis..."
+          sleep 2
+        done
+    
+    - name: Generate test data
+      run: |
+        cd scripts
+        python generate_test_data.py
+    
+    - name: Run Podium Integration Tests
+      run: |
+        cd datametronome/podium
+        pytest tests/test_integration_database.py -v --cov=datametronome_podium --cov-report=xml --cov-report=term-missing
+    
+    - name: Run End-to-End System Tests
+      run: |
+        pytest tests/test_e2e_system.py -v --cov=datametronome --cov-report=xml --cov-report=term-missing
+    
+    - name: Upload integration coverage
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./**/coverage.xml
+        flags: integration-tests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  # Performance Tests
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: integration-tests
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-benchmark
+        pip install asyncpg psycopg[binary] sqlalchemy
+        pip install -r requirements.txt
+    
+    - name: Wait for PostgreSQL
+      run: |
+        until pg_isready -h localhost -p 5432 -U testuser; do
+          echo "Waiting for PostgreSQL..."
+          sleep 2
+        done
+    
+    - name: Generate performance test data
+      run: |
+        cd scripts
+        python generate_test_data.py
+    
+    - name: Run Performance Tests
+      run: |
+        pytest tests/test_e2e_system.py::TestDataMetronomePerformance -v --benchmark-only
+    
+    - name: Upload performance results
+      uses: actions/upload-artifact@v3
+      with:
+        name: performance-results
+        path: .pytest_cache/
+
+  # Security Tests
+  security-tests:
+    name: Security Tests
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit safety
+    
+    - name: Run Bandit security scan
+      run: |
+        bandit -r datametronome/ -f json -o bandit-report.json || true
+    
+    - name: Run Safety check
+      run: |
+        safety check --json --output safety-report.json || true
+    
+    - name: Upload security reports
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-reports
+        path: |
+          bandit-report.json
+          safety-report.json
+
+  # Code Quality Checks
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    needs: unit-tests
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install quality tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install black isort flake8 mypy
+    
+    - name: Check code formatting with Black
+      run: |
+        black --check --diff datametronome/
+    
+    - name: Check import sorting with isort
+      run: |
+        isort --check-only --diff datametronome/
+    
+    - name: Lint with flake8
+      run: |
+        flake8 datametronome/ --count --select=E9,F63,F7,F82 --show-source --statistics
+    
+    - name: Type check with mypy
+      run: |
+        mypy datametronome/ --ignore-missing-imports
+
+  # Test Results Summary
+  test-summary:
+    name: Test Summary
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests, performance-tests, security-tests, code-quality]
+    if: always()
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Create test summary
+      run: |
+        echo "## 🧪 DataMetronome Test Results" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "### Unit Tests: ${{ needs.unit-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "### Integration Tests: ${{ needs.integration-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "### Performance Tests: ${{ needs.performance-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "### Security Tests: ${{ needs.security-tests.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "### Code Quality: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [[ "${{ needs.unit-tests.result }}" == "success" ]]; then
+          echo "✅ **Unit Tests PASSED** - Core logic is working correctly" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Unit Tests FAILED** - Critical issues detected" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        if [[ "${{ needs.integration-tests.result }}" == "success" ]]; then
+          echo "✅ **Integration Tests PASSED** - System components work together" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ **Integration Tests FAILED** - System integration issues" >> $GITHUB_STEP_SUMMARY
+        fi
+        
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "---" >> $GITHUB_STEP_SUMMARY
+        echo "**Note:** Unit tests are the MOST IMPORTANT tests and must pass for any deployment." >> $GITHUB_STEP_SUMMARY

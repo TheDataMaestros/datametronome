@@ -1,0 +1,43 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "metronome-pulse-postgres-sqlalchemy"
+dynamic = ["version"]
+description = "PostgreSQL DataPulse connector using SQLAlchemy"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "DataMetronome Team", email = "team@datametronome.dev"}
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Database :: Front-Ends",
+]
+requires-python = ">=3.9"
+dependencies = [
+    "metronome-pulse-core>=0.1.0",
+    "sqlalchemy[asyncio]>=2.0.0",
+    "asyncpg>=0.28.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/datametronome/metronome-pulse-postgres-sqlalchemy"
+Repository = "https://github.com/datametronome/metronome-pulse-postgres-sqlalchemy"
+Documentation = "https://datametronome.dev/docs/pulse-postgres-sqlalchemy"
+Issues = "https://github.com/datametronome/metronome-pulse-postgres-sqlalchemy/issues"
+
+[tool.hatch.version]
+path = "metronome_pulse_postgres_sqlalchemy/__init__.py"
+
