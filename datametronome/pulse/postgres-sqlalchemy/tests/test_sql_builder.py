@@ -144,9 +144,11 @@ class TestPostgresSQLAlchemyBuilder:
         # All placeholders should be :column_row format
         sql = self.builder.delete_using_values("public.events", ["id", "name", "value"], 5)
         
-        # Check parameter count
+        # Check parameter count - count all parameters that start with : and contain _
         expected_params = 15  # 3 columns * 5 rows
-        param_count = len([p for p in sql.split() if p.startswith(":") and p.endswith("_")])
+        # Use regex to find all parameter placeholders, handling commas and parentheses
+        import re
+        param_count = len(re.findall(r':\w+_\d+', sql))
         assert param_count == expected_params
         
         # Verify placeholder pattern
@@ -185,9 +187,9 @@ class TestPostgresSQLAlchemyBuilder:
         sql = self.builder.delete_using_values("public.events", many_columns, 1)
         assert "v(col1, col2, col3, col4, col5, col6, col7, col8, col9, col10)" in sql
         
-        # Check parameter placeholders
-        for i, col in enumerate(many_columns):
-            assert f":{col}_{i}" in sql
+        # Check parameter placeholders - with 1 row, all columns get row index 0
+        for col in many_columns:
+            assert f":{col}_0" in sql
     
     def test_sql_structure_validation(self):
         """Test that generated SQL has correct structure"""
@@ -224,7 +226,7 @@ class TestPostgresSQLAlchemySQLBuilderIntegration:
     
     def test_full_delete_workflow(self):
         """Test a complete delete workflow with multiple operations"""
-        builder = PostgresSQLAlchemySQLBuilder()
+        builder = PostgresSQLAlchemyBuilder()
         
         # Perform delete operation with multiple columns and rows
         delete_sql = builder.delete_using_values("public.user_sessions", ["session_id", "user_id", "created_at"], 50)
@@ -240,7 +242,7 @@ class TestPostgresSQLAlchemySQLBuilderIntegration:
     
     def test_consistency_across_different_operations(self):
         """Test that the builder produces consistent SQL across different operations"""
-        builder = PostgresSQLAlchemySQLBuilder()
+        builder = PostgresSQLAlchemyBuilder()
         
         # Test different table/column combinations
         operations = [
@@ -265,7 +267,7 @@ class TestPostgresSQLAlchemySQLBuilderIntegration:
     
     def test_parameter_binding_compatibility(self):
         """Test that generated SQL is compatible with SQLAlchemy parameter binding"""
-        builder = PostgresSQLAlchemySQLBuilder()
+        builder = PostgresSQLAlchemyBuilder()
         
         # Generate SQL for a complex operation
         sql = builder.delete_using_values("public.analytics", ["user_id", "event_date", "metric_value"], 10)
