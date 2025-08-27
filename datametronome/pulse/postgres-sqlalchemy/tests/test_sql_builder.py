@@ -1,15 +1,15 @@
 import pytest
 from metronome_pulse_postgres_sqlalchemy.sql_builder import (
-    PostgresSQLAlchemySQLBuilder,
+    PostgresSQLAlchemyBuilder,
 )
 
 
-class TestPostgresSQLAlchemySQLBuilder:
-    """Comprehensive tests for PostgresSQLAlchemySQLBuilder"""
+class TestPostgresSQLAlchemyBuilder:
+    """Comprehensive tests for PostgresSQLAlchemyBuilder"""
     
     def setup_method(self):
         """Setup method to create a fresh builder instance for each test"""
-        self.builder = PostgresSQLAlchemySQLBuilder()
+        self.builder = PostgresSQLAlchemyBuilder()
     
     def test_delete_using_values_sqlalchemy_build_single_row(self):
         """Test DELETE with VALUES for single row deletion using SQLAlchemy style"""

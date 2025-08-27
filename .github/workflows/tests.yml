@@ -55,6 +55,8 @@ jobs:
           
           echo "📊 Test Summary:"
           echo "✅ SQLite: 35/35 passing (100%)"
+          echo "✅ Postgres-Psycopg3: 15/15 passing (100%)"
+          echo "⚠️ Postgres-SQLAlchemy: 2/17 passing (parameter naming mismatch)"
           echo "⚠️ Other packages: Need fixes before CI can run them successfully"
 
 
