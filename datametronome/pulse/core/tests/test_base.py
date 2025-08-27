@@ -180,11 +180,17 @@ class TestReadable:
             def connect(self):
                 return True
             
+            def close(self):
+                return True
+            
             def disconnect(self):
                 return True
             
             def is_connected(self):
                 return True
+            
+            def query(self, query_config):
+                return [{"query": str(query_config), "params": None}]
             
             def execute_query(self, query: str, params: dict = None):
                 return {"query": query, "params": params}
@@ -215,32 +221,37 @@ class TestWriteOnlyConnector:
         class ConcreteWriteOnlyConnector(WriteOnlyConnector):
             def connect(self):
                 return True
-            
+    
+            def close(self):
+                return True
+    
             def disconnect(self):
                 return True
-            
+    
             def is_connected(self):
                 return True
-            
+    
+            def write(self, data, destination: str, config: dict = None):
+                return None
+    
             def execute_write(self, query: str, params: dict = None):
                 return {"affected_rows": 1}
-            
+    
             def execute_batch(self, queries: list[str], params: list[dict] = None):
                 return {"affected_rows": [1, 2, 3]}
-            
+    
             def begin_transaction(self):
                 return True
-            
+    
             def commit_transaction(self):
                 return True
-            
+    
             def rollback_transaction(self):
                 return True
         
         connector = ConcreteWriteOnlyConnector()
         assert connector is not None
         assert isinstance(connector, WriteOnlyConnector)
-        assert isinstance(connector, BaseConnector)
     
     def test_writeonly_connector_abstract_methods(self):
         """Test that WriteOnlyConnector requires implementation of abstract methods"""
@@ -253,11 +264,17 @@ class TestWriteOnlyConnector:
             def connect(self):
                 return True
             
+            def close(self):
+                return True
+            
             def disconnect(self):
                 return True
             
             def is_connected(self):
                 return True
+            
+            def write(self, data, destination: str, config: dict = None):
+                return None
             
             def execute_write(self, query: str, params: dict = None):
                 return {"affected_rows": 1}
@@ -292,11 +309,17 @@ class TestWriteOnlyConnector:
             def connect(self):
                 return True
             
+            def close(self):
+                return True
+            
             def disconnect(self):
                 return True
             
             def is_connected(self):
                 return True
+            
+            def write(self, data, destination: str, config: dict = None):
+                return None
             
             def execute_write(self, query: str, params: dict = None):
                 return {"affected_rows": 1}
@@ -344,11 +367,20 @@ class TestReadWriteConnector:
             def connect(self):
                 return True
             
+            def close(self):
+                return True
+            
             def disconnect(self):
                 return True
             
             def is_connected(self):
                 return True
+            
+            def query(self, query: str, params: dict = None):
+                return [{"result": "data"}]
+            
+            def write(self, data, destination: str, config: dict = None):
+                return None
             
             def execute_query(self, query: str, params: dict = None):
                 return [{"result": "data"}]
@@ -362,7 +394,7 @@ class TestReadWriteConnector:
             def execute_write(self, query: str, params: dict = None):
                 return {"affected_rows": 1}
             
-            def execute_batch(self, queries: list[str], params: list[dict] = None):
+            def execute_batch(self, queries: list[str], params: dict = None):
                 return {"affected_rows": [1, 2, 3]}
             
             def begin_transaction(self):
@@ -377,9 +409,8 @@ class TestReadWriteConnector:
         connector = ConcreteReadWriteConnector()
         assert connector is not None
         assert isinstance(connector, ReadWriteConnector)
-        assert isinstance(connector, ReadOnlyConnector)
-        assert isinstance(connector, WriteOnlyConnector)
-        assert isinstance(connector, BaseConnector)
+        assert isinstance(connector, Readable)
+        assert isinstance(connector, Writable)
     
     def test_readwrite_connector_abstract_methods(self):
         """Test that ReadWriteConnector requires implementation of abstract methods"""
@@ -396,11 +427,20 @@ class TestReadWriteConnector:
             def connect(self):
                 return True
             
+            def close(self):
+                return True
+            
             def disconnect(self):
                 return True
             
             def is_connected(self):
                 return True
+            
+            def query(self, query: str, params: dict = None):
+                return self.data
+            
+            def write(self, data, destination: str, config: dict = None):
+                return None
             
             def execute_query(self, query: str, params: dict = None):
                 return self.data
@@ -422,9 +462,9 @@ class TestReadWriteConnector:
                     return {"affected_rows": 0}
                 return {"affected_rows": 0}
             
-            def execute_batch(self, queries: list[str], params: list[dict] = None):
+            def execute_batch(self, queries: list[str], params: dict = None):
                 affected_rows = []
-                for i, query in enumerate(query):
+                for i, query in enumerate(queries):
                     param = params[i] if params and i < len(params) else None
                     result = self.execute_write(query, param)
                     affected_rows.append(result["affected_rows"])
