@@ -16,7 +16,7 @@ class SQLitePulse(Pulse, Readable, Writable):
     Business logic, table creation, and DDL are handled by Podium.
     """
     
-    def __init__(self, database_path: str = "datametronome.db"):
+    def __init__(self, database_path="datametronome.db"):
         self.database_path = database_path
         self.connection = None
         self._readonly = SQLiteReadonlyPulse(database_path)
@@ -57,7 +57,7 @@ class SQLitePulse(Pulse, Readable, Writable):
                 await self._writeonly.is_connected())
     
     # Readable interface methods - delegate to readonly connector
-    async def query(self, query_config: str | Dict[str, Any]) -> list:
+    async def query(self, query_config):
         """Query data from SQLite."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
@@ -69,13 +69,13 @@ class SQLitePulse(Pulse, Readable, Writable):
             raise RuntimeError("Not connected to SQLite database")
         return await self._readonly.query_with_params(sql, params)
     
-    async def get_table_info(self, table_name: str) -> List[Dict[str, Any]]:
+    async def get_table_info(self, table_name):
         """Get table schema information."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
         return await self._readonly.get_table_info(table_name)
     
-    async def list_tables(self) -> List[str]:
+    async def list_tables(self):
         """List all tables in the database."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")

@@ -12,7 +12,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
     Business logic and table creation are handled by Podium.
     """
     
-    def __init__(self, database_path: str = "datametronome.db"):
+    def __init__(self, database_path="datametronome.db"):
         self.database_path = database_path
         self.connection = None
     
