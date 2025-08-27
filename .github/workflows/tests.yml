@@ -37,12 +37,13 @@ jobs:
       - name: Install packages in development mode
         run: |
           echo "🔧 Installing packages in development mode..."
-          pip install -e ./datametronome/pulse/core
-          pip install -e ./datametronome/pulse/sqlite
-          pip install -e ./datametronome/pulse/postgres-psycopg3
-          pip install -e ./datametronome/pulse/postgres-sqlalchemy
-          pip install -e ./datametronome/pulse/postgres
-          pip install -e ./datametronome/podium
+          # Install packages without dependencies first to avoid file:// URL issues
+          pip install -e ./datametronome/pulse/core --no-deps
+          pip install -e ./datametronome/pulse/sqlite --no-deps
+          pip install -e ./datametronome/pulse/postgres-psycopg3 --no-deps
+          pip install -e ./datametronome/pulse/postgres-sqlalchemy --no-deps
+          pip install -e ./datametronome/pulse/postgres --no-deps
+          pip install -e ./datametronome/podium --no-deps
           # UI package doesn't have setup.py, skip for now
           
           echo "📦 Installed packages:"
