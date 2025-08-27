@@ -2,7 +2,7 @@ import sqlite3
 import asyncio
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+# Removed typing imports as requested
 from datetime import datetime
 
 from metronome_pulse_core.interfaces import Pulse, Readable, Writable
@@ -63,7 +63,7 @@ class SQLitePulse(Pulse, Readable, Writable):
             raise RuntimeError("Not connected to SQLite database")
         return await self._readonly.query(query_config)
     
-    async def query_with_params(self, sql: str, params: List[Any]) -> List[Dict[str, Any]]:
+    async def query_with_params(self, sql, params):
         """Execute parameterized query."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
@@ -82,7 +82,7 @@ class SQLitePulse(Pulse, Readable, Writable):
         return await self._readonly.list_tables()
     
     # Writable interface methods - delegate to writeonly connector
-    async def write(self, data: List[Dict[str, Any]], destination: str, config: Optional[Dict[str, Any]] = None) -> None:
+    async def write(self, data, destination, config=None):
         """Write data to SQLite."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
@@ -94,13 +94,13 @@ class SQLitePulse(Pulse, Readable, Writable):
         
         return await self._writeonly.write(data, config)
     
-    async def execute(self, sql: str, params: Optional[List[Any]] = None) -> bool:
+    async def execute(self, sql, params=None):
         """Execute raw SQL."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
         return await self._writeonly.execute(sql, params)
     
-    async def copy_records(self, table_name: str, records: List[Dict[str, Any]]) -> bool:
+    async def copy_records(self, table_name, records):
         """Bulk insert records using SQLite's efficient INSERT."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")

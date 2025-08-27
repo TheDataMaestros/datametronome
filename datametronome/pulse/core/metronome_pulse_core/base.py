@@ -4,7 +4,7 @@ Base connector interface for DataPulse connectors.
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any
+# Removed typing imports as requested
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -50,7 +50,7 @@ class BaseConnector(ABC):
             config: Connection configuration.
         """
         self.config = config
-        self._connection_pool: Any = None
+        self._connection_pool = None
         self._is_connected = False
     
     @abstractmethod

@@ -56,6 +56,16 @@ jobs:
         pip install python-jose[cryptography]>=3.3.0 passlib>=1.7.4 bcrypt==4.0.1 apscheduler>=3.10.0
         pip install sqlalchemy>=2.0.0 psycopg[binary]>=3.0.0 asyncpg>=0.28.0 redis>=4.5.0
     
+    - name: Install packages in development mode
+      run: |
+        # Install packages in dependency order so cross-dependencies work
+        pip install -e ./datametronome/pulse/core --no-deps
+        pip install -e ./datametronome/pulse/sqlite --no-deps
+        pip install -e ./datametronome/pulse/postgres-psycopg3 --no-deps
+        pip install -e ./datametronome/pulse/postgres-sqlalchemy --no-deps
+        pip install -e ./datametronome/pulse/postgres --no-deps
+        pip install -e ./datametronome/podium --no-deps
+    
     - name: Run Core Unit Tests
       run: |
         cd datametronome/pulse/core

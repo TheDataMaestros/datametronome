@@ -1,7 +1,7 @@
 import sqlite3
 import asyncio
 from pathlib import Path
-from typing import Dict, Any, List
+# Removed typing imports as requested
 
 from metronome_pulse_core.interfaces import Pulse, Readable
 
@@ -64,7 +64,7 @@ class SQLiteReadonlyPulse(Pulse, Readable):
         except Exception as e:
             raise RuntimeError(f"Query failed: {e}")
     
-    async def query_with_params(self, sql: str, params: List[Any]) -> List[Dict[str, Any]]:
+    async def query_with_params(self, sql, params):
         """Execute parameterized query."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
