@@ -64,13 +64,36 @@ class TestBaseConnector:
             def connect(self):
                 return "connected"
             
+            def close(self):
+                return "closed"
+            
             def disconnect(self):
                 return "disconnected"
             
             def is_connected(self):
                 return True
+            
+            def execute_query(self, query: str, params: dict = None):
+                return [{"result": "data"}]
+            
+            def get_freshness(self):
+                return "unknown"
+            
+            def get_row_count(self):
+                return 0
+            
+            def get_schema(self):
+                return {}
+            
+            def get_table_info(self, table_name: str):
+                return []
+            
+            def test_connection(self):
+                return True
         
-        connector = TestConnector()
+        from metronome_pulse_core.base import ConnectionConfig
+        config = ConnectionConfig(host="localhost", port=5432, database="test")
+        connector = TestConnector(config)
         assert isinstance(connector, BaseConnector)
         assert connector.connect() == "connected"
         assert connector.disconnect() == "disconnected"
