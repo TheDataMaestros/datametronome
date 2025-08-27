@@ -431,21 +431,23 @@ class TestConnectorIntegration:
     
     def test_connector_hierarchy(self):
         """Test that connector hierarchy is properly structured"""
-        # ReadWriteConnector should inherit from both ReadOnly and WriteOnly
-        assert issubclass(ReadWriteConnector, ReadOnlyConnector)
-        assert issubclass(ReadWriteConnector, WriteOnlyConnector)
-        assert issubclass(ReadWriteConnector, BaseConnector)
+        # ReadWriteConnector should inherit from Pulse, Readable, and Writable
+        assert issubclass(ReadWriteConnector, Pulse)
+        assert issubclass(ReadWriteConnector, Readable)
+        assert issubclass(ReadWriteConnector, Writable)
         
-        # ReadOnlyConnector should inherit from BaseConnector
-        assert issubclass(ReadOnlyConnector, BaseConnector)
+        # ReadOnlyConnector should inherit from Pulse and Readable
+        assert issubclass(ReadOnlyConnector, Pulse)
+        assert issubclass(ReadOnlyConnector, Readable)
         
-        # WriteOnlyConnector should inherit from BaseConnector
-        assert issubclass(WriteOnlyConnector, BaseConnector)
+        # WriteOnlyConnector should inherit from Pulse and Writable
+        assert issubclass(WriteOnlyConnector, Pulse)
+        assert issubclass(WriteOnlyConnector, Writable)
         
-        # BaseConnector should be at the top of the hierarchy
-        assert not issubclass(BaseConnector, ReadOnlyConnector)
-        assert not issubclass(BaseConnector, WriteOnlyConnector)
-        assert not issubclass(BaseConnector, ReadWriteConnector)
+        # All connectors should inherit from Pulse (the base interface)
+        assert issubclass(ReadOnlyConnector, Pulse)
+        assert issubclass(WriteOnlyConnector, Pulse)
+        assert issubclass(ReadWriteConnector, Pulse)
     
     def test_connector_method_signatures(self):
         """Test that connector methods have consistent signatures"""

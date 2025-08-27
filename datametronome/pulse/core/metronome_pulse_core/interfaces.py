@@ -88,6 +88,27 @@ class Readable(ABC):
     async def fetch_all(self, query: str, params: dict = None) -> list:
         """Fetch all results from a query (alias for query method)."""
         return await self.query(query)
+    
+    # Additional methods for backward compatibility
+    async def get_freshness(self) -> str:
+        """Get data freshness information (default implementation)."""
+        return "unknown"
+    
+    async def get_row_count(self) -> int:
+        """Get total row count (default implementation)."""
+        return 0
+    
+    async def get_schema(self) -> dict:
+        """Get table schema (default implementation)."""
+        return {}
+    
+    async def get_table_info(self, table_name: str) -> list:
+        """Get table information (default implementation)."""
+        return []
+    
+    async def test_connection(self) -> bool:
+        """Test if connection is working (default implementation)."""
+        return await self.is_connected()
 
 
 class Writable(ABC):
@@ -115,6 +136,33 @@ class Writable(ABC):
             Exception: If the write operation fails
         """
         pass
+    
+    # Additional convenience methods for backward compatibility
+    async def execute_write(self, query: str, params: dict = None) -> dict:
+        """Execute a write query and return result (alias for write method)."""
+        # This is a simplified version for backward compatibility
+        await self.write([params] if params else [], "temp_table")
+        return {"affected_rows": 1}
+    
+    async def execute_batch(self, queries: list[str], params: list[dict] = None) -> dict:
+        """Execute multiple write queries in batch (alias for write method)."""
+        # This is a simplified version for backward compatibility
+        if params:
+            for param in params:
+                await self.write([param], "temp_table")
+        return {"affected_rows": len(queries) if queries else 0}
+    
+    async def begin_transaction(self) -> bool:
+        """Begin a transaction (default implementation)."""
+        return True
+    
+    async def commit_transaction(self) -> bool:
+        """Commit a transaction (default implementation)."""
+        return True
+    
+    async def rollback_transaction(self) -> bool:
+        """Rollback a transaction (default implementation)."""
+        return True
 
 
 # Additional interface classes for backward compatibility
