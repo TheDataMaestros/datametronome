@@ -19,14 +19,37 @@ class TestBaseConnector:
         class ConcreteConnector(BaseConnector):
             def connect(self):
                 return True
-            
+    
+            def close(self):
+                return True
+    
             def disconnect(self):
                 return True
-            
+    
             def is_connected(self):
                 return True
+            
+            def execute_query(self, query: str, params: dict = None):
+                return [{"result": "data"}]
+            
+            def get_freshness(self):
+                return "unknown"
+            
+            def get_row_count(self):
+                return 0
+            
+            def get_schema(self):
+                return {}
+            
+            def get_table_info(self, table_name: str):
+                return []
+            
+            def test_connection(self):
+                return True
         
-        connector = ConcreteConnector()
+        from metronome_pulse_core.base import ConnectionConfig
+        config = ConnectionConfig(host="localhost", port=5432, database="test")
+        connector = ConcreteConnector(config)
         assert connector is not None
         assert isinstance(connector, BaseConnector)
     
