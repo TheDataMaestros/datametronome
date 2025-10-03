@@ -1,0 +1,279 @@
+version: '3.8'
+
+# Production Docker Compose Configuration for DataMetronome
+# 
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up -d
+#
+# Environment variables should be set in .env file:
+#   - DATAMETRONOME_SECRET_KEY
+#   - DATAMETRONOME_DATABASE_URL
+#   - POSTGRES_PASSWORD
+#   - etc.
+
+services:
+  # PostgreSQL Database (Production)
+  postgres:
+    image: postgres:15-alpine
+    container_name: datametronome-postgres-prod
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-datametronome}
+      POSTGRES_USER: ${POSTGRES_USER:-datametronome}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./backups:/backups
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-datametronome}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - datametronome-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Redis Cache (Production)
+  redis:
+    image: redis:7-alpine
+    container_name: datametronome-redis-prod
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - datametronome-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
+  # Podium API (Production)
+  podium:
+    build:
+      context: ./datametronome/podium
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: 3.11
+    image: datametronome-podium:latest
+    container_name: datametronome-podium-prod
+    environment:
+      # Application settings
+      DATAMETRONOME_SECRET_KEY: ${DATAMETRONOME_SECRET_KEY:?SECRET_KEY is required}
+      DATAMETRONOME_DATABASE_URL: postgresql://${POSTGRES_USER:-datametronome}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-datametronome}
+      DATAMETRONOME_DEBUG: "false"
+      DATAMETRONOME_HOST: "0.0.0.0"
+      DATAMETRONOME_PORT: "8000"
+      
+      # Redis settings
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: json
+      
+      # Security
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8501,https://yourdomain.com}
+      TOKEN_EXPIRE_MINUTES: ${TOKEN_EXPIRE_MINUTES:-60}
+      
+      # Scheduler
+      SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
+      SCHEDULER_TIMEZONE: ${SCHEDULER_TIMEZONE:-UTC}
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+      - ./logs:/app/logs
+    ports:
+      - "${PODIUM_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - datametronome-network
+    deploy:
+      replicas: 2  # Run 2 instances for high availability
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Streamlit UI (Production)
+  ui:
+    build:
+      context: ./datametronome/ui-streamlit
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: 3.11
+    image: datametronome-ui:latest
+    container_name: datametronome-ui-prod
+    environment:
+      PODIUM_API_BASE: http://podium:8000
+      STREAMLIT_SERVER_PORT: "8501"
+      STREAMLIT_SERVER_ADDRESS: "0.0.0.0"
+      STREAMLIT_SERVER_HEADLESS: "true"
+      STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+      STREAMLIT_SERVER_ENABLE_CORS: "false"
+      STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION: "true"
+    volumes:
+      - ./logs/ui:/app/logs
+    ports:
+      - "${UI_PORT:-8501}:8501"
+    depends_on:
+      podium:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8501/_stcore/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - datametronome-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Nginx Reverse Proxy (Optional - for SSL termination)
+  nginx:
+    image: nginx:alpine
+    container_name: datametronome-nginx-prod
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/logs:/var/log/nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - podium
+      - ui
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - datametronome-network
+    profiles:
+      - with-nginx  # Only start with: docker-compose --profile with-nginx up
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+  # Prometheus (Monitoring - Optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: datametronome-prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    restart: unless-stopped
+    networks:
+      - datametronome-network
+    profiles:
+      - monitoring  # Only start with: docker-compose --profile monitoring up
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+  # Grafana (Visualization - Optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: datametronome-grafana
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD is required when using Grafana}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:3000}
+      GF_INSTALL_PLUGINS: ${GRAFANA_PLUGINS:-}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources:ro
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    networks:
+      - datametronome-network
+    profiles:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+
+networks:
+  datametronome-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.25.0.0/16
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
+
