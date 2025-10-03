@@ -48,7 +48,8 @@ def create_root_endpoints(app: FastAPI) -> None:
             "message": "DataMetronome Podium API",
             "version": "0.1.0",
             "docs": "/docs",
-            "redoc": "/redoc"
+            "redoc": "/redoc",
+            "metrics": "/metrics"
         }
     
     @app.get("/health")
@@ -102,6 +103,29 @@ def create_root_endpoints(app: FastAPI) -> None:
             }
         
         return health_status
+    
+    @app.get("/metrics")
+    async def metrics():
+        """
+        Prometheus metrics endpoint.
+        
+        Returns application metrics in Prometheus format for monitoring:
+        - HTTP request metrics (count, duration, in-progress)
+        - Database metrics (queries, connections)
+        - Check run metrics (success rate, duration, anomalies)
+        - System health metrics
+        - Business metrics (users, clefs, staves)
+        """
+        from fastapi import Response
+        from .core.metrics import get_metrics_content, update_system_metrics
+        
+        # Update dynamic metrics before returning
+        await update_system_metrics()
+        
+        # Get metrics in Prometheus format
+        content, content_type = get_metrics_content()
+        
+        return Response(content=content, media_type=content_type)
 
 
 @asynccontextmanager
@@ -110,12 +134,19 @@ async def lifespan(app: FastAPI):
     # Startup
     logging.info("Starting DataMetronome Podium...")
     
+    # Initialize metrics
+    from .core.metrics import initialize_metrics, set_component_health
+    initialize_metrics()
+    logging.info("Metrics initialized")
+    
     # Initialize database
     await init_db()
+    set_component_health('database', True)
     logging.info("Database initialized")
     
     # Initialize scheduler
     await init_scheduler()
+    set_component_health('scheduler', True)
     logging.info("Scheduler initialized")
     
     yield
@@ -140,6 +171,10 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         lifespan=lifespan,
     )
+    
+    # Add metrics middleware (first, to track all requests)
+    from .core.middleware import MetricsMiddleware
+    app.add_middleware(MetricsMiddleware)
     
     # Add CORS middleware
     app.add_middleware(CORSMiddleware,

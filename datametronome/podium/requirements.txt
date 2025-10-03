@@ -13,3 +13,6 @@ bcrypt==4.0.1
 
 # Scheduling (minimal)
 apscheduler>=3.10.0
+
+# Monitoring and metrics
+prometheus-client>=0.19.0
