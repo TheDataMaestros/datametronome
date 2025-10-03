@@ -137,6 +137,11 @@ async def lifespan(app: FastAPI):
     # Startup
     logging.info("Starting DataMetronome Podium...")
     
+    # Validate and print configuration
+    from .core.config import validate_and_report_config, print_startup_banner
+    print_startup_banner()
+    validate_and_report_config()
+    
     # Initialize metrics
     from .core.metrics import initialize_metrics, set_component_health
     initialize_metrics()
