@@ -216,3 +216,23 @@ async def delete_data(table: str, where_clause: str, where_params: List[Any]) ->
     sql = f"DELETE FROM {table} WHERE {where_clause}"
     connector = await get_db()
     return await connector.execute(sql, where_params)
+
+
+async def get_db_connection_status() -> bool:
+    """
+    Check database connection health.
+    
+    Returns:
+        bool: True if database is connected and responsive, False otherwise.
+    """
+    global sqlite_connector
+    try:
+        if not sqlite_connector:
+            return False
+        
+        # Try a simple query to verify connectivity
+        result = await sqlite_connector.query("SELECT 1")
+        return result is not None
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        return False

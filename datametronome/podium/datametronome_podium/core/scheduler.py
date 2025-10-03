@@ -98,5 +98,21 @@ def get_scheduler_status():
     return {
         "status": "running",
         "job_count": len(scheduler.get_jobs()),
-        "timezone": scheduler.timezone
+        "timezone": str(scheduler.timezone)
     }
+
+
+async def is_scheduler_running() -> bool:
+    """
+    Check if scheduler is running and healthy.
+    
+    Returns:
+        bool: True if scheduler is running, False if disabled or failed.
+    """
+    try:
+        if not scheduler:
+            return False
+        return scheduler.running
+    except Exception as e:
+        logger.error(f"Scheduler health check failed: {e}")
+        return False

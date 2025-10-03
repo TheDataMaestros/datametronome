@@ -52,9 +52,56 @@ def create_root_endpoints(app: FastAPI) -> None:
         }
     
     @app.get("/health")
-    async def health_check() -> dict[str, str]:
-        """Health check endpoint."""
-        return {"status": "healthy"}
+    async def health_check() -> dict[str, str | dict]:
+        """
+        Health check endpoint for load balancers and monitoring.
+        
+        Returns comprehensive system health status including:
+        - Overall health status
+        - Database connectivity
+        - Version information
+        - Timestamp
+        """
+        from datetime import datetime, timezone
+        
+        health_status = {
+            "status": "healthy",
+            "version": "0.1.0",
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "service": "datametronome-podium",
+            "checks": {}
+        }
+        
+        # Check database connectivity
+        try:
+            from .core.database import get_db_connection_status
+            db_status = await get_db_connection_status()
+            health_status["checks"]["database"] = {
+                "status": "healthy" if db_status else "unhealthy",
+                "message": "Database connection OK" if db_status else "Database connection failed"
+            }
+        except Exception as e:
+            health_status["checks"]["database"] = {
+                "status": "unhealthy",
+                "message": f"Database check failed: {str(e)}"
+            }
+            health_status["status"] = "degraded"
+        
+        # Check scheduler status
+        try:
+            from .core.scheduler import is_scheduler_running
+            scheduler_status = await is_scheduler_running()
+            health_status["checks"]["scheduler"] = {
+                "status": "healthy" if scheduler_status else "degraded",
+                "message": "Scheduler running" if scheduler_status else "Scheduler not running"
+            }
+        except Exception as e:
+            health_status["checks"]["scheduler"] = {
+                "status": "unknown",
+                "message": f"Scheduler check failed: {str(e)}"
+            }
+        
+        return health_status
 
 
 @asynccontextmanager
