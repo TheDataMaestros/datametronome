@@ -3,18 +3,77 @@ Pydantic schemas for Stave operations.
 """
 
 from typing import Any
+from pydantic import BaseModel, Field, field_validator, ConfigDict
 
-from pydantic import BaseModel, Field
+
+VALID_DATA_SOURCE_TYPES = ["postgres", "mysql", "mongodb", "sqlite", "redis", "snowflake", "bigquery"]
 
 
 class StaveBase(BaseModel):
     """Base stave schema."""
     
-    name: str = Field(..., min_length=1, max_length=255)
-    description: str | None = None
-    data_source_type: str = Field(..., min_length=1, max_length=100)
-    connection_config: dict[str, Any] = Field(..., description="Connection parameters")
-    is_active: bool = True
+    model_config = ConfigDict(json_schema_extra={
+        "example": {
+            "name": "Production Database",
+            "description": "Main production PostgreSQL database",
+            "data_source_type": "postgres",
+            "connection_config": {
+                "host": "db.example.com",
+                "port": 5432,
+                "database": "prod_db",
+                "user": "monitor_user"
+            },
+            "is_active": True
+        }
+    })
+    
+    name: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=255,
+        description="Human-readable name for the data source",
+        examples=["Production Database", "Analytics DB", "User Service Cache"]
+    )
+    description: str | None = Field(
+        None,
+        max_length=1000,
+        description="Optional description of the data source",
+        examples=["Primary production database for user data"]
+    )
+    data_source_type: str = Field(
+        ..., 
+        min_length=1, 
+        max_length=100,
+        description=f"Type of data source. Supported: {', '.join(VALID_DATA_SOURCE_TYPES)}",
+        examples=["postgres"]
+    )
+    connection_config: dict[str, Any] = Field(
+        ..., 
+        description="Connection parameters specific to the data source type",
+        examples=[{"host": "localhost", "port": 5432, "database": "mydb"}]
+    )
+    is_active: bool = Field(
+        True,
+        description="Whether this data source is actively monitored"
+    )
+    
+    @field_validator('data_source_type')
+    @classmethod
+    def validate_data_source_type(cls, v: str) -> str:
+        """Validate data source type is supported."""
+        if v.lower() not in VALID_DATA_SOURCE_TYPES:
+            raise ValueError(
+                f"data_source_type must be one of {VALID_DATA_SOURCE_TYPES}, got '{v}'"
+            )
+        return v.lower()
+    
+    @field_validator('connection_config')
+    @classmethod
+    def validate_connection_config(cls, v: dict[str, Any]) -> dict[str, Any]:
+        """Validate connection config has required fields."""
+        if not v:
+            raise ValueError("connection_config cannot be empty")
+        return v
 
 
 class StaveCreate(StaveBase):
