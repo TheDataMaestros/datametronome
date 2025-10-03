@@ -211,10 +211,18 @@ Our comprehensive testing shows DataMetronome's superior performance:
 
 ## 📚 **Documentation**
 
-- [Quick Start Guide](docs/quickstart.md)
-- [API Reference](docs/api.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
-- [Community Demo](community_demo.py)
+### Core Documentation
+- **[📖 Documentation Hub](docs/README.md)** - Complete documentation index
+- **[🚀 Quick Start Guide](docs/quickstart.md)** - Get started in 5 minutes
+- **[📚 API Reference](docs/api.md)** - Complete API documentation
+- **[🏗️ Architecture Guide](docs/architecture.md)** - System design and diagrams
+- **[👨‍💻 Development Guide](docs/development.md)** - Contributing to DataMetronome
+
+### Additional Resources
+- **[🚀 Deployment Guide](DEPLOYMENT.md)** - Production deployment strategies
+- **[🗺️ Roadmap](ROADMAP.md)** - Future plans and priorities
+- **[🤝 Contributing Guidelines](CONTRIBUTING.md)** - How to contribute
+- **[🎵 Community Demo](community_demo.py)** - Full demonstration
 
 ## 🏆 **Why Choose DataMetronome?**
 
