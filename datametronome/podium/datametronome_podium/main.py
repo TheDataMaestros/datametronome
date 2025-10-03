@@ -7,14 +7,17 @@ import logging
 import os
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 import uvicorn
 
 from .core.config import settings
 from .core.database import init_db, close_db
 from .core.scheduler import init_scheduler, shutdown_scheduler
 from .core.logging_config import setup_logging, get_logger
+from .core.rate_limit import limiter
 from .api.v1.api import api_router
 
 # Configure logging based on environment
@@ -56,7 +59,8 @@ def create_root_endpoints(app: FastAPI) -> None:
         }
     
     @app.get("/health")
-    async def health_check() -> dict[str, str | dict]:
+    @limiter.limit("100 per minute")
+    async def health_check(request: Request) -> dict[str, str | dict]:
         """
         Health check endpoint for load balancers and monitoring.
         
@@ -108,7 +112,8 @@ def create_root_endpoints(app: FastAPI) -> None:
         return health_status
     
     @app.get("/metrics")
-    async def metrics():
+    @limiter.limit("20 per minute")
+    async def metrics(request: Request):
         """
         Prometheus metrics endpoint.
         
@@ -179,6 +184,10 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
         lifespan=lifespan,
     )
+    
+    # Add rate limiting
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     
     # Add metrics middleware (first, to track all requests)
     from .core.middleware import MetricsMiddleware
