@@ -20,8 +20,16 @@ class PostgresPsycopgSQLBuilder:
 
         Parameters are flattened row-major: (k1_row1, k2_row1, k1_row2, k2_row2, ...)
         """
+        # Parameter validation
+        if target_table is None:
+            raise ValueError("target_table cannot be None")
+        if key_columns is None:
+            raise ValueError("key_columns cannot be None")
+        if len(key_columns) == 0:
+            raise ValueError("key_columns cannot be empty")
         if num_rows <= 0:
             raise ValueError("num_rows must be > 0")
+            
         cols = ", ".join(key_columns)
         tuple_size = len(key_columns)
         value_rows: list[str] = []

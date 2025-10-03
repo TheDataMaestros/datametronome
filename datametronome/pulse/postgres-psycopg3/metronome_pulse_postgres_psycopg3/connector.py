@@ -7,7 +7,7 @@ with full support for the DataPulse ecosystem and psycopg3 features.
 
 import psycopg
 from metronome_pulse_core import Pulse, Readable, Writable
-from .sql_builder import PostgresPsycopg3Builder
+from .sql_builder import PostgresPsycopgSQLBuilder
 
 
 class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
@@ -34,7 +34,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
         self._password = password
         self._kwargs = kwargs
         self._pool = None
-        self._sql = PostgresPsycopg3Builder()
+        self._sql = PostgresPsycopgSQLBuilder()
     
     async def connect(self):
         """Establish connection pool to PostgreSQL using psycopg3."""
@@ -267,7 +267,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
                 # Convert to list of dictionaries
                 return [dict(zip(columns, row)) for row in rows]
     
-    async def execute(self, query: str, params: list = None) -> Any:
+    async def execute(self, query: str, params: list = None):
         """
         Execute a SQL command that doesn't return results.
         

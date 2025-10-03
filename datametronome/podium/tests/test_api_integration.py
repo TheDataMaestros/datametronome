@@ -14,11 +14,11 @@ from datetime import datetime, timedelta
 from typing import Dict, Any, List
 
 # Import the FastAPI app and models
-from datametronome.podium.datametronome_podium.main import app
-from datametronome.podium.datametronome_podium.models.user import User
-from datametronome.podium.datametronome_podium.models.stave import Stave
-from datametronome.podium.datametronome_podium.models.clef import Clef
-from datametronome.podium.datametronome_podium.models.check_run import CheckRun
+from datametronome_podium.main import app
+from datametronome_podium.models.user import User
+from datametronome_podium.models.stave import Stave
+from datametronome_podium.models.clef import Clef
+from datametronome_podium.models.check_run import CheckRun
 
 
 class TestPodiumAPIIntegration:

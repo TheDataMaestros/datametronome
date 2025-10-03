@@ -1,7 +1,7 @@
 import sqlite3
 import asyncio
 from pathlib import Path
-from typing import Dict, Any, List
+# Removed typing imports as requested
 
 from metronome_pulse_core.interfaces import Pulse, Readable
 
@@ -12,7 +12,7 @@ class SQLiteReadonlyPulse(Pulse, Readable):
     Business logic and table creation are handled by Podium.
     """
     
-    def __init__(self, database_path: str = "datametronome.db"):
+    def __init__(self, database_path="datametronome.db"):
         self.database_path = database_path
         self.connection = None
     
@@ -40,7 +40,7 @@ class SQLiteReadonlyPulse(Pulse, Readable):
         """Check if connected to SQLite."""
         return self.connection is not None
     
-    async def query(self, query_config: str | Dict[str, Any]) -> list:
+    async def query(self, query_config):
         """Query data from SQLite."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
@@ -64,7 +64,7 @@ class SQLiteReadonlyPulse(Pulse, Readable):
         except Exception as e:
             raise RuntimeError(f"Query failed: {e}")
     
-    async def query_with_params(self, sql: str, params: List[Any]) -> List[Dict[str, Any]]:
+    async def query_with_params(self, sql, params):
         """Execute parameterized query."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
@@ -77,7 +77,7 @@ class SQLiteReadonlyPulse(Pulse, Readable):
         except Exception as e:
             raise RuntimeError(f"Parameterized query failed: {e}")
     
-    async def get_table_info(self, table_name: str) -> List[Dict[str, Any]]:
+    async def get_table_info(self, table_name):
         """Get table schema information."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
@@ -90,7 +90,7 @@ class SQLiteReadonlyPulse(Pulse, Readable):
         except Exception as e:
             raise RuntimeError(f"Failed to get table info: {e}")
     
-    async def list_tables(self) -> List[str]:
+    async def list_tables(self):
         """List all tables in the database."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")

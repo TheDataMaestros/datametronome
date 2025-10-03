@@ -5,7 +5,7 @@ This connector provides flexible, ORM-capable PostgreSQL connectivity
 with full support for the DataPulse ecosystem and SQLAlchemy features.
 """
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker, AsyncEngine
 from sqlalchemy import text
 from metronome_pulse_core import Pulse, Readable, Writable
 from .sql_builder import PostgresSQLAlchemyBuilder
@@ -331,7 +331,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
                 synchronous_commit_off=synchronous_commit_off,
             )
     
-    async def execute(self, query: str, params: dict = None) -> Any:
+    async def execute(self, query: str, params: dict = None):
         """
         Execute a SQL command that doesn't return results.
         
@@ -354,7 +354,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
             await session.commit()
             return result
     
-    async def execute_many(self, query: str, params_list: List[Dict[str, Any]]) -> None:
+    async def execute_many(self, query: str, params_list: list) -> None:
         """
         Execute a SQL command multiple times with different parameters.
         
@@ -377,7 +377,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
     # ----------------------- Operation list API -----------------------
     async def apply_operations(
         self,
-        operations: List[Dict[str, Any]],
+        operations: list,
         *,
         insert_chunk_size: int = 10000,
     ) -> None:
@@ -396,10 +396,10 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
             kind = op.get('type')
             if kind == 'insert':
                 table = op['table']
-                rows: List[Dict[str, Any]] = op.get('rows', [])
+                rows: list = op.get('rows', [])
                 if not rows:
                     continue
-                columns: List[str] | None = op.get('columns')
+                columns: list | None = op.get('columns')
                 if columns is None:
                     columns = list(rows[0].keys())
                 placeholders = ", ".join([f":{c}" for c in columns])
@@ -420,7 +420,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
             else:
                 raise ValueError(f"Unsupported operation type: {kind}")
     
-    async def get_table_info(self, table_name: str) -> Dict[str, Any]:
+    async def get_table_info(self, table_name: str) -> dict:
         """
         Get information about a table structure.
         
@@ -481,11 +481,11 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
         return self._engine is not None
     
     @property
-    def engine(self) -> Optional[AsyncEngine]:
+    def engine(self) -> AsyncEngine | None:
         """Get the SQLAlchemy engine instance."""
         return self._engine
     
     @property
-    def session_maker(self) -> Optional[AsyncSessionMaker]:
+    def session_maker(self) -> async_sessionmaker | None:
         """Get the SQLAlchemy session maker."""
         return self._session_maker

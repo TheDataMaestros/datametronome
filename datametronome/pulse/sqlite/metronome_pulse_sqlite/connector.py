@@ -2,7 +2,7 @@ import sqlite3
 import asyncio
 import json
 from pathlib import Path
-from typing import Optional, Dict, Any, List
+# Removed typing imports as requested
 from datetime import datetime
 
 from metronome_pulse_core.interfaces import Pulse, Readable, Writable
@@ -16,7 +16,7 @@ class SQLitePulse(Pulse, Readable, Writable):
     Business logic, table creation, and DDL are handled by Podium.
     """
     
-    def __init__(self, database_path: str = "datametronome.db"):
+    def __init__(self, database_path="datametronome.db"):
         self.database_path = database_path
         self.connection = None
         self._readonly = SQLiteReadonlyPulse(database_path)
@@ -57,32 +57,32 @@ class SQLitePulse(Pulse, Readable, Writable):
                 await self._writeonly.is_connected())
     
     # Readable interface methods - delegate to readonly connector
-    async def query(self, query_config: str | Dict[str, Any]) -> list:
+    async def query(self, query_config):
         """Query data from SQLite."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
         return await self._readonly.query(query_config)
     
-    async def query_with_params(self, sql: str, params: List[Any]) -> List[Dict[str, Any]]:
+    async def query_with_params(self, sql, params):
         """Execute parameterized query."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
         return await self._readonly.query_with_params(sql, params)
     
-    async def get_table_info(self, table_name: str) -> List[Dict[str, Any]]:
+    async def get_table_info(self, table_name):
         """Get table schema information."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
         return await self._readonly.get_table_info(table_name)
     
-    async def list_tables(self) -> List[str]:
+    async def list_tables(self):
         """List all tables in the database."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
         return await self._readonly.list_tables()
     
     # Writable interface methods - delegate to writeonly connector
-    async def write(self, data: List[Dict[str, Any]], destination: str, config: Optional[Dict[str, Any]] = None) -> None:
+    async def write(self, data, destination, config=None):
         """Write data to SQLite."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
@@ -94,13 +94,13 @@ class SQLitePulse(Pulse, Readable, Writable):
         
         return await self._writeonly.write(data, config)
     
-    async def execute(self, sql: str, params: Optional[List[Any]] = None) -> bool:
+    async def execute(self, sql, params=None):
         """Execute raw SQL."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
         return await self._writeonly.execute(sql, params)
     
-    async def copy_records(self, table_name: str, records: List[Dict[str, Any]]) -> bool:
+    async def copy_records(self, table_name, records):
         """Bulk insert records using SQLite's efficient INSERT."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")

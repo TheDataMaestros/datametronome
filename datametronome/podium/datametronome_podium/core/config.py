@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, env="DATAMETRONOME_PORT", ge=1, le=65535)
     
     # Security
-    secret_key: str = Field(..., env="DATAMETRONOME_SECRET_KEY", min_length=32)
+    secret_key: str = Field(default="test-secret-key-for-development-only-32-chars", env="DATAMETRONOME_SECRET_KEY", min_length=32)
     algorithm: str = "HS256"
     access_token_expire_minutes: int = Field(default=30, env="DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES", ge=1)
     

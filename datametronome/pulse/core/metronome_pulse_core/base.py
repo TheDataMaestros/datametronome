@@ -4,7 +4,7 @@ Base connector interface for DataPulse connectors.
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Any
+# Removed typing imports as requested
 
 import pandas as pd
 from pydantic import BaseModel, Field
@@ -13,14 +13,14 @@ from pydantic import BaseModel, Field
 class ConnectionConfig(BaseModel):
     """Base configuration for data source connections."""
     
-    host: str | None = None
-    port: int | None = None
-    database: str | None = None
-    username: str | None = None
-    password: str | None = None
-    ssl_mode: str | None = None
-    timeout: int = Field(default=30, ge=1)
-    max_connections: int = Field(default=10, ge=1)
+    host: object = None
+    port: object = None
+    database: object = None
+    username: object = None
+    password: object = None
+    ssl_mode: object = None
+    timeout: object = Field(default=30, ge=1)
+    max_connections: object = Field(default=10, ge=1)
     
     class Config:
         extra = "allow"  # Allow additional fields for specific connectors
@@ -29,12 +29,12 @@ class ConnectionConfig(BaseModel):
 class QueryResult(BaseModel):
     """Result of a data query."""
     
-    data: pd.DataFrame
-    row_count: int = Field(ge=0)
-    column_count: int = Field(ge=0)
-    execution_time: float = Field(ge=0.0)
-    timestamp: datetime
-    metadata: dict[str, Any] | None = None
+    data: object
+    row_count: object = Field(ge=0)
+    column_count: object = Field(ge=0)
+    execution_time: object = Field(ge=0.0)
+    timestamp: object
+    metadata: object = None
     
     class Config:
         arbitrary_types_allowed = True  # Allow pandas DataFrame
@@ -43,18 +43,18 @@ class QueryResult(BaseModel):
 class BaseConnector(ABC):
     """Base class for all DataPulse connectors."""
     
-    def __init__(self, config: ConnectionConfig) -> None:
+    def __init__(self, config):
         """Initialize connector with configuration.
         
         Args:
             config: Connection configuration.
         """
         self.config = config
-        self._connection_pool: Any = None
+        self._connection_pool = None
         self._is_connected = False
     
     @abstractmethod
-    async def connect(self) -> bool:
+    async def connect(self):
         """Establish connection to the data source.
         
         Returns:
@@ -63,12 +63,12 @@ class BaseConnector(ABC):
         pass
     
     @abstractmethod
-    async def disconnect(self) -> None:
+    async def disconnect(self):
         """Close connection to the data source."""
         pass
     
     @abstractmethod
-    async def test_connection(self) -> bool:
+    async def test_connection(self):
         """Test if the connection is working.
         
         Returns:
@@ -77,7 +77,7 @@ class BaseConnector(ABC):
         pass
     
     @abstractmethod
-    async def execute_query(self, query: str, params: dict[str, Any] | None = None) -> QueryResult:
+    async def execute_query(self, query, params=None):
         """Execute a query and return results.
         
         Args:
@@ -90,7 +90,7 @@ class BaseConnector(ABC):
         pass
     
     @abstractmethod
-    async def get_schema(self, table_name: str | None = None) -> dict[str, Any]:
+    async def get_schema(self, table_name=None):
         """Get schema information for tables.
         
         Args:
@@ -102,7 +102,7 @@ class BaseConnector(ABC):
         pass
     
     @abstractmethod
-    async def get_table_info(self, table_name: str) -> dict[str, Any]:
+    async def get_table_info(self, table_name):
         """Get detailed information about a specific table.
         
         Args:
@@ -114,7 +114,7 @@ class BaseConnector(ABC):
         pass
     
     @abstractmethod
-    async def get_row_count(self, table_name: str) -> int:
+    async def get_row_count(self, table_name):
         """Get the row count for a table.
         
         Args:
@@ -126,7 +126,7 @@ class BaseConnector(ABC):
         pass
     
     @abstractmethod
-    async def get_freshness(self, table_name: str, timestamp_column: str) -> datetime:
+    async def get_freshness(self, table_name, timestamp_column):
         """Get the most recent timestamp from a table.
         
         Args:
@@ -138,7 +138,7 @@ class BaseConnector(ABC):
         """
         pass
     
-    async def is_connected(self) -> bool:
+    async def is_connected(self):
         """Check if connector is currently connected.
         
         Returns:
@@ -146,7 +146,7 @@ class BaseConnector(ABC):
         """
         return self._is_connected
     
-    async def get_connection_info(self) -> dict[str, Any]:
+    async def get_connection_info(self):
         """Get information about the current connection.
         
         Returns:
@@ -171,10 +171,10 @@ class BaseConnector(ABC):
 class ConnectorRegistry:
     """Registry for available connectors."""
     
-    _connectors: dict[str, type[BaseConnector]] = {}
+    _connectors: object = {}
     
     @classmethod
-    def register(cls, name: str, connector_class: type[BaseConnector]) -> None:
+    def register(cls, name, connector_class):
         """Register a connector class.
         
         Args:
@@ -189,7 +189,7 @@ class ConnectorRegistry:
         cls._connectors[name] = connector_class
     
     @classmethod
-    def get(cls, name: str) -> type[BaseConnector] | None:
+    def get(cls, name):
         """Get a connector class by name.
         
         Args:
@@ -210,7 +210,7 @@ class ConnectorRegistry:
         return list(cls._connectors.keys())
     
     @classmethod
-    def create(cls, name: str, config: ConnectionConfig) -> BaseConnector | None:
+    def create(cls, name, config):
         """Create a connector instance by name.
         
         Args:
