@@ -58,15 +58,14 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             record_http_request(method, endpoint, status_code, duration)
             http_requests_in_progress.labels(method=method, endpoint=endpoint).dec()
             
-            # Log request
-            logger.info(
-                f"{method} {endpoint} {status_code} {duration:.3f}s",
-                extra={
-                    "method": method,
-                    "endpoint": endpoint,
-                    "status_code": status_code,
-                    "duration_seconds": duration
-                }
+            # Log request with structured data
+            from .logging_config import log_api_request
+            log_api_request(
+                logger,
+                method=method,
+                path=endpoint,
+                status_code=status_code,
+                duration=duration
             )
 
 

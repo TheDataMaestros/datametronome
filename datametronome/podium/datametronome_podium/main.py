@@ -4,6 +4,7 @@ Main application module for DataMetronome Podium.
 
 import asyncio
 import logging
+import os
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,11 +14,13 @@ import uvicorn
 from .core.config import settings
 from .core.database import init_db, close_db
 from .core.scheduler import init_scheduler, shutdown_scheduler
+from .core.logging_config import setup_logging, get_logger
 from .api.v1.api import api_router
 
-# Configure logging
-logging.basicConfig(level=settings.log_level)
-logger = logging.getLogger(__name__)
+# Configure logging based on environment
+log_format = os.getenv("LOG_FORMAT", "text")  # 'text' for dev, 'json' for prod
+setup_logging(log_level=settings.log_level, log_format=log_format)
+logger = get_logger(__name__)
 
 
 def create_cors_middleware() -> CORSMiddleware:
