@@ -59,8 +59,7 @@ def create_root_endpoints(app: FastAPI) -> None:
         }
     
     @app.get("/health")
-    @limiter.limit("100 per minute")
-    async def health_check(request: Request) -> dict[str, str | dict]:
+    async def health_check() -> dict[str, str | dict]:
         """
         Health check endpoint for load balancers and monitoring.
         
@@ -112,8 +111,7 @@ def create_root_endpoints(app: FastAPI) -> None:
         return health_status
     
     @app.get("/metrics")
-    @limiter.limit("20 per minute")
-    async def metrics(request: Request):
+    async def metrics():
         """
         Prometheus metrics endpoint.
         
