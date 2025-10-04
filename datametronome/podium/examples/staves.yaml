@@ -1,0 +1,118 @@
+# Stave Configuration File
+# Define your data sources here in an easy-to-read YAML format
+
+staves:
+  # PostgreSQL Database
+  - id: stave-prod-postgres-001
+    name: Production PostgreSQL
+    description: Main production database for user data
+    data_source_type: postgres
+    connection_config:
+      host: db.example.com
+      port: 5432
+      database: prod_db
+      user: monitor_user
+      password: ${POSTGRES_PASSWORD}  # Use environment variable
+      ssl_mode: require
+    is_active: true
+    
+  # SQLite Database
+  - id: stave-local-sqlite-001
+    name: Local Analytics DB
+    description: Local SQLite database for analytics
+    data_source_type: sqlite
+    connection_config:
+      path: /data/analytics.db
+    is_active: true
+    
+  # MySQL Database
+  - id: stave-app-mysql-001
+    name: Application MySQL
+    description: MySQL database for application backend
+    data_source_type: mysql
+    connection_config:
+      host: mysql.example.com
+      port: 3306
+      database: app_db
+      user: readonly_user
+      password: ${MYSQL_PASSWORD}
+    is_active: true
+    
+  # Redis Cache
+  - id: stave-cache-redis-001
+    name: Production Cache
+    description: Redis cache for session data
+    data_source_type: redis
+    connection_config:
+      host: redis.example.com
+      port: 6379
+      db: 0
+      password: ${REDIS_PASSWORD}
+      ssl: true
+    is_active: true
+    
+  # MongoDB
+  - id: stave-docs-mongo-001
+    name: Document Store
+    description: MongoDB for document storage
+    data_source_type: mongodb
+    connection_config:
+      uri: mongodb://user:${MONGO_PASSWORD}@mongo.example.com:27017/
+      database: documents
+    is_active: true
+
+# Clefs (Data Quality Checks)
+clefs:
+  # NULL Check
+  - id: clef-email-null-001
+    stave_id: stave-prod-postgres-001
+    name: Email NULL Check
+    description: Ensure all users have email addresses
+    check_type: null_check
+    config:
+      table: users
+      column: email
+      threshold: 0.0
+    schedule: "@hourly"
+    is_active: true
+    
+  # Range Check
+  - id: clef-age-range-001
+    stave_id: stave-prod-postgres-001
+    name: Age Range Validation
+    description: Ensure age is within reasonable bounds
+    check_type: range_check
+    config:
+      table: users
+      column: age
+      min: 0
+      max: 150
+    schedule: "@daily"
+    is_active: true
+    
+  # Volume Check
+  - id: clef-events-volume-001
+    stave_id: stave-prod-postgres-001
+    name: Daily Events Volume
+    description: Check that daily events are within expected range
+    check_type: volume_check
+    config:
+      table: events
+      expected_min: 1000
+      expected_max: 100000
+    schedule: "0 8 * * *"  # Daily at 8 AM
+    is_active: true
+    
+  # Pattern Check
+  - id: clef-email-format-001
+    stave_id: stave-prod-postgres-001
+    name: Email Format Check
+    description: Validate email addresses match expected format
+    check_type: pattern_check
+    config:
+      table: users
+      column: email
+      pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    is_active: true
+

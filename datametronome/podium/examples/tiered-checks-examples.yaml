@@ -1,0 +1,325 @@
+# DataMetronome Tiered Checks Examples
+# This file demonstrates the four tiers of data quality checks
+# with their corresponding severity configurations
+
+# =============================================================================
+# TIER 1: SIMPLE DECLARATIVE CHECKS
+# =============================================================================
+# Persona: Anyone (Analysts, Ops)
+# Purpose: Basic data hygiene on a single data source
+# These are easily configured in a UI
+
+staves:
+  - id: "stave-users"
+    name: "User Database"
+    data_source_type: "postgres"
+    connection_config:
+      host: "db.example.com"
+      database: "users"
+      user: "monitor"
+
+clefs:
+  # Simple NULL check with severity thresholds
+  - id: "clef-email-null"
+    stave_id: "stave-users"
+    name: "Email NULL Check"
+    check_type: "null_check"
+    config:
+      table: "users"
+      column: "email"
+      threshold: 0.01  # Legacy threshold (1% max NULLs)
+    severity_config:
+      warn: "> 5%"     # Dissonance if more than 5% NULLs
+      fail: "> 20%"    # Cacophony if more than 20% NULLs
+    schedule: "@hourly"
+
+  # Range validation with custom thresholds
+  - id: "clef-age-range"
+    stave_id: "stave-users"
+    name: "Age Range Validation"
+    check_type: "range_check"
+    config:
+      table: "users"
+      column: "age"
+      min: 0
+      max: 150
+    severity_config:
+      warn: "> 1%"     # Dissonance if more than 1% out of range
+      fail: "> 10%"    # Cacophony if more than 10% out of range
+    schedule: "@daily"
+
+  # Volume check with multiple thresholds
+  - id: "clef-user-volume"
+    stave_id: "stave-users"
+    name: "User Registration Volume"
+    check_type: "volume_check"
+    config:
+      table: "users"
+      expected_min: 100
+      expected_max: 10000
+    severity_config:
+      warn: "> 8000"   # Dissonance if too many registrations
+      fail: "< 100"    # Cacophony if too few registrations
+    schedule: "@hourly"
+
+  # Uniqueness check
+  - id: "clef-email-unique"
+    stave_id: "stave-users"
+    name: "Email Uniqueness"
+    check_type: "uniqueness_check"
+    config:
+      table: "users"
+      column: "email"
+    severity_config:
+      warn: "> 0"      # Dissonance if any duplicates found
+      fail: "> 10"     # Cacophony if more than 10 duplicates
+    schedule: "@daily"
+
+  # Pattern validation
+  - id: "clef-email-pattern"
+    stave_id: "stave-users"
+    name: "Email Format Validation"
+    check_type: "pattern_check"
+    config:
+      table: "users"
+      column: "email"
+      pattern: "^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$"
+    severity_config:
+      warn: "> 5%"     # Dissonance if more than 5% invalid formats
+      fail: "> 25%"    # Cacophony if more than 25% invalid formats
+    schedule: "@daily"
+
+# =============================================================================
+# TIER 2: ADVANCED DECLARATIVE CHECKS
+# =============================================================================
+# Persona: Power Users, Data Analysts, Engineers
+# Purpose: Complex, multi-source logic without writing Python code
+
+staves:
+  - id: "stave-api"
+    name: "User API"
+    data_source_type: "api"
+    connection_config:
+      base_url: "https://api.example.com"
+      headers:
+        Authorization: "Bearer ${API_TOKEN}"
+
+  - id: "stave-analytics"
+    name: "Analytics Database"
+    data_source_type: "postgres"
+    connection_config:
+      host: "analytics.example.com"
+      database: "analytics"
+      user: "monitor"
+
+clefs:
+  # Multi-source reconciliation check
+  - id: "clef-user-count-reconciliation"
+    stave_id: "stave-users"
+    name: "API vs DB User Count Reconciliation"
+    check_type: "reconciliation"
+    config:
+      source_a:
+        type: "stave-users"
+        query: "SELECT COUNT(*) as total FROM users WHERE active = true"
+      source_b:
+        type: "stave-api"
+        query:
+          endpoint: "/users/count"
+          params:
+            active: true
+      strategy:
+        type: "field_match"
+        field: "total"
+        tolerance: 0.01  # 1% tolerance
+    severity_config:
+      warn: "> 0.05"    # Dissonance if difference > 5%
+      fail: "> 0.10"    # Cacophony if difference > 10%
+    schedule: "@hourly"
+
+  # Data freshness check
+  - id: "clef-user-freshness"
+    stave_id: "stave-users"
+    name: "User Data Freshness"
+    check_type: "freshness_check"
+    config:
+      table: "users"
+      column: "last_updated"
+      max_age_hours: 24
+    severity_config:
+      warn: "> 12"      # Dissonance if data older than 12 hours
+      fail: "> 48"      # Cacophony if data older than 48 hours
+    schedule: "@hourly"
+
+  # Schema validation
+  - id: "clef-user-schema"
+    stave_id: "stave-users"
+    name: "User Table Schema"
+    check_type: "schema_check"
+    config:
+      table: "users"
+      expected_columns:
+        - "id"
+        - "email"
+        - "name"
+        - "age"
+        - "created_at"
+      expected_types:
+        id: "integer"
+        email: "varchar"
+        age: "integer"
+    severity_config:
+      warn: "> 0"       # Dissonance if any schema drift
+      fail: "> 0"       # Cacophony if any schema drift (immediate failure)
+    schedule: "@daily"
+
+  # Cross-reference validation
+  - id: "clef-user-analytics-lookup"
+    stave_id: "stave-users"
+    name: "User Analytics Cross-Reference"
+    check_type: "lookup_validation"
+    config:
+      source_table: "users"
+      source_column: "id"
+      lookup_source: "stave-analytics"
+      lookup_query: "SELECT DISTINCT user_id FROM user_events"
+      lookup_column: "user_id"
+      strategy: "all_source_must_exist_in_lookup"
+    severity_config:
+      warn: "> 5%"      # Dissonance if more than 5% missing in analytics
+      fail: "> 20%"     # Cacophony if more than 20% missing in analytics
+    schedule: "@daily"
+
+# =============================================================================
+# TIER 3: INTELLIGENT CHECKS (ML-DRIVEN)
+# =============================================================================
+# Persona: The Platform (configured by analysts/engineers)
+# Purpose: Proactive, stateful monitoring that learns from historical data
+
+clefs:
+  # ML-driven volume anomaly detection
+  - id: "clef-user-registration-forecast"
+    stave_id: "stave-users"
+    name: "User Registration Anomaly Detection"
+    check_type: "forecast"
+    config:
+      metric: "row_count"
+      table: "users"
+      time_column: "created_at"
+      aggregation: "daily"
+      model: "sarima"
+      confidence: 95
+      lookback_days: 30
+    severity_config:
+      warn: "> 80"      # Dissonance if anomaly score > 80%
+      fail: "> 95"      # Cacophony if anomaly score > 95%
+    schedule: "@daily"
+
+  # Statistical drift detection
+  - id: "clef-user-age-drift"
+    stave_id: "stave-users"
+    name: "User Age Distribution Drift"
+    check_type: "drift_detection"
+    config:
+      table: "users"
+      column: "age"
+      reference_period: "last_30_days"
+      comparison_period: "last_7_days"
+      method: "ks_test"
+      threshold: 0.05
+    severity_config:
+      warn: "> 0.10"    # Dissonance if drift p-value > 0.10
+      fail: "> 0.25"    # Cacophony if drift p-value > 0.25
+    schedule: "@weekly"
+
+  # General anomaly detection
+  - id: "clef-user-activity-anomaly"
+    stave_id: "stave-analytics"
+    name: "User Activity Anomaly Detection"
+    check_type: "anomaly_detection"
+    config:
+      table: "user_events"
+      metric: "event_count"
+      time_column: "timestamp"
+      aggregation: "hourly"
+      algorithm: "isolation_forest"
+      contamination: 0.1
+    severity_config:
+      warn: "> 0.05"    # Dissonance if anomaly probability > 5%
+      fail: "> 0.15"    # Cacophony if anomaly probability > 15%
+    schedule: "@hourly"
+
+# =============================================================================
+# TIER 4: CUSTOM PYTHON CHECKS
+# =============================================================================
+# Persona: Data Engineers
+# Purpose: Implementing any business rule that is too complex for declarative checks
+
+clefs:
+  # Custom business logic check
+  - id: "clef-custom-business-rule"
+    stave_id: "stave-users"
+    name: "Custom User Business Rule"
+    check_type: "custom_python"
+    config:
+      script_path: "datametronome_scripts/user_business_rules.py"
+      function_name: "check_user_compliance"
+      parameters:
+        min_age: 18
+        required_fields: ["email", "name", "phone"]
+        business_rules: "premium_user_validation"
+    severity_config:
+      warn: "> 0"       # Dissonance if any violations found
+      fail: "> 10"      # Cacophony if more than 10 violations
+    schedule: "@daily"
+
+  # Custom SQL with complex logic
+  - id: "clef-custom-sql-complex"
+    stave_id: "stave-users"
+    name: "Complex User Segmentation Check"
+    check_type: "custom_sql"
+    config:
+      query: |
+        SELECT 
+          COUNT(*) as total_users,
+          COUNT(CASE WHEN age >= 18 AND age <= 65 THEN 1 END) as working_age_users,
+          COUNT(CASE WHEN email LIKE '%@gmail.com' THEN 1 END) as gmail_users
+        FROM users 
+        WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
+      expected_min: 1000
+      expected_max: 50000
+    severity_config:
+      warn: "> 40000"   # Dissonance if too many recent users
+      fail: "< 1000"    # Cacophony if too few recent users
+    schedule: "@daily"
+
+# =============================================================================
+# SEVERITY CONFIGURATION EXAMPLES
+# =============================================================================
+# Examples of different severity threshold configurations
+
+severity_examples:
+  # Conservative (strict) thresholds
+  conservative:
+    warn: "> 1%"       # Dissonance at 1%
+    fail: "> 5%"       # Cacophony at 5%
+  
+  # Moderate thresholds
+  moderate:
+    warn: "> 5%"       # Dissonance at 5%
+    fail: "> 20%"      # Cacophony at 20%
+  
+  # Lenient thresholds
+  lenient:
+    warn: "> 10%"      # Dissonance at 10%
+    fail: "> 50%"      # Cacophony at 50%
+  
+  # Volume-specific thresholds
+  volume_strict:
+    warn: "> 1000"     # Dissonance if count > 1000
+    fail: "< 100"      # Cacophony if count < 100
+  
+  # Time-based thresholds
+  time_sensitive:
+    warn: "> 1"        # Dissonance if any delay
+    fail: "> 5"        # Cacophony if delay > 5 units

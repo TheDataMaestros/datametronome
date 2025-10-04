@@ -1,0 +1,228 @@
+# Example configuration with conflicts and dissonance
+# This file demonstrates various issues that the validator can detect
+
+staves:
+  # Duplicate names (warning)
+  - id: stave-001
+    name: Production Database
+    data_source_type: postgres
+    connection_config:
+      host: db.example.com
+      port: 5432
+      database: prod_db
+      user: monitor
+      
+  - id: stave-002
+    name: Production Database  # Duplicate name!
+    data_source_type: postgres
+    connection_config:
+      host: db.example.com
+      port: 5432
+      database: prod_db
+      user: monitor
+      
+  # Same connection as above (conflict warning)
+  - id: stave-003
+    name: Main DB
+    data_source_type: postgres
+    connection_config:
+      host: db.example.com
+      port: 5432
+      database: prod_db
+      user: monitor
+      
+  # Hardcoded password (warning)
+  - id: stave-004
+    name: Local Development DB
+    data_source_type: postgres
+    connection_config:
+      host: localhost
+      port: 5432
+      database: dev_db
+      user: dev_user
+      password: hardcoded_password_123  # Bad!
+      
+  # Production name with localhost (warning)
+  - id: stave-005
+    name: Production Cache
+    data_source_type: redis
+    connection_config:
+      host: localhost  # Production using localhost?
+      port: 6379
+      db: 0
+      
+  # Too many connections to same host
+  - id: stave-006
+    name: Analytics DB
+    data_source_type: postgres
+    connection_config:
+      host: db.example.com
+      port: 5432
+      database: analytics
+      user: monitor
+      
+  - id: stave-007
+    name: Logs DB
+    data_source_type: postgres
+    connection_config:
+      host: db.example.com
+      port: 5432
+      database: logs
+      user: monitor
+      
+  - id: stave-008
+    name: Metrics DB
+    data_source_type: postgres
+    connection_config:
+      host: db.example.com
+      port: 5432
+      database: metrics
+      user: monitor
+
+clefs:
+  # References non-existent stave (error)
+  - id: clef-001
+    stave_id: stave-999  # Doesn't exist!
+    name: Missing Stave Check
+    check_type: null_check
+    config:
+      table: users
+      column: email
+      
+  # Invalid range check (error)
+  - id: clef-002
+    stave_id: stave-001
+    name: Invalid Range Check
+    check_type: range_check
+    config:
+      table: users
+      column: age
+      min: 150
+      max: 0  # min > max!
+      
+  # Invalid null threshold (error)
+  - id: clef-003
+    stave_id: stave-001
+    name: Invalid Null Check
+    check_type: null_check
+    config:
+      table: users
+      column: email
+      threshold: 2.0  # Should be 0-1!
+      
+  # Inappropriate check type for Redis
+  - id: clef-004
+    stave_id: stave-005
+    name: Redis Null Check
+    check_type: null_check  # Not appropriate for Redis
+    config:
+      table: users
+      column: email
+      
+  # Too many checks with same name on same stave
+  - id: clef-005
+    stave_id: stave-001
+    name: Email Check
+    check_type: null_check
+    config:
+      table: users
+      column: email
+      
+  - id: clef-006
+    stave_id: stave-001
+    name: Email Check  # Duplicate name!
+    check_type: pattern_check
+    config:
+      table: users
+      column: email
+      pattern: "^[^@]+@[^@]+$"
+      
+  # Many checks scheduled at same time (performance warning)
+  - id: clef-007
+    stave_id: stave-001
+    name: Hourly Check 1
+    check_type: volume_check
+    config:
+      table: users
+    schedule: "@hourly"
+    
+  - id: clef-008
+    stave_id: stave-001
+    name: Hourly Check 2
+    check_type: volume_check
+    config:
+      table: orders
+    schedule: "@hourly"
+    
+  - id: clef-009
+    stave_id: stave-001
+    name: Hourly Check 3
+    check_type: volume_check
+    config:
+      table: products
+    schedule: "@hourly"
+    
+  - id: clef-010
+    stave_id: stave-001
+    name: Hourly Check 4
+    check_type: volume_check
+    config:
+      table: categories
+    schedule: "@hourly"
+    
+  - id: clef-011
+    stave_id: stave-001
+    name: Hourly Check 5
+    check_type: volume_check
+    config:
+      table: reviews
+    schedule: "@hourly"
+    
+  # More hourly checks to trigger the warning
+  - id: clef-012
+    stave_id: stave-001
+    name: Hourly Check 6
+    check_type: volume_check
+    config:
+      table: payments
+    schedule: "@hourly"
+    
+  - id: clef-013
+    stave_id: stave-001
+    name: Hourly Check 7
+    check_type: volume_check
+    config:
+      table: invoices
+    schedule: "@hourly"
+    
+  - id: clef-014
+    stave_id: stave-001
+    name: Hourly Check 8
+    check_type: volume_check
+    config:
+      table: customers
+    schedule: "@hourly"
+    
+  - id: clef-015
+    stave_id: stave-001
+    name: Hourly Check 9
+    check_type: volume_check
+    config:
+      table: suppliers
+    schedule: "@hourly"
+    
+  - id: clef-016
+    stave_id: stave-001
+    name: Hourly Check 10
+    check_type: volume_check
+    config:
+      table: inventory
+    schedule: "@hourly"
+    
+  - id: clef-017
+    stave_id: stave-001
+    name: Hourly Check 11
+    check_type: volume_check
+    config:
+      table: shipments
+    schedule: "@hourly"

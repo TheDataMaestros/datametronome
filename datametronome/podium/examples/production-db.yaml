@@ -1,0 +1,43 @@
+# Single Stave Configuration
+# Example: One production database with its checks
+
+stave:
+  id: stave-prod-001
+  name: Production Database
+  description: Main production PostgreSQL database
+  data_source_type: postgres
+  connection_config:
+    host: ${DB_HOST}
+    port: ${DB_PORT:-5432}  # Default to 5432 if not set
+    database: ${DB_NAME}
+    user: ${DB_USER}
+    password: ${DB_PASSWORD}
+    ssl_mode: require
+    connect_timeout: 30
+  is_active: true
+
+clefs:
+  - name: User Email Check
+    check_type: null_check
+    config:
+      table: users
+      column: email
+      threshold: 0.0
+    schedule: "@hourly"
+    
+  - name: User Age Range
+    check_type: range_check
+    config:
+      table: users
+      column: age
+      min: 0
+      max: 150
+    schedule: "@daily"
+    
+  - name: Daily User Volume
+    check_type: volume_check
+    config:
+      table: users
+      expected_min: 1000
+    schedule: "0 8 * * *"
+
