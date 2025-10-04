@@ -4,6 +4,18 @@ Welcome to the DataMetronome documentation!
 
 ## 📖 Documentation Index
 
+### Product & Technical Design
+- **[📋 Product Design Document (PDD)](PDD_DataMetronome.md)** - Product vision, strategy, and roadmap
+  - Product overview and market analysis
+  - User personas and use cases
+  - Features and capabilities
+  - Go-to-market strategy
+- **[🔧 Technical Design Document (TDD)](TDD_DataPulse.md)** - Complete technical specifications
+  - System architecture and design
+  - API specifications
+  - Performance requirements
+  - Security considerations
+
 ### Getting Started
 - **[Quick Start Guide](quickstart.md)** - Get up and running in minutes
   - For Data Engineers
