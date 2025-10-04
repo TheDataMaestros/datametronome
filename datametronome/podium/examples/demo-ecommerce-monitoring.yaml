@@ -1,0 +1,255 @@
+# E-Commerce Data Quality Monitoring Configuration
+# This configuration demonstrates a realistic monitoring setup for an e-commerce platform
+
+staves:
+  # Main Production Database
+  - id: stave-prod-postgres-main
+    name: Production PostgreSQL - Main DB
+    description: Main production database for user accounts, orders, and products
+    data_source_type: postgres
+    connection_config:
+      host: ${PROD_DB_HOST:-localhost}
+      port: ${PROD_DB_PORT:-5432}
+      database: ${PROD_DB_NAME:-ecommerce_prod}
+      user: ${PROD_DB_USER:-monitor_user}
+      password: ${PROD_DB_PASSWORD}
+      ssl_mode: require
+      connect_timeout: 30
+    is_active: true
+    
+  # Analytics Data Warehouse
+  - id: stave-analytics-postgres
+    name: Analytics Data Warehouse
+    description: Data warehouse for analytics and reporting
+    data_source_type: postgres
+    connection_config:
+      host: ${ANALYTICS_DB_HOST:-analytics-db.company.com}
+      port: 5432
+      database: analytics_warehouse
+      user: ${ANALYTICS_DB_USER:-analytics_user}
+      password: ${ANALYTICS_DB_PASSWORD}
+      ssl_mode: require
+    is_active: true
+    
+  # Redis Cache
+  - id: stave-redis-cache
+    name: Redis Cache Cluster
+    description: Redis cache for session data and frequently accessed data
+    data_source_type: redis
+    connection_config:
+      host: ${REDIS_HOST:-redis.company.com}
+      port: 6379
+      db: 0
+      password: ${REDIS_PASSWORD}
+      ssl: true
+    is_active: true
+    
+  # MongoDB for Product Catalog
+  - id: stave-mongodb-catalog
+    name: Product Catalog MongoDB
+    description: MongoDB storing product catalog and search data
+    data_source_type: mongodb
+    connection_config:
+      uri: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@mongo.company.com:27017/
+      database: product_catalog
+    is_active: true
+
+# Data Quality Checks (Clefs)
+clefs:
+  # Level 1: Simple Declarative Checks
+  
+  # User Data Quality
+  - id: clef-users-email-null
+    stave_id: stave-prod-postgres-main
+    name: User Email Required
+    description: Ensure all users have email addresses (no NULLs allowed)
+    check_type: column_values
+    config:
+      table: users
+      column: email
+      condition: if_null
+    fail: if_null > 0%
+    schedule: "@hourly"
+    is_active: true
+    
+  - id: clef-users-age-range
+    stave_id: stave-prod-postgres-main
+    name: User Age Validation
+    description: Ensure user ages are within reasonable bounds
+    check_type: column_values
+    config:
+      table: users
+      column: age
+      min: 13
+      max: 120
+    schedule: "@daily"
+    is_active: true
+    
+  - id: clef-users-email-format
+    stave_id: stave-prod-postgres-main
+    name: Email Format Validation
+    description: Validate email addresses match expected format
+    check_type: column_values
+    config:
+      table: users
+      column: email
+      pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+    schedule: "@daily"
+    is_active: true
+    
+  # Order Data Quality
+  - id: clef-orders-count-daily
+    stave_id: stave-prod-postgres-main
+    name: Daily Orders Volume
+    description: Monitor daily order volume for anomalies
+    check_type: row_count
+    config:
+      table: orders
+    warn: "> 10000"  # More than 10k orders per day
+    fail: "< 100"    # Less than 100 orders per day
+    schedule: "0 8 * * *"  # Daily at 8 AM
+    is_active: true
+    
+  - id: clef-orders-amount-range
+    stave_id: stave-prod-postgres-main
+    name: Order Amount Validation
+    description: Ensure order amounts are within reasonable range
+    check_type: column_values
+    config:
+      table: orders
+      column: total_amount
+      min: 0.01
+      max: 50000.00
+    schedule: "@hourly"
+    is_active: true
+    
+  # Product Data Quality
+  - id: clef-products-price-positive
+    stave_id: stave-prod-postgres-main
+    name: Product Price Validation
+    description: Ensure all products have positive prices
+    check_type: column_values
+    config:
+      table: products
+      column: price
+      min: 0.01
+    fail: "< 0.01"
+    schedule: "@hourly"
+    is_active: true
+    
+  # Data Freshness Checks
+  - id: clef-orders-freshness
+    stave_id: stave-prod-postgres-main
+    name: Orders Data Freshness
+    description: Ensure orders data is being updated regularly
+    check_type: freshness
+    config:
+      table: orders
+      column: created_at
+      max_age: "2 hours"
+    fail: "> 4 hours"
+    schedule: "@hourly"
+    is_active: true
+    
+  - id: clef-users-freshness
+    stave_id: stave-prod-postgres-main
+    name: Users Data Freshness
+    description: Ensure user data is being updated regularly
+    check_type: freshness
+    config:
+      table: users
+      column: updated_at
+      max_age: "24 hours"
+    warn: "> 48 hours"
+    fail: "> 72 hours"
+    schedule: "@daily"
+    is_active: true
+    
+  # Level 2: Intelligent Checks (ML-Driven)
+  
+  - id: clef-orders-anomaly-detection
+    stave_id: stave-prod-postgres-main
+    name: Order Volume Anomaly Detection
+    description: Detect unusual patterns in daily order volume using ML
+    check_type: forecast
+    config:
+      metric: row_count
+      table: orders
+      strategy:
+        model: sarima
+        confidence: 95
+        lookback_days: 30
+    schedule: "@daily"
+    is_active: true
+    
+  - id: clef-revenue-drift-detection
+    stave_id: stave-analytics-postgres
+    name: Revenue Data Drift Detection
+    description: Detect statistical drift in revenue data patterns
+    check_type: data_profile_drift
+    config:
+      table: daily_revenue
+      columns: ["total_revenue", "avg_order_value", "order_count"]
+      baseline_period: "30 days"
+      drift_threshold: 0.15
+    schedule: "@daily"
+    is_active: true
+    
+  # Level 3: Advanced Declarative Checks
+  
+  - id: clef-inventory-reconciliation
+    stave_id: stave-prod-postgres-main
+    name: Inventory Reconciliation
+    description: Ensure inventory counts match between main DB and analytics
+    check_type: lookup_validation
+    config:
+      source_table: products
+      lookup_table: inventory_analytics
+      join_columns: ["product_id"]
+      validation_columns: ["stock_quantity"]
+      tolerance: 0.05  # 5% tolerance
+    schedule: "@hourly"
+    is_active: true
+    
+  # Level 4: Custom Code Checks
+  
+  - id: clef-business-rules-validation
+    stave_id: stave-prod-postgres-main
+    name: Custom Business Rules Validation
+    description: Validate complex business rules that can't be expressed declaratively
+    check_type: python
+    config:
+      script_path: "custom_checks/business_rules_validator.py"
+      parameters:
+        max_discount_percentage: 50
+        min_order_value_for_free_shipping: 50
+        max_items_per_order: 100
+    schedule: "@daily"
+    is_active: true
+    
+  # Cache Performance Checks
+  - id: clef-redis-memory-usage
+    stave_id: stave-redis-cache
+    name: Redis Memory Usage Check
+    description: Monitor Redis memory usage and connection health
+    check_type: python
+    config:
+      script_path: "custom_checks/redis_health_check.py"
+      max_memory_usage_percent: 80
+      min_connected_clients: 1
+    schedule: "@hourly"
+    is_active: true
+    
+  # MongoDB Health Checks
+  - id: clef-mongodb-collection-count
+    stave_id: stave-mongodb-catalog
+    name: Product Catalog Document Count
+    description: Ensure product catalog has reasonable number of documents
+    check_type: python
+    config:
+      script_path: "custom_checks/mongodb_collection_check.py"
+      collection: products
+      min_documents: 1000
+      max_documents: 1000000
+    schedule: "@daily"
+    is_active: true

@@ -1,0 +1,82 @@
+# Simple Demo Configuration
+# Perfect for quick testing and demonstrations
+
+staves:
+  # SQLite Demo Database (no external dependencies)
+  - id: stave-demo-sqlite
+    name: Demo SQLite Database
+    description: Local SQLite database for demo purposes
+    data_source_type: sqlite
+    connection_config:
+      path: "/tmp/demo.db"
+    is_active: true
+    
+  # PostgreSQL Demo (if available)
+  - id: stave-demo-postgres
+    name: Demo PostgreSQL Database
+    description: Demo PostgreSQL database
+    data_source_type: postgres
+    connection_config:
+      host: ${DEMO_DB_HOST:-localhost}
+      port: ${DEMO_DB_PORT:-5432}
+      database: ${DEMO_DB_NAME:-demo_db}
+      user: ${DEMO_DB_USER:-demo_user}
+      password: ${DEMO_DB_PASSWORD:-demo_pass}
+    is_active: true
+
+# Simple Data Quality Checks
+clefs:
+  # Basic NULL checks
+  - id: clef-users-email-check
+    stave_id: stave-demo-sqlite
+    name: Users Email Check
+    description: Ensure users have email addresses
+    check_type: column_values
+    config:
+      table: users
+      column: email
+      condition: if_null
+    fail: if_null > 0%
+    schedule: "@hourly"
+    is_active: true
+    
+  # Row count monitoring
+  - id: clef-orders-count-check
+    stave_id: stave-demo-sqlite
+    name: Orders Count Check
+    description: Monitor order count
+    check_type: row_count
+    config:
+      table: orders
+    warn: "> 1000"
+    fail: "< 10"
+    schedule: "@daily"
+    is_active: true
+    
+  # Data freshness
+  - id: clef-data-freshness-check
+    stave_id: stave-demo-sqlite
+    name: Data Freshness Check
+    description: Ensure data is being updated
+    check_type: freshness
+    config:
+      table: users
+      column: updated_at
+      max_age: "1 hour"
+    fail: "> 2 hours"
+    schedule: "@hourly"
+    is_active: true
+    
+  # PostgreSQL specific checks
+  - id: clef-postgres-users-check
+    stave_id: stave-demo-postgres
+    name: PostgreSQL Users Check
+    description: Check users in PostgreSQL
+    check_type: column_values
+    config:
+      table: users
+      column: status
+      condition: if_null
+    fail: if_null > 5%
+    schedule: "@hourly"
+    is_active: true

@@ -1,0 +1,40 @@
+[
+  {
+    "clef_id": "clef-users-email-check",
+    "stave_id": "stave-demo-sqlite",
+    "status": "warn",
+    "observed_value": 0.167,
+    "message": "16.7% of users have NULL email addresses",
+    "metadata": {
+      "total_users": 12,
+      "null_emails": 2,
+      "threshold": "> 10%"
+    },
+    "executed_at": "2025-10-04T15:14:08.323238"
+  },
+  {
+    "clef_id": "clef-orders-count-check",
+    "stave_id": "stave-demo-sqlite",
+    "status": "pass",
+    "observed_value": 50,
+    "message": "Order count is within expected range",
+    "metadata": {
+      "total_orders": 50,
+      "min_threshold": 10,
+      "max_threshold": 1000
+    },
+    "executed_at": "2025-10-04T15:14:08.323259"
+  },
+  {
+    "clef_id": "clef-data-freshness-check",
+    "stave_id": "stave-demo-sqlite",
+    "status": "pass",
+    "observed_value": 0.5,
+    "message": "Data is fresh, last updated 30 minutes ago",
+    "metadata": {
+      "last_update": "2025-10-04T14:44:08.323266",
+      "max_age": "2 hours"
+    },
+    "executed_at": "2025-10-04T15:14:08.323396"
+  }
+]

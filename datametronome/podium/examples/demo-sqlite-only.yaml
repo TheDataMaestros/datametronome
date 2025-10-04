@@ -1,0 +1,71 @@
+# SQLite-Only Demo Configuration
+# Perfect for demos without external database dependencies
+
+staves:
+  # SQLite Demo Database (no external dependencies)
+  - id: stave-demo-sqlite
+    name: Demo SQLite Database
+    description: Local SQLite database for demo purposes
+    data_source_type: sqlite
+    connection_config:
+      path: "/tmp/demo.db"
+    is_active: true
+
+# Simple Data Quality Checks for SQLite
+clefs:
+  # Users Email Check - will show Dissonance due to NULL emails
+  - id: clef-users-email-check
+    stave_id: stave-demo-sqlite
+    name: Users Email Check
+    description: Ensure users have email addresses (will show Dissonance due to NULL emails)
+    check_type: column_values
+    config:
+      table: users
+      column: email
+      condition: if_null
+    warn: if_null > 5%   # Warn if more than 5% NULL
+    fail: if_null > 20%  # Fail if more than 20% NULL
+    schedule: "@hourly"
+    is_active: true
+    
+  # Orders Count Check - should show Harmony
+  - id: clef-orders-count-check
+    stave_id: stave-demo-sqlite
+    name: Orders Count Check
+    description: Monitor order count (should show Harmony)
+    check_type: row_count
+    config:
+      table: orders
+    warn: "> 100"    # Warn if more than 100 orders
+    fail: "< 10"     # Fail if less than 10 orders
+    schedule: "@daily"
+    is_active: true
+    
+  # Data Freshness Check - should show Harmony
+  - id: clef-data-freshness-check
+    stave_id: stave-demo-sqlite
+    name: Data Freshness Check
+    description: Ensure data is being updated (should show Harmony)
+    check_type: freshness
+    config:
+      table: users
+      column: updated_at
+      max_age: "1 hour"
+    warn: "> 2 hours"   # Warn if older than 2 hours
+    fail: "> 4 hours"   # Fail if older than 4 hours
+    schedule: "@hourly"
+    is_active: true
+    
+  # Product Price Check - should show Harmony
+  - id: clef-product-price-check
+    stave_id: stave-demo-sqlite
+    name: Product Price Validation
+    description: Ensure all products have positive prices (should show Harmony)
+    check_type: column_values
+    config:
+      table: products
+      column: price
+      min: 0.01
+    fail: "< 0.01"   # Fail if any price is less than 0.01
+    schedule: "@hourly"
+    is_active: true
