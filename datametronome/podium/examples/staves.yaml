@@ -63,25 +63,26 @@ staves:
 
 # Clefs (Data Quality Checks)
 clefs:
-  # NULL Check
+  # NULL Check (Level 1: Declarative)
   - id: clef-email-null-001
     stave_id: stave-prod-postgres-001
     name: Email NULL Check
     description: Ensure all users have email addresses
-    check_type: null_check
+    check_type: column_values
     config:
       table: users
       column: email
-      threshold: 0.0
+      condition: if_null
+    fail: if_null > 0%
     schedule: "@hourly"
     is_active: true
     
-  # Range Check
+  # Range Check (Level 1: Declarative)
   - id: clef-age-range-001
     stave_id: stave-prod-postgres-001
     name: Age Range Validation
     description: Ensure age is within reasonable bounds
-    check_type: range_check
+    check_type: column_values
     config:
       table: users
       column: age
@@ -90,25 +91,25 @@ clefs:
     schedule: "@daily"
     is_active: true
     
-  # Volume Check
+  # Row Count Check (Level 1: Declarative)
   - id: clef-events-volume-001
     stave_id: stave-prod-postgres-001
     name: Daily Events Volume
     description: Check that daily events are within expected range
-    check_type: volume_check
+    check_type: row_count
     config:
       table: events
-      expected_min: 1000
-      expected_max: 100000
+    warn: "> 50000"
+    fail: "< 1000"
     schedule: "0 8 * * *"  # Daily at 8 AM
     is_active: true
     
-  # Pattern Check
+  # Pattern Check (Level 1: Declarative)
   - id: clef-email-format-001
     stave_id: stave-prod-postgres-001
     name: Email Format Check
     description: Validate email addresses match expected format
-    check_type: pattern_check
+    check_type: column_values
     config:
       table: users
       column: email

@@ -211,7 +211,9 @@ def create_clef(
     config: dict[str, Any],
     description: str | None = None,
     schedule: str | None = None,
-    is_active: bool = True
+    is_active: bool = True,
+    warn: str | None = None,
+    fail: str | None = None
 ) -> Clef:
     """
     Create a new Clef with auto-generated ID and timestamps.
@@ -245,6 +247,8 @@ def create_clef(
         config=config,
         schedule=schedule,
         is_active=is_active,
+        warn=warn,
+        fail=fail,
         created_at=datetime.now(),
         updated_at=datetime.now()
     )
@@ -281,12 +285,14 @@ def create_null_check(
     return create_clef(
         stave_id=stave_id,
         name=name,
-        check_type="null_check",
+        check_type="column_values",
         config={
             "table": table,
             "column": column,
-            "threshold": threshold
+            "condition": "if_null"
         },
+        warn=f"if_null > {threshold * 100:.1f}%" if threshold > 0 else None,
+        fail="if_null > 0%" if threshold == 0 else None,
         schedule=schedule
     )
 
@@ -331,7 +337,7 @@ def create_range_check(
     return create_clef(
         stave_id=stave_id,
         name=name,
-        check_type="range_check",
+        check_type="column_values",
         config=config,
         schedule=schedule
     )
@@ -374,7 +380,7 @@ def create_volume_check(
     return create_clef(
         stave_id=stave_id,
         name=name,
-        check_type="volume_check",
+        check_type="row_count",
         config=config,
         schedule=schedule
     )

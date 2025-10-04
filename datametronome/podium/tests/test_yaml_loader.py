@@ -41,11 +41,12 @@ staves:
 clefs:
   - stave_id: stave-001
     name: Email NULL Check
-    check_type: null_check
+    check_type: column_values
     config:
       table: users
       column: email
-      threshold: 0.0
+      condition: if_null
+    fail: if_null > 0%
     schedule: "@hourly"
 """
         
@@ -67,7 +68,7 @@ clefs:
         # Verify clefs loaded
         assert len(clefs) == 1
         assert clefs[0].name == "Email NULL Check"
-        assert clefs[0].check_type == "null_check"
+        assert clefs[0].check_type == "column_values"
         
         print(f"\n✅ Loaded {len(staves)} staves:")
         for stave in staves:
@@ -90,14 +91,16 @@ stave:
 
 clefs:
   - name: Email Check
-    check_type: null_check
+    check_type: column_values
     config:
       table: users
       column: email
+      condition: if_null
+    fail: if_null > 0%
     schedule: "@hourly"
     
   - name: Age Range Check
-    check_type: range_check
+    check_type: column_values
     config:
       table: users
       column: age
@@ -183,10 +186,12 @@ staves:
 clefs:
   - stave_id: stave-001
     name: Check 1
-    check_type: null_check
+    check_type: column_values
     config:
       table: users
       column: email
+      condition: if_null
+    fail: if_null > 0%
 """
         
         yaml_file = tmp_path / "auto-ids.yaml"
@@ -225,10 +230,12 @@ clefs:
   - id: clef-001
     stave_id: stave-001
     name: Test Check
-    check_type: null_check
+    check_type: column_values
     config:
       table: users
       column: email
+      condition: if_null
+    fail: if_null > 0%
 """
         
         yaml_file = tmp_path / "valid.yaml"
@@ -238,10 +245,10 @@ clefs:
         result = validate_yaml_config(yaml_file)
         
         assert result["valid"] is True
-        assert len(result["errors"]) == 0
+        assert len(result["issues"]) == 0
         
         print(f"\n{result['summary']}")
-        if result["warnings"]:
+        if result.get("warnings"):
             print("Warnings:")
             for warning in result["warnings"]:
                 print(f"  - {warning}")
@@ -260,9 +267,12 @@ staves:
 clefs:
   - stave_id: stave-999
     name: Test Check
-    check_type: null_check
+    check_type: column_values
     config:
       table: users
+      column: email
+      condition: if_null
+    fail: if_null > 0%
 """
         
         yaml_file = tmp_path / "invalid.yaml"
@@ -272,12 +282,12 @@ clefs:
         result = validate_yaml_config(yaml_file)
         
         assert result["valid"] is False
-        assert len(result["errors"]) > 0
+        assert len(result["issues"]) > 0
         
         print(f"\n{result['summary']}")
-        print("Errors:")
-        for error in result["errors"]:
-            print(f"  - {error}")
+        print("Issues:")
+        for issue in result["issues"]:
+            print(f"  - {issue}")
 
 
 class TestRealExampleFiles:

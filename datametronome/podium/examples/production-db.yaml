@@ -18,15 +18,16 @@ stave:
 
 clefs:
   - name: User Email Check
-    check_type: null_check
+    check_type: column_values
     config:
       table: users
       column: email
-      threshold: 0.0
+      condition: if_null
+    fail: if_null > 0%
     schedule: "@hourly"
     
   - name: User Age Range
-    check_type: range_check
+    check_type: column_values
     config:
       table: users
       column: age
@@ -35,9 +36,10 @@ clefs:
     schedule: "@daily"
     
   - name: Daily User Volume
-    check_type: volume_check
+    check_type: row_count
     config:
       table: users
-      expected_min: 1000
+    warn: "> 50000"
+    fail: "< 1000"
     schedule: "0 8 * * *"
 

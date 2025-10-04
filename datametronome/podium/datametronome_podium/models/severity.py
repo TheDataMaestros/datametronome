@@ -118,30 +118,77 @@ class SeverityThreshold:
         
         # Parse different condition formats
         if condition.startswith("<="):
-            threshold = float(condition[2:].strip())
+            threshold_str = condition[2:].strip()
+            if threshold_str.endswith('%'):
+                threshold = float(threshold_str[:-1].strip())
+                if value <= 1.0:
+                    threshold = threshold / 100.0
+            else:
+                threshold = float(threshold_str)
             return value <= threshold
         elif condition.startswith(">="):
-            threshold = float(condition[2:].strip())
+            threshold_str = condition[2:].strip()
+            if threshold_str.endswith('%'):
+                threshold = float(threshold_str[:-1].strip())
+                if value <= 1.0:
+                    threshold = threshold / 100.0
+            else:
+                threshold = float(threshold_str)
             return value >= threshold
         elif condition.startswith("<"):
-            threshold = float(condition[1:].strip())
+            threshold_str = condition[1:].strip()
+            if threshold_str.endswith('%'):
+                threshold = float(threshold_str[:-1].strip())
+                if value <= 1.0:
+                    threshold = threshold / 100.0
+            else:
+                threshold = float(threshold_str)
             return value < threshold
         elif condition.startswith(">"):
-            threshold = float(condition[1:].strip())
+            threshold_str = condition[1:].strip()
+            if threshold_str.endswith('%'):
+                threshold = float(threshold_str[:-1].strip())
+                if value <= 1.0:
+                    threshold = threshold / 100.0
+            else:
+                threshold = float(threshold_str)
             return value > threshold
         elif condition.startswith("=="):
-            threshold = float(condition[2:].strip())
+            threshold_str = condition[2:].strip()
+            if threshold_str.endswith('%'):
+                threshold = float(threshold_str[:-1].strip())
+                if value <= 1.0:
+                    threshold = threshold / 100.0
+            else:
+                threshold = float(threshold_str)
             return value == threshold
         elif condition.startswith("!="):
-            threshold = float(condition[2:].strip())
+            threshold_str = condition[2:].strip()
+            if threshold_str.endswith('%'):
+                threshold = float(threshold_str[:-1].strip())
+                if value <= 1.0:
+                    threshold = threshold / 100.0
+            else:
+                threshold = float(threshold_str)
             return value != threshold
         elif "=" in condition and not any(op in condition for op in ["<", ">", "!"]):
-            threshold = float(condition.split("=")[1].strip())
+            threshold_part = condition.split("=")[1].strip()
+            if threshold_part.endswith('%'):
+                threshold = float(threshold_part[:-1].strip())
+                if value <= 1.0:
+                    threshold = threshold / 100.0
+            else:
+                threshold = float(threshold_part)
             return value == threshold
         else:
             # Default to equality
             try:
-                threshold = float(condition)
+                if condition.endswith('%'):
+                    threshold = float(condition[:-1].strip())
+                    if value <= 1.0:
+                        threshold = threshold / 100.0
+                else:
+                    threshold = float(condition)
                 return value == threshold
             except ValueError:
                 raise ValueError(f"Invalid condition format: {condition}")

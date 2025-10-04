@@ -223,10 +223,11 @@ class TestClefCreationExamples:
         )
         
         assert check.name == "Email NULL Check"
-        assert check.check_type == "null_check"
+        assert check.check_type == "column_values"
         assert check.config["table"] == "users"
         assert check.config["column"] == "email"
-        assert check.config["threshold"] == 0.0
+        assert check.config["condition"] == "if_null"
+        assert check.fail == "if_null > 0%"
         assert check.schedule == "@hourly"
         print(f"\nCreated: {check}")
         # Output: 🟢 Active Email NULL Check (null_check, scheduled: @hourly)
@@ -245,7 +246,7 @@ class TestClefCreationExamples:
         )
         
         assert check.name == "Age Range Validation"
-        assert check.check_type == "range_check"
+        assert check.check_type == "column_values"
         assert check.config["min"] == 0
         assert check.config["max"] == 150
         print(f"\nCreated: {check}")
@@ -263,7 +264,7 @@ class TestClefCreationExamples:
         )
         
         assert check.name == "Daily Events Volume"
-        assert check.check_type == "volume_check"
+        assert check.check_type == "row_count"
         assert check.config["expected_min"] == 1000
         assert check.config["expected_max"] == 100000
         print(f"\nCreated: {check}")
@@ -274,7 +275,7 @@ class TestClefCreationExamples:
         check = create_clef(
             stave_id="stave-123",
             name="Email Format Check",
-            check_type="pattern_check",
+            check_type="column_values",
             config={
                 "table": "users",
                 "column": "email",
@@ -285,7 +286,7 @@ class TestClefCreationExamples:
         )
         
         assert check.name == "Email Format Check"
-        assert check.check_type == "pattern_check"
+        assert check.check_type == "column_values"
         assert "pattern" in check.config
         print(f"\nCreated: {check}")
 
@@ -432,7 +433,7 @@ class TestHelperFunctionsExamples:
         assert is_valid_data_source_type("oracle") is False
         
         # Check check types
-        assert is_valid_check_type("null_check") is True
+        assert is_valid_check_type("column_values") is True
         assert is_valid_check_type("custom_check") is False
         
         # Get all supported types

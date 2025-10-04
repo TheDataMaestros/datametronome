@@ -32,28 +32,46 @@ class TestTDDCompliantClefs:
         # Level 1: Declarative Checks
         print(f"   📊 Level 1 - Declarative Checks:")
         for check_type in LEVEL_1_CHECKS:
-            clef = Clef(id="temp", stave_id="temp", name="Example", check_type=check_type, config={})
+            # Provide minimal config for each check type
+            config = {"table": "test_table"}
+            if check_type == "freshness":
+                config = {"column": "test_column"}
+            elif check_type == "column_values":
+                config = {"column": "test_column"}
+            
+            clef = Clef(id="temp", stave_id="temp", name="Example", check_type=check_type, config=config)
             print(f"      ✅ {check_type}: {clef.level_description}")
             assert clef.level == 1
         
         # Level 2: Intelligent Checks
         print(f"   📊 Level 2 - Intelligent Checks:")
         for check_type in LEVEL_2_CHECKS:
-            clef = Clef(id="temp", stave_id="temp", name="Example", check_type=check_type, config={})
+            # Provide minimal config for each check type
+            config = {"metric": "test_metric"}
+            if check_type == "data_profile_drift":
+                config = {"column": "test_column"}
+            
+            clef = Clef(id="temp", stave_id="temp", name="Example", check_type=check_type, config=config)
             print(f"      ✅ {check_type}: {clef.level_description}")
             assert clef.level == 2
         
         # Level 3: Advanced Declarative Checks
         print(f"   📊 Level 3 - Advanced Declarative Checks:")
         for check_type in LEVEL_3_CHECKS:
-            clef = Clef(id="temp", stave_id="temp", name="Example", check_type=check_type, config={})
+            # Provide minimal config for lookup_validation
+            config = {"lookup": {"pulse": "test", "query": "SELECT 1", "key_column": "id"}}
+            
+            clef = Clef(id="temp", stave_id="temp", name="Example", check_type=check_type, config=config)
             print(f"      ✅ {check_type}: {clef.level_description}")
             assert clef.level == 3
         
         # Level 4: Custom Code
         print(f"   📊 Level 4 - Custom Code:")
         for check_type in LEVEL_4_CHECKS:
-            clef = Clef(id="temp", stave_id="temp", name="Example", check_type=check_type, config={})
+            # Provide minimal config for python
+            config = {"script_path": "test.py"}
+            
+            clef = Clef(id="temp", stave_id="temp", name="Example", check_type=check_type, config=config)
             print(f"      ✅ {check_type}: {clef.level_description}")
             assert clef.level == 4
     
