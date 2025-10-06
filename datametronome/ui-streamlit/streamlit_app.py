@@ -136,7 +136,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # Podium API configuration
-PODIUM_API_BASE = os.getenv("PODIUM_API_BASE", "http://localhost:8000")
+PODIUM_API_BASE = os.getenv("PODIUM_API_BASE", "http://localhost:8001")
 API_BASE = f"{PODIUM_API_BASE}/api/v1"
 
 # Initialize session state
@@ -144,6 +144,12 @@ if 'auth_token' not in st.session_state:
     st.session_state.auth_token = None
 if 'user_info' not in st.session_state:
     st.session_state.user_info = None
+if 'use_real_data' not in st.session_state:
+    st.session_state.use_real_data = True
+if 'staves' not in st.session_state:
+    st.session_state.staves = []
+if 'clefs' not in st.session_state:
+    st.session_state.clefs = []
 
 async def call_podium_api(endpoint, method="GET", data=None, token=None):
     """Call Podium API endpoint."""
@@ -196,6 +202,81 @@ def logout_user():
     st.session_state.auth_token = None
     st.session_state.user_info = None
 
+def sync_call_podium_api(endpoint, method="GET", data=None, token=None):
+    """Synchronous wrapper for Podium API calls."""
+    import asyncio
+    return asyncio.run(call_podium_api(endpoint, method, data, token))
+
+def load_real_staves():
+    """Load real staves from Podium API."""
+    if not st.session_state.auth_token:
+        return []
+    
+    staves = sync_call_podium_api("/staves/", token=st.session_state.auth_token)
+    if staves:
+        st.session_state.staves = staves
+    return staves or []
+
+def load_real_clefs():
+    """Load real clefs from Podium API."""
+    if not st.session_state.auth_token:
+        return []
+    
+    clefs = sync_call_podium_api("/clefs/", token=st.session_state.auth_token)
+    if clefs:
+        st.session_state.clefs = clefs
+    return clefs or []
+
+def create_stave(name, description, data_source_type, connection_config):
+    """Create a new stave via Podium API."""
+    if not st.session_state.auth_token:
+        st.error("Please login first")
+        return None
+    
+    stave_data = {
+        "id": f"stave-{int(datetime.now().timestamp())}",
+        "name": name,
+        "description": description,
+        "data_source_type": data_source_type,
+        "connection_config": connection_config,
+        "is_active": True,
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "updated_at": datetime.utcnow().isoformat() + "Z"
+    }
+    
+    result = sync_call_podium_api("/staves/", method="POST", data=stave_data, token=st.session_state.auth_token)
+    if result:
+        load_real_staves()  # Refresh the list
+        st.success(f"Created stave: {name}")
+        return result
+    return None
+
+def create_clef(stave_id, name, description, check_type, config, schedule):
+    """Create a new clef via Podium API."""
+    if not st.session_state.auth_token:
+        st.error("Please login first")
+        return None
+    
+    clef_data = {
+        "id": f"clef-{int(datetime.now().timestamp() * 1000)}",
+        "stave_id": stave_id,
+        "name": name,
+        "description": description,
+        "check_type": check_type,
+        "config": config,
+        "schedule": schedule,
+        "is_active": True,
+        "created_at": datetime.utcnow().isoformat() + "Z",
+        "updated_at": datetime.utcnow().isoformat() + "Z"
+    }
+    
+    result = sync_call_podium_api("/clefs/", method="POST", data=clef_data, token=st.session_state.auth_token)
+    if result:
+        load_real_clefs()  # Refresh the list
+        st.success(f"Created clef: {name}")
+        return result
+    return None
+
 def show_login_page():
     """Show login page."""
     # Header with optional logo
@@ -233,14 +314,40 @@ def show_dashboard():
             logout_user()
             st.rerun()
     
+    # Data source toggle in sidebar
+    with st.sidebar:
+        st.markdown("### 🔄 Data Source")
+        use_demo_data = st.toggle(
+            "Use Demo Data", 
+            value=not st.session_state.use_real_data,
+            help="Toggle to use demo data instead of real data from Podium API"
+        )
+        st.session_state.use_real_data = not use_demo_data
+        
+        if st.session_state.use_real_data:
+            if st.session_state.auth_token:
+                st.success("✅ Connected to Podium API")
+                if st.button("🔄 Refresh Data"):
+                    load_real_staves()
+                    load_real_clefs()
+                    st.rerun()
+            else:
+                st.error("❌ Not authenticated")
+                st.info("💡 Login to see real data")
+        else:
+            st.info("📊 Using demo data")
+            st.caption("Toggle off to use real data")
+
     # Dashboard tabs
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+    tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
         "📊 Overview", 
         "🚨 Anomalies", 
         "🤖 ML Anomalies", 
         "📈 Trends & Patterns", 
         "🔍 Investigation",
-        "📄 Reports"
+        "📄 Reports",
+        "⚙️ Staves",
+        "🎯 Clefs"
     ])
     
     with tab1:
@@ -260,6 +367,13 @@ def show_dashboard():
     
     with tab6:
         show_reports_tab()
+    
+    with tab7:
+        show_staves_tab()
+    
+    with tab8:
+        show_clefs_tab()
+    
     if _SHOW_BRANDING:
         _render_footer_badge(width=160)
 
@@ -267,8 +381,19 @@ def show_overview_tab():
     """Show overview tab with system health metrics."""
     st.markdown("## 📊 System Overview")
     
-    # Show system health from mock data instead of calling API
-    st.info("🔍 System health metrics from your configured monitoring staves.")
+    if st.session_state.use_real_data and st.session_state.auth_token:
+        # Load real data
+        staves = load_real_staves()
+        clefs = load_real_clefs()
+        st.info(f"🔍 System health metrics from {len(staves)} configured staves and {len(clefs)} clefs.")
+    elif st.session_state.use_real_data and not st.session_state.auth_token:
+        staves = []
+        clefs = []
+        st.warning("🔍 Real data mode enabled but not authenticated. Please login to see actual configurations.")
+    else:
+        staves = []
+        clefs = []
+        st.info("🔍 System health metrics from demo data. Disable 'Use Demo Data' to see actual configurations.")
     
     # System health metrics
     col1, col2, col3, col4 = st.columns(4)
@@ -844,6 +969,362 @@ def show_reports_tab():
         #         # For example: response = await call_podium_api("/reports/custom", method="POST", data={"query": query})
         #         st.success("Custom report generation initiated!")
         #         # You would then display the results or download them
+
+def show_staves_tab():
+    """Show staves configuration tab."""
+    st.markdown("## ⚙️ Data Sources (Staves) Management")
+    
+    if not st.session_state.auth_token:
+        st.warning("Please login to manage staves.")
+        return
+    
+    # Load existing staves
+    staves = load_real_staves()
+    
+    # Create new stave section
+    with st.expander("➕ Create New Stave", expanded=False):
+        st.markdown("### Create a new data source")
+        
+        with st.form("create_stave_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                name = st.text_input("Stave Name", placeholder="e.g., Production Database")
+                description = st.text_area("Description", placeholder="Description of this data source")
+                data_source_type = st.selectbox(
+                    "Data Source Type",
+                    ["postgres", "sqlite", "mysql", "bigquery", "snowflake"]
+                )
+            
+            with col2:
+                if data_source_type == "postgres":
+                    host = st.text_input("Host", value="localhost")
+                    port = st.number_input("Port", value=5432)
+                    database = st.text_input("Database", value="testdb")
+                    user = st.text_input("Username", value="testuser")
+                    password = st.text_input("Password", type="password", value="testpass")
+                    
+                    connection_config = {
+                        "host": host,
+                        "port": port,
+                        "database": database,
+                        "user": user,
+                        "password": password
+                    }
+                elif data_source_type == "sqlite":
+                    db_path = st.text_input("Database Path", value="datametronome.db")
+                    connection_config = {"database_path": db_path}
+                else:
+                    st.info(f"Configuration for {data_source_type} will be implemented.")
+                    connection_config = {}
+            
+            submitted = st.form_submit_button("Create Stave")
+            
+            if submitted:
+                if name and description:
+                    create_stave(name, description, data_source_type, connection_config)
+                    st.rerun()
+                else:
+                    st.error("Please fill in all required fields.")
+    
+    # Display existing staves
+    st.markdown("### 📋 Existing Staves")
+    
+    if staves:
+        for stave in staves:
+            with st.expander(f"🔗 {stave.get('name', 'Unnamed')} ({stave.get('data_source_type', 'unknown')})"):
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.markdown(f"**ID**: `{stave.get('id', 'N/A')}`")
+                    st.markdown(f"**Description**: {stave.get('description', 'No description')}")
+                    st.markdown(f"**Type**: {stave.get('data_source_type', 'Unknown')}")
+                    st.markdown(f"**Status**: {'🟢 Active' if stave.get('is_active', False) else '🔴 Inactive'}")
+                    st.markdown(f"**Created**: {stave.get('created_at', 'Unknown')}")
+                    
+                    # Show connection config (masked)
+                    if stave.get('connection_config'):
+                        st.markdown("**Connection Config**:")
+                        config = stave['connection_config'].copy()
+                        if 'password' in config:
+                            config['password'] = '***masked***'
+                        st.json(config)
+                
+                with col2:
+                    if st.button("🗑️ Delete", key=f"delete_stave_{stave.get('id')}"):
+                        # TODO: Implement delete functionality
+                        st.info("Delete functionality will be implemented.")
+                    
+                    if st.button("🔄 Test", key=f"test_stave_{stave.get('id')}"):
+                        test_stave_connection(stave.get('id'))
+    else:
+        st.info("No staves configured. Create your first data source above.")
+
+def show_clefs_tab():
+    """Show clefs configuration tab."""
+    st.markdown("## 🎯 Data Quality Checks (Clefs) Management")
+    
+    if not st.session_state.auth_token:
+        st.warning("Please login to manage clefs.")
+        return
+    
+    # Load existing staves and clefs
+    staves = load_real_staves()
+    clefs = load_real_clefs()
+    
+    if not staves:
+        st.warning("Please create at least one stave before creating clefs.")
+        return
+    
+    # Create new clef section
+    with st.expander("➕ Create New Clef", expanded=False):
+        st.markdown("### Create a new data quality check")
+        
+        with st.form("create_clef_form"):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                stave_id = st.selectbox(
+                    "Select Stave",
+                    options=[s.get('id') for s in staves],
+                    format_func=lambda x: next(s.get('name') for s in staves if s.get('id') == x)
+                )
+                name = st.text_input("Clef Name", placeholder="e.g., Check for NULL emails")
+                description = st.text_area("Description", placeholder="Description of this quality check")
+                check_type = st.selectbox(
+                    "Check Type",
+                    ["null_check", "range_check", "uniqueness_check", "schema_check", "custom_sql"]
+                )
+            
+            with col2:
+                schedule = st.text_input("Schedule (Cron)", value="0 * * * *", help="Cron expression for scheduling")
+                
+                # Dynamic config based on check type
+                if check_type == "null_check":
+                    st.markdown("**Null Check Configuration:**")
+                    table = st.text_input("Table", placeholder="users")
+                    column = st.text_input("Column", placeholder="email")
+                    threshold = st.number_input("Threshold (%)", min_value=0.0, max_value=100.0, value=1.0)
+                    
+                    config = {
+                        "table": table,
+                        "column": column,
+                        "threshold": threshold / 100.0
+                    }
+                
+                elif check_type == "range_check":
+                    st.markdown("**Range Check Configuration:**")
+                    table = st.text_input("Table", placeholder="users")
+                    column = st.text_input("Column", placeholder="age")
+                    min_val = st.number_input("Minimum Value", value=0)
+                    max_val = st.number_input("Maximum Value", value=120)
+                    threshold = st.number_input("Threshold (%)", min_value=0.0, max_value=100.0, value=2.0)
+                    
+                    config = {
+                        "table": table,
+                        "column": column,
+                        "min": min_val,
+                        "max": max_val,
+                        "threshold": threshold / 100.0
+                    }
+                
+                elif check_type == "uniqueness_check":
+                    st.markdown("**Uniqueness Check Configuration:**")
+                    table = st.text_input("Table", placeholder="users")
+                    column = st.text_input("Column", placeholder="email")
+                    threshold = st.number_input("Threshold (%)", min_value=0.0, max_value=100.0, value=0.0)
+                    
+                    config = {
+                        "table": table,
+                        "column": column,
+                        "threshold": threshold / 100.0
+                    }
+                
+                else:
+                    st.info(f"Configuration for {check_type} will be implemented.")
+                    config = {}
+            
+            submitted = st.form_submit_button("Create Clef")
+            
+            if submitted:
+                if name and description and stave_id:
+                    create_clef(stave_id, name, description, check_type, config, schedule)
+                    st.rerun()
+                else:
+                    st.error("Please fill in all required fields.")
+    
+    # Display existing clefs
+    st.markdown("### 📋 Existing Clefs")
+    
+    if clefs:
+        for clef in clefs:
+            # Find the stave name
+            stave_name = next(
+                (s.get('name') for s in staves if s.get('id') == clef.get('stave_id')),
+                'Unknown Stave'
+            )
+            
+            with st.expander(f"🎯 {clef.get('name', 'Unnamed')} (on {stave_name})"):
+                col1, col2 = st.columns([3, 1])
+                
+                with col1:
+                    st.markdown(f"**ID**: `{clef.get('id', 'N/A')}`")
+                    st.markdown(f"**Description**: {clef.get('description', 'No description')}")
+                    st.markdown(f"**Type**: {clef.get('check_type', 'Unknown')}")
+                    st.markdown(f"**Stave**: {stave_name}")
+                    st.markdown(f"**Schedule**: {clef.get('schedule', 'No schedule')}")
+                    st.markdown(f"**Status**: {'🟢 Active' if clef.get('is_active', False) else '🔴 Inactive'}")
+                    st.markdown(f"**Created**: {clef.get('created_at', 'Unknown')}")
+                    
+                    # Show configuration
+                    if clef.get('config'):
+                        st.markdown("**Configuration**:")
+                        st.json(clef['config'])
+                
+                with col2:
+                    if st.button("🗑️ Delete", key=f"delete_clef_{clef.get('id')}"):
+                        # TODO: Implement delete functionality
+                        st.info("Delete functionality will be implemented.")
+                    
+                    if st.button("▶️ Run Now", key=f"run_clef_{clef.get('id')}"):
+                        run_clef_now(clef.get('id'))
+                    
+                    if st.button("📊 View Results", key=f"results_clef_{clef.get('id')}"):
+                        view_clef_results(clef.get('id'))
+    else:
+        st.info("No clefs configured. Create your first data quality check above.")
+
+# API Functions
+def load_real_staves():
+    """Load staves from the Podium API."""
+    try:
+        headers = {"Authorization": f"Bearer {st.session_state.auth_token}"}
+        with httpx.Client() as client:
+            response = client.get(f"{PODIUM_API_BASE}/api/v1/staves/", headers=headers)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                st.error(f"Failed to load staves: {response.status_code}")
+                return []
+    except Exception as e:
+        st.error(f"Error loading staves: {str(e)}")
+        return []
+
+def load_real_clefs():
+    """Load clefs from the Podium API."""
+    try:
+        headers = {"Authorization": f"Bearer {st.session_state.auth_token}"}
+        with httpx.Client() as client:
+            response = client.get(f"{PODIUM_API_BASE}/api/v1/clefs/", headers=headers)
+            if response.status_code == 200:
+                return response.json()
+            else:
+                st.error(f"Failed to load clefs: {response.status_code}")
+                return []
+    except Exception as e:
+        st.error(f"Error loading clefs: {str(e)}")
+        return []
+
+def test_stave_connection(stave_id):
+    """Test connection to a stave."""
+    try:
+        headers = {"Authorization": f"Bearer {st.session_state.auth_token}"}
+        with httpx.Client() as client:
+            response = client.post(
+                f"{PODIUM_API_BASE}/api/v1/stave-actions/{stave_id}/test-connection", 
+                headers=headers
+            )
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    st.success(f"✅ Connection successful! ({result.get('connection_time', 0):.3f}s)")
+                    if result.get('metadata'):
+                        st.json(result['metadata'])
+                else:
+                    st.error(f"❌ Connection failed: {result.get('message')}")
+                    if result.get('metadata'):
+                        st.json(result['metadata'])
+            else:
+                st.error(f"Failed to test connection: {response.status_code}")
+    except Exception as e:
+        st.error(f"Error testing connection: {str(e)}")
+
+def run_clef_now(clef_id):
+    """Run a clef immediately."""
+    try:
+        headers = {"Authorization": f"Bearer {st.session_state.auth_token}"}
+        with httpx.Client() as client:
+            response = client.post(
+                f"{PODIUM_API_BASE}/api/v1/clefs/{clef_id}/run-now", 
+                headers=headers
+            )
+            if response.status_code == 200:
+                result = response.json()
+                if result.get('success'):
+                    status = result.get('status', 'unknown')
+                    status_icon = {"pass": "✅", "warn": "⚠️", "fail": "❌"}.get(status, "❓")
+                    st.success(f"{status_icon} Check completed: {result.get('message')}")
+                    st.info(f"Execution time: {result.get('execution_time', 0):.3f}s")
+                    if result.get('metadata'):
+                        st.json(result['metadata'])
+                else:
+                    st.error(f"❌ Check failed: {result.get('message')}")
+            else:
+                st.error(f"Failed to run clef: {response.status_code}")
+    except Exception as e:
+        st.error(f"Error running clef: {str(e)}")
+
+def view_clef_results(clef_id):
+    """View results for a clef."""
+    try:
+        headers = {"Authorization": f"Bearer {st.session_state.auth_token}"}
+        with httpx.Client() as client:
+            response = client.get(
+                f"{PODIUM_API_BASE}/api/v1/clefs/{clef_id}/results", 
+                headers=headers
+            )
+            if response.status_code == 200:
+                result = response.json()
+                results = result.get('results', [])
+                
+                if results:
+                    st.success(f"📊 Found {len(results)} execution results")
+                    
+                    # Create a DataFrame for better display
+                    df_data = []
+                    for r in results:
+                        df_data.append({
+                            'Timestamp': r.get('timestamp', 'Unknown'),
+                            'Status': r.get('status', 'unknown'),
+                            'Message': r.get('message', 'No message'),
+                            'Execution Time': f"{r.get('execution_time', 0):.3f}s",
+                            'Anomalies': r.get('anomalies_count', 0),
+                            'Severity': r.get('severity', 'unknown')
+                        })
+                    
+                    df = pd.DataFrame(df_data)
+                    st.dataframe(df, use_container_width=True)
+                    
+                    # Show latest result details
+                    if results:
+                        latest = results[0]
+                        st.markdown("### Latest Result Details")
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Status", latest.get('status', 'unknown'))
+                        with col2:
+                            st.metric("Execution Time", f"{latest.get('execution_time', 0):.3f}s")
+                        with col3:
+                            st.metric("Anomalies", latest.get('anomalies_count', 0))
+                        
+                        if latest.get('metadata'):
+                            st.json(latest['metadata'])
+                else:
+                    st.info("No execution results found for this clef.")
+            else:
+                st.error(f"Failed to load results: {response.status_code}")
+    except Exception as e:
+        st.error(f"Error loading results: {str(e)}")
 
 # Main app logic
 def main():
