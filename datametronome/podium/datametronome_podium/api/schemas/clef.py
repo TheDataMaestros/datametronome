@@ -8,13 +8,13 @@ from pydantic import BaseModel, Field, field_validator, ConfigDict
 
 
 VALID_CHECK_TYPES = [
-    "null_check",
-    "uniqueness_check",
-    "range_check",
-    "pattern_check",
-    "custom_sql",
-    "freshness_check",
-    "volume_check"
+    "row_count",
+    "freshness", 
+    "column_values",
+    "forecast",
+    "data_profile_drift",
+    "lookup_validation",
+    "python"
 ]
 
 
@@ -70,6 +70,16 @@ class ClefBase(BaseModel):
         True,
         description="Whether this check is actively running"
     )
+    warn: str | None = Field(
+        None,
+        description="Warning condition (e.g., '> 5000', 'if_null > 5%')",
+        examples=["> 5000", "if_null > 5%", "< 20%"]
+    )
+    fail: str | None = Field(
+        None,
+        description="Failure condition (e.g., '< 1000', 'if_null > 10%')",
+        examples=["< 1000", "if_null > 10%", "> 50%"]
+    )
     
     @field_validator('check_type')
     @classmethod
@@ -87,6 +97,16 @@ class ClefBase(BaseModel):
         """Validate cron expression format."""
         if v is None:
             return v
+        
+        # Accept shorthand formats like @hourly, @daily, etc.
+        if v.startswith('@'):
+            valid_shorthands = ['@yearly', '@monthly', '@weekly', '@daily', '@hourly', '@minutely']
+            if v.lower() in valid_shorthands:
+                return v.lower()
+            else:
+                raise ValueError(
+                    f"Invalid cron shorthand: '{v}'. Valid shorthands: {', '.join(valid_shorthands)}"
+                )
         
         # Basic cron validation (5 or 6 fields separated by spaces)
         parts = v.split()

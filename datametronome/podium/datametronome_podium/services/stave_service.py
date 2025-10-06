@@ -439,11 +439,8 @@ def deserialize_stave(data: dict[str, Any]) -> Stave:
     if isinstance(data.get("connection_config"), str):
         data["connection_config"] = json.loads(data["connection_config"])
     
-    # Convert ISO strings to datetime objects
-    if isinstance(data.get("created_at"), str):
-        data["created_at"] = datetime.fromisoformat(data["created_at"])
-    if isinstance(data.get("updated_at"), str):
-        data["updated_at"] = datetime.fromisoformat(data["updated_at"])
+    # Keep datetime fields as strings for API compatibility
+    # (The API schemas expect strings, not datetime objects)
     
     return Stave(**data)
 
@@ -453,6 +450,7 @@ def serialize_clef(clef: Clef) -> dict[str, Any]:
     Serialize a Clef for database storage.
     
     Converts config dict to JSON string for TEXT column storage.
+    Only includes fields that exist in the database schema.
     
     Args:
         clef: Clef instance
@@ -460,12 +458,21 @@ def serialize_clef(clef: Clef) -> dict[str, Any]:
     Returns:
         Dict ready for database insertion
     """
-    data = clef.model_dump()
-    # Convert config dict to JSON string
-    data["config"] = json.dumps(data["config"])
-    # Convert datetime objects to ISO strings
-    data["created_at"] = data["created_at"].isoformat()
-    data["updated_at"] = data["updated_at"].isoformat()
+    # Only include fields that exist in the database schema
+    data = {
+        "id": clef.id,
+        "stave_id": clef.stave_id,
+        "name": clef.name,
+        "description": clef.description,
+        "check_type": clef.check_type,
+        "config": json.dumps(clef.config),
+        "schedule": clef.schedule,
+        "is_active": clef.is_active,
+        "warn": clef.warn,
+        "fail": clef.fail,
+        "created_at": clef.created_at.isoformat(),
+        "updated_at": clef.updated_at.isoformat()
+    }
     return data
 
 
@@ -488,11 +495,8 @@ def deserialize_clef(data: dict[str, Any]) -> Clef:
     if isinstance(data.get("config"), str):
         data["config"] = json.loads(data["config"])
     
-    # Convert ISO strings to datetime objects
-    if isinstance(data.get("created_at"), str):
-        data["created_at"] = datetime.fromisoformat(data["created_at"])
-    if isinstance(data.get("updated_at"), str):
-        data["updated_at"] = datetime.fromisoformat(data["updated_at"])
+    # Keep datetime fields as strings for API compatibility
+    # (The API schemas expect strings, not datetime objects)
     
     return Clef(**data)
 
