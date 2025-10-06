@@ -1,6 +1,7 @@
 """Clef endpoints for DataMetronome Podium using DataPulse connectors."""
 
 from typing import Any, List
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -24,11 +25,48 @@ async def get_clefs(skip: int = 0, limit: int = 100) -> List[ClefResponse]:
     """
     try:
         db = await get_db()
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Log which database file we're using
+        db_file = getattr(db, 'database_path', 'unknown')
+        logger.info(f"Using database file: {db_file}")
+        
+        # Try a simple count query first
+        count_result = await db.query({"sql": "SELECT COUNT(*) as count FROM clefs", "params": []})
+        logger.info(f"COUNT query result: {count_result}")
+        
+        # Try without ORDER BY
+        clefs_no_order = await db.query({"sql": "SELECT * FROM clefs LIMIT ? OFFSET ?", "params": [limit, skip]})
+        logger.info(f"Query without ORDER BY returned: {len(clefs_no_order)} clefs")
+        
+        # Try the original query
         clefs = await db.query({
             "sql": "SELECT * FROM clefs ORDER BY created_at DESC LIMIT ? OFFSET ?", 
             "params": [limit, skip]
         })
-        return [ClefResponse(**clef) for clef in clefs]
+        logger.info(f"Found {len(clefs)} clefs in database")
+        logger.info(f"Query params: limit={limit}, skip={skip}")
+        from datametronome_podium.services.stave_service import deserialize_clef
+        response_data = []
+        for clef in clefs:
+            try:
+                deserialized = deserialize_clef(clef)
+                clef_dict = deserialized.model_dump()
+                # Convert datetime objects to strings for API compatibility
+                if isinstance(clef_dict.get('created_at'), datetime):
+                    clef_dict['created_at'] = clef_dict['created_at'].isoformat()
+                if isinstance(clef_dict.get('updated_at'), datetime):
+                    clef_dict['updated_at'] = clef_dict['updated_at'].isoformat()
+                response_data.append(ClefResponse(**clef_dict))
+            except Exception as e:
+                # Log the error but continue processing other clefs
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to deserialize clef {clef.get('id', 'unknown')}: {e}")
+                logger.exception(e)
+                continue
+        return response_data
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -62,7 +100,15 @@ async def get_clef(clef_id: str) -> ClefResponse:
                 detail="Clef not found"
             )
         
-        return ClefResponse(**clefs[0])
+        from datametronome_podium.services.stave_service import deserialize_clef
+        deserialized = deserialize_clef(clefs[0])
+        clef_dict = deserialized.model_dump()
+        # Convert datetime objects to strings for API compatibility
+        if isinstance(clef_dict.get('created_at'), datetime):
+            clef_dict['created_at'] = clef_dict['created_at'].isoformat()
+        if isinstance(clef_dict.get('updated_at'), datetime):
+            clef_dict['updated_at'] = clef_dict['updated_at'].isoformat()
+        return ClefResponse(**clef_dict)
     except HTTPException:
         raise
     except Exception as e:
