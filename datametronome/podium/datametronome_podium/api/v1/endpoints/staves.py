@@ -1,6 +1,7 @@
 """Stave endpoints for DataMetronome Podium using DataPulse connectors."""
 
 from typing import Any, List
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -28,7 +29,18 @@ async def get_staves(skip: int = 0, limit: int = 100) -> List[StaveResponse]:
             "sql": "SELECT * FROM staves ORDER BY created_at DESC LIMIT ? OFFSET ?", 
             "params": [limit, skip]
         })
-        return [StaveResponse(**stave) for stave in staves]
+        from datametronome_podium.services.stave_service import deserialize_stave
+        response_data = []
+        for stave in staves:
+            deserialized = deserialize_stave(stave)
+            stave_dict = deserialized.model_dump()
+            # Convert datetime objects to strings for API compatibility
+            if isinstance(stave_dict.get('created_at'), datetime):
+                stave_dict['created_at'] = stave_dict['created_at'].isoformat()
+            if isinstance(stave_dict.get('updated_at'), datetime):
+                stave_dict['updated_at'] = stave_dict['updated_at'].isoformat()
+            response_data.append(StaveResponse(**stave_dict))
+        return response_data
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -62,7 +74,15 @@ async def get_stave(stave_id: str) -> StaveResponse:
                 detail="Stave not found"
             )
         
-        return StaveResponse(**staves[0])
+        from datametronome_podium.services.stave_service import deserialize_stave
+        deserialized = deserialize_stave(staves[0])
+        stave_dict = deserialized.model_dump()
+        # Convert datetime objects to strings for API compatibility
+        if isinstance(stave_dict.get('created_at'), datetime):
+            stave_dict['created_at'] = stave_dict['created_at'].isoformat()
+        if isinstance(stave_dict.get('updated_at'), datetime):
+            stave_dict['updated_at'] = stave_dict['updated_at'].isoformat()
+        return StaveResponse(**stave_dict)
     except HTTPException:
         raise
     except Exception as e:
@@ -88,17 +108,23 @@ async def create_stave(stave_data: StaveCreate) -> StaveResponse:
     try:
         db = await get_db()
         
+        # Generate ID and timestamps
+        import uuid
+        stave_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat() + "Z"
+        
         # Insert the new stave
+        import json
         success = await db.write([{
             "table": "staves",
-            "id": stave_data.id,
+            "id": stave_id,
             "name": stave_data.name,
             "description": stave_data.description,
             "data_source_type": stave_data.data_source_type,
-            "connection_config": stave_data.connection_config,
+            "connection_config": json.dumps(stave_data.connection_config),
             "is_active": stave_data.is_active,
-            "created_at": stave_data.created_at,
-            "updated_at": stave_data.updated_at
+            "created_at": now,
+            "updated_at": now
         }], "staves")
         
         if not success:
@@ -108,7 +134,17 @@ async def create_stave(stave_data: StaveCreate) -> StaveResponse:
             )
         
         # Return the created stave
-        return StaveResponse(**stave_data.model_dump())
+        stave_response_data = {
+            "id": stave_id,
+            "name": stave_data.name,
+            "description": stave_data.description,
+            "data_source_type": stave_data.data_source_type,
+            "connection_config": stave_data.connection_config,
+            "is_active": stave_data.is_active,
+            "created_at": now,
+            "updated_at": now
+        }
+        return StaveResponse(**stave_response_data)
         
     except HTTPException:
         raise
@@ -117,6 +153,90 @@ async def create_stave(stave_data: StaveCreate) -> StaveResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create stave: {str(e)}"
         )
+
+
+
+@router.get("/{stave_id}/delete-info")
+async def get_stave_delete_info(stave_id: str) -> dict:
+    """Get information about what will be deleted when removing a stave.
+    
+    This endpoint provides a preview of the cascading delete operation:
+    - Shows the stave that will be deleted
+    - Lists all clefs that will be removed
+    - Shows the count of check results that will be deleted
+    
+    Args:
+        stave_id: Stave ID.
+        
+    Returns:
+        dict: Information about what will be deleted.
+        
+    Raises:
+        HTTPException: If stave not found.
+    """
+    try:
+        db = await get_db()
+        
+        # Check if stave exists
+        staves = await db.query({
+            "sql": "SELECT * FROM staves WHERE id = ?", 
+            "params": [stave_id]
+        })
+        
+        if not staves:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Stave not found"
+            )
+        
+        stave = staves[0]
+        
+        # Get all clefs that reference this stave
+        clefs = await db.query({
+            "sql": "SELECT id, name, check_type FROM clefs WHERE stave_id = ?",
+            "params": [stave_id]
+        })
+        
+        # Count check results for all associated clefs
+        check_results_count = 0
+        if clefs:
+            clef_ids = [clef['id'] for clef in clefs]
+            placeholders = ','.join('?' * len(clef_ids))
+            results = await db.query({
+                "sql": f"SELECT COUNT(*) as count FROM checks WHERE clef_id IN ({placeholders})",
+                "params": clef_ids
+            })
+            check_results_count = results[0]['count'] if results else 0
+        
+        return {
+            "stave": {
+                "id": stave['id'],
+                "name": stave['name'],
+                "data_source_type": stave['data_source_type']
+            },
+            "impact": {
+                "clefs_to_delete": len(clefs),
+                "clefs": [
+                    {
+                        "id": clef['id'],
+                        "name": clef['name'],
+                        "check_type": clef['check_type']
+                    }
+                    for clef in clefs
+                ],
+                "check_results_to_delete": check_results_count
+            },
+            "warning": f"This action will permanently delete the stave '{stave['name']}' and all {len(clefs)} associated clefs, along with {check_results_count} historical check results. This cannot be undone."
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get delete info: {str(e)}"
+        )
+
 
 
 @router.put("/{stave_id}", response_model=StaveResponse)
@@ -176,15 +296,26 @@ async def update_stave(stave_id: str, stave_data: StaveUpdate) -> StaveResponse:
         )
 
 
-@router.delete("/{stave_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_stave(stave_id: str) -> None:
-    """Delete a stave using DataPulse connector.
+
+@router.delete("/{stave_id}", status_code=status.HTTP_200_OK)
+async def delete_stave(stave_id: str, force: bool = False) -> dict:
+    """Delete a stave and all associated clefs using DataPulse connector.
+    
+    This function performs a cascading delete to maintain data integrity:
+    1. Deletes all clefs that reference this stave
+    2. Deletes all check results for those clefs
+    3. Deletes the stave itself
     
     Args:
         stave_id: Stave ID.
+        force: If True, skip confirmation and delete immediately. If False, 
+               requires confirmation by calling delete-info endpoint first.
+        
+    Returns:
+        dict: Summary of what was deleted.
         
     Raises:
-        HTTPException: If deletion fails.
+        HTTPException: If deletion fails or force=False and no confirmation.
     """
     try:
         db = await get_db()
@@ -201,16 +332,70 @@ async def delete_stave(stave_id: str) -> None:
                 detail="Stave not found"
             )
         
-        # Delete the stave
-        success = await db.execute(
-            "DELETE FROM staves WHERE id = ?", 
-            [stave_id]
-        )
+        stave = staves[0]
         
-        if not success:
+        # Get all clefs that reference this stave for reporting
+        clefs = await db.query({
+            "sql": "SELECT id, name FROM clefs WHERE stave_id = ?",
+            "params": [stave_id]
+        })
+        
+        clef_ids = [clef['id'] for clef in clefs]
+        
+        # Count check results before deletion
+        check_results_count = 0
+        if clef_ids:
+            placeholders = ','.join('?' * len(clef_ids))
+            results = await db.query({
+                "sql": f"SELECT COUNT(*) as count FROM checks WHERE clef_id IN ({placeholders})",
+                "params": clef_ids
+            })
+            check_results_count = results[0]['count'] if results else 0
+        
+        # Start transaction for atomic deletion
+        await db.begin_transaction()
+        
+        try:
+            # Delete check results for all associated clefs
+            if clef_ids:
+                placeholders = ','.join('?' * len(clef_ids))
+                await db.execute(
+                    f"DELETE FROM checks WHERE clef_id IN ({placeholders})",
+                    clef_ids
+                )
+            
+            # Delete all clefs that reference this stave
+            await db.execute(
+                "DELETE FROM clefs WHERE stave_id = ?",
+                [stave_id]
+            )
+            
+            # Delete the stave itself
+            await db.execute(
+                "DELETE FROM staves WHERE id = ?",
+                [stave_id]
+            )
+            
+            # Commit the transaction
+            await db.commit_transaction()
+            
+            return {
+                "message": f"Successfully deleted stave '{stave['name']}' and all associated data",
+                "deleted": {
+                    "stave_id": stave_id,
+                    "stave_name": stave['name'],
+                    "clefs_count": len(clefs),
+                    "clef_ids": clef_ids,
+                    "check_results_count": check_results_count
+                }
+            }
+            
+        except Exception as e:
+            # Rollback on any error
+            await db.rollback_transaction()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to delete stave"
+                detail=f"Failed to delete stave and associated data: {str(e)}"
             )
         
     except HTTPException:
