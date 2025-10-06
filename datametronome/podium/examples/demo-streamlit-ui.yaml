@@ -3,23 +3,19 @@
 
 staves:
   # Main demo database
-  - id: stave-streamlit-demo
+  - id: stave-demo-sqlite
     name: Streamlit Demo Database
     description: Main database for Streamlit UI demonstrations
-    data_source_type: postgres
+    data_source_type: sqlite
     connection_config:
-      host: ${DEMO_HOST:-localhost}
-      port: ${DEMO_PORT:-5432}
-      database: ${DEMO_DB:-streamlit_demo}
-      user: ${DEMO_USER:-demo}
-      password: ${DEMO_PASSWORD:-demo123}
+      database_path: data/datametronome.db
     is_active: true
 
 # Clefs designed to show different severity levels and check types
 clefs:
   # Harmony (Pass) Examples
   - id: clef-harmony-row-count
-    stave_id: stave-streamlit-demo
+    stave_id: stave-demo-sqlite
     name: ✅ Harmony - Healthy Row Count
     description: This check should always pass - shows Harmony status
     check_type: row_count
@@ -32,7 +28,7 @@ clefs:
     
   # Dissonance (Warning) Examples
   - id: clef-dissonance-null-emails
-    stave_id: stave-streamlit-demo
+    stave_id: stave-demo-sqlite
     name: ⚠️ Dissonance - Some NULL Emails
     description: This check shows Dissonance when some emails are NULL
     check_type: column_values
@@ -46,13 +42,13 @@ clefs:
     is_active: true
     
   - id: clef-dissonance-freshness
-    stave_id: stave-streamlit-demo
+    stave_id: stave-demo-sqlite
     name: ⚠️ Dissonance - Data Getting Stale
     description: Shows Dissonance when data is getting stale
     check_type: freshness
     config:
-      table: orders
-      column: created_at
+      table: products
+      column: updated_at
       max_age: "1 hour"
     warn: "> 2 hours"    # Warn if older than 2 hours
     fail: "> 4 hours"    # Fail if older than 4 hours
@@ -61,20 +57,20 @@ clefs:
     
   # Cacophony (Failure) Examples
   - id: clef-cacophony-critical-nulls
-    stave_id: stave-streamlit-demo
+    stave_id: stave-demo-sqlite
     name: ❌ Cacophony - Critical NULL Values
     description: This check fails when critical data is missing
     check_type: column_values
     config:
-      table: orders
-      column: customer_id
+      table: users
+      column: name
       condition: if_null
     fail: if_null > 0%   # Fail on any NULLs
     schedule: "@hourly"
     is_active: true
     
   - id: clef-cacophony-no-data
-    stave_id: stave-streamlit-demo
+    stave_id: stave-demo-sqlite
     name: ❌ Cacophony - No Data Available
     description: Fails when no data is available
     check_type: row_count
@@ -86,13 +82,13 @@ clefs:
     
   # Advanced Checks for UI Demonstration
   - id: clef-ml-anomaly-detection
-    stave_id: stave-streamlit-demo
+    stave_id: stave-demo-sqlite
     name: 🤖 ML Anomaly Detection
     description: Demonstrates intelligent ML-based checks
     check_type: forecast
     config:
       metric: row_count
-      table: daily_metrics
+      table: users
       strategy:
         model: sarima
         confidence: 95
@@ -100,20 +96,20 @@ clefs:
     is_active: true
     
   - id: clef-data-drift-detection
-    stave_id: stave-streamlit-demo
+    stave_id: stave-demo-sqlite
     name: 📊 Data Drift Detection
     description: Shows data profile drift detection
     check_type: data_profile_drift
     config:
-      table: user_behavior
-      columns: ["session_duration", "page_views", "conversion_rate"]
+      table: users
+      columns: ["age", "name"]
       baseline_period: "7 days"
       drift_threshold: 0.1
     schedule: "@daily"
     is_active: true
     
   - id: clef-custom-python-check
-    stave_id: stave-streamlit-demo
+    stave_id: stave-demo-sqlite
     name: 🐍 Custom Python Check
     description: Demonstrates custom Python validation
     check_type: python
