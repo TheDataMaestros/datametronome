@@ -25,3 +25,7 @@ slowapi>=0.1.9
 
 # YAML configuration
 pyyaml>=6.0
+
+Faker
+watchdog
+apscheduler

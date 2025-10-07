@@ -155,6 +155,13 @@ async def lifespan(app: FastAPI):
     set_component_health('database', True)
     logging.info("Database initialized")
     
+    # Create default staves and clefs
+    try:
+        from .services.default_setup import create_default_staves_and_clefs
+        await create_default_staves_and_clefs()
+    except Exception as e:
+        logger.error(f"Failed to create default staves and clefs: {e}")
+
     # Initialize scheduler
     await init_scheduler()
     set_component_health('scheduler', True)
