@@ -1297,7 +1297,7 @@ def view_clef_results(clef_id):
                             'Timestamp': r.get('timestamp', 'Unknown'),
                             'Status': r.get('status', 'unknown'),
                             'Message': r.get('message', 'No message'),
-                            'Execution Time': f"{r.get('execution_time', 0):.3f}s",
+                            'Execution Time': f"{r.get('execution_time', 0):.3f}s" if r.get('execution_time') is not None else "N/A",
                             'Anomalies': r.get('anomalies_count', 0),
                             'Severity': r.get('severity', 'unknown')
                         })
@@ -1313,12 +1313,22 @@ def view_clef_results(clef_id):
                         with col1:
                             st.metric("Status", latest.get('status', 'unknown'))
                         with col2:
-                            st.metric("Execution Time", f"{latest.get('execution_time', 0):.3f}s")
+                            st.metric("Execution Time", f"{latest.get('execution_time', 0):.3f}s" if latest.get('execution_time') is not None else "N/A")
                         with col3:
                             st.metric("Anomalies", latest.get('anomalies_count', 0))
                         
                         if latest.get('metadata'):
-                            st.json(latest['metadata'])
+                            metadata = latest['metadata']
+                            # Handle both string and dict formats
+                            if isinstance(metadata, str):
+                                try:
+                                    import json
+                                    metadata = json.loads(metadata)
+                                except:
+                                    st.text("Metadata (raw):")
+                                    st.text(metadata)
+                                    return
+                            st.json(metadata)
                 else:
                     st.info("No execution results found for this clef.")
             else:
