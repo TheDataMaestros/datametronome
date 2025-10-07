@@ -90,8 +90,8 @@ def create_stave(
         data_source_type=data_source_type,
         connection_config=connection_config,
         is_active=is_active,
-        created_at=datetime.now(),
-        updated_at=datetime.now()
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
 
 
@@ -249,8 +249,8 @@ def create_clef(
         is_active=is_active,
         warn=warn,
         fail=fail,
-        created_at=datetime.now(),
-        updated_at=datetime.now()
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
     )
 
 

@@ -157,11 +157,11 @@ class Clef(BaseModel):
         description="Whether this check is actively running"
     )
     created_at: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=datetime.utcnow,
         description="When this check was created"
     )
     updated_at: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=datetime.utcnow,
         description="When this check was last updated"
     )
     

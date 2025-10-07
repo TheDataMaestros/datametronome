@@ -134,18 +134,27 @@ async def create_clef(clef_data: ClefCreate) -> ClefResponse:
     try:
         db = await get_db()
         
+        # Generate ID and timestamps
+        import uuid
+        clef_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat() + "Z"
+        
         # Insert the new clef
+        import json
         success = await db.write([{
             "table": "clefs",
-            "id": clef_data.id,
+            "id": clef_id,
             "stave_id": clef_data.stave_id,
             "name": clef_data.name,
             "description": clef_data.description,
             "check_type": clef_data.check_type,
-            "config": clef_data.config,
+            "config": json.dumps(clef_data.config),
             "is_active": clef_data.is_active,
-            "created_at": clef_data.created_at,
-            "updated_at": clef_data.updated_at
+            "created_at": now,
+            "updated_at": now,
+            "schedule": clef_data.schedule,
+            "warn": clef_data.warn,
+            "fail": clef_data.fail
         }], "clefs")
         
         if not success:
@@ -155,7 +164,13 @@ async def create_clef(clef_data: ClefCreate) -> ClefResponse:
             )
         
         # Return the created clef
-        return ClefResponse(**clef_data.model_dump())
+        clef_response_data = {
+            "id": clef_id,
+            **clef_data.model_dump(),
+            "created_at": now,
+            "updated_at": now
+        }
+        return ClefResponse(**clef_response_data)
         
     except HTTPException:
         raise
@@ -197,7 +212,7 @@ async def update_clef(clef_id: str, clef_data: ClefUpdate) -> ClefResponse:
         
         # Update the clef
         update_data = clef_data.model_dump(exclude_unset=True)
-        update_data["updated_at"] = clef_data.updated_at
+        update_data["updated_at"] = datetime.utcnow().isoformat() + "Z"
         
         success = await db.write([{
             "table": "clefs",

@@ -270,7 +270,7 @@ async def update_stave(stave_id: str, stave_data: StaveUpdate) -> StaveResponse:
         
         # Update the stave
         update_data = stave_data.model_dump(exclude_unset=True)
-        update_data["updated_at"] = stave_data.updated_at
+        update_data["updated_at"] = datetime.utcnow().isoformat() + "Z"
         
         success = await db.write([{
             "table": "staves",

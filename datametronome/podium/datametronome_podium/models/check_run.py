@@ -18,7 +18,7 @@ class CheckRun(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     parameters: dict = {}
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     
     @field_validator('status')
     @classmethod

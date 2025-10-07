@@ -99,11 +99,11 @@ class Stave(BaseModel):
         description="Whether monitoring is active for this data source"
     )
     created_at: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=datetime.utcnow,
         description="When this stave was created"
     )
     updated_at: datetime = Field(
-        default_factory=datetime.now,
+        default_factory=datetime.utcnow,
         description="When this stave was last updated"
     )
     
