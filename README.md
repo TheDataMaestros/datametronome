@@ -1,5 +1,9 @@
 # 🎵 DataMetronome
 
+<div align="center">
+  <img src="datametronome/ui-streamlit/assets/logo_datametronome.svg" alt="DataMetronome Logo" width="400">
+</div>
+
 **Real-time Data Quality & Anomaly Detection Platform**
 
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
@@ -41,6 +45,21 @@ DataMetronome is an **open-source, community-driven platform** that provides rea
 - **Clean interfaces** - Simple, consistent APIs
 - **Standalone testing** - Each datapulse has comprehensive, independent tests
 - **Docker support** - Easy deployment and testing
+
+## 🖼️ **Visual Showcase**
+
+<div align="center">
+  <h3>📊 Interactive Dashboard</h3>
+  <p><em>Real-time data quality monitoring with beautiful visualizations</em></p>
+  
+  <h3>🚨 Anomaly Detection</h3>
+  <p><em>ML-powered outlier detection with statistical analysis</em></p>
+  
+  <h3>📈 Performance Analytics</h3>
+  <p><em>Comprehensive metrics and trend analysis</em></p>
+</div>
+
+> **🎯 See it in action!** Launch the dashboard with `streamlit run datametronome/ui-streamlit/streamlit_app.py` and explore all features in real-time.
 
 ## 🎯 **Perfect For**
 
@@ -174,6 +193,36 @@ The DataMetronome dashboard provides **5 powerful tabs** that showcase the compl
 - **Charts**: Plotly for interactive visualizations
 - **Containerization**: Docker for easy deployment
 - **Package Management**: uv for fast dependency resolution
+
+### **Architecture Overview**
+
+```mermaid
+graph TB
+    subgraph "DataMetronome Platform"
+        A[📊 Streamlit Dashboard] --> B[🔌 DataPulse Connectors]
+        B --> C[📈 PostgreSQL Database]
+        B --> D[🤖 Anomaly Detection Engine]
+        D --> E[📊 ML Algorithms]
+        D --> F[📈 Statistical Analysis]
+        A --> G[📱 Real-time Monitoring]
+        G --> H[🚨 Alert System]
+    end
+    
+    subgraph "Data Sources"
+        I[🗄️ PostgreSQL]
+        J[📊 SQLite]
+        K[🔗 Custom Connectors]
+    end
+    
+    C --> I
+    B --> J
+    B --> K
+    
+    style A fill:#ff6b6b
+    style D fill:#4ecdc4
+    style E fill:#45b7d1
+    style F fill:#96ceb4
+```
 
 ### **Performance Highlights**
 - **10x faster** than traditional ORMs
