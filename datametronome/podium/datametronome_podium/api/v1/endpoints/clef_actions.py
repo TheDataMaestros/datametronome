@@ -101,7 +101,7 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
             "timestamp": datetime.now().isoformat(),
             "execution_time": result.execution_time,
             "anomalies_count": len(result.metadata.get('anomalies', [])) if result.metadata else 0,
-            "severity": result.severity.value.lower()
+            "severity": result.severity.value  # Store the severity value: "harmony", "dissonance", "cacophony"
         }
         
         await insert_data("checks", check_data)
@@ -172,8 +172,10 @@ async def get_clef_results(
             "params": [clef_id, limit, offset]
         })
         
-        # Format results
+        # Format results with consistent UTC timestamps
         import json
+        from datametronome_podium.core.timestamp_utils import to_utc_isoformat, add_timezone_info_to_response
+        
         formatted_results = []
         for result in results:
             # Parse metadata from JSON string if it exists
@@ -184,18 +186,24 @@ async def get_clef_results(
                 except (json.JSONDecodeError, TypeError):
                     metadata = result["details"]  # Keep as-is if parsing fails
             
+            # Ensure timestamp is in UTC format
+            timestamp = result["timestamp"]
+            if timestamp and not timestamp.endswith('Z'):
+                # Convert to UTC format if not already
+                timestamp = to_utc_isoformat(timestamp)
+            
             formatted_results.append({
                 "id": result["id"],
                 "status": result["status"],
                 "message": result["message"],
-                "timestamp": result["timestamp"],
+                "timestamp": timestamp,
                 "execution_time": result["execution_time"],
                 "anomalies_count": result["anomalies_count"],
                 "severity": result["severity"],
                 "metadata": metadata
             })
         
-        return {
+        response_data = {
             "clef_id": clef_id,
             "results": formatted_results,
             "pagination": {
@@ -203,8 +211,15 @@ async def get_clef_results(
                 "limit": limit,
                 "offset": offset,
                 "has_more": offset + limit < total
+            },
+            "_timezone_info": {
+                "backend_timezone": "UTC",
+                "timestamp_format": "ISO 8601 with Z suffix (e.g., 2025-10-08T22:30:00Z)",
+                "note": "All timestamps are stored and processed in UTC. UI converts to local timezone for display."
             }
         }
+        
+        return response_data
         
     except Exception as e:
         logger.error(f"Failed to get results for clef {clef_id}: {e}")

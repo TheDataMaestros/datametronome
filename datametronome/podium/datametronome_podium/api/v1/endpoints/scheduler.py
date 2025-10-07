@@ -36,11 +36,21 @@ async def get_scheduler_status_endpoint() -> Dict[str, Any]:
 
 
 @router.get("/clefs")
-async def get_scheduled_clefs_endpoint() -> List[Dict[str, Any]]:
+async def get_scheduled_clefs_endpoint() -> Dict[str, Any]:
     """Get all currently scheduled clefs."""
     try:
         scheduled_clefs = await get_scheduled_clefs()
-        return scheduled_clefs
+        
+        # Add timezone information to the response
+        return {
+            "clefs": scheduled_clefs,
+            "_timezone_info": {
+                "backend_timezone": "UTC",
+                "timestamp_format": "ISO 8601 with Z suffix (e.g., 2025-10-08T22:30:00Z)",
+                "note": "All timestamps are stored and processed in UTC. UI converts to local timezone for display.",
+                "scheduler_timezone": "UTC"
+            }
+        }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

@@ -10,6 +10,8 @@ from datetime import datetime, timedelta
 import uuid
 import os
 from pathlib import Path
+import pytz
+import time
 
 # Page configuration
 assets_dir = Path(__file__).resolve().parent / "assets"
@@ -258,16 +260,13 @@ def create_clef(stave_id, name, description, check_type, config, schedule):
         return None
     
     clef_data = {
-        "id": f"clef-{int(datetime.now().timestamp() * 1000)}",
         "stave_id": stave_id,
         "name": name,
         "description": description,
         "check_type": check_type,
         "config": config,
         "schedule": schedule,
-        "is_active": True,
-        "created_at": datetime.utcnow().isoformat() + "Z",
-        "updated_at": datetime.utcnow().isoformat() + "Z"
+        "is_active": True
     }
     
     result = sync_call_podium_api("/clefs/", method="POST", data=clef_data, token=st.session_state.auth_token)
@@ -276,6 +275,53 @@ def create_clef(stave_id, name, description, check_type, config, schedule):
         st.success(f"Created clef: {name}")
         return result
     return None
+
+def delete_clef(clef_id, clef_name):
+    """Delete a clef via Podium API."""
+    if not st.session_state.auth_token:
+        st.error("Please login first")
+        return False
+    
+    result = sync_call_podium_api(f"/clefs/{clef_id}", method="DELETE", token=st.session_state.auth_token)
+    # DELETE returns 204 (None) on success, or raises exception on failure
+    load_real_clefs()  # Refresh the list
+    st.success(f"Deleted clef: {clef_name}")
+    return True
+
+def delete_stave(stave_id, stave_name):
+    """Delete a stave via Podium API."""
+    if not st.session_state.auth_token:
+        st.error("Please login first")
+        return False
+    
+    result = sync_call_podium_api(f"/staves/{stave_id}", method="DELETE", token=st.session_state.auth_token)
+    # DELETE returns 200 with summary on success, or raises exception on failure
+    load_real_staves()  # Refresh the list
+    st.success(f"Deleted stave: {stave_name}")
+    return True
+
+def generate_sample_data(stave_id, table_name, count=100):
+    """Generate sample data for a stave via Podium API."""
+    if not st.session_state.auth_token:
+        st.error("Please login first")
+        return False
+    
+    try:
+        result = sync_call_podium_api(
+            f"/stave-actions/{stave_id}/generate-data",
+            method="POST", 
+            data={"table_name": table_name, "count": count},
+            token=st.session_state.auth_token
+        )
+        if result:
+            st.success(f"Generated {count} records for {table_name} table")
+            return True
+        else:
+            st.error(f"Failed to generate data for {table_name}")
+            return False
+    except Exception as e:
+        st.error(f"Error generating data: {str(e)}")
+        return False
 
 def show_login_page():
     """Show login page."""
@@ -297,6 +343,69 @@ def show_login_page():
     if _SHOW_BRANDING:
         _render_footer_badge(width=160)
 
+def show_homepage():
+    """Show the new homepage."""
+    st.markdown('<h1 class="main-header">🎵 DataMetronome Dashboard</h1>', unsafe_allow_html=True)
+
+    # Header with user info, logout, and clock
+    col1, col2, col3, col4 = st.columns([2, 1, 1, 1.5])
+    with col1:
+        st.markdown("### Welcome back! 🚀")
+    with col2:
+        st.info(f"User: {st.session_state.user_info.get('username', 'Unknown')}")
+    with col3:
+        if st.button("Logout"):
+            logout_user()
+            st.rerun()
+    with col4:
+        # Clock
+        clock_placeholder = st.empty()
+
+    # Main content of the homepage
+    st.markdown("---")
+    st.markdown("## System at a Glance")
+    
+    # You can reuse components from your overview tab or create new ones
+    show_overview_tab()
+    
+    st.markdown("---")
+    st.markdown("## Navigation")
+    st.markdown("Select a section below to dive deeper into the details.")
+
+    # Using columns for navigation buttons
+    nav_cols = st.columns(4)
+    with nav_cols[0]:
+        if st.button("🚨 Anomalies", use_container_width=True):
+            st.session_state.active_tab = "🚨 Anomalies"
+            # To navigate, we can consider switching to a multi-page app structure
+            # For now, this will require a rerun and logic to switch tabs
+            show_anomalies_tab()
+    with nav_cols[1]:
+        if st.button("⚙️ Staves", use_container_width=True):
+            st.session_state.active_tab = "⚙️ Staves"
+            show_staves_tab()
+    with nav_cols[2]:
+        if st.button("🎯 Clefs", use_container_width=True):
+            st.session_state.active_tab = "🎯 Clefs"
+            show_clefs_tab()
+    with nav_cols[3]:
+        if st.button("📄 Reports", use_container_width=True):
+            st.session_state.active_tab = "📄 Reports"
+            show_reports_tab()
+
+    if _SHOW_BRANDING:
+        _render_footer_badge(width=160)
+        
+    # Clock update loop
+    while True:
+        # Get current time in local timezone.
+        # This will be the server's local time.
+        # For user's browser time, we would need a frontend component.
+        now = datetime.now(pytz.utc).astimezone()
+        clock_placeholder.markdown(f"### 🕒 {now.strftime('%Y-%m-%d %H:%M:%S')} ({now.tzname()})")
+        time.sleep(1)
+
+
 def show_dashboard():
     """Show main dashboard."""
     if _SHOW_BRANDING:
@@ -314,29 +423,21 @@ def show_dashboard():
             logout_user()
             st.rerun()
     
-    # Data source toggle in sidebar
+    # Sidebar with clock and data source toggle
     with st.sidebar:
-        st.markdown("### 🔄 Data Source")
-        use_demo_data = st.toggle(
-            "Use Demo Data", 
-            value=not st.session_state.use_real_data,
-            help="Toggle to use demo data instead of real data from Podium API"
-        )
-        st.session_state.use_real_data = not use_demo_data
+        # Clock
+        st.markdown("---")
+        clock_placeholder = st.empty()
         
-        if st.session_state.use_real_data:
-            if st.session_state.auth_token:
-                st.success("✅ Connected to Podium API")
-                if st.button("🔄 Refresh Data"):
-                    load_real_staves()
-                    load_real_clefs()
-                    st.rerun()
-            else:
-                st.error("❌ Not authenticated")
-                st.info("💡 Login to see real data")
+        if st.session_state.auth_token:
+            st.success("✅ Connected to Podium API")
+            if st.button("🔄 Refresh Data"):
+                load_real_staves()
+                load_real_clefs()
+                st.rerun()
         else:
-            st.info("📊 Using demo data")
-            st.caption("Toggle off to use real data")
+            st.error("❌ Not authenticated")
+            st.info("💡 Login to see real data")
 
     # Dashboard tabs
     tab1, tab2, tab3, tab4, tab5, tab6, tab7, tab8 = st.tabs([
@@ -376,118 +477,346 @@ def show_dashboard():
     
     if _SHOW_BRANDING:
         _render_footer_badge(width=160)
+        
+    # Clock update loop
+    while True:
+        now = datetime.now(pytz.utc).astimezone()
+        clock_placeholder.markdown(f"### 🕒 {now.strftime('%H:%M:%S')} ({now.tzname()})")
+        time.sleep(1)
+
+def generate_demo_results(clefs, staves):
+    """Generate mock check results for demo purposes."""
+    if not clefs or not staves:
+        return []
+    
+    results = []
+    for clef in clefs:
+        # Simulate two recent runs for each clef
+        for i in range(2):
+            # Make timestamps look realistic by subtracting a random timedelta
+            delta_minutes = np.random.randint(1, 24 * 60 * 3) # Up to 3 days ago
+            timestamp = datetime.now(pytz.utc) - timedelta(minutes=delta_minutes)
+            
+            status = np.random.choice(['pass', 'fail', 'warn'], p=[0.8, 0.1, 0.1])
+            results.append({
+                "id": f"check-demo-{uuid.uuid4().hex[:6]}",
+                "clef_id": clef.get('id'),
+                "stave_id": clef.get('stave_id'),
+                "status": status,
+                "timestamp": timestamp.isoformat(),
+                "execution_time": np.random.uniform(0.1, 2.5),
+                "anomalies_count": np.random.randint(0, 5) if status == 'fail' else 0,
+                "message": f"Demo run {i+1} for {clef.get('name')}",
+                "metadata": {"source": "demo_data"}
+            })
+    
+    # Sort by timestamp to make it realistic
+    results.sort(key=lambda x: x['timestamp'], reverse=True)
+    return results
+
+# Helper functions for overview tab
+def get_recent_check_results():
+    """Get recent check results from API."""
+    try:
+        headers = {"Authorization": f"Bearer {st.session_state.auth_token}"}
+        with httpx.Client() as client:
+            # Get results from all clefs (we'll get the most recent ones)
+            response = client.get(f"{PODIUM_API_BASE}/api/v1/clefs/", headers=headers)
+            if response.status_code == 200:
+                clefs = response.json()
+                all_results = []
+                
+                # Get recent results for each clef
+                for clef in clefs:  # Get results from ALL clefs, not just first 5
+                    clef_id = clef.get('id')
+                    results_response = client.get(f"{PODIUM_API_BASE}/api/v1/clefs/{clef_id}/results", headers=headers)
+                    if results_response.status_code == 200:
+                        results_data = results_response.json()
+                        clef_results = results_data.get('results', [])
+                        for result in clef_results[:2]:  # Get 2 most recent per clef
+                            result['clef_id'] = clef_id
+                            result['stave_id'] = clef.get('stave_id')
+                            all_results.append(result)
+                
+                # Sort by timestamp and return most recent
+                all_results.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+                
+                # Debug: Show what we found
+                if all_results:
+                    st.caption(f"🔍 Found {len(all_results)} recent results from {len(clefs)} clefs")
+                
+                return all_results[:15]  # Return 15 most recent
+    except Exception as e:
+        st.error(f"Error loading recent results: {str(e)}")
+    return []
+
+def get_latest_stave_status(stave_id, recent_results):
+    """Get the latest status for a specific stave, preferring successful results."""
+    stave_results = [r for r in recent_results if r.get('stave_id') == stave_id]
+    if not stave_results:
+        return None
+    
+    # Sort by timestamp (most recent first)
+    stave_results.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+    
+    # First try to find a successful result
+    for result in stave_results:
+        status = str(result.get('status', '')).lower().strip()
+        if status in ['pass', 'harmony', 'success']:
+            return result
+    
+    # If no successful result, return the most recent
+    return stave_results[0]
+
+def format_timestamp_for_display(timestamp_str):
+    """Convert UTC timestamp to local timezone for display."""
+    if not timestamp_str:
+        return "Unknown"
+    
+    try:
+        from datetime import datetime, timezone
+        
+        # Parse timestamp
+        if 'T' in timestamp_str:
+            dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        else:
+            dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+        
+        # Ensure timezone aware (assume UTC if not specified)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        
+        # Convert to local timezone
+        dt_local = dt.astimezone()
+        
+        # Format for display with timezone
+        return dt_local.strftime('%Y-%m-%d %H:%M:%S %Z')
+        
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+def get_time_ago(timestamp_str):
+    """Convert timestamp to human readable time ago using browser's local timezone."""
+    if not timestamp_str:
+        return "Unknown"
+    
+    try:
+        from datetime import datetime, timezone
+        
+        # Parse timestamp
+        if 'T' in timestamp_str:
+            dt = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+        else:
+            dt = datetime.strptime(timestamp_str, '%Y-%m-%d %H:%M:%S')
+        
+        # Ensure timezone aware (assume UTC if not specified)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        
+        # Use browser's local timezone (Streamlit runs in browser)
+        now_local = datetime.now(timezone.utc).astimezone()
+        dt_local = dt.astimezone()
+        
+        diff = now_local - dt_local
+        
+        # Handle past timestamps only (executions should always be in the past)
+        if diff.total_seconds() < 0:
+            # If somehow in future, just show "Just now"
+            return "Just now"
+        
+        seconds = diff.total_seconds()
+        
+        if seconds > 86400:  # More than a day
+            days = int(seconds // 86400)
+            return f"{days} day{'s' if days > 1 else ''} ago"
+        elif seconds > 3600:  # More than an hour
+            hours = int(seconds // 3600)
+            return f"{hours} hour{'s' if hours > 1 else ''} ago"
+        elif seconds > 60:  # More than a minute
+            minutes = int(seconds // 60)
+            return f"{minutes} minute{'s' if minutes > 1 else ''} ago"
+        else:
+            return "Just now"
+    except Exception as e:
+        return f"Error: {str(e)}"
+
+def get_status_icon(status):
+    """Get status icon based on status."""
+    if not status:
+        return "❓"
+    
+    # Normalize status to lowercase and clean up
+    status_clean = str(status).lower().strip()
+    
+    # Remove emoji prefixes if present
+    status_clean = status_clean.replace('✅', '').replace('❌', '').replace('⚠️', '').strip()
+    
+    status_map = {
+        'pass': '✅',
+        'harmony': '✅',
+        'success': '✅',
+        'fail': '❌',
+        'cacophony': '❌',
+        'error': '❌',
+        'warn': '⚠️',
+        'dissonance': '⚠️',
+        'warning': '⚠️'
+    }
+    return status_map.get(status_clean, f"❓ {status}")
+
+def get_status_display(status):
+    """Get formatted status display."""
+    if not status:
+        return "❓ Unknown"
+    
+    # Normalize status to lowercase and clean up
+    status_clean = str(status).lower().strip()
+    
+    # Remove emoji prefixes if present
+    status_clean = status_clean.replace('✅', '').replace('❌', '').replace('⚠️', '').strip()
+    
+    status_map = {
+        'pass': '✅ Passed',
+        'harmony': '✅ Passed',
+        'success': '✅ Passed',
+        'fail': '❌ Failed',
+        'cacophony': '❌ Failed',
+        'error': '❌ Failed',
+        'warn': '⚠️ Warning',
+        'dissonance': '⚠️ Warning',
+        'warning': '⚠️ Warning'
+    }
+    return status_map.get(status_clean, f"❓ {status}")
+
+def get_stave_type_icon(stave_type):
+    """Get icon for stave type."""
+    icon_map = {
+        'sqlite': '🗄️',
+        'postgresql': '🐘',
+        'mysql': '🐬',
+        'mongodb': '🍃',
+        'redis': '🔴'
+    }
+    return icon_map.get(stave_type.lower(), '📊')
+
+def get_clef_name_by_id(clef_id, clefs):
+    """Get clef name by ID."""
+    for clef in clefs:
+        if clef.get('id') == clef_id:
+            return clef.get('name', 'Unknown Clef')
+    return 'Unknown Clef'
+
+def get_stave_name_by_id(stave_id, staves):
+    """Get stave name by ID."""
+    for stave in staves:
+        if stave.get('id') == stave_id:
+            return stave.get('name', 'Unknown Stave')
+    return 'Unknown Stave'
+
+def test_stave_connection(stave_id):
+    """Test connection to a specific stave."""
+    try:
+        headers = {"Authorization": f"Bearer {st.session_state.auth_token}"}
+        with httpx.Client() as client:
+            response = client.post(f"{PODIUM_API_BASE}/api/v1/stave-actions/{stave_id}/test-connection", headers=headers)
+            if response.status_code == 200:
+                st.success("✅ Connection test successful!")
+            else:
+                st.error(f"❌ Connection test failed: {response.text}")
+    except Exception as e:
+        st.error(f"❌ Error testing connection: {str(e)}")
 
 def show_overview_tab():
-    """Show overview tab with system health metrics."""
-    st.markdown("## 📊 System Overview")
-    
-    if st.session_state.use_real_data and st.session_state.auth_token:
-        # Load real data
+    """Show overview tab with real-time system health metrics."""
+    st.markdown("## 🎵 System Overview")
+    st.markdown("Welcome to your DataMetronome dashboard. Here's a summary of your data quality monitoring system.")
+
+    # Load real data
+    if st.session_state.auth_token:
         staves = load_real_staves()
         clefs = load_real_clefs()
-        st.info(f"🔍 System health metrics from {len(staves)} configured staves and {len(clefs)} clefs.")
-    elif st.session_state.use_real_data and not st.session_state.auth_token:
-        staves = []
-        clefs = []
-        st.warning("🔍 Real data mode enabled but not authenticated. Please login to see actual configurations.")
+        recent_results = get_recent_check_results()
+        
+        if st.button("🔄 Refresh", key="refresh_overview"):
+            st.rerun()
     else:
         staves = []
         clefs = []
-        st.info("🔍 System health metrics from demo data. Disable 'Use Demo Data' to see actual configurations.")
-    
-    # System health metrics
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.markdown("""
-        <div class="metric-card">
-            <h3>System Status</h3>
-            <h2>✅ Healthy</h2>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown("""
-        <div class="metric-card">
-            <h3>API Status</h3>
-            <h2>🟢 Running</h2>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        st.markdown("""
-        <div class="metric-card">
-            <h3>Database</h3>
-            <h2>🟢 Connected</h2>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col4:
-        st.markdown("""
-        <div class="metric-card">
-            <h3>Last Check</h3>
-            <h2>2 hours ago</h2>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Stave status overview
-    st.markdown("## ⚙️ Monitoring Stave Status")
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        st.markdown("### 🔍 Data Quality Staves")
-        st.markdown("""
-        - **Users Monitor**: ✅ Last run: 2 hours ago
-        - **Orders Monitor**: ✅ Last run: 1 hour ago
-        - **Events Monitor**: ⚠️ Last run: 3 hours ago
-        """)
-    
-    with col2:
-        st.markdown("### 🤖 ML Analysis Staves")
-        st.markdown("""
-        - **ML Anomaly Detector**: ✅ Last run: 1 hour ago
-        - **Model Training**: ✅ Last run: 6 hours ago
-        - **Performance Monitor**: ✅ Last run: 1 hour ago
-        """)
-    
-    with col3:
-        st.markdown("### 📊 Analytics Staves")
-        st.markdown("""
-        - **Distribution Analyzer**: ✅ Last run: 4 hours ago
-        - **Time Series Analyzer**: ✅ Last run: 4 hours ago
-        - **Pattern Detector**: ✅ Last run: 4 hours ago
-        """)
-    
-    # Quick actions
-    st.markdown("## 🚀 Quick Actions")
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        if st.button("🔄 Refresh All Staves", use_container_width=True):
-            st.success("All monitoring staves refreshed!")
-            st.rerun()
-    
-    with col2:
-        if st.button("📊 Run Health Check", use_container_width=True):
-            st.info("Health check completed! All systems operational.")
-    
-    with col3:
-        if st.button("📈 View Performance", use_container_width=True):
-            st.info("Performance metrics loaded!")
-    
-    # Recent activity
-    st.markdown("## 📋 Recent Activity")
-    
-    recent_activity = pd.DataFrame({
-        "Time": ["2 hours ago", "1 hour ago", "3 hours ago", "4 hours ago", "6 hours ago"],
-        "Stave": ["Users Monitor", "Orders Monitor", "Events Monitor", "Analytics Suite", "ML Training"],
-        "Action": ["Data quality check", "Anomaly detection", "Schema validation", "Trend analysis", "Model update"],
-        "Status": ["✅ Passed", "✅ Passed", "❌ Failed", "✅ Completed", "✅ Completed"],
-        "Details": ["150 records checked", "7 anomalies found", "Column type change", "Patterns analyzed", "Model accuracy: 94.2%"]
-    })
-    
-    st.dataframe(recent_activity, use_container_width=True)
+        recent_results = []
+        st.warning("🔍 Please login to see real-time data")
+
+    # Main layout with two columns
+    left_col, right_col = st.columns((2, 1))
+
+    with left_col:
+        st.markdown("### 📊 System Health Metrics")
+        col1, col2, col3, col4 = st.columns(4)
+        
+        total_checks = len(recent_results)
+        passed_checks = len([r for r in recent_results if r.get('status') in ['pass', 'harmony', 'success']])
+        success_rate = (passed_checks / total_checks * 100) if total_checks > 0 else 100
+        
+        with col1:
+            st.metric("Success Rate", f"{success_rate:.1f}%")
+        with col2:
+            st.metric("Active Staves", len(staves))
+        with col3:
+            st.metric("Active Clefs", len(clefs))
+        with col4:
+            st.metric("Scheduled Clefs", len([c for c in clefs if c.get('schedule')]))
+
+        st.markdown("---")
+        
+        # Enhanced Recent Activity
+        st.markdown("### 📋 Recent Activity")
+        if recent_results:
+            for result in recent_results[:5]: # Show 5 most recent
+                clef_name = get_clef_name_by_id(result.get('clef_id'), clefs)
+                stave_name = get_stave_name_by_id(result.get('stave_id'), staves)
+                with st.expander(f"{get_status_icon(result.get('status'))} **{clef_name}** on *{stave_name}* - {get_time_ago(result.get('timestamp'))}"):
+                    st.json(result)
+        else:
+            st.info("No recent activity found.")
+
+    with right_col:
+        st.markdown("### ⚙️ Data Source Status")
+        if staves:
+            for stave in staves:
+                latest_result = get_latest_stave_status(stave.get('id'), recent_results)
+                status_icon = get_status_icon(latest_result.get('status')) if latest_result else "⏸️"
+                time_ago = get_time_ago(latest_result.get('timestamp')) if latest_result else "No recent activity"
+                st.markdown(f"**{stave.get('name')}**: {status_icon} _{time_ago}_")
+        else:
+            st.info("No staves configured.")
+
+        st.markdown("---")
+        
+        # Quick Actions
+        st.markdown("### 🚀 Quick Actions")
+        if st.button("▶️ Run All Clefs", use_container_width=True):
+            st.info("This feature is coming soon!")
+        if st.button("📄 New Report", use_container_width=True):
+            st.info("This feature is coming soon!")
+
+        st.markdown("---")
+
+        # Status chart
+        st.markdown("### ✅ Checks Summary")
+        if recent_results:
+            passed_count = len([r for r in recent_results if r.get('status') in ['pass', 'harmony', 'success']])
+            failed_count = len([r for r in recent_results if r.get('status') in ['fail', 'cacophony', 'error']])
+            warning_count = len([r for r in recent_results if r.get('status') in ['warn', 'dissonance', 'warning']])
+            
+            chart_data = pd.DataFrame({
+                "Status": ["Passed", "Failed", "Warning"],
+                "Count": [passed_count, failed_count, warning_count],
+            })
+            
+            fig = px.bar(chart_data, x="Status", y="Count", color="Status",
+                         color_discrete_map={"Passed": "green", "Failed": "red", "Warning": "orange"})
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("No check results to display.")
 
 def show_anomalies_tab():
     """Show anomalies tab with data quality monitoring."""
@@ -1051,12 +1380,61 @@ def show_staves_tab():
                         st.json(config)
                 
                 with col2:
-                    if st.button("🗑️ Delete", key=f"delete_stave_{stave.get('id')}"):
-                        # TODO: Implement delete functionality
-                        st.info("Delete functionality will be implemented.")
+                    stave_id = stave.get('id')
+                    stave_name = stave.get('name', 'Unnamed')
+                    
+                    # Initialize confirmation state if not exists
+                    if f"confirm_delete_stave_{stave_id}" not in st.session_state:
+                        st.session_state[f"confirm_delete_stave_{stave_id}"] = False
+                    
+                    if st.session_state[f"confirm_delete_stave_{stave_id}"]:
+                        st.warning(f"⚠️ Are you sure you want to delete '{stave_name}'?")
+                        col_yes, col_no = st.columns(2)
+                        with col_yes:
+                            if st.button("✅ Yes, Delete", key=f"yes_delete_stave_{stave_id}"):
+                                delete_stave(stave_id, stave_name)
+                                st.session_state[f"confirm_delete_stave_{stave_id}"] = False
+                                st.rerun()
+                        with col_no:
+                            if st.button("❌ Cancel", key=f"no_delete_stave_{stave_id}"):
+                                st.session_state[f"confirm_delete_stave_{stave_id}"] = False
+                                st.rerun()
+                    else:
+                        if st.button("🗑️ Delete", key=f"delete_stave_{stave_id}"):
+                            st.session_state[f"confirm_delete_stave_{stave_id}"] = True
+                            st.rerun()
                     
                     if st.button("🔄 Test", key=f"test_stave_{stave.get('id')}"):
                         test_stave_connection(stave.get('id'))
+
+                    if st.button("✨ Generate Data", key=f"generate_data_stave_{stave.get('id')}"):
+                        stave_id = stave.get('id')
+                        stave_name = stave.get('name', 'Unknown')
+                        
+                        # Show options for data generation
+                        st.subheader(f"Generate Data for {stave_name}")
+                        
+                        col1, col2 = st.columns(2)
+                        
+                        with col1:
+                            if st.button("👥 Generate Users", key=f"gen_users_{stave_id}"):
+                                generate_sample_data(stave_id, "users", 50)
+                        
+                        with col2:
+                            if st.button("📦 Generate Products", key=f"gen_products_{stave_id}"):
+                                generate_sample_data(stave_id, "products", 25)
+                        
+                        col3, col4 = st.columns(2)
+                        
+                        with col3:
+                            if st.button("🛒 Generate Orders", key=f"gen_orders_{stave_id}"):
+                                generate_sample_data(stave_id, "orders", 100)
+                        
+                        with col4:
+                            if st.button("🔄 Refresh All Data", key=f"refresh_all_{stave_id}"):
+                                generate_sample_data(stave_id, "users", 50)
+                                generate_sample_data(stave_id, "products", 25)
+                                generate_sample_data(stave_id, "orders", 100)
     else:
         st.info("No staves configured. Create your first data source above.")
 
@@ -1182,9 +1560,29 @@ def show_clefs_tab():
                         st.json(clef['config'])
                 
                 with col2:
-                    if st.button("🗑️ Delete", key=f"delete_clef_{clef.get('id')}"):
-                        # TODO: Implement delete functionality
-                        st.info("Delete functionality will be implemented.")
+                    clef_id = clef.get('id')
+                    clef_name = clef.get('name', 'Unnamed')
+                    
+                    # Initialize confirmation state if not exists
+                    if f"confirm_delete_clef_{clef_id}" not in st.session_state:
+                        st.session_state[f"confirm_delete_clef_{clef_id}"] = False
+                    
+                    if st.session_state[f"confirm_delete_clef_{clef_id}"]:
+                        st.warning(f"⚠️ Are you sure you want to delete '{clef_name}'?")
+                        col_yes, col_no = st.columns(2)
+                        with col_yes:
+                            if st.button("✅ Yes, Delete", key=f"yes_delete_clef_{clef_id}"):
+                                delete_clef(clef_id, clef_name)
+                                st.session_state[f"confirm_delete_clef_{clef_id}"] = False
+                                st.rerun()
+                        with col_no:
+                            if st.button("❌ Cancel", key=f"no_delete_clef_{clef_id}"):
+                                st.session_state[f"confirm_delete_clef_{clef_id}"] = False
+                                st.rerun()
+                    else:
+                        if st.button("🗑️ Delete", key=f"delete_clef_{clef_id}"):
+                            st.session_state[f"confirm_delete_clef_{clef_id}"] = True
+                            st.rerun()
                     
                     if st.button("▶️ Run Now", key=f"run_clef_{clef.get('id')}"):
                         run_clef_now(clef.get('id'))
@@ -1294,7 +1692,7 @@ def view_clef_results(clef_id):
                     df_data = []
                     for r in results:
                         df_data.append({
-                            'Timestamp': r.get('timestamp', 'Unknown'),
+                            'Timestamp': format_timestamp_for_display(r.get('timestamp')),
                             'Status': r.get('status', 'unknown'),
                             'Message': r.get('message', 'No message'),
                             'Execution Time': f"{r.get('execution_time', 0):.3f}s" if r.get('execution_time') is not None else "N/A",

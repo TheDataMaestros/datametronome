@@ -102,11 +102,11 @@ async def _store_clef_result(clef_id: str, result, clef, db) -> None:
             "stave_id": clef.stave_id,
             "clef_id": clef_id,
             "check_type": clef.check_type,
-            "status": str(result.severity).lower(),
+            "status": result.status,  # Store the actual status: "pass", "warn", or "fail"
             "message": result.message,
             "details": metadata_json,
             "timestamp": datetime.utcnow().isoformat(),
-            "severity": str(result.severity).lower()
+            "severity": result.severity.value  # Store the severity value: "harmony", "dissonance", "cacophony"
         }], "checks")
         
         if success:
@@ -253,11 +253,18 @@ async def get_scheduled_clefs() -> List[Dict[str, Any]]:
                 
                 if clef_result:
                     clef = deserialize_clef(clef_result[0])
+                    
+                    # Ensure next_run timestamp is in UTC format
+                    next_run = None
+                    if job.next_run_time:
+                        from datametronome_podium.core.timestamp_utils import to_utc_isoformat
+                        next_run = to_utc_isoformat(job.next_run_time)
+                    
                     scheduled_clefs.append({
                         "clef_id": clef_id,
                         "clef_name": clef.name,
                         "schedule": clef.schedule,
-                        "next_run": job.next_run_time.isoformat() if job.next_run_time else None,
+                        "next_run": next_run,
                         "job_id": job.id
                     })
         
