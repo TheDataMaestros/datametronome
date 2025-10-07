@@ -13,11 +13,11 @@ staves:
 
 # Clefs designed to show different severity levels and check types
 clefs:
-  # Harmony (Pass) Examples
+  # Row Count Check
   - id: clef-harmony-row-count
     stave_id: stave-demo-sqlite
-    name: ✅ Harmony - Healthy Row Count
-    description: This check should always pass - shows Harmony status
+    name: Users Table Row Count Check
+    description: Monitors the total number of users in the database
     check_type: row_count
     config:
       table: users
@@ -26,11 +26,11 @@ clefs:
     schedule: "@hourly"
     is_active: true
     
-  # Dissonance (Warning) Examples
+  # Email NULL Check
   - id: clef-dissonance-null-emails
     stave_id: stave-demo-sqlite
-    name: ⚠️ Dissonance - Some NULL Emails
-    description: This check shows Dissonance when some emails are NULL
+    name: Email NULL Values Check
+    description: Validates that email addresses are not NULL in user records
     check_type: column_values
     config:
       table: users
@@ -43,8 +43,8 @@ clefs:
     
   - id: clef-dissonance-freshness
     stave_id: stave-demo-sqlite
-    name: ⚠️ Dissonance - Data Getting Stale
-    description: Shows Dissonance when data is getting stale
+    name: Products Data Freshness Check
+    description: Monitors how recently the products table was updated
     check_type: freshness
     config:
       table: products
@@ -55,11 +55,11 @@ clefs:
     schedule: "@hourly"
     is_active: true
     
-  # Cacophony (Failure) Examples
+  # User Name NULL Check
   - id: clef-cacophony-critical-nulls
     stave_id: stave-demo-sqlite
-    name: ❌ Cacophony - Critical NULL Values
-    description: This check fails when critical data is missing
+    name: User Name NULL Values Check
+    description: Ensures all users have valid names (no NULLs allowed)
     check_type: column_values
     config:
       table: users

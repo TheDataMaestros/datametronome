@@ -36,6 +36,7 @@ class ClefBase(BaseModel):
         }
     })
     
+    stave_id: str = Field(..., description="ID of the associated stave")
     name: str = Field(
         ..., 
         min_length=1, 
@@ -136,11 +137,7 @@ class ClefBase(BaseModel):
 
 class ClefCreate(ClefBase):
     """Schema for creating a clef."""
-    
-    id: str
-    stave_id: str = Field(..., description="ID of the associated stave")
-    created_at: str
-    updated_at: str
+    pass
 
 
 class ClefUpdate(BaseModel):
@@ -159,7 +156,6 @@ class ClefResponse(ClefBase):
     """Schema for clef responses."""
     
     id: str
-    stave_id: str
     created_at: str
     updated_at: str
     
