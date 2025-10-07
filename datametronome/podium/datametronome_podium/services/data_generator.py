@@ -13,16 +13,32 @@ from faker import Faker
 
 fake = Faker()
 
+def generate_users_data(count: int = 100) -> list[dict]:
+    """Generate a list of sample users."""
+    users = []
+    for _ in range(count):
+        users.append({
+            "id": str(uuid.uuid4()),
+            "name": fake.name(),
+            "email": fake.email(),
+            "age": random.randint(18, 80),
+            "created_at": fake.date_time_between(start_date="-1y", end_date="now").isoformat() + "Z",
+            "updated_at": fake.date_time_between(start_date="-1y", end_date="now").isoformat() + "Z"
+        })
+    return users
+
 def generate_products_data(count: int = 100) -> list[dict]:
     """Generate a list of sample products."""
     products = []
     for _ in range(count):
         products.append({
-            "product_id": str(uuid.uuid4()),
+            "id": str(uuid.uuid4()),
             "name": fake.ecommerce_name(),
-            "category": fake.ecommerce_category(),
+            "description": fake.text(max_nb_chars=200),
             "price": round(random.uniform(5.0, 500.0), 2),
-            "created_at": fake.date_time_this_year().isoformat()
+            "category": fake.ecommerce_category(),
+            "in_stock": random.choice([True, False]),
+            "created_at": fake.date_time_between(start_date="-1y", end_date="now").isoformat() + "Z"
         })
     return products
 
@@ -36,12 +52,12 @@ def generate_orders_data(products: list[dict], count: int = 500) -> list[dict]:
         product = random.choice(products)
         quantity = random.randint(1, 5)
         orders.append({
-            "order_id": str(uuid.uuid4()),
-            "product_id": product["product_id"],
-            "customer_email": fake.email(),
+            "id": str(uuid.uuid4()),
+            "user_id": str(uuid.uuid4()),  # Generate random user ID
+            "product_id": product["id"],
             "quantity": quantity,
-            "total_price": round(product["price"] * quantity, 2),
-            "order_date": fake.date_time_between(start_date="-1y", end_date="now").isoformat(),
+            "total_amount": round(product["price"] * quantity, 2),
+            "order_date": fake.date_time_between(start_date="-1y", end_date="now").isoformat() + "Z",
             "status": random.choice(["completed", "shipped", "pending", "cancelled"])
         })
     return orders
@@ -51,11 +67,11 @@ def generate_clickstream_data(count: int = 1000) -> list[dict]:
     events = []
     for _ in range(count):
         events.append({
-            "event_id": str(uuid.uuid4()),
-            "user_id": fake.uuid4(),
-            "url": fake.uri(),
-            "event_type": random.choice(["page_view", "click", "add_to_cart", "purchase"]),
-            "timestamp": datetime.utcnow().isoformat() + "Z",
-            "ip_address": fake.ipv4()
+            "id": str(uuid.uuid4()),
+            "user_id": str(uuid.uuid4()),
+            "page_url": fake.uri(),
+            "click_timestamp": fake.date_time_between(start_date="-1y", end_date="now").isoformat() + "Z",
+            "session_id": str(uuid.uuid4()),
+            "user_agent": fake.user_agent()
         })
     return events

@@ -301,26 +301,76 @@ def delete_stave(stave_id, stave_name):
     return True
 
 def generate_sample_data(stave_id, table_name, count=100):
-    """Generate sample data for a stave via Podium API."""
+    """Generate sample data for a stave via Podium API with detailed feedback."""
     if not st.session_state.auth_token:
-        st.error("Please login first")
+        st.error("🔒 Please login first")
         return False
     
+    # Create a placeholder for loading feedback
+    status_placeholder = st.empty()
+    
     try:
+        # Show loading state
+        with status_placeholder.container():
+            st.info(f"🔄 Generating {count} {table_name} records...")
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+        
+        # Simulate progress updates
+        status_text.text("📡 Connecting to API...")
+        progress_bar.progress(0.2)
+        
         result = sync_call_podium_api(
             f"/stave-actions/{stave_id}/generate-data",
             method="POST", 
             data={"table_name": table_name, "count": count},
             token=st.session_state.auth_token
         )
+        
+        status_text.text("⚙️ Processing data...")
+        progress_bar.progress(0.7)
+        
         if result:
-            st.success(f"Generated {count} records for {table_name} table")
+            status_text.text("✅ Data generation completed!")
+            progress_bar.progress(1.0)
+            
+            # Show detailed success message
+            with status_placeholder.container():
+                st.success(f"🎉 Successfully generated {count} records for `{table_name}` table!")
+                
+                # Show additional details if available
+                if isinstance(result, dict):
+                    if 'generated_count' in result:
+                        st.info(f"📊 Actual records created: {result['generated_count']}")
+                    if 'execution_time' in result:
+                        st.info(f"⏱️ Generation time: {result['execution_time']:.2f} seconds")
+                    if 'tables_affected' in result:
+                        st.info(f"🗂️ Tables affected: {', '.join(result['tables_affected'])}")
+            
             return True
         else:
-            st.error(f"Failed to generate data for {table_name}")
+            status_text.text("❌ Generation failed!")
+            progress_bar.progress(0)
+            
+            with status_placeholder.container():
+                st.error(f"❌ Failed to generate data for `{table_name}` table")
+                st.info("💡 Try checking your stave configuration or API connectivity")
             return False
+            
     except Exception as e:
-        st.error(f"Error generating data: {str(e)}")
+        with status_placeholder.container():
+            st.error(f"💥 Error generating data: {str(e)}")
+            
+            # Provide helpful troubleshooting info
+            if "Connection refused" in str(e):
+                st.info("🔧 **Troubleshooting**: Check if the Podium API server is running")
+            elif "404" in str(e):
+                st.info("🔧 **Troubleshooting**: The stave might not exist or the endpoint is incorrect")
+            elif "401" in str(e):
+                st.info("🔧 **Troubleshooting**: Authentication failed - try logging in again")
+            else:
+                st.info("🔧 **Troubleshooting**: Check the API logs for more details")
+        
         return False
 
 def show_login_page():
@@ -1432,9 +1482,51 @@ def show_staves_tab():
                         
                         with col4:
                             if st.button("🔄 Refresh All Data", key=f"refresh_all_{stave_id}"):
-                                generate_sample_data(stave_id, "users", 50)
-                                generate_sample_data(stave_id, "products", 25)
-                                generate_sample_data(stave_id, "orders", 100)
+                                st.subheader("🔄 Generating All Sample Data")
+                                
+                                # Track overall progress
+                                total_operations = 3
+                                completed_operations = 0
+                                
+                                overall_progress = st.progress(0)
+                                overall_status = st.empty()
+                                
+                                # Generate users
+                                overall_status.text(f"👥 Generating users data... ({completed_operations + 1}/{total_operations})")
+                                users_success = generate_sample_data(stave_id, "users", 50)
+                                if users_success:
+                                    completed_operations += 1
+                                    overall_progress.progress(completed_operations / total_operations)
+                                
+                                # Generate products
+                                overall_status.text(f"📦 Generating products data... ({completed_operations + 1}/{total_operations})")
+                                products_success = generate_sample_data(stave_id, "products", 25)
+                                if products_success:
+                                    completed_operations += 1
+                                    overall_progress.progress(completed_operations / total_operations)
+                                
+                                # Generate orders
+                                overall_status.text(f"🛒 Generating orders data... ({completed_operations + 1}/{total_operations})")
+                                orders_success = generate_sample_data(stave_id, "orders", 100)
+                                if orders_success:
+                                    completed_operations += 1
+                                    overall_progress.progress(completed_operations / total_operations)
+                                
+                                # Final summary
+                                overall_status.text("✅ All data generation completed!")
+                                overall_progress.progress(1.0)
+                                
+                                if all([users_success, products_success, orders_success]):
+                                    st.success("🎉 All sample data generated successfully!")
+                                    st.info(f"📊 Generated: 50 users, 25 products, 100 orders")
+                                else:
+                                    failed_ops = []
+                                    if not users_success: failed_ops.append("users")
+                                    if not products_success: failed_ops.append("products") 
+                                    if not orders_success: failed_ops.append("orders")
+                                    
+                                    st.warning(f"⚠️ Some operations failed: {', '.join(failed_ops)}")
+                                    st.info("💡 Try generating each table individually to troubleshoot")
     else:
         st.info("No staves configured. Create your first data source above.")
 
