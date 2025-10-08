@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -300,7 +301,7 @@ def delete_stave(stave_id, stave_name):
     st.success(f"Deleted stave: {stave_name}")
     return True
 
-def preview_stave_data(stave_id, stave_name):
+def preview_stave_data(stave_id, stave_name, table_name=None):
     """Preview data from a stave's tables."""
     if not st.session_state.auth_token:
         st.error("🔒 Please login first")
@@ -308,71 +309,127 @@ def preview_stave_data(stave_id, stave_name):
     
     st.subheader(f"👁️ Data Preview: {stave_name}")
     
-    # Common table names to check
-    common_tables = ["users", "products", "orders", "clicks", "events", "customers", "transactions"]
-    
-    # Table selection
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        selected_table = st.selectbox(
-            "Select table to preview:",
-            common_tables,
-            key=f"preview_table_select_{stave_id}"
-        )
-    
-    with col2:
-        limit = st.number_input("Rows to show:", min_value=5, max_value=100, value=10, step=5, key=f"preview_limit_{stave_id}")
-    
-    if st.button("🔍 Load Preview", key=f"load_preview_{stave_id}_{selected_table}"):
-        with st.spinner(f"Loading {selected_table} data..."):
-            try:
-                # Call API to get sample data
-                result = sync_call_podium_api(
-                    f"/stave-actions/{stave_id}/preview-data",
-                    method="POST",
-                    data={"table_name": selected_table, "limit": limit},
-                    token=st.session_state.auth_token
-                )
+    # For DEMO staves, use the specific table with fixed limit
+    if table_name:
+        # Direct preview for DEMO staves - automatically load 10 rows
+        selected_table = table_name
+        limit = 10  # Fixed limit for DEMO staves
+        
+        try:
+            # Call API to get sample data
+            result = sync_call_podium_api(
+                f"/stave-actions/{stave_id}/preview-data",
+                method="POST",
+                data={"table_name": selected_table, "count": limit},
+                token=st.session_state.auth_token
+            )
+            
+            if result and isinstance(result, dict) and result.get('success'):
+                data = result.get('data', [])
                 
-                if result and result.get('success'):
-                    data = result.get('data', [])
+                if data:
+                    st.success(f"📊 Showing {len(data)} records from `{selected_table}` table")
                     
-                    if data:
-                        st.success(f"📊 Found {len(data)} records in `{selected_table}` table")
-                        
-                        # Display as DataFrame
-                        df = pd.DataFrame(data)
-                        st.dataframe(df, use_container_width=True)
-                        
-                        # Show additional info
-                        col1, col2, col3 = st.columns(3)
-                        with col1:
-                            st.metric("Rows", len(data))
-                        with col2:
-                            st.metric("Columns", len(df.columns) if not df.empty else 0)
-                        with col3:
-                            st.metric("Table", selected_table)
-                        
-                        # Download option
-                        csv = df.to_csv(index=False)
-                        st.download_button(
-                            label="📥 Download CSV",
-                            data=csv,
-                            file_name=f"{selected_table}_sample.csv",
-                            mime="text/csv",
-                            key=f"download_preview_{stave_id}_{selected_table}"
-                        )
-                    else:
-                        st.info(f"ℹ️ No data found in `{selected_table}` table. Try generating some data first!")
+                    # Display as DataFrame
+                    df = pd.DataFrame(data)
+                    st.dataframe(df, use_container_width=True)
+                    
+                    # Show additional info
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        st.metric("Rows", len(data))
+                    with col2:
+                        st.metric("Columns", len(df.columns) if not df.empty else 0)
+                    with col3:
+                        st.metric("Table", selected_table)
+                    
+                    # Download option
+                    csv = df.to_csv(index=False)
+                    st.download_button(
+                        label="📥 Download CSV",
+                        data=csv,
+                        file_name=f"{selected_table}_sample.csv",
+                        mime="text/csv",
+                        key=f"download_preview_{stave_id}_{selected_table}"
+                    )
                 else:
-                    st.error(f"❌ Failed to preview data: {result.get('message', 'Unknown error')}")
+                    st.info(f"ℹ️ No data found in `{selected_table}` table. Try generating some data first!")
+            elif result and isinstance(result, dict):
+                st.error(f"❌ Failed to preview data: {result.get('message', 'Unknown error')}")
+            else:
+                st.error(f"❌ Failed to preview data - no valid response from API")
+                
+        except Exception as e:
+            st.error(f"💥 Error loading preview: {str(e)}")
+            if "404" in str(e):
+                st.info("💡 The table might not exist in this database")
+            elif "Connection refused" in str(e):
+                st.info("💡 Check if the API server is running")
+    else:
+        # Flexible preview for regular staves - show dropdown and options
+        common_tables = ["users", "products", "orders", "clicks", "events", "customers", "transactions"]
+        col1, col2 = st.columns([2, 1])
+        with col1:
+            selected_table = st.selectbox(
+                "Select table to preview:",
+                common_tables,
+                key=f"preview_table_select_{stave_id}"
+            )
+        with col2:
+            limit = st.number_input("Rows to show:", min_value=5, max_value=100, value=10, step=5, key=f"preview_limit_{stave_id}")
+        
+        if st.button("🔍 Load Preview", key=f"load_preview_{stave_id}_{selected_table}"):
+            with st.spinner(f"Loading {selected_table} data..."):
+                try:
+                    # Call API to get sample data
+                    result = sync_call_podium_api(
+                        f"/stave-actions/{stave_id}/preview-data",
+                        method="POST",
+                        data={"table_name": selected_table, "count": limit},
+                        token=st.session_state.auth_token
+                    )
                     
-            except Exception as e:
-                st.error(f"💥 Error loading preview: {str(e)}")
-                if "404" in str(e):
-                    st.info("💡 The table might not exist in this database")
-                elif "Connection refused" in str(e):
-                    st.info("💡 Check if the API server is running")
+                    if result and isinstance(result, dict) and result.get('success'):
+                        data = result.get('data', [])
+                        
+                        if data:
+                            st.success(f"📊 Showing {len(data)} records from `{selected_table}` table")
+                            
+                            # Display as DataFrame
+                            df = pd.DataFrame(data)
+                            st.dataframe(df, use_container_width=True)
+                            
+                            # Show additional info
+                            col1, col2, col3 = st.columns(3)
+                            with col1:
+                                st.metric("Rows", len(data))
+                            with col2:
+                                st.metric("Columns", len(df.columns) if not df.empty else 0)
+                            with col3:
+                                st.metric("Table", selected_table)
+                            
+                            # Download option
+                            csv = df.to_csv(index=False)
+                            st.download_button(
+                                label="📥 Download CSV",
+                                data=csv,
+                                file_name=f"{selected_table}_sample.csv",
+                                mime="text/csv",
+                                key=f"download_preview_{stave_id}_{selected_table}"
+                            )
+                        else:
+                            st.info(f"ℹ️ No data found in `{selected_table}` table. Try generating some data first!")
+                    elif result and isinstance(result, dict):
+                        st.error(f"❌ Failed to preview data: {result.get('message', 'Unknown error')}")
+                    else:
+                        st.error(f"❌ Failed to preview data - no valid response from API")
+                        
+                except Exception as e:
+                    st.error(f"💥 Error loading preview: {str(e)}")
+                    if "404" in str(e):
+                        st.info("💡 The table might not exist in this database")
+                    elif "Connection refused" in str(e):
+                        st.info("💡 Check if the API server is running")
 
 def show_data_generation_options(stave_id, stave_name):
     """Show data generation options for a stave."""
@@ -630,10 +687,29 @@ def show_dashboard():
     
     # Sidebar with clock and data source toggle
     with st.sidebar:
-        # Clock
+        # Live JavaScript clock that updates every second
         st.markdown("---")
-        clock_placeholder = st.empty()
-        
+        components.html("""
+            <div style="font-size: 1.5em; font-weight: 600; margin-bottom: 1em; color: inherit;">
+                🕒 <span id="live-clock">Loading...</span>
+            </div>
+            <script>
+                function updateClock() {
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString('en-US', { 
+                        hour12: false, 
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        second: '2-digit' 
+                    });
+                    const tzStr = now.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop();
+                    document.getElementById('live-clock').textContent = timeStr + ' (' + tzStr + ')';
+                }
+                updateClock();
+                setInterval(updateClock, 1000);
+            </script>
+        """, height=50)
+
         if st.session_state.auth_token:
             st.success("✅ Connected to Podium API")
             if st.button("🔄 Refresh Data"):
@@ -682,12 +758,6 @@ def show_dashboard():
     
     if _SHOW_BRANDING:
         _render_footer_badge(width=160)
-        
-    # Clock update loop
-    while True:
-        now = datetime.now(pytz.utc).astimezone()
-        clock_placeholder.markdown(f"### 🕒 {now.strftime('%H:%M:%S')} ({now.tzname()})")
-        time.sleep(1)
 
 def generate_demo_results(clefs, staves):
     """Generate mock check results for demo purposes."""
@@ -1612,12 +1682,44 @@ def show_staves_tab():
                     if st.button("🔄 Test", key=f"test_stave_{stave.get('id')}"):
                         test_stave_connection(stave.get('id'))
 
-                    # Data Preview Button
-                    if st.button("👁️ Preview Data", key=f"preview_data_stave_{stave.get('id')}"):
-                        preview_stave_data(stave.get('id'), stave.get('name', 'Unknown'))
+                    # Check if this is a DEMO stave
+                    is_demo_stave = stave_name.startswith('DEMO-')
                     
-                    if st.button("✨ Generate Data", key=f"generate_data_stave_{stave.get('id')}"):
-                        show_data_generation_options(stave.get('id'), stave.get('name', 'Unknown'))
+                    if is_demo_stave:
+                        # For DEMO staves, show simple direct buttons
+                        if 'Clickstream' in stave_name:
+                            # Initialize session state for preview
+                            preview_key = f"show_preview_{stave_id}"
+                            if preview_key not in st.session_state:
+                                st.session_state[preview_key] = False
+                            
+                            col_prev, col_gen = st.columns(2)
+                            
+                            with col_prev:
+                                if st.button("👁️ Preview Clicks", key=f"preview_{stave_id}", use_container_width=True):
+                                    st.session_state[preview_key] = not st.session_state[preview_key]
+                                    st.rerun()
+                            
+                            with col_gen:
+                                if st.button("✨ Generate Clicks", key=f"gen_{stave_id}", use_container_width=True):
+                                    with st.spinner("🔄 Generating clickstream data..."):
+                                        success = generate_sample_data(stave_id, "clicks", 50)
+                                        if success:
+                                            st.success("✅ Generated 50 click records!")
+                                            st.balloons()
+                            
+                            # Show preview panel if toggled on
+                            if st.session_state[preview_key]:
+                                with st.container():
+                                    st.markdown("---")
+                                    preview_stave_data(stave_id, stave_name, table_name="clicks")
+                    else:
+                        # For regular staves, show flexible options
+                        if st.button("👁️ Preview Data", key=f"preview_data_stave_{stave.get('id')}"):
+                            preview_stave_data(stave.get('id'), stave.get('name', 'Unknown'))
+                        
+                        if st.button("✨ Generate Data", key=f"generate_data_stave_{stave.get('id')}"):
+                            show_data_generation_options(stave.get('id'), stave.get('name', 'Unknown'))
     else:
         st.info("No staves configured. Create your first data source above.")
 

@@ -105,7 +105,7 @@ async def _store_clef_result(clef_id: str, result, clef, db) -> None:
             "status": result.status,  # Store the actual status: "pass", "warn", or "fail"
             "message": result.message,
             "details": metadata_json,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "severity": result.severity.value  # Store the severity value: "harmony", "dissonance", "cacophony"
         }], "checks")
         

@@ -49,14 +49,22 @@ DataMetronome is an **open-source, community-driven platform** that provides rea
 ## 🖼️ **Visual Showcase**
 
 <div align="center">
-  <h3>📊 Interactive Dashboard</h3>
-  <p><em>Real-time data quality monitoring with beautiful visualizations</em></p>
   
-  <h3>🚨 Anomaly Detection</h3>
-  <p><em>ML-powered outlier detection with statistical analysis</em></p>
-  
-  <h3>📈 Performance Analytics</h3>
-  <p><em>Comprehensive metrics and trend analysis</em></p>
+### 📊 Interactive Dashboard
+<img src=".cursor/screenshots/streamlit-ui-after-login.png" alt="DataMetronome Dashboard" width="800">
+
+*Real-time data quality monitoring with beautiful visualizations*
+
+### 🚨 System Status & Monitoring
+<img src=".cursor/screenshots/streamlit-ui-status.png" alt="System Status" width="800">
+
+*Live system health monitoring and performance metrics*
+
+### 📈 Data Analysis & Insights
+<img src=".cursor/screenshots/page-2025-10-04T18-19-49-798Z.png" alt="Data Analysis" width="800">
+
+*Comprehensive data analysis with interactive visualizations*
+
 </div>
 
 > **🎯 See it in action!** Launch the dashboard with `streamlit run datametronome/ui-streamlit/streamlit_app.py` and explore all features in real-time.

@@ -91,14 +91,14 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
         # Store the result in database
         import json
         check_data = {
-            "id": f"check-{clef_id}-{datetime.now().isoformat()}",
+            "id": f"check-{clef_id}-{datetime.utcnow().isoformat()}",
             "stave_id": stave.id,
             "clef_id": clef.id,
             "check_type": clef.check_type,
             "status": result.status,
             "message": result.message,
             "details": json.dumps(result.metadata) if result.metadata else None,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": datetime.utcnow().isoformat() + "Z",
             "execution_time": result.execution_time,
             "anomalies_count": len(result.metadata.get('anomalies', [])) if result.metadata else 0,
             "severity": result.severity.value  # Store the severity value: "harmony", "dissonance", "cacophony"

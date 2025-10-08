@@ -155,15 +155,23 @@ async def generate_sample_data(
         # Try to insert the data into the stave's database
         inserted_count = 0
         try:
-            tester = ConnectionTester()
-            connector = await tester.get_connector(stave)
-            
-            # Create table if it doesn't exist (basic schema)
-            await _ensure_table_exists(connector, table_name)
-            
-            # Insert the data
-            inserted_count = await connector.write(data, table_name)
-            logger.info(f"✅ Successfully inserted {inserted_count} records into {table_name}")
+            # Get connector based on stave type
+            if stave.data_source_type == "sqlite":
+                from metronome_pulse_sqlite import SQLitePulse
+                db_path = stave.connection_config.get('database_path', stave.connection_config.get('path'))
+                connector = SQLitePulse(db_path)
+                await connector.connect()
+                
+                # Create table if it doesn't exist
+                await _ensure_table_exists(connector, table_name)
+                
+                # Insert the data
+                success = await connector.write(data, table_name)
+                inserted_count = len(data) if success else 0
+                await connector.close()
+                logger.info(f"✅ Successfully inserted {inserted_count} records into {table_name}")
+            else:
+                logger.info(f"⏭️  Skipping data insertion for {stave.data_source_type} (not implemented yet)")
             
         except Exception as e:
             logger.warning(f"⚠️ Could not insert data into stave database: {e}")
@@ -229,12 +237,24 @@ async def preview_stave_data(
 
         # Try to fetch data from the stave's database
         try:
-            tester = ConnectionTester()
-            connector = await tester.get_connector(stave)
-            
-            # Query for sample data
-            query_sql = f"SELECT * FROM {table_name} LIMIT ?"
-            data = await connector.query({"sql": query_sql, "params": [limit]})
+            # Get connector based on stave type
+            if stave.data_source_type == "sqlite":
+                from metronome_pulse_sqlite import SQLiteReadonlyPulse
+                db_path = stave.connection_config.get('database_path', stave.connection_config.get('path'))
+                connector = SQLiteReadonlyPulse(db_path)
+                await connector.connect()
+                
+                # Query for sample data
+                data = await connector.query({
+                    "sql": f"SELECT * FROM {table_name} LIMIT ?",
+                    "params": [limit]
+                })
+                await connector.close()
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                    detail=f"Preview not implemented for {stave.data_source_type} yet"
+                )
             
             logger.info(f"📊 Retrieved {len(data) if data else 0} records from {table_name}")
             
