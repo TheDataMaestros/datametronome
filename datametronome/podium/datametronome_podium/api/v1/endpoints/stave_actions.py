@@ -204,6 +204,78 @@ async def generate_sample_data(
         )
 
 
+@router.post("/{stave_id}/preview-data")
+async def preview_stave_data(
+    stave_id: str,
+    request: GenerateDataRequest  # Reusing the same model, but with table_name and count=limit
+) -> Dict[str, Any]:
+    """
+    Preview data from a table in a stave's data source.
+    
+    This endpoint fetches a sample of data from the specified table for preview purposes.
+    """
+    try:
+        # Get the stave from database
+        db = await get_db()
+        staves = await db.query({"sql": "SELECT * FROM staves WHERE id = ?", "params": [stave_id]})
+        if not staves:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Stave not found")
+        
+        stave = deserialize_stave(staves[0])
+        table_name = request.table_name
+        limit = request.count  # Using count as limit for preview
+        
+        logger.info(f"🔍 Previewing data from stave {stave_id}, table {table_name}, limit {limit}")
+
+        # Try to fetch data from the stave's database
+        try:
+            tester = ConnectionTester()
+            connector = await tester.get_connector(stave)
+            
+            # Query for sample data
+            query_sql = f"SELECT * FROM {table_name} LIMIT ?"
+            data = await connector.query({"sql": query_sql, "params": [limit]})
+            
+            logger.info(f"📊 Retrieved {len(data) if data else 0} records from {table_name}")
+            
+            return {
+                "success": True,
+                "message": f"Successfully retrieved {len(data) if data else 0} records from table '{table_name}'",
+                "stave_id": stave_id,
+                "stave_name": stave.name,
+                "table_name": table_name,
+                "limit": limit,
+                "row_count": len(data) if data else 0,
+                "data": data or [],
+                "columns": list(data[0].keys()) if data and len(data) > 0 else []
+            }
+            
+        except Exception as e:
+            logger.warning(f"⚠️ Could not fetch data from table {table_name}: {e}")
+            
+            # If table doesn't exist or query fails, return helpful message
+            if "no such table" in str(e).lower():
+                return {
+                    "success": False,
+                    "message": f"Table '{table_name}' does not exist in this database",
+                    "stave_id": stave_id,
+                    "table_name": table_name,
+                    "data": [],
+                    "suggestion": "Try generating data for this table first"
+                }
+            else:
+                raise
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Data preview failed for stave {stave_id}, table {table_name}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Data preview failed: {str(e)}"
+        )
+
+
 async def _ensure_table_exists(connector, table_name: str):
     """Ensure a table exists with a basic schema for data generation."""
     try:

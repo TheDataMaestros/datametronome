@@ -98,12 +98,12 @@ async def create_default_staves_and_clefs():
         await clicks_db.execute(
             """
             CREATE TABLE IF NOT EXISTS clicks (
-                event_id TEXT PRIMARY KEY,
+                id TEXT PRIMARY KEY,
                 user_id TEXT,
-                url TEXT,
-                event_type TEXT,
-                "timestamp" TEXT,
-                ip_address TEXT
+                page_url TEXT,
+                click_timestamp TEXT,
+                session_id TEXT,
+                user_agent TEXT
             )
             """,
             params=[]
@@ -132,12 +132,12 @@ async def generate_streaming_data_job():
         await clicks_db.execute(
             """
             CREATE TABLE IF NOT EXISTS clicks (
-                event_id TEXT PRIMARY KEY,
+                id TEXT PRIMARY KEY,
                 user_id TEXT,
-                url TEXT,
-                event_type TEXT,
-                "timestamp" TEXT,
-                ip_address TEXT
+                page_url TEXT,
+                click_timestamp TEXT,
+                session_id TEXT,
+                user_agent TEXT
             )
             """,
             params=[]

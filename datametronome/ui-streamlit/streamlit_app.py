@@ -300,6 +300,161 @@ def delete_stave(stave_id, stave_name):
     st.success(f"Deleted stave: {stave_name}")
     return True
 
+def preview_stave_data(stave_id, stave_name):
+    """Preview data from a stave's tables."""
+    if not st.session_state.auth_token:
+        st.error("🔒 Please login first")
+        return
+    
+    st.subheader(f"👁️ Data Preview: {stave_name}")
+    
+    # Common table names to check
+    common_tables = ["users", "products", "orders", "clicks", "events", "customers", "transactions"]
+    
+    # Table selection
+    col1, col2 = st.columns([2, 1])
+    with col1:
+        selected_table = st.selectbox(
+            "Select table to preview:",
+            common_tables,
+            key=f"preview_table_select_{stave_id}"
+        )
+    
+    with col2:
+        limit = st.number_input("Rows to show:", min_value=5, max_value=100, value=10, step=5, key=f"preview_limit_{stave_id}")
+    
+    if st.button("🔍 Load Preview", key=f"load_preview_{stave_id}_{selected_table}"):
+        with st.spinner(f"Loading {selected_table} data..."):
+            try:
+                # Call API to get sample data
+                result = sync_call_podium_api(
+                    f"/stave-actions/{stave_id}/preview-data",
+                    method="POST",
+                    data={"table_name": selected_table, "limit": limit},
+                    token=st.session_state.auth_token
+                )
+                
+                if result and result.get('success'):
+                    data = result.get('data', [])
+                    
+                    if data:
+                        st.success(f"📊 Found {len(data)} records in `{selected_table}` table")
+                        
+                        # Display as DataFrame
+                        df = pd.DataFrame(data)
+                        st.dataframe(df, use_container_width=True)
+                        
+                        # Show additional info
+                        col1, col2, col3 = st.columns(3)
+                        with col1:
+                            st.metric("Rows", len(data))
+                        with col2:
+                            st.metric("Columns", len(df.columns) if not df.empty else 0)
+                        with col3:
+                            st.metric("Table", selected_table)
+                        
+                        # Download option
+                        csv = df.to_csv(index=False)
+                        st.download_button(
+                            label="📥 Download CSV",
+                            data=csv,
+                            file_name=f"{selected_table}_sample.csv",
+                            mime="text/csv",
+                            key=f"download_preview_{stave_id}_{selected_table}"
+                        )
+                    else:
+                        st.info(f"ℹ️ No data found in `{selected_table}` table. Try generating some data first!")
+                else:
+                    st.error(f"❌ Failed to preview data: {result.get('message', 'Unknown error')}")
+                    
+            except Exception as e:
+                st.error(f"💥 Error loading preview: {str(e)}")
+                if "404" in str(e):
+                    st.info("💡 The table might not exist in this database")
+                elif "Connection refused" in str(e):
+                    st.info("💡 Check if the API server is running")
+
+def show_data_generation_options(stave_id, stave_name):
+    """Show data generation options for a stave."""
+    st.subheader(f"✨ Generate Data for {stave_name}")
+    
+    # Available data types
+    data_types = {
+        "users": {"emoji": "👥", "default_count": 50, "description": "User accounts with name, email, age"},
+        "products": {"emoji": "📦", "default_count": 25, "description": "Product catalog with prices and categories"},
+        "orders": {"emoji": "🛒", "default_count": 100, "description": "Order transactions with quantities"},
+        "clicks": {"emoji": "🖱️", "default_count": 200, "description": "Clickstream events with URLs and timestamps"}
+    }
+    
+    st.markdown("### 📋 Select Data Type to Generate")
+    
+    # Create a more flexible UI
+    selected_type = st.selectbox(
+        "Choose data type:",
+        list(data_types.keys()),
+        format_func=lambda x: f"{data_types[x]['emoji']} {x.capitalize()} - {data_types[x]['description']}",
+        key=f"gen_type_select_{stave_id}"
+    )
+    
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        count = st.number_input(
+            "Number of records:",
+            min_value=1,
+            max_value=1000,
+            value=data_types[selected_type]["default_count"],
+            step=10,
+            key=f"gen_count_{stave_id}"
+        )
+    
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)  # Spacing
+        if st.button(f"🚀 Generate {selected_type.capitalize()}", key=f"gen_execute_{stave_id}_{selected_type}", type="primary"):
+            generate_sample_data(stave_id, selected_type, count)
+    
+    st.markdown("---")
+    st.markdown("### 🔄 Or Generate All Sample Data")
+    
+    if st.button("🎯 Generate Complete Dataset", key=f"gen_all_{stave_id}", type="secondary"):
+        st.subheader("🔄 Generating Complete Sample Dataset")
+        
+        # Track overall progress
+        operations = [
+            ("users", 50, "👥"),
+            ("products", 25, "📦"),
+            ("orders", 100, "🛒")
+        ]
+        
+        total_operations = len(operations)
+        completed_operations = 0
+        
+        overall_progress = st.progress(0)
+        overall_status = st.empty()
+        
+        results = {}
+        
+        for table_name, default_count, emoji in operations:
+            overall_status.text(f"{emoji} Generating {table_name} data... ({completed_operations + 1}/{total_operations})")
+            success = generate_sample_data(stave_id, table_name, default_count)
+            results[table_name] = success
+            
+            if success:
+                completed_operations += 1
+            overall_progress.progress((completed_operations) / total_operations)
+        
+        # Final summary
+        overall_status.text("✅ All data generation completed!")
+        overall_progress.progress(1.0)
+        
+        if all(results.values()):
+            st.success("🎉 Complete dataset generated successfully!")
+            st.info(f"📊 Generated: {', '.join([f'{c} {n}' for n, c, _ in operations])}")
+        else:
+            failed_ops = [name for name, success in results.items() if not success]
+            st.warning(f"⚠️ Some operations failed: {', '.join(failed_ops)}")
+            st.info("💡 Try generating each table individually to troubleshoot")
+
 def generate_sample_data(stave_id, table_name, count=100):
     """Generate sample data for a stave via Podium API with detailed feedback."""
     if not st.session_state.auth_token:
@@ -1457,76 +1612,12 @@ def show_staves_tab():
                     if st.button("🔄 Test", key=f"test_stave_{stave.get('id')}"):
                         test_stave_connection(stave.get('id'))
 
+                    # Data Preview Button
+                    if st.button("👁️ Preview Data", key=f"preview_data_stave_{stave.get('id')}"):
+                        preview_stave_data(stave.get('id'), stave.get('name', 'Unknown'))
+                    
                     if st.button("✨ Generate Data", key=f"generate_data_stave_{stave.get('id')}"):
-                        stave_id = stave.get('id')
-                        stave_name = stave.get('name', 'Unknown')
-                        
-                        # Show options for data generation
-                        st.subheader(f"Generate Data for {stave_name}")
-                        
-                        col1, col2 = st.columns(2)
-                        
-                        with col1:
-                            if st.button("👥 Generate Users", key=f"gen_users_{stave_id}"):
-                                generate_sample_data(stave_id, "users", 50)
-                        
-                        with col2:
-                            if st.button("📦 Generate Products", key=f"gen_products_{stave_id}"):
-                                generate_sample_data(stave_id, "products", 25)
-                        
-                        col3, col4 = st.columns(2)
-                        
-                        with col3:
-                            if st.button("🛒 Generate Orders", key=f"gen_orders_{stave_id}"):
-                                generate_sample_data(stave_id, "orders", 100)
-                        
-                        with col4:
-                            if st.button("🔄 Refresh All Data", key=f"refresh_all_{stave_id}"):
-                                st.subheader("🔄 Generating All Sample Data")
-                                
-                                # Track overall progress
-                                total_operations = 3
-                                completed_operations = 0
-                                
-                                overall_progress = st.progress(0)
-                                overall_status = st.empty()
-                                
-                                # Generate users
-                                overall_status.text(f"👥 Generating users data... ({completed_operations + 1}/{total_operations})")
-                                users_success = generate_sample_data(stave_id, "users", 50)
-                                if users_success:
-                                    completed_operations += 1
-                                    overall_progress.progress(completed_operations / total_operations)
-                                
-                                # Generate products
-                                overall_status.text(f"📦 Generating products data... ({completed_operations + 1}/{total_operations})")
-                                products_success = generate_sample_data(stave_id, "products", 25)
-                                if products_success:
-                                    completed_operations += 1
-                                    overall_progress.progress(completed_operations / total_operations)
-                                
-                                # Generate orders
-                                overall_status.text(f"🛒 Generating orders data... ({completed_operations + 1}/{total_operations})")
-                                orders_success = generate_sample_data(stave_id, "orders", 100)
-                                if orders_success:
-                                    completed_operations += 1
-                                    overall_progress.progress(completed_operations / total_operations)
-                                
-                                # Final summary
-                                overall_status.text("✅ All data generation completed!")
-                                overall_progress.progress(1.0)
-                                
-                                if all([users_success, products_success, orders_success]):
-                                    st.success("🎉 All sample data generated successfully!")
-                                    st.info(f"📊 Generated: 50 users, 25 products, 100 orders")
-                                else:
-                                    failed_ops = []
-                                    if not users_success: failed_ops.append("users")
-                                    if not products_success: failed_ops.append("products") 
-                                    if not orders_success: failed_ops.append("orders")
-                                    
-                                    st.warning(f"⚠️ Some operations failed: {', '.join(failed_ops)}")
-                                    st.info("💡 Try generating each table individually to troubleshoot")
+                        show_data_generation_options(stave.get('id'), stave.get('name', 'Unknown'))
     else:
         st.info("No staves configured. Create your first data source above.")
 
