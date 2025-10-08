@@ -685,30 +685,17 @@ def show_dashboard():
             logout_user()
             st.rerun()
     
-    # Sidebar with clock and data source toggle
+    # Sidebar with clock
     with st.sidebar:
-        # Live JavaScript clock that updates every second
         st.markdown("---")
-        components.html("""
-            <div style="font-size: 1.5em; font-weight: 600; margin-bottom: 1em; color: inherit;">
-                🕒 <span id="live-clock">Loading...</span>
-            </div>
-            <script>
-                function updateClock() {
-                    const now = new Date();
-                    const timeStr = now.toLocaleTimeString('en-US', { 
-                        hour12: false, 
-                        hour: '2-digit', 
-                        minute: '2-digit', 
-                        second: '2-digit' 
-                    });
-                    const tzStr = now.toLocaleTimeString('en-US', { timeZoneName: 'short' }).split(' ').pop();
-                    document.getElementById('live-clock').textContent = timeStr + ' (' + tzStr + ')';
-                }
-                updateClock();
-                setInterval(updateClock, 1000);
-            </script>
-        """, height=50)
+        
+        # Use fragment to update clock independently
+        @st.fragment(run_every=1.0)
+        def show_clock():
+            now = datetime.now(pytz.utc).astimezone()
+            st.markdown(f"### 🕒 {now.strftime('%H:%M:%S')} ({now.tzname()})")
+        
+        show_clock()
 
         if st.session_state.auth_token:
             st.success("✅ Connected to Podium API")
