@@ -1,0 +1,1021 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DataMetronome Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/framer-motion@10.16.0/dist/framer-motion.js"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        .gradient-bg { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-2px); box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .loading-spinner {
+            border: 2px solid #f3f4f6;
+            border-top: 2px solid #0ea5e9;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div id="app">
+        <!-- Login Page -->
+        <div id="loginPage" class="min-h-screen gradient-bg flex items-center justify-center p-8">
+            <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+                <div class="text-center mb-8">
+                    <div class="text-4xl mb-4">🎵</div>
+                    <h1 class="text-3xl font-bold text-gray-900 mb-2">DataMetronome</h1>
+                    <p class="text-gray-600">Your Data Quality Command Center</p>
+                </div>
+                
+                <form id="loginForm" class="space-y-6">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Username</label>
+                        <input type="text" id="username" value="admin" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                        <input type="password" id="password" value="admin" 
+                               class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required>
+                    </div>
+                    <button type="submit" 
+                            class="w-full bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200">
+                        Sign In
+                    </button>
+                </form>
+                
+                <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                    <p class="text-sm text-blue-800">
+                        <strong>Demo Credentials:</strong><br>
+                        Username: <code class="bg-blue-100 px-1 rounded">admin</code><br>
+                        Password: <code class="bg-blue-100 px-1 rounded">admin</code>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard -->
+        <div id="dashboard" class="hidden">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b border-gray-200">
+                <div class="px-4 sm:px-6 lg:px-8">
+                    <div class="flex justify-between items-center h-16">
+                        <div class="flex items-center">
+                            <span class="text-2xl mr-3">🎵</span>
+                            <h1 class="text-2xl font-bold text-gray-900">DataMetronome Dashboard</h1>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div id="clock" class="text-sm font-mono text-gray-600"></div>
+                            <span id="userInfo" class="text-sm text-gray-600"></span>
+                            <button id="logoutBtn" class="text-gray-600 hover:text-gray-900">Logout</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main class="py-6">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <!-- Navigation Tabs -->
+                    <div class="border-b border-gray-200 mb-6">
+                        <nav class="-mb-px flex space-x-8">
+                            <button class="tab-btn active" data-tab="overview">📊 Overview</button>
+                            <button class="tab-btn" data-tab="staves">⚙️ Staves</button>
+                            <button class="tab-btn" data-tab="clefs">🎯 Clefs</button>
+                            <button class="tab-btn" data-tab="reports">📄 Reports</button>
+                        </nav>
+                    </div>
+
+                    <!-- Overview Tab -->
+                    <div id="overviewTab" class="tab-content">
+                        <div class="mb-6">
+                            <h2 class="text-3xl font-bold text-gray-900">System Overview</h2>
+                            <p class="text-gray-600 mt-1">Monitor your data quality metrics and system health</p>
+                        </div>
+
+                        <!-- Metrics Grid -->
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-600">Success Rate</p>
+                                        <p class="text-2xl font-bold text-gray-900" id="successRate">--</p>
+                                    </div>
+                                    <div class="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                                        <span class="text-white text-sm">✓</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-600">Active Staves</p>
+                                        <p class="text-2xl font-bold text-gray-900" id="activeStaves">--</p>
+                                    </div>
+                                    <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                                        <span class="text-white text-sm">🗄️</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-600">Active Clefs</p>
+                                        <p class="text-2xl font-bold text-gray-900" id="activeClefs">--</p>
+                                    </div>
+                                    <div class="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                                        <span class="text-white text-sm">🛡️</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-sm font-medium text-gray-600">Last Check</p>
+                                        <p class="text-2xl font-bold text-gray-900" id="lastCheck">--</p>
+                                    </div>
+                                    <div class="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                                        <span class="text-white text-sm">⏰</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Recent Activity -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <h3 class="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+                            <div id="recentActivity" class="space-y-3">
+                                <div class="text-center py-8 text-gray-500">
+                                    <div class="loading-spinner mx-auto mb-4"></div>
+                                    <p>Loading recent activity...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Staves Tab -->
+                    <div id="stavesTab" class="tab-content hidden">
+                        <div class="mb-6">
+                            <h2 class="text-3xl font-bold text-gray-900">Data Sources (Staves)</h2>
+                            <p class="text-gray-600 mt-1">Manage your data source connections</p>
+                        </div>
+                        <div id="stavesContent" class="space-y-4">
+                            <div class="text-center py-8 text-gray-500">
+                                <div class="loading-spinner mx-auto mb-4"></div>
+                                <p>Loading staves...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Clefs Tab -->
+                    <div id="clefsTab" class="tab-content hidden">
+                        <div class="mb-6">
+                            <h2 class="text-3xl font-bold text-gray-900">Quality Checks (Clefs)</h2>
+                            <p class="text-gray-600 mt-1">Manage your data quality checks</p>
+                        </div>
+                        <div id="clefsContent" class="space-y-4">
+                            <div class="text-center py-8 text-gray-500">
+                                <div class="loading-spinner mx-auto mb-4"></div>
+                                <p>Loading clefs...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reports Tab -->
+                    <div id="reportsTab" class="tab-content hidden">
+                        <div class="mb-6">
+                            <h2 class="text-3xl font-bold text-gray-900">Reports & Analytics</h2>
+                            <p class="text-gray-600 mt-1">Comprehensive data quality reports</p>
+                        </div>
+                        <div id="reportsContent" class="space-y-4">
+                            <div class="text-center py-8 text-gray-500">
+                                <div class="loading-spinner mx-auto mb-4"></div>
+                                <p>Loading reports...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const API_BASE_URL = 'http://localhost:8001/api/v1';
+        let authToken = null;
+        let currentUser = null;
+
+        // Initialize app
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+        });
+
+        function initializeApp() {
+            // Check for stored token
+            const storedToken = localStorage.getItem('datametronome_token');
+            const storedUser = localStorage.getItem('datametronome_user');
+            
+            if (storedToken && storedUser) {
+                authToken = storedToken;
+                currentUser = JSON.parse(storedUser);
+                showDashboard();
+                loadDashboardData();
+            } else {
+                showLogin();
+            }
+
+            // Event listeners
+            document.getElementById('loginForm').addEventListener('submit', handleLogin);
+            document.getElementById('logoutBtn').addEventListener('click', handleLogout);
+            
+            // Tab navigation
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    switchTab(this.dataset.tab);
+                });
+            });
+
+            // Start the clock
+            startClock();
+        }
+
+        function startClock() {
+            function updateClock() {
+                const now = new Date();
+                const timeString = now.toLocaleTimeString([], { 
+                    hour12: false, 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    second: '2-digit' 
+                });
+                const dateString = now.toLocaleDateString([], {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric'
+                });
+                const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                
+                document.getElementById('clock').innerHTML = `
+                    <div class="text-right">
+                        <div class="font-bold">${timeString}</div>
+                        <div class="text-xs">${dateString}</div>
+                        <div class="text-xs">${timezone}</div>
+                    </div>
+                `;
+            }
+            
+            updateClock(); // Initial update
+            setInterval(updateClock, 1000); // Update every second
+        }
+
+        function formatTimestampForDisplay(timestampStr) {
+            if (!timestampStr) return "Unknown";
+            
+            try {
+                // Parse UTC timestamp from database
+                let dt;
+                if (timestampStr.includes('T')) {
+                    dt = new Date(timestampStr.replace('Z', '+00:00'));
+                } else {
+                    dt = new Date(timestampStr + 'Z'); // Assume UTC if no timezone
+                }
+                
+                // Convert to local timezone for display
+                return dt.toLocaleString([], {
+                    year: 'numeric',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    timeZoneName: 'short'
+                });
+            } catch (e) {
+                return "Invalid date";
+            }
+        }
+
+        function getTimeAgo(timestampStr) {
+            if (!timestampStr) return "Unknown";
+            
+            try {
+                // Parse UTC timestamp from database
+                let dt;
+                if (timestampStr.includes('T')) {
+                    dt = new Date(timestampStr.replace('Z', '+00:00'));
+                } else {
+                    dt = new Date(timestampStr + 'Z');
+                }
+                
+                const now = new Date();
+                const diffMs = now - dt;
+                
+                if (diffMs < 0) return "Just now";
+                
+                const diffSeconds = Math.floor(diffMs / 1000);
+                const diffMinutes = Math.floor(diffSeconds / 60);
+                const diffHours = Math.floor(diffMinutes / 60);
+                const diffDays = Math.floor(diffHours / 24);
+                
+                if (diffDays > 0) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+                if (diffHours > 0) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+                if (diffMinutes > 0) return `${diffMinutes} minute${diffMinutes > 1 ? 's' : ''} ago`;
+                return "Just now";
+            } catch (e) {
+                return "Unknown";
+            }
+        }
+
+        function showLogin() {
+            document.getElementById('loginPage').classList.remove('hidden');
+            document.getElementById('dashboard').classList.add('hidden');
+        }
+
+        function showDashboard() {
+            document.getElementById('loginPage').classList.add('hidden');
+            document.getElementById('dashboard').classList.remove('hidden');
+            document.getElementById('userInfo').textContent = `Welcome, ${currentUser.username}`;
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            try {
+                const response = await axios.post(`${API_BASE_URL}/auth/login`, {
+                    username,
+                    password
+                });
+                
+                if (response.data.access_token) {
+                    authToken = response.data.access_token;
+                    currentUser = { username };
+                    
+                    // Store in localStorage
+                    localStorage.setItem('datametronome_token', authToken);
+                    localStorage.setItem('datametronome_user', JSON.stringify(currentUser));
+                    
+                    showDashboard();
+                    loadDashboardData();
+                }
+            } catch (error) {
+                alert('Login failed. Please check your credentials and ensure the Podium API is running.');
+                console.error('Login error:', error);
+            }
+        }
+
+        function handleLogout() {
+            authToken = null;
+            currentUser = null;
+            localStorage.removeItem('datametronome_token');
+            localStorage.removeItem('datametronome_user');
+            showLogin();
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active', 'border-blue-500', 'text-blue-600');
+                btn.classList.add('border-transparent', 'text-gray-500');
+            });
+            
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active', 'border-blue-500', 'text-blue-600');
+            document.querySelector(`[data-tab="${tabName}"]`).classList.remove('border-transparent', 'text-gray-500');
+            
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.add('hidden');
+            });
+            
+            document.getElementById(`${tabName}Tab`).classList.remove('hidden');
+            
+            // Load tab data
+            if (tabName === 'staves') {
+                loadStaves();
+            } else if (tabName === 'clefs') {
+                loadClefs();
+            } else if (tabName === 'reports') {
+                loadReports();
+            }
+        }
+
+        async function loadDashboardData() {
+            if (!authToken) return;
+            
+            try {
+                // Load staves
+                const stavesResponse = await axios.get(`${API_BASE_URL}/staves/`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                // Load clefs
+                const clefsResponse = await axios.get(`${API_BASE_URL}/clefs/`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                // Update metrics
+                const activeStaves = stavesResponse.data.filter(s => s.is_active).length;
+                const activeClefs = clefsResponse.data.filter(c => c.is_active).length;
+                
+                document.getElementById('activeStaves').textContent = `${activeStaves}/${stavesResponse.data.length}`;
+                document.getElementById('activeClefs').textContent = `${activeClefs}/${clefsResponse.data.length}`;
+                
+                // Load recent activity
+                loadRecentActivity(clefsResponse.data);
+                
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                document.getElementById('recentActivity').innerHTML = `
+                    <div class="text-center py-8 text-red-500">
+                        <p>Failed to load dashboard data</p>
+                        <p class="text-sm">Check if the Podium API is running on port 8001</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadRecentActivity(clefs) {
+            const recentActivity = document.getElementById('recentActivity');
+            
+            try {
+                let allResults = [];
+                
+                // Get recent results from each clef
+                for (const clef of clefs.slice(0, 5)) { // Limit to first 5 clefs
+                    try {
+                        const response = await axios.get(`${API_BASE_URL}/clefs/${clef.id}/results`, {
+                            headers: { Authorization: `Bearer ${authToken}` }
+                        });
+                        const results = response.data.results || [];
+                        allResults.push(...results.slice(0, 2)); // Get 2 most recent per clef
+                    } catch (error) {
+                        console.warn(`Could not load results for clef ${clef.id}`);
+                    }
+                }
+                
+                // Sort by timestamp and take most recent
+                allResults.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+                
+                if (allResults.length > 0) {
+                    const latestResult = allResults[0];
+                    document.getElementById('lastCheck').textContent = getTimeAgo(latestResult.timestamp);
+                    
+                    // Calculate success rate
+                    const passedChecks = allResults.filter(r => r.status === 'pass').length;
+                    const successRate = (passedChecks / allResults.length) * 100;
+                    document.getElementById('successRate').textContent = `${successRate.toFixed(1)}%`;
+                    
+                    // Display recent activity
+                    recentActivity.innerHTML = allResults.slice(0, 5).map(result => `
+                                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                            <div class="flex items-center">
+                                                <div class="w-2 h-2 rounded-full mr-3 ${result.status === 'pass' ? 'bg-green-500' : result.status === 'fail' ? 'bg-red-500' : 'bg-yellow-500'}"></div>
+                                                <div>
+                                                    <p class="text-sm font-medium text-gray-900">${clefs.find(c => c.id === result.clef_id)?.name || 'Unknown Clef'}</p>
+                                                    <p class="text-xs text-gray-500">${formatTimestampForDisplay(result.timestamp)}</p>
+                                                </div>
+                                            </div>
+                                            <div class="text-right">
+                                                <p class="text-sm text-gray-900">
+                                                    ${result.status === 'pass' ? '✅ Passed' : result.status === 'fail' ? '❌ Failed' : '⚠️ Warning'}
+                                                </p>
+                                                <p class="text-xs text-gray-500">${result.execution_time?.toFixed(3)}s</p>
+                                            </div>
+                                        </div>
+                    `).join('');
+                } else {
+                    recentActivity.innerHTML = `
+                        <div class="text-center py-8 text-gray-500">
+                            <p>No recent activity found</p>
+                            <p class="text-sm">Run some checks to see activity here</p>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading recent activity:', error);
+                recentActivity.innerHTML = `
+                    <div class="text-center py-8 text-red-500">
+                        <p>Failed to load recent activity</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadStaves() {
+            const stavesContent = document.getElementById('stavesContent');
+            
+            try {
+                const response = await axios.get(`${API_BASE_URL}/staves/`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                const staves = response.data;
+                
+                if (staves.length === 0) {
+                    stavesContent.innerHTML = `
+                        <div class="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
+                            <div class="text-4xl mb-4">🗄️</div>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">No staves configured</h3>
+                            <p class="text-gray-600">Create your first data source to get started</p>
+                        </div>
+                    `;
+                } else {
+                    stavesContent.innerHTML = staves.map(stave => `
+                        <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                                        <span class="text-white text-sm">🗄️</span>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-900">${stave.name}</h3>
+                                        <p class="text-sm text-gray-600">${stave.description}</p>
+                                        <div class="flex items-center space-x-4 mt-2">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                ${stave.data_source_type}
+                                            </span>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${stave.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                                ${stave.is_active ? 'Active' : 'Inactive'}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button onclick="testStaveConnection('${stave.id}', '${stave.name}')" 
+                                            class="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
+                                            title="Test Connection">
+                                        🔗 Test
+                                    </button>
+                                    <button onclick="previewStaveData('${stave.id}', '${stave.name}')" 
+                                            class="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
+                                            title="Preview Data">
+                                        👁️ Preview
+                                    </button>
+                                    <button onclick="deleteStave('${stave.id}', '${stave.name}')" 
+                                            class="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
+                                            title="Delete Stave">
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading staves:', error);
+                stavesContent.innerHTML = `
+                    <div class="text-center py-8 text-red-500">
+                        <p>Failed to load staves</p>
+                        <p class="text-sm">Check if the Podium API is running</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadClefs() {
+            const clefsContent = document.getElementById('clefsContent');
+            
+            try {
+                const response = await axios.get(`${API_BASE_URL}/clefs/`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                const clefs = response.data;
+                
+                if (clefs.length === 0) {
+                    clefsContent.innerHTML = `
+                        <div class="text-center py-12 bg-white rounded-xl shadow-sm border border-gray-200">
+                            <div class="text-4xl mb-4">🛡️</div>
+                            <h3 class="text-lg font-medium text-gray-900 mb-2">No clefs configured</h3>
+                            <p class="text-gray-600">Create your first data quality check to get started</p>
+                        </div>
+                    `;
+                } else {
+                    clefsContent.innerHTML = clefs.map(clef => `
+                        <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div class="flex items-center justify-between">
+                                <div class="flex items-center space-x-4">
+                                    <div class="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                                        <span class="text-white text-sm">🛡️</span>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-semibold text-gray-900">${clef.name}</h3>
+                                        <p class="text-sm text-gray-600">${clef.description}</p>
+                                        <div class="flex items-center space-x-4 mt-2">
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                ${clef.check_type.replace('_', ' ')}
+                                            </span>
+                                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${clef.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                                                ${clef.is_active ? 'Active' : 'Inactive'}
+                                            </span>
+                                            ${clef.schedule ? `<span class="text-xs text-gray-500">⏰ ${clef.schedule}</span>` : ''}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button onclick="runClefNow('${clef.id}', '${clef.name}')" 
+                                            class="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" 
+                                            title="Run Check Now">
+                                        ▶️ Run
+                                    </button>
+                                    <button onclick="viewClefResults('${clef.id}', '${clef.name}')" 
+                                            class="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
+                                            title="View Results">
+                                        📊 Results
+                                    </button>
+                                    <button onclick="deleteClef('${clef.id}', '${clef.name}')" 
+                                            class="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
+                                            title="Delete Clef">
+                                        🗑️ Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                console.error('Error loading clefs:', error);
+                clefsContent.innerHTML = `
+                    <div class="text-center py-8 text-red-500">
+                        <p>Failed to load clefs</p>
+                        <p class="text-sm">Check if the Podium API is running</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadReports() {
+            const reportsContent = document.getElementById('reportsContent');
+            
+            try {
+                const response = await axios.get(`${API_BASE_URL}/reports/summary`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                const summary = response.data;
+                
+                reportsContent.innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                        <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Total Staves</p>
+                                    <p class="text-2xl font-bold text-gray-900">${summary.total_staves || 0}</p>
+                                </div>
+                                <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white text-sm">🗄️</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Total Clefs</p>
+                                    <p class="text-2xl font-bold text-gray-900">${summary.total_clefs || 0}</p>
+                                </div>
+                                <div class="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white text-sm">🛡️</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Total Checks</p>
+                                    <p class="text-2xl font-bold text-gray-900">${summary.total_checks || 0}</p>
+                                </div>
+                                <div class="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white text-sm">✓</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-600">Success Rate</p>
+                                    <p class="text-2xl font-bold text-gray-900">${(summary.success_rate || 0).toFixed(1)}%</p>
+                                </div>
+                                <div class="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center">
+                                    <span class="text-white text-sm">📊</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">System Summary</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="font-medium text-gray-900 mb-3">Check Results</h4>
+                                <div class="space-y-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Passed:</span>
+                                        <span class="font-medium text-green-600">${summary.passed_checks || 0}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Failed:</span>
+                                        <span class="font-medium text-red-600">${summary.failed_checks || 0}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Warnings:</span>
+                                        <span class="font-medium text-yellow-600">${summary.warning_checks || 0}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div>
+                                <h4 class="font-medium text-gray-900 mb-3">System Health</h4>
+                                <div class="space-y-2">
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Data Sources:</span>
+                                        <span class="font-medium">${summary.total_staves || 0}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Quality Checks:</span>
+                                        <span class="font-medium">${summary.total_clefs || 0}</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span class="text-gray-600">Overall Health:</span>
+                                        <span class="font-medium ${(summary.success_rate || 0) >= 95 ? 'text-green-600' : (summary.success_rate || 0) >= 85 ? 'text-yellow-600' : 'text-red-600'}">
+                                            ${(summary.success_rate || 0) >= 95 ? 'Excellent' : (summary.success_rate || 0) >= 85 ? 'Good' : 'Needs Attention'}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading reports:', error);
+                reportsContent.innerHTML = `
+                    <div class="text-center py-8 text-red-500">
+                        <p>Failed to load reports</p>
+                        <p class="text-sm">Check if the Podium API is running</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Toast notification system
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            const bgColor = type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : type === 'warning' ? 'bg-yellow-500' : 'bg-blue-500';
+            const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
+            
+            toast.className = `fixed top-4 right-4 ${bgColor} text-white px-6 py-3 rounded-lg shadow-lg z-50 transform transition-all duration-300`;
+            toast.innerHTML = `
+                <div class="flex items-center space-x-2">
+                    <span>${icon}</span>
+                    <span>${message}</span>
+                </div>
+            `;
+            
+            document.body.appendChild(toast);
+            
+            // Animate in
+            setTimeout(() => {
+                toast.classList.add('translate-x-0');
+                toast.classList.remove('translate-x-full');
+            }, 100);
+            
+            // Remove after 4 seconds
+            setTimeout(() => {
+                toast.classList.add('translate-x-full');
+                toast.classList.remove('translate-x-0');
+                setTimeout(() => {
+                    document.body.removeChild(toast);
+                }, 300);
+            }, 4000);
+        }
+
+        // Stave functions
+        async function testStaveConnection(staveId, staveName) {
+            showToast(`Testing connection to ${staveName}...`, 'info');
+            
+            try {
+                const response = await axios.post(`${API_BASE_URL}/stave-actions/${staveId}/test-connection`, {}, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                if (response.data.success) {
+                    showToast(`✅ Connection to ${staveName} successful!`, 'success');
+                } else {
+                    showToast(`❌ Connection to ${staveName} failed: ${response.data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Connection test error:', error);
+                showToast(`❌ Failed to test connection to ${staveName}`, 'error');
+            }
+        }
+
+        async function previewStaveData(staveId, staveName) {
+            showToast(`Loading data preview for ${staveName}...`, 'info');
+            
+            try {
+                const response = await axios.post(`${API_BASE_URL}/stave-actions/${staveId}/preview-data`, {
+                    table_name: 'users',
+                    count: 10
+                }, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                if (response.data.success) {
+                    const data = response.data.data;
+                    showToast(`✅ Loaded ${data.length} records from ${staveName}`, 'success');
+                    
+                    // Show data in a modal
+                    showDataModal(`${staveName} - Data Preview`, data);
+                } else {
+                    showToast(`❌ Failed to preview data: ${response.data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Preview error:', error);
+                showToast(`❌ Failed to preview data from ${staveName}`, 'error');
+            }
+        }
+
+        async function deleteStave(staveId, staveName) {
+            if (!confirm(`Are you sure you want to delete "${staveName}"? This action cannot be undone.`)) {
+                return;
+            }
+            
+            showToast(`Deleting ${staveName}...`, 'warning');
+            
+            try {
+                await axios.delete(`${API_BASE_URL}/staves/${staveId}`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                showToast(`✅ ${staveName} deleted successfully!`, 'success');
+                loadStaves(); // Refresh the list
+            } catch (error) {
+                console.error('Delete error:', error);
+                showToast(`❌ Failed to delete ${staveName}`, 'error');
+            }
+        }
+
+        // Clef functions
+        async function runClefNow(clefId, clefName) {
+            showToast(`Running ${clefName}...`, 'info');
+            
+            try {
+                const response = await axios.post(`${API_BASE_URL}/clefs/${clefId}/run-now`, {}, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                if (response.data.success) {
+                    const status = response.data.status;
+                    const statusIcon = status === 'pass' ? '✅' : status === 'fail' ? '❌' : '⚠️';
+                    const statusText = status === 'pass' ? 'Passed' : status === 'fail' ? 'Failed' : 'Warning';
+                    
+                    showToast(`${statusIcon} ${clefName} completed: ${statusText}`, 'success');
+                    
+                    // Show detailed results
+                    showResultsModal(`${clefName} - Execution Results`, response.data);
+                } else {
+                    showToast(`❌ ${clefName} failed: ${response.data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Run clef error:', error);
+                showToast(`❌ Failed to run ${clefName}`, 'error');
+            }
+        }
+
+        async function viewClefResults(clefId, clefName) {
+            showToast(`Loading results for ${clefName}...`, 'info');
+            
+            try {
+                const response = await axios.get(`${API_BASE_URL}/clefs/${clefId}/results`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                const results = response.data.results || [];
+                
+                if (results.length > 0) {
+                    showToast(`✅ Loaded ${results.length} results for ${clefName}`, 'success');
+                    showResultsModal(`${clefName} - Execution History`, results);
+                } else {
+                    showToast(`ℹ️ No results found for ${clefName}`, 'info');
+                }
+            } catch (error) {
+                console.error('View results error:', error);
+                showToast(`❌ Failed to load results for ${clefName}`, 'error');
+            }
+        }
+
+        async function deleteClef(clefId, clefName) {
+            if (!confirm(`Are you sure you want to delete "${clefName}"? This action cannot be undone.`)) {
+                return;
+            }
+            
+            showToast(`Deleting ${clefName}...`, 'warning');
+            
+            try {
+                await axios.delete(`${API_BASE_URL}/clefs/${clefId}`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                showToast(`✅ ${clefName} deleted successfully!`, 'success');
+                loadClefs(); // Refresh the list
+            } catch (error) {
+                console.error('Delete error:', error);
+                showToast(`❌ Failed to delete ${clefName}`, 'error');
+            }
+        }
+
+        // Modal functions
+        function showDataModal(title, data) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900">${title}</h2>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    </div>
+                    <div class="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                        <pre class="text-sm text-gray-700 whitespace-pre-wrap">${JSON.stringify(data, null, 2)}</pre>
+                    </div>
+                    <div class="flex justify-end mt-6">
+                        <button onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        function showResultsModal(title, results) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            
+            const resultsArray = Array.isArray(results) ? results : [results];
+            const resultsHtml = resultsArray.map(result => `
+                <div class="border border-gray-200 rounded-lg p-4 mb-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="font-medium">${result.status === 'pass' ? '✅ Passed' : result.status === 'fail' ? '❌ Failed' : '⚠️ Warning'}</span>
+                        <span class="text-sm text-gray-500">${formatTimestampForDisplay(result.timestamp)}</span>
+                    </div>
+                    <div class="text-sm text-gray-600 mb-2">${result.message || 'No message'}</div>
+                    <div class="text-xs text-gray-500">
+                        Execution time: ${result.execution_time?.toFixed(3)}s
+                        ${result.anomalies_count > 0 ? ` | Anomalies: ${result.anomalies_count}` : ''}
+                    </div>
+                    ${result.metadata ? `
+                        <details class="mt-2">
+                            <summary class="text-xs text-gray-500 cursor-pointer">Show metadata</summary>
+                            <pre class="text-xs text-gray-600 mt-1 bg-gray-50 p-2 rounded">${JSON.stringify(result.metadata, null, 2)}</pre>
+                        </details>
+                    ` : ''}
+                </div>
+            `).join('');
+            
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900">${title}</h2>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    </div>
+                    <div class="max-h-96 overflow-y-auto">
+                        ${resultsHtml}
+                    </div>
+                    <div class="flex justify-end mt-6">
+                        <button onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        function closeModal() {
+            const modals = document.querySelectorAll('.fixed.inset-0.bg-black.bg-opacity-50');
+            modals.forEach(modal => {
+                document.body.removeChild(modal);
+            });
+        }
+    </script>
+</body>
+</html>
