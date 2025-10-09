@@ -463,7 +463,13 @@
                             headers: { Authorization: `Bearer ${authToken}` }
                         });
                         const results = response.data.results || [];
-                        allResults.push(...results.slice(0, 2)); // Get 2 most recent per clef
+                        // Add clef info to each result
+                        const resultsWithClef = results.slice(0, 2).map(r => ({
+                            ...r,
+                            clef_id: clef.id,
+                            clef_name: clef.name
+                        }));
+                        allResults.push(...resultsWithClef);
                     } catch (error) {
                         console.warn(`Could not load results for clef ${clef.id}`);
                     }
@@ -483,11 +489,11 @@
                     
                     // Display recent activity
                     recentActivity.innerHTML = allResults.slice(0, 5).map(result => `
-                                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                        <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2">
                                             <div class="flex items-center">
                                                 <div class="w-2 h-2 rounded-full mr-3 ${result.status === 'pass' ? 'bg-green-500' : result.status === 'fail' ? 'bg-red-500' : 'bg-yellow-500'}"></div>
                                                 <div>
-                                                    <p class="text-sm font-medium text-gray-900">${clefs.find(c => c.id === result.clef_id)?.name || 'Unknown Clef'}</p>
+                                                    <p class="text-sm font-medium text-gray-900">${result.clef_name || 'Unknown Clef'}</p>
                                                     <p class="text-xs text-gray-500">${formatTimestampForDisplay(result.timestamp)}</p>
                                                 </div>
                                             </div>
@@ -495,7 +501,7 @@
                                                 <p class="text-sm text-gray-900">
                                                     ${result.status === 'pass' ? '✅ Passed' : result.status === 'fail' ? '❌ Failed' : '⚠️ Warning'}
                                                 </p>
-                                                <p class="text-xs text-gray-500">${result.execution_time?.toFixed(3)}s</p>
+                                                <p class="text-xs text-gray-500">${result.execution_time ? result.execution_time.toFixed(3) + 's' : 'N/A'}</p>
                                             </div>
                                         </div>
                     `).join('');
