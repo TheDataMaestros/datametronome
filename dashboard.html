@@ -165,13 +165,41 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Data Preview Section -->
+                        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-gray-900">Monitored Data Preview</h3>
+                                <div class="flex items-center space-x-3">
+                                    <select id="previewStaveSelect" class="px-3 py-1 border border-gray-300 rounded-lg text-sm" onchange="updateTableDropdown()">
+                                        <option value="">Loading staves...</option>
+                                    </select>
+                                    <select id="previewTableSelect" class="px-3 py-1 border border-gray-300 rounded-lg text-sm" onchange="loadDataPreview()">
+                                        <option value="">Select a stave first...</option>
+                                    </select>
+                                    <button onclick="loadDataPreview()" class="text-sm text-blue-600 hover:text-blue-700">
+                                        🔄 Refresh
+                                    </button>
+                                </div>
+                            </div>
+                            <div id="dataPreview">
+                                <div class="text-center py-8 text-gray-500">
+                                    <p class="text-sm">Select a stave and table, then click refresh to load preview</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Staves Tab -->
                     <div id="stavesTab" class="tab-content hidden">
-                        <div class="mb-6">
-                            <h2 class="text-3xl font-bold text-gray-900">Data Sources (Staves)</h2>
-                            <p class="text-gray-600 mt-1">Manage your data source connections</p>
+                        <div class="mb-6 flex items-center justify-between">
+                            <div>
+                                <h2 class="text-3xl font-bold text-gray-900">Data Sources (Staves)</h2>
+                                <p class="text-gray-600 mt-1">Manage your data source connections</p>
+                            </div>
+                            <button onclick="showImportYamlModal('staves')" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center">
+                                📥 Import YAML
+                            </button>
                         </div>
                         <div id="stavesContent" class="space-y-4">
                             <div class="text-center py-8 text-gray-500">
@@ -183,9 +211,14 @@
 
                     <!-- Clefs Tab -->
                     <div id="clefsTab" class="tab-content hidden">
-                        <div class="mb-6">
-                            <h2 class="text-3xl font-bold text-gray-900">Quality Checks (Clefs)</h2>
-                            <p class="text-gray-600 mt-1">Manage your data quality checks</p>
+                        <div class="mb-6 flex items-center justify-between">
+                            <div>
+                                <h2 class="text-3xl font-bold text-gray-900">Quality Checks (Clefs)</h2>
+                                <p class="text-gray-600 mt-1">Manage your data quality checks</p>
+                            </div>
+                            <button onclick="showImportYamlModal('clefs')" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center">
+                                📥 Import YAML
+                            </button>
                         </div>
                         <div id="clefsContent" class="space-y-4">
                             <div class="text-center py-8 text-gray-500">
@@ -215,7 +248,8 @@
 
     <script>
         // Configuration
-        const API_BASE_URL = 'http://localhost:8001/api/v1';
+        const API_BASE_URL = 'http://localhost:8000/api/v1';
+        const DASHBOARD_VERSION = '1.1.0-bigquery'; // Update this to force cache refresh
         let authToken = null;
         let currentUser = null;
 
@@ -439,6 +473,9 @@
                 // Load recent activity
                 loadRecentActivity(clefsResponse.data);
                 
+                // Load data preview
+                loadDataPreview();
+                
             } catch (error) {
                 console.error('Error loading dashboard data:', error);
                 document.getElementById('recentActivity').innerHTML = `
@@ -456,15 +493,15 @@
             try {
                 let allResults = [];
                 
-                // Get recent results from each clef
-                for (const clef of clefs.slice(0, 5)) { // Limit to first 5 clefs
+                // Get recent results from ALL clefs (not just first 5)
+                for (const clef of clefs) {
                     try {
                         const response = await axios.get(`${API_BASE_URL}/clefs/${clef.id}/results`, {
                             headers: { Authorization: `Bearer ${authToken}` }
                         });
                         const results = response.data.results || [];
                         // Add clef info to each result
-                        const resultsWithClef = results.slice(0, 2).map(r => ({
+                        const resultsWithClef = results.map(r => ({
                             ...r,
                             clef_id: clef.id,
                             clef_name: clef.name
@@ -487,8 +524,8 @@
                     const successRate = (passedChecks / allResults.length) * 100;
                     document.getElementById('successRate').textContent = `${successRate.toFixed(1)}%`;
                     
-                    // Display recent activity
-                    recentActivity.innerHTML = allResults.slice(0, 5).map(result => `
+                    // Display recent activity (top 10 most recent)
+                    recentActivity.innerHTML = allResults.slice(0, 10).map(result => `
                                         <div class="flex items-center justify-between p-3 bg-gray-50 rounded-lg mb-2">
                                             <div class="flex items-center">
                                                 <div class="w-2 h-2 rounded-full mr-3 ${result.status === 'pass' ? 'bg-green-500' : result.status === 'fail' ? 'bg-red-500' : 'bg-yellow-500'}"></div>
@@ -508,8 +545,11 @@
                 } else {
                     recentActivity.innerHTML = `
                         <div class="text-center py-8 text-gray-500">
-                            <p>No recent activity found</p>
-                            <p class="text-sm">Run some checks to see activity here</p>
+                            <p class="mb-2">📊 No recent activity yet</p>
+                            <p class="text-sm text-gray-400">Checks will run according to their schedules:</p>
+                            <p class="text-xs text-gray-400 mt-2">• Every 2 minutes: Clickstream checks</p>
+                            <p class="text-xs text-gray-400">• Hourly: Most quality checks</p>
+                            <p class="text-xs text-gray-400">• Daily: ML and advanced checks</p>
                         </div>
                     `;
                 }
@@ -518,6 +558,7 @@
                 recentActivity.innerHTML = `
                     <div class="text-center py-8 text-red-500">
                         <p>Failed to load recent activity</p>
+                        <p class="text-xs mt-2">${error.message}</p>
                     </div>
                 `;
             }
@@ -543,7 +584,7 @@
                     `;
                 } else {
                     stavesContent.innerHTML = staves.map(stave => `
-                        <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6 cursor-pointer" onclick="showStaveDetails('${stave.id}', ${JSON.stringify(stave).replace(/"/g, '&quot;')})">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-4">
                                     <div class="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center">
@@ -551,7 +592,7 @@
                                     </div>
                                     <div>
                                         <h3 class="text-lg font-semibold text-gray-900">${stave.name}</h3>
-                                        <p class="text-sm text-gray-600">${stave.description}</p>
+                                        <p class="text-sm text-gray-600">${stave.description || ''}</p>
                                         <div class="flex items-center space-x-4 mt-2">
                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                                                 ${stave.data_source_type}
@@ -563,17 +604,17 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2">
-                                    <button onclick="testStaveConnection('${stave.id}', '${stave.name}')" 
+                                    <button onclick="event.stopPropagation(); testStaveConnection('${stave.id}', '${stave.name}')" 
                                             class="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
                                             title="Test Connection">
                                         🔗 Test
                                     </button>
-                                    <button onclick="previewStaveData('${stave.id}', '${stave.name}')" 
+                                    <button onclick="event.stopPropagation(); previewStaveData('${stave.id}', '${stave.name}')" 
                                             class="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
                                             title="Preview Data">
                                         👁️ Preview
                                     </button>
-                                    <button onclick="deleteStave('${stave.id}', '${stave.name}')" 
+                                    <button onclick="event.stopPropagation(); deleteStave('${stave.id}', '${stave.name}')" 
                                             class="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
                                             title="Delete Stave">
                                         🗑️ Delete
@@ -614,7 +655,7 @@
                     `;
                 } else {
                     clefsContent.innerHTML = clefs.map(clef => `
-                        <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                        <div class="card-hover bg-white rounded-xl shadow-sm border border-gray-200 p-6 cursor-pointer" onclick="showClefDetails('${clef.id}', ${JSON.stringify(clef).replace(/"/g, '&quot;')})">
                             <div class="flex items-center justify-between">
                                 <div class="flex items-center space-x-4">
                                     <div class="w-8 h-8 bg-purple-500 rounded-lg flex items-center justify-center">
@@ -622,7 +663,7 @@
                                     </div>
                                     <div>
                                         <h3 class="text-lg font-semibold text-gray-900">${clef.name}</h3>
-                                        <p class="text-sm text-gray-600">${clef.description}</p>
+                                        <p class="text-sm text-gray-600">${clef.description || ''}</p>
                                         <div class="flex items-center space-x-4 mt-2">
                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
                                                 ${clef.check_type.replace('_', ' ')}
@@ -635,17 +676,17 @@
                                     </div>
                                 </div>
                                 <div class="flex items-center space-x-2">
-                                    <button onclick="runClefNow('${clef.id}', '${clef.name}')" 
+                                    <button onclick="event.stopPropagation(); runClefNow('${clef.id}', '${clef.name}')" 
                                             class="p-2 text-gray-600 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors" 
                                             title="Run Check Now">
                                         ▶️ Run
                                     </button>
-                                    <button onclick="viewClefResults('${clef.id}', '${clef.name}')" 
+                                    <button onclick="event.stopPropagation(); viewClefResults('${clef.id}', '${clef.name}')" 
                                             class="p-2 text-gray-600 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" 
                                             title="View Results">
                                         📊 Results
                                     </button>
-                                    <button onclick="deleteClef('${clef.id}', '${clef.name}')" 
+                                    <button onclick="event.stopPropagation(); deleteClef('${clef.id}', '${clef.name}')" 
                                             class="p-2 text-gray-600 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" 
                                             title="Delete Clef">
                                         🗑️ Delete
@@ -835,9 +876,15 @@
         async function previewStaveData(staveId, staveName) {
             showToast(`Loading data preview for ${staveName}...`, 'info');
             
+            // Determine table name based on stave
+            let tableName = 'users';
+            if (staveName.includes('Clickstream')) {
+                tableName = 'clicks';
+            }
+            
             try {
                 const response = await axios.post(`${API_BASE_URL}/stave-actions/${staveId}/preview-data`, {
-                    table_name: 'users',
+                    table_name: tableName,
                     count: 10
                 }, {
                     headers: { Authorization: `Bearer ${authToken}` }
@@ -845,16 +892,78 @@
                 
                 if (response.data.success) {
                     const data = response.data.data;
-                    showToast(`✅ Loaded ${data.length} records from ${staveName}`, 'success');
+                    showToast(`✅ Loaded ${data.length} records from ${tableName} table`, 'success');
                     
                     // Show data in a modal
-                    showDataModal(`${staveName} - Data Preview`, data);
+                    showDataModal(`${staveName} - ${tableName} Table Preview`, data);
                 } else {
                     showToast(`❌ Failed to preview data: ${response.data.message}`, 'error');
                 }
             } catch (error) {
                 console.error('Preview error:', error);
                 showToast(`❌ Failed to preview data from ${staveName}`, 'error');
+            }
+        }
+
+        async function generateStaveData(staveId, staveName) {
+            showToast(`Generating sample data for ${staveName}...`, 'info');
+            
+            // Determine table name based on stave
+            let tableName = 'users';
+            let count = 50;
+            if (staveName.includes('Clickstream')) {
+                tableName = 'clicks';
+                count = 100;
+            }
+            
+            try {
+                const response = await axios.post(`${API_BASE_URL}/stave-actions/${staveId}/generate-data`, {
+                    table_name: tableName,
+                    count: count
+                }, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                if (response.data.success) {
+                    showToast(`✅ Generated ${count} records for ${tableName} table!`, 'success');
+                } else {
+                    showToast(`❌ Failed to generate data: ${response.data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Generate data error:', error);
+                showToast(`❌ Failed to generate data for ${staveName}`, 'error');
+            }
+        }
+
+        async function generateTableData(staveId, staveName, tableName) {
+            const countMap = {
+                'clicks': 100,
+                'users': 50,
+                'orders': 75,
+                'products': 25
+            };
+            const count = countMap[tableName] || 50;
+            
+            showToast(`Generating ${count} ${tableName} records...`, 'info');
+            
+            try {
+                const response = await axios.post(`${API_BASE_URL}/stave-actions/${staveId}/generate-data`, {
+                    table_name: tableName,
+                    count: count
+                }, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                if (response.data.success) {
+                    showToast(`✅ Generated ${count} records for ${tableName} table!`, 'success');
+                    // Reload the preview
+                    setTimeout(() => loadDataPreview(), 500);
+                } else {
+                    showToast(`❌ Failed to generate data: ${response.data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Generate data error:', error);
+                showToast(`❌ Failed to generate ${tableName} data`, 'error');
             }
         }
 
@@ -1021,6 +1130,614 @@
             modals.forEach(modal => {
                 document.body.removeChild(modal);
             });
+        }
+
+        // Convert JSON to YAML-like format
+        function jsonToYaml(obj, indent = 0) {
+            const spaces = '  '.repeat(indent);
+            let yaml = '';
+            
+            for (const [key, value] of Object.entries(obj)) {
+                if (value === null) {
+                    yaml += `${spaces}${key}: null\n`;
+                } else if (typeof value === 'object' && !Array.isArray(value)) {
+                    yaml += `${spaces}${key}:\n`;
+                    yaml += jsonToYaml(value, indent + 1);
+                } else if (Array.isArray(value)) {
+                    yaml += `${spaces}${key}:\n`;
+                    value.forEach(item => {
+                        if (typeof item === 'object') {
+                            yaml += `${spaces}  -\n`;
+                            yaml += jsonToYaml(item, indent + 2);
+                        } else {
+                            yaml += `${spaces}  - ${item}\n`;
+                        }
+                    });
+                } else if (typeof value === 'string') {
+                    yaml += `${spaces}${key}: "${value}"\n`;
+                } else if (typeof value === 'boolean') {
+                    yaml += `${spaces}${key}: ${value}\n`;
+                } else {
+                    yaml += `${spaces}${key}: ${value}\n`;
+                }
+            }
+            
+            return yaml;
+        }
+
+        function showStaveDetails(staveId, staveData) {
+            // Prevent event bubbling to parent elements
+            event.stopPropagation();
+            
+            const stave = typeof staveData === 'string' ? JSON.parse(staveData.replace(/&quot;/g, '"')) : staveData;
+            
+            const yamlConfig = jsonToYaml(stave);
+            
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900">${stave.name}</h2>
+                            <p class="text-sm text-gray-500">Stave Configuration</p>
+                        </div>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-3">Quick Info</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">ID:</span>
+                                    <span class="font-mono text-gray-900">${stave.id}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Type:</span>
+                                    <span class="font-medium text-gray-900">${stave.data_source_type}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Status:</span>
+                                    <span class="font-medium ${stave.is_active ? 'text-green-600' : 'text-red-600'}">${stave.is_active ? '🟢 Active' : '🔴 Inactive'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Created:</span>
+                                    <span class="text-gray-900">${new Date(stave.created_at).toLocaleString()}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-3">Actions</h3>
+                            <div class="space-y-2">
+                                <button onclick="event.stopPropagation(); testStaveConnection('${stave.id}', '${stave.name}')" 
+                                        class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center">
+                                    🔗 Test Connection
+                                </button>
+                                <button onclick="event.stopPropagation(); previewStaveData('${stave.id}', '${stave.name}')" 
+                                        class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center justify-center">
+                                    👁️ Preview Data
+                                </button>
+                                ${stave.name.includes('DEMO') || stave.name.includes('Demo') ? `
+                                <button onclick="event.stopPropagation(); generateStaveData('${stave.id}', '${stave.name}')" 
+                                        class="w-full bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center justify-center">
+                                    ✨ Generate Sample Data
+                                </button>
+                                ` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Configuration (YAML)</h3>
+                        <div class="bg-gray-900 text-green-400 rounded-lg p-4 overflow-x-auto">
+                            <pre class="text-sm font-mono">${yamlConfig}</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button onclick="copyToClipboard(\`${yamlConfig.replace(/`/g, '\\`')}\`)" 
+                                class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center">
+                            📋 Copy YAML
+                        </button>
+                        <button onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        function showClefDetails(clefId, clefData) {
+            // Prevent event bubbling to parent elements
+            event.stopPropagation();
+            
+            const clef = typeof clefData === 'string' ? JSON.parse(clefData.replace(/&quot;/g, '"')) : clefData;
+            
+            const yamlConfig = jsonToYaml(clef);
+            
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900">${clef.name}</h2>
+                            <p class="text-sm text-gray-500">Clef Configuration</p>
+                        </div>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-3">Quick Info</h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">ID:</span>
+                                    <span class="font-mono text-gray-900">${clef.id}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Type:</span>
+                                    <span class="font-medium text-gray-900">${clef.check_type}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Status:</span>
+                                    <span class="font-medium ${clef.is_active ? 'text-green-600' : 'text-red-600'}">${clef.is_active ? '🟢 Active' : '🔴 Inactive'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Schedule:</span>
+                                    <span class="font-mono text-gray-900">${clef.schedule || 'Not scheduled'}</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-gray-600">Created:</span>
+                                    <span class="text-gray-900">${new Date(clef.created_at).toLocaleString()}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-3">Actions</h3>
+                            <div class="space-y-2">
+                                <button onclick="event.stopPropagation(); runClefNow('${clef.id}', '${clef.name}')" 
+                                        class="w-full bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center justify-center">
+                                    ▶️ Run Check Now
+                                </button>
+                                <button onclick="event.stopPropagation(); viewClefResults('${clef.id}', '${clef.name}')" 
+                                        class="w-full bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center justify-center">
+                                    📊 View Results
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 mb-3">Configuration (YAML)</h3>
+                        <div class="bg-gray-900 text-green-400 rounded-lg p-4 overflow-x-auto">
+                            <pre class="text-sm font-mono">${yamlConfig}</pre>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button onclick="copyToClipboard(\`${yamlConfig.replace(/`/g, '\\`')}\`)" 
+                                class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg flex items-center">
+                            📋 Copy YAML
+                        </button>
+                        <button onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('✅ Configuration copied to clipboard!', 'success');
+            }).catch(err => {
+                showToast('❌ Failed to copy to clipboard', 'error');
+            });
+        }
+
+        function showImportYamlModal(type) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <div class="flex items-center justify-between mb-6">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900">Import ${type === 'staves' ? 'Staves' : 'Clefs'} from YAML</h2>
+                            <p class="text-sm text-gray-500">Paste your YAML configuration below</p>
+                        </div>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">
+                            YAML Configuration
+                        </label>
+                        <textarea id="yamlInput" 
+                                  class="w-full h-64 px-3 py-2 border border-gray-300 rounded-lg font-mono text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+                                  placeholder="${type === 'staves' ? getStaveYamlExample() : getClefYamlExample()}"></textarea>
+                        <p class="text-xs text-gray-500 mt-1">
+                            Paste your YAML configuration here. The system will validate it before importing.
+                        </p>
+                    </div>
+                    
+                    <div id="validationResult" class="mb-4"></div>
+                    
+                    <div class="flex justify-end space-x-3">
+                        <button onclick="validateYaml('${type}')" 
+                                class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center">
+                            🔍 Validate
+                        </button>
+                        <button onclick="importYamlConfig('${type}')" 
+                                class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg flex items-center">
+                            📥 Import
+                        </button>
+                        <button onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Cancel
+                        </button>
+                    </div>
+                    
+                    <div class="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p class="text-sm text-blue-800">
+                            <strong>💡 Tip:</strong> You can import staves and clefs together or separately. 
+                            The system will validate your YAML before importing.
+                        </p>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        function getStaveYamlExample() {
+            return `staves:
+  - id: stave-my-database
+    name: My Database
+    description: My production database
+    data_source_type: sqlite
+    connection_config:
+      database_path: my_data.db
+    is_active: true`;
+        }
+
+        function getClefYamlExample() {
+            return `clefs:
+  - id: clef-my-check
+    stave_id: stave-existing-id
+    name: My Quality Check
+    description: Check for NULL emails
+    check_type: column_values
+    config:
+      table: users
+      column: email
+      condition: if_null
+    warn: "if_null > 5%"
+    fail: "if_null > 20%"
+    schedule: "@hourly"
+    is_active: true`;
+        }
+
+        async function validateYaml(type) {
+            const yamlInput = document.getElementById('yamlInput').value;
+            const validationResult = document.getElementById('validationResult');
+            
+            if (!yamlInput.trim()) {
+                validationResult.innerHTML = `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p class="text-sm text-red-800">❌ Please enter YAML configuration</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            validationResult.innerHTML = `
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <p class="text-sm text-blue-800">🔍 Validating YAML...</p>
+                </div>
+            `;
+            
+            try {
+                // Parse YAML (basic validation)
+                const lines = yamlInput.split('\\n');
+                let config = {};
+                
+                // Simple YAML parsing validation
+                if (!yamlInput.includes('staves:') && !yamlInput.includes('clefs:')) {
+                    throw new Error('YAML must contain either "staves:" or "clefs:" section');
+                }
+                
+                // Count items
+                const staveCount = (yamlInput.match(/- id:/g) || []).length;
+                const hasStaves = yamlInput.includes('staves:');
+                const hasClefs = yamlInput.includes('clefs:');
+                
+                validationResult.innerHTML = `
+                    <div class="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <p class="text-sm text-green-800 font-medium">✅ YAML is valid!</p>
+                        <p class="text-xs text-green-700 mt-1">
+                            Found: ${hasStaves ? 'Staves section' : ''} ${hasClefs ? 'Clefs section' : ''}
+                        </p>
+                    </div>
+                `;
+                
+                showToast('✅ YAML validation passed!', 'success');
+            } catch (error) {
+                validationResult.innerHTML = `
+                    <div class="bg-red-50 border border-red-200 rounded-lg p-3">
+                        <p class="text-sm text-red-800 font-medium">❌ Invalid YAML</p>
+                        <p class="text-xs text-red-700 mt-1">${error.message}</p>
+                    </div>
+                `;
+                
+                showToast('❌ YAML validation failed', 'error');
+            }
+        }
+
+        async function importYamlConfig(type) {
+            const yamlInput = document.getElementById('yamlInput').value;
+            
+            if (!yamlInput.trim()) {
+                showToast('❌ Please enter YAML configuration', 'error');
+                return;
+            }
+            
+            showToast('📥 Importing configuration...', 'info');
+            
+            try {
+                // Send YAML to backend for import
+                const response = await axios.post(`${API_BASE_URL}/import/yaml`, {
+                    yaml_content: yamlInput,
+                    type: type
+                }, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                if (response.data.success) {
+                    showToast(`✅ Successfully imported ${response.data.staves_created || 0} staves and ${response.data.clefs_created || 0} clefs!`, 'success');
+                    closeModal();
+                    
+                    // Reload the appropriate tab
+                    if (type === 'staves') {
+                        loadStaves();
+                    } else {
+                        loadClefs();
+                    }
+                } else {
+                    showToast(`❌ Import failed: ${response.data.message}`, 'error');
+                }
+            } catch (error) {
+                console.error('Import error:', error);
+                
+                // If endpoint doesn't exist, show manual import instructions
+                if (error.response?.status === 404) {
+                    showManualImportInstructions(yamlInput);
+                } else {
+                    showToast('❌ Import failed. See console for details.', 'error');
+                }
+            }
+        }
+
+        function showManualImportInstructions(yamlContent) {
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-xl p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+                    <div class="flex items-center justify-between mb-6">
+                        <h2 class="text-2xl font-bold text-gray-900">Manual Import Instructions</h2>
+                        <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                            <p class="text-sm text-yellow-800">
+                                The import API endpoint is not available. Use the command-line import utility instead.
+                            </p>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Step 1: Save YAML to File</h3>
+                            <p class="text-sm text-gray-600 mb-2">Save the following content to a file (e.g., <code class="bg-gray-100 px-1 rounded">my-config.yaml</code>):</p>
+                            <div class="bg-gray-900 text-green-400 rounded-lg p-4 overflow-x-auto">
+                                <pre class="text-sm font-mono">${yamlContent}</pre>
+                            </div>
+                            <button onclick="copyToClipboard(\`${yamlContent.replace(/`/g, '\\`')}\`)" 
+                                    class="mt-2 bg-gray-500 hover:bg-gray-600 text-white px-3 py-1 rounded text-sm">
+                                📋 Copy YAML
+                            </button>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Step 2: Run Import Command</h3>
+                            <p class="text-sm text-gray-600 mb-2">In your terminal, run:</p>
+                            <div class="bg-gray-900 text-green-400 rounded-lg p-4">
+                                <pre class="text-sm font-mono">cd datametronome/podium
+python3 scripts/import_yaml.py my-config.yaml --dry-run  # Preview first
+python3 scripts/import_yaml.py my-config.yaml             # Import
+python3 scripts/import_yaml.py my-config.yaml --clean     # Replace existing</pre>
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">Step 3: Refresh Dashboard</h3>
+                            <p class="text-sm text-gray-600">After importing, refresh this page to see the new staves/clefs.</p>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end mt-6">
+                        <button onclick="closeModal()" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">
+                            Close
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        // Table mapping for different stave types
+        const staveTableMapping = {
+            'clickstream': ['clicks'],
+            'ecommerce': ['users', 'products', 'orders'],
+            'postgres': ['users', 'products', 'orders'],
+            'postgresql': ['users', 'products', 'orders'],
+            'bigquery': ['bigquery-public-data.samples.shakespeare', 'bigquery-public-data.samples.natality', 'bigquery-public-data.usa_names.usa_1910_current'],
+            'sqlite': ['users', 'products', 'orders', 'clicks']
+        };
+
+        function updateTableDropdown() {
+            const staveSelect = document.getElementById('previewStaveSelect');
+            const tableSelect = document.getElementById('previewTableSelect');
+            
+            if (!staveSelect || !tableSelect) return;
+            
+            const selectedStaveId = staveSelect.value;
+            if (!selectedStaveId) {
+                tableSelect.innerHTML = '<option value="">Select a stave first...</option>';
+                return;
+            }
+            
+            // Find the selected stave's name to determine type
+            const selectedOption = staveSelect.options[staveSelect.selectedIndex];
+            const staveName = selectedOption ? selectedOption.textContent : '';
+            
+            // Determine which tables to show based on stave name/type
+            let tables = ['users', 'products', 'orders']; // default
+            
+            if (staveName.includes('Clickstream')) {
+                tables = staveTableMapping.clickstream;
+            } else if (staveName.includes('Ecommerce')) {
+                tables = staveTableMapping.ecommerce;
+            } else if (staveName.includes('PostgreSQL') || staveName.includes('Postgres')) {
+                tables = staveTableMapping.postgres;
+            } else if (staveName.includes('BigQuery')) {
+                tables = staveTableMapping.bigquery;
+            }
+            
+            // Update the dropdown
+            tableSelect.innerHTML = tables.map(table => 
+                `<option value="${table}">${table}</option>`
+            ).join('');
+            
+            console.log(`📊 Updated table dropdown for ${staveName}:`, tables);
+            
+            // Auto-load preview after updating dropdown
+            loadDataPreview();
+        }
+
+        async function loadDataPreview() {
+            const dataPreview = document.getElementById('dataPreview');
+            const tableSelect = document.getElementById('previewTableSelect');
+            const staveSelect = document.getElementById('previewStaveSelect');
+            const tableName = tableSelect ? tableSelect.value : 'users';
+            
+            try {
+                // Get staves
+                const stavesResponse = await axios.get(`${API_BASE_URL}/staves/`, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                const staves = stavesResponse.data;
+                const demoStaves = staves.filter(s => s.name.includes('DEMO') || s.name.includes('Demo'));
+                
+                // Populate stave selector if not already populated
+                if (staveSelect && staveSelect.options[0].value === '') {
+                    staveSelect.innerHTML = demoStaves.map(s => 
+                        `<option value="${s.id}">${s.name}</option>`
+                    ).join('');
+                    // Update table dropdown based on first stave
+                    updateTableDropdown();
+                }
+                
+                if (demoStaves.length === 0) {
+                    dataPreview.innerHTML = `
+                        <div class="text-center py-8 text-gray-500">
+                            <p>No demo staves configured yet</p>
+                        </div>
+                    `;
+                    return;
+                }
+                
+                // Get selected stave or use first one
+                const selectedStaveId = staveSelect ? staveSelect.value : demoStaves[0].id;
+                const stave = demoStaves.find(s => s.id === selectedStaveId) || demoStaves[0];
+                
+                dataPreview.innerHTML = `
+                    <div class="text-center py-4">
+                        <div class="loading-spinner mx-auto mb-2"></div>
+                        <p class="text-sm text-gray-500">Loading ${tableName} table from ${stave.name}...</p>
+                    </div>
+                `;
+                
+                const response = await axios.post(`${API_BASE_URL}/stave-actions/${stave.id}/preview-data`, {
+                    table_name: tableName,
+                    count: 5
+                }, {
+                    headers: { Authorization: `Bearer ${authToken}` }
+                });
+                
+                if (response.data.success && response.data.data.length > 0) {
+                    const data = response.data.data;
+                    const columns = Object.keys(data[0]);
+                    
+                    dataPreview.innerHTML = `
+                        <div class="mb-3">
+                            <p class="text-sm text-gray-600">
+                                Showing ${data.length} records from <span class="font-medium">${tableName}</span> table 
+                                in <span class="font-medium">${stave.name}</span>
+                            </p>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        ${columns.map(col => `<th class="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase">${col}</th>`).join('')}
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200">
+                                    ${data.map(row => `
+                                        <tr>
+                                            ${columns.map(col => `<td class="px-3 py-2 text-sm text-gray-900">${row[col] !== null ? row[col] : '<span class="text-gray-400">null</span>'}</td>`).join('')}
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="mt-3 text-right">
+                            <button onclick="previewStaveData('${stave.id}', '${stave.name}')" 
+                                    class="text-sm text-blue-600 hover:text-blue-700">
+                                View Full Preview →
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    dataPreview.innerHTML = `
+                        <div class="text-center py-8 text-gray-500">
+                            <p>No data available in ${tableName} table</p>
+                            ${stave.name.includes('DEMO') || stave.name.includes('Demo') ? `
+                                <button onclick="generateTableData('${stave.id}', '${stave.name}', '${tableName}')" 
+                                        class="mt-4 bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded-lg">
+                                    ✨ Generate ${tableName} Data
+                                </button>
+                            ` : ''}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading data preview:', error);
+                dataPreview.innerHTML = `
+                    <div class="text-center py-8 text-red-500">
+                        <p>Failed to load data preview</p>
+                        <p class="text-sm">Check if the Podium API is running</p>
+                    </div>
+                `;
+            }
         }
     </script>
 </body>

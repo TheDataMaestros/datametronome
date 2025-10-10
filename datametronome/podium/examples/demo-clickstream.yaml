@@ -1,0 +1,58 @@
+# Demo Clickstream Configuration
+# Designed for monitoring clickstream data with realistic checks
+
+staves:
+  # Clickstream demo database
+  - id: stave-demo-clickstream
+    name: DEMO-Clickstream
+    description: Demo stave for clickstream data monitoring
+    data_source_type: sqlite
+    connection_config:
+      database_path: demo.db
+    is_active: true
+
+# Clefs for clickstream monitoring
+clefs:
+  # NULL Check for user_id
+  - id: clef-clicks-user-id-null
+    stave_id: stave-demo-clickstream
+    name: Clicks NULL Value Check
+    description: Ensures all clicks have a valid user_id (no NULLs allowed)
+    check_type: column_values
+    config:
+      table: clicks
+      column: user_id
+      condition: if_null
+    warn: null
+    fail: null  # No threshold - any data is acceptable for demo
+    schedule: "*/2 * * * *"  # Run every 2 minutes
+    is_active: true
+  
+  # Row Count Check
+  - id: clef-clicks-row-count
+    stave_id: stave-demo-clickstream
+    name: Clickstream Volume Check
+    description: Monitors the total number of clicks in the database
+    check_type: row_count
+    config:
+      table: clicks
+    warn: "> 10000"  # Warn if more than 10k clicks
+    fail: "< 10"     # Fail if less than 10 clicks
+    schedule: "@hourly"
+    is_active: true
+  
+  # Freshness Check
+  - id: clef-clicks-freshness
+    stave_id: stave-demo-clickstream
+    name: Clickstream Data Freshness
+    description: Ensures clickstream data is recent and up-to-date
+    check_type: freshness
+    config:
+      table: clicks
+      column: click_timestamp
+      max_age: "1 hour"
+    warn: "> 2 hours"   # Warn if data is older than 2 hours
+    fail: "> 6 hours"   # Fail if data is older than 6 hours
+    schedule: "@hourly"
+    is_active: true
+

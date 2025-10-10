@@ -204,7 +204,7 @@ class ClefExecutor:
         threshold = config.get("threshold", 0.0)
         
         # Build SQL query to count NULLs
-        if stave.data_source_type in ["postgres", "postgresql", "mysql"]:
+        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT 
                 COUNT(*) as total_rows,
@@ -325,7 +325,7 @@ class ClefExecutor:
         
         where_clause = " OR ".join(conditions)
         
-        if stave.data_source_type in ["postgres", "postgresql", "mysql"]:
+        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT 
                 COUNT(*) as total_rows,
@@ -607,7 +607,7 @@ class ClefExecutor:
         column = config["column"]
         
         # Build SQL query to find duplicates
-        if stave.data_source_type in ["postgres", "postgresql", "mysql"]:
+        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT 
                 {column},
@@ -690,6 +690,15 @@ class ClefExecutor:
                 COUNT(*) as total_rows,
                 COUNT(CASE WHEN {column} ~ '{pattern}' THEN 1 END) as matching_rows,
                 COUNT(CASE WHEN {column} !~ '{pattern}' THEN 1 END) as non_matching_rows
+            FROM {table}
+            WHERE {column} IS NOT NULL
+            """
+        elif stave.data_source_type == "bigquery":
+            sql = f"""
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT(CASE WHEN REGEXP_CONTAINS({column}, r'{pattern}') THEN 1 END) as matching_rows,
+                COUNT(CASE WHEN NOT REGEXP_CONTAINS({column}, r'{pattern}') THEN 1 END) as non_matching_rows
             FROM {table}
             WHERE {column} IS NOT NULL
             """
@@ -1000,6 +1009,17 @@ class ClefExecutor:
                     password=config['password']
                 )
                 await connector.connect()
+            elif stave.data_source_type == "bigquery":
+                from metronome_pulse_bigquery import BigQueryReadonlyPulse
+                config = stave.connection_config
+                connector = BigQueryReadonlyPulse(
+                    project_id=config['project_id'],
+                    credentials_path=config.get('credentials_path'),
+                    credentials_json=config.get('credentials_json'),
+                    dataset=config.get('dataset'),
+                    location=config.get('location', 'US')
+                )
+                await connector.connect()
             else:
                 return CheckResult(
                     clef_id=clef.id,
@@ -1125,6 +1145,17 @@ class ClefExecutor:
                     database=config['database'],
                     user=config['user'],
                     password=config['password']
+                )
+                await connector.connect()
+            elif stave.data_source_type == "bigquery":
+                from metronome_pulse_bigquery import BigQueryReadonlyPulse
+                config = stave.connection_config
+                connector = BigQueryReadonlyPulse(
+                    project_id=config['project_id'],
+                    credentials_path=config.get('credentials_path'),
+                    credentials_json=config.get('credentials_json'),
+                    dataset=config.get('dataset'),
+                    location=config.get('location', 'US')
                 )
                 await connector.connect()
             else:

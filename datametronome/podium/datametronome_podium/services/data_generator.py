@@ -30,13 +30,17 @@ def generate_users_data(count: int = 100) -> list[dict]:
 def generate_products_data(count: int = 100) -> list[dict]:
     """Generate a list of sample products."""
     products = []
+    categories = ["Electronics", "Clothing", "Books", "Home & Garden", "Sports", "Toys", "Food & Beverage"]
+    product_prefixes = ["Premium", "Deluxe", "Standard", "Basic", "Pro", "Ultra", "Classic"]
+    product_types = ["Widget", "Gadget", "Item", "Product", "Device", "Tool", "Kit"]
+    
     for _ in range(count):
         products.append({
             "id": str(uuid.uuid4()),
-            "name": fake.ecommerce_name(),
+            "name": f"{random.choice(product_prefixes)} {random.choice(product_types)} {fake.word().title()}",
             "description": fake.text(max_nb_chars=200),
             "price": round(random.uniform(5.0, 500.0), 2),
-            "category": fake.ecommerce_category(),
+            "category": random.choice(categories),
             "in_stock": random.choice([True, False]),
             "created_at": fake.date_time_between(start_date="-1y", end_date="now").isoformat() + "Z"
         })

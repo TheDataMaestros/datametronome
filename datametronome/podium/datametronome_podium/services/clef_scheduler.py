@@ -106,6 +106,8 @@ async def _store_clef_result(clef_id: str, result, clef, db) -> None:
             "message": result.message,
             "details": metadata_json,
             "timestamp": datetime.utcnow().isoformat() + "Z",
+            "execution_time": result.execution_time,  # Store execution time in seconds
+            "anomalies_count": result.anomalies_count if hasattr(result, 'anomalies_count') else 0,
             "severity": result.severity.value  # Store the severity value: "harmony", "dissonance", "cacophony"
         }], "checks")
         

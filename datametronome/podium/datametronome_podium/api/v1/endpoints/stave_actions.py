@@ -170,6 +170,23 @@ async def generate_sample_data(
                 inserted_count = len(data) if success else 0
                 await connector.close()
                 logger.info(f"✅ Successfully inserted {inserted_count} records into {table_name}")
+            elif stave.data_source_type == "bigquery":
+                from metronome_pulse_bigquery import BigQueryPulse
+                config = stave.connection_config
+                connector = BigQueryPulse(
+                    project_id=config['project_id'],
+                    credentials_path=config.get('credentials_path'),
+                    credentials_json=config.get('credentials_json'),
+                    dataset=config.get('dataset'),
+                    location=config.get('location', 'US')
+                )
+                await connector.connect()
+                
+                # Insert the data
+                await connector.write(data, table_name)
+                inserted_count = len(data)
+                await connector.close()
+                logger.info(f"✅ Successfully inserted {inserted_count} records into {table_name}")
             else:
                 logger.info(f"⏭️  Skipping data insertion for {stave.data_source_type} (not implemented yet)")
             
@@ -249,6 +266,36 @@ async def preview_stave_data(
                     "sql": f"SELECT * FROM {table_name} LIMIT ?",
                     "params": [limit]
                 })
+                await connector.close()
+            elif stave.data_source_type == "bigquery":
+                from metronome_pulse_bigquery import BigQueryReadonlyPulse
+                config = stave.connection_config
+                connector = BigQueryReadonlyPulse(
+                    project_id=config['project_id'],
+                    credentials_path=config.get('credentials_path'),
+                    credentials_json=config.get('credentials_json'),
+                    dataset=config.get('dataset'),
+                    location=config.get('location', 'US')
+                )
+                await connector.connect()
+                
+                # Query for sample data
+                data = await connector.query(f"SELECT * FROM {table_name} LIMIT {limit}")
+                await connector.close()
+            elif stave.data_source_type in ["postgres", "postgresql"]:
+                from metronome_pulse_postgres import PostgresReadOnlyPulse
+                config = stave.connection_config
+                connector = PostgresReadOnlyPulse(
+                    host=config['host'],
+                    port=config.get('port', 5432),
+                    database=config['database'],
+                    user=config['user'],
+                    password=config['password']
+                )
+                await connector.connect()
+                
+                # Query for sample data
+                data = await connector.query(f"SELECT * FROM {table_name} LIMIT {limit}")
                 await connector.close()
             else:
                 raise HTTPException(

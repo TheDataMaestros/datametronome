@@ -1,0 +1,266 @@
+# Complete Demo Configuration for DataMetronome
+# This file contains all demo staves and clefs for a complete demonstration
+# Import this on first run to set up the entire demo environment
+
+staves:
+  # Clickstream demo database
+  - id: stave-demo-clickstream
+    name: DEMO-Clickstream
+    description: Demo stave for clickstream/analytics data monitoring
+    data_source_type: sqlite
+    connection_config:
+      database_path: demo.db
+    is_active: true
+
+  # E-commerce demo database
+  - id: stave-demo-ecommerce
+    name: DEMO-Ecommerce
+    description: Demo stave for e-commerce data (users, products, orders)
+    data_source_type: sqlite
+    connection_config:
+      database_path: demo.db
+    is_active: true
+
+  # PostgreSQL production database
+  - id: stave-demo-postgres
+    name: DEMO-PostgreSQL
+    description: Demo PostgreSQL database with users, products, and orders tables
+    data_source_type: postgres
+    connection_config:
+      host: localhost
+      port: 5432
+      database: datametronome_test
+      user: testuser
+      password: testpass
+    is_active: true
+
+  # BigQuery analytics database
+  - id: stave-demo-bigquery
+    name: DEMO-BigQuery Analytics
+    description: Demo BigQuery analytics database for cloud-scale data quality monitoring
+    data_source_type: bigquery
+    connection_config:
+      project_id: ${BIGQUERY_PROJECT_ID}  # Set via environment variable
+      dataset: analytics
+      credentials_path: ${BIGQUERY_CREDENTIALS_PATH}  # Set via environment variable
+      # Alternative: credentials_json for direct JSON credentials
+      location: US
+    is_active: true  # ✅ ENABLED - Set to false to disable
+
+# Clefs for comprehensive data quality monitoring
+clefs:
+  # ============================================================================
+  # Clickstream Monitoring Clefs
+  # ============================================================================
+  
+  - id: clef-clicks-user-id-null
+    stave_id: stave-demo-clickstream
+    name: Clicks NULL Value Check
+    description: Ensures all clicks have a valid user_id (no NULLs allowed)
+    check_type: column_values
+    config:
+      table: clicks
+      column: user_id
+      condition: if_null
+    warn: null
+    fail: null
+    schedule: "*/2 * * * *"  # Run every 2 minutes
+    is_active: true
+  
+  - id: clef-clicks-volume
+    stave_id: stave-demo-clickstream
+    name: Clickstream Volume Check
+    description: Monitors the total number of clicks in the database
+    check_type: row_count
+    config:
+      table: clicks
+    warn: "> 10000"  # Warn if more than 10k clicks
+    fail: "< 10"     # Fail if less than 10 clicks
+    schedule: "@hourly"
+    is_active: true
+  
+  - id: clef-clicks-freshness
+    stave_id: stave-demo-clickstream
+    name: Clickstream Data Freshness
+    description: Ensures clickstream data is recent and up-to-date
+    check_type: freshness
+    config:
+      table: clicks
+      column: click_timestamp
+      max_age: "1 hour"
+    warn: "> 2 hours"   # Warn if data is older than 2 hours
+    fail: "> 6 hours"   # Fail if data is older than 6 hours
+    schedule: "@hourly"
+    is_active: true
+  
+  # ============================================================================
+  # E-commerce Monitoring Clefs
+  # ============================================================================
+  
+  # Users table checks
+  - id: clef-users-email-null
+    stave_id: stave-demo-ecommerce
+    name: ✅ Users Email Check
+    description: Validates that email addresses are not NULL in user records
+    check_type: column_values
+    config:
+      table: users
+      column: email
+      condition: if_null
+    warn: "if_null > 5%"   # Warn if more than 5% NULL
+    fail: "if_null > 20%"  # Fail if more than 20% NULL
+    schedule: "@hourly"
+    is_active: true
+  
+  - id: clef-users-row-count
+    stave_id: stave-demo-ecommerce
+    name: ✅ Users Table Volume
+    description: Monitors the total number of users in the database
+    check_type: row_count
+    config:
+      table: users
+    warn: "> 10000"  # Warn if more than 10k users
+    fail: "< 10"     # Fail if less than 10 users
+    schedule: "@hourly"
+    is_active: true
+  
+  # Products table checks
+  - id: clef-products-price-validation
+    stave_id: stave-demo-ecommerce
+    name: ✅ Product Price Validation
+    description: Ensures all products have valid positive prices
+    check_type: column_values
+    config:
+      table: products
+      column: price
+      min: 0.01
+    warn: null
+    fail: "< 0.01"  # Fail if price is zero or negative
+    schedule: "@hourly"
+    is_active: true
+  
+  - id: clef-products-row-count
+    stave_id: stave-demo-ecommerce
+    name: ⚠️ Products Availability Check
+    description: Ensures product catalog is not empty
+    check_type: row_count
+    config:
+      table: products
+    warn: "< 5"      # Warn if less than 5 products
+    fail: "< 1"      # Fail if no products
+    schedule: "@hourly"
+    is_active: true
+  
+  # Orders table checks
+  - id: clef-orders-volume
+    stave_id: stave-demo-ecommerce
+    name: Orders Volume Check
+    description: Monitors order count to ensure business activity
+    check_type: row_count
+    config:
+      table: orders
+    warn: "< 10"     # Warn if less than 10 orders
+    fail: "< 1"      # Fail if no orders
+    schedule: "@daily"
+    is_active: true
+  
+  - id: clef-orders-freshness
+    stave_id: stave-demo-ecommerce
+    name: Orders Data Freshness
+    description: Ensures orders are being created recently
+    check_type: freshness
+    config:
+      table: orders
+      column: order_date
+      max_age: "1 day"
+    warn: "> 2 days"   # Warn if no orders in 2 days
+    fail: "> 7 days"   # Fail if no orders in a week
+    schedule: "@daily"
+    is_active: true
+  
+  # ============================================================================
+  # BigQuery Cloud Analytics Clefs (when BigQuery is configured)
+  # ============================================================================
+  
+  - id: clef-bigquery-users-email-null
+    stave_id: stave-demo-bigquery
+    name: 🌐 BigQuery Email NULL Check
+    description: Ensures BigQuery user emails are never null
+    check_type: null_check
+    config:
+      table: users
+      column: email
+      threshold: 0.0
+    schedule: "0 */6 * * *"  # Every 6 hours
+    is_active: true  # ✅ ENABLED
+  
+  - id: clef-bigquery-events-freshness
+    stave_id: stave-demo-bigquery
+    name: 🌐 BigQuery Events Freshness
+    description: Verifies BigQuery events are recent within 24 hours
+    check_type: freshness
+    config:
+      table: events
+      timestamp_column: created_at
+      max_age_hours: 24
+    schedule: "0 */1 * * *"  # Hourly
+    is_active: false
+  
+  - id: clef-bigquery-orders-range
+    stave_id: stave-demo-bigquery
+    name: 🌐 BigQuery Order Amount Range
+    description: Validates BigQuery order amounts are within expected range
+    check_type: range_check
+    config:
+      table: orders
+      column: amount
+      min_value: 0
+      max_value: 100000
+      threshold: 0.01
+    schedule: "0 */4 * * *"  # Every 4 hours
+    is_active: false
+  
+  - id: clef-bigquery-email-pattern
+    stave_id: stave-demo-bigquery
+    name: 🌐 BigQuery Email Pattern Check
+    description: Validates email format using BigQuery REGEXP_CONTAINS
+    check_type: pattern_check
+    config:
+      table: users
+      column: email
+      pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
+      threshold: 0.02
+    schedule: "0 8 * * *"  # Daily at 8 AM
+    is_active: false
+
+  # ============================================================================
+  # Advanced Monitoring Clefs (ML and Analytics)
+  # ============================================================================
+  
+  - id: clef-ml-anomaly-detection
+    stave_id: stave-demo-ecommerce
+    name: 🤖 ML Anomaly Detection
+    description: Demonstrates intelligent ML-based anomaly detection
+    check_type: forecast
+    config:
+      metric: row_count
+      table: users
+      strategy:
+        model: sarima
+        confidence: 95
+    schedule: "@daily"
+    is_active: true
+  
+  - id: clef-data-drift-detection
+    stave_id: stave-demo-ecommerce
+    name: 📊 Data Drift Detection
+    description: Detects statistical drift in user data profiles
+    check_type: data_profile_drift
+    config:
+      table: users
+      columns: ["age", "name"]
+      baseline_period: "7 days"
+      drift_threshold: 0.1
+    schedule: "@daily"
+    is_active: true
+
