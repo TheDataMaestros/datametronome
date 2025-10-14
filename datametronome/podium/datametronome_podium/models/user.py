@@ -15,7 +15,7 @@ class User(BaseModel):
     email: str = Field(..., pattern=r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
     full_name: str | None = None
     is_active: bool = True
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(default_factory=datetime.utcnow)
     
     @field_validator('username')
     @classmethod

@@ -18,7 +18,7 @@ scheduler: Optional[AsyncIOScheduler] = None
 
 
 async def init_scheduler():
-    """Initialize the scheduler."""
+    """Initialize the scheduler and load all scheduled clefs."""
     global scheduler
     
     if not settings.scheduler_enabled:
@@ -37,9 +37,44 @@ async def init_scheduler():
         scheduler.start()
         logger.info("Scheduler started successfully")
         
+        # Add the streaming data generator job
+        try:
+            from datametronome_podium.services.default_setup import generate_streaming_data_job
+            scheduler.add_job(
+                generate_streaming_data_job,
+                trigger='interval',
+                minutes=10,
+                id='streaming_data_generator',
+                replace_existing=True
+            )
+            logger.info("Added streaming data generator job to run every 10 minutes.")
+        except Exception as e:
+            logger.error(f"Failed to add streaming data generator job: {e}")
+
+        # Load and schedule all clefs with cron expressions
+        await _load_and_schedule_clefs()
+        
     except Exception as e:
         logger.error(f"Failed to start scheduler: {e}")
         raise
+
+
+async def _load_and_schedule_clefs():
+    """Load and schedule all clefs from the database."""
+    try:
+        from datametronome_podium.services.clef_scheduler import load_and_schedule_all_clefs
+        
+        logger.info("🔄 Loading and scheduling clefs...")
+        result = await load_and_schedule_all_clefs()
+        
+        if result["scheduled"] > 0:
+            logger.info(f"✅ Scheduled {result['scheduled']} clefs successfully")
+        if result["failed"] > 0:
+            logger.warning(f"⚠️  Failed to schedule {result['failed']} clefs")
+            
+    except Exception as e:
+        logger.error(f"Failed to load and schedule clefs: {e}")
+        # Don't raise here - we want the scheduler to start even if clef loading fails
 
 
 async def shutdown_scheduler():

@@ -19,11 +19,23 @@ async def init_db() -> None:
     global sqlite_connector
     
     try:
-        # Create SQLite connector
-        sqlite_connector = SQLitePulse("data/datametronome.db")
+        # Create SQLite connector using configured database URL
+        from datametronome_podium.core.config import settings
+        import os
+        db_path = settings.database_url.replace("sqlite:///", "").replace("./", "")
+        full_path = os.path.abspath(db_path)
+        logger.info(f"Initializing database with file: {db_path}")
+        logger.info(f"Full path: {full_path}")
+        logger.info(f"File exists: {os.path.exists(full_path)}")
+        sqlite_connector = SQLitePulse(db_path)
         
         # Connect to the database
         await sqlite_connector.connect()
+        logger.info(f"Connected to database: {sqlite_connector.database_path}")
+        
+        # Immediately check if clefs table has data
+        test_count = await sqlite_connector.query({"sql": "SELECT COUNT(*) as count FROM clefs", "params": []})
+        logger.info(f"Clefs in database RIGHT AFTER CONNECT: {test_count[0]['count']}")
         
         # Create tables
         await _create_tables()

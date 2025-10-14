@@ -1,6 +1,7 @@
 """Clef endpoints for DataMetronome Podium using DataPulse connectors."""
 
 from typing import Any, List
+from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, status
 
@@ -24,11 +25,48 @@ async def get_clefs(skip: int = 0, limit: int = 100) -> List[ClefResponse]:
     """
     try:
         db = await get_db()
+        import logging
+        logger = logging.getLogger(__name__)
+        
+        # Log which database file we're using
+        db_file = getattr(db, 'database_path', 'unknown')
+        logger.info(f"Using database file: {db_file}")
+        
+        # Try a simple count query first
+        count_result = await db.query({"sql": "SELECT COUNT(*) as count FROM clefs", "params": []})
+        logger.info(f"COUNT query result: {count_result}")
+        
+        # Try without ORDER BY
+        clefs_no_order = await db.query({"sql": "SELECT * FROM clefs LIMIT ? OFFSET ?", "params": [limit, skip]})
+        logger.info(f"Query without ORDER BY returned: {len(clefs_no_order)} clefs")
+        
+        # Try the original query
         clefs = await db.query({
             "sql": "SELECT * FROM clefs ORDER BY created_at DESC LIMIT ? OFFSET ?", 
             "params": [limit, skip]
         })
-        return [ClefResponse(**clef) for clef in clefs]
+        logger.info(f"Found {len(clefs)} clefs in database")
+        logger.info(f"Query params: limit={limit}, skip={skip}")
+        from datametronome_podium.services.stave_service import deserialize_clef
+        response_data = []
+        for clef in clefs:
+            try:
+                deserialized = deserialize_clef(clef)
+                clef_dict = deserialized.model_dump()
+                # Convert datetime objects to strings for API compatibility
+                if isinstance(clef_dict.get('created_at'), datetime):
+                    clef_dict['created_at'] = clef_dict['created_at'].isoformat()
+                if isinstance(clef_dict.get('updated_at'), datetime):
+                    clef_dict['updated_at'] = clef_dict['updated_at'].isoformat()
+                response_data.append(ClefResponse(**clef_dict))
+            except Exception as e:
+                # Log the error but continue processing other clefs
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.warning(f"Failed to deserialize clef {clef.get('id', 'unknown')}: {e}")
+                logger.exception(e)
+                continue
+        return response_data
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -62,7 +100,15 @@ async def get_clef(clef_id: str) -> ClefResponse:
                 detail="Clef not found"
             )
         
-        return ClefResponse(**clefs[0])
+        from datametronome_podium.services.stave_service import deserialize_clef
+        deserialized = deserialize_clef(clefs[0])
+        clef_dict = deserialized.model_dump()
+        # Convert datetime objects to strings for API compatibility
+        if isinstance(clef_dict.get('created_at'), datetime):
+            clef_dict['created_at'] = clef_dict['created_at'].isoformat()
+        if isinstance(clef_dict.get('updated_at'), datetime):
+            clef_dict['updated_at'] = clef_dict['updated_at'].isoformat()
+        return ClefResponse(**clef_dict)
     except HTTPException:
         raise
     except Exception as e:
@@ -88,18 +134,27 @@ async def create_clef(clef_data: ClefCreate) -> ClefResponse:
     try:
         db = await get_db()
         
+        # Generate ID and timestamps
+        import uuid
+        clef_id = str(uuid.uuid4())
+        now = datetime.utcnow().isoformat() + "Z"
+        
         # Insert the new clef
+        import json
         success = await db.write([{
             "table": "clefs",
-            "id": clef_data.id,
+            "id": clef_id,
             "stave_id": clef_data.stave_id,
             "name": clef_data.name,
             "description": clef_data.description,
             "check_type": clef_data.check_type,
-            "config": clef_data.config,
+            "config": json.dumps(clef_data.config),
             "is_active": clef_data.is_active,
-            "created_at": clef_data.created_at,
-            "updated_at": clef_data.updated_at
+            "created_at": now,
+            "updated_at": now,
+            "schedule": clef_data.schedule,
+            "warn": clef_data.warn,
+            "fail": clef_data.fail
         }], "clefs")
         
         if not success:
@@ -109,7 +164,13 @@ async def create_clef(clef_data: ClefCreate) -> ClefResponse:
             )
         
         # Return the created clef
-        return ClefResponse(**clef_data.model_dump())
+        clef_response_data = {
+            "id": clef_id,
+            **clef_data.model_dump(),
+            "created_at": now,
+            "updated_at": now
+        }
+        return ClefResponse(**clef_response_data)
         
     except HTTPException:
         raise
@@ -151,7 +212,7 @@ async def update_clef(clef_id: str, clef_data: ClefUpdate) -> ClefResponse:
         
         # Update the clef
         update_data = clef_data.model_dump(exclude_unset=True)
-        update_data["updated_at"] = clef_data.updated_at
+        update_data["updated_at"] = datetime.utcnow().isoformat() + "Z"
         
         success = await db.write([{
             "table": "clefs",

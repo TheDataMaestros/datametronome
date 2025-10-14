@@ -1,0 +1,203 @@
+  we fix the remaining issue, pretty please ?
+  # TDD-Compliant Clefs Configuration
+# This file demonstrates the official TDD Clefs structure as specified in the design document
+
+staves:
+  - id: "stave-users"
+    name: "User Database"
+    data_source_type: "postgres"
+    connection_config:
+      host: "db.example.com"
+      database: "users"
+      user: "monitor"
+      password: "${DB_PASSWORD}"
+
+# TDD-Compliant Clef Structure
+clef:
+  # Optional metadata for the entire rule set
+  owner: "@data-team"
+  
+  # Optional default context for simple checks, reducing repetition
+  # Placeholders like {table} in a check's query will be substituted with this value
+  table: "public.users"
+  
+  # The list of individual check objects to be executed for this Stave
+  checks:
+    # =============================================================================
+    # LEVEL 1: DECLARATIVE CHECKS
+    # =============================================================================
+    
+    # Row count check with severity conditions
+    - check: "row_count"
+      name: "Daily User Registration Volume"
+      warn: "> 50000"    # Dissonance if more than 50,000 users registered
+      fail: "< 1000"     # Cacophony if fewer than 1,000 users registered
+      schedule: "@hourly"
+    
+    # Data freshness check
+    - check: "freshness"
+      name: "User Data Freshness"
+      column: "last_updated"
+      warn: "> 12 hours"    # Dissonance if data older than 12 hours
+      fail: "> 48 hours"    # Cacophony if data older than 48 hours
+      schedule: "@hourly"
+    
+    # Column values validation (consolidated from multiple legacy checks)
+    - check: "column_values"
+      name: "Email NULL Check"
+      column: "email"
+      fail: "if_null > 5%"    # Cacophony if more than 5% NULL emails
+      schedule: "@daily"
+    
+    - check: "column_values"
+      name: "Age Range Validation"
+      column: "age"
+      fail: "if_out_of_range: [0, 150] > 1%"    # Cacophony if more than 1% out of range
+      schedule: "@daily"
+    
+    - check: "column_values"
+      name: "Email Format Validation"
+      column: "email"
+      fail: "if_not_matching: '^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$' > 5%"
+      schedule: "@daily"
+    
+    - check: "column_values"
+      name: "Email Uniqueness Check"
+      column: "email"
+      fail: "if_not_unique > 0"    # Cacophony if any duplicate emails
+      schedule: "@daily"
+    
+    # =============================================================================
+    # LEVEL 2: INTELLIGENT CHECKS
+    # =============================================================================
+    
+    # ML-driven anomaly detection
+    - check: "forecast"
+      name: "User Registration Anomaly Detection"
+      metric: "row_count"
+      strategy:
+        model: "sarima"
+        confidence: 95
+        lookback_days: 30
+      warn: "> 80"    # Dissonance if anomaly score > 80%
+      fail: "> 95"    # Cacophony if anomaly score > 95%
+      schedule: "@daily"
+    
+    # Statistical drift detection
+    - check: "data_profile_drift"
+      name: "User Age Distribution Drift"
+      column: "age"
+      strategy:
+        test: "kolmogorov_smirnov"
+        critical_p_value: 0.05
+        reference_period: "last_30_days"
+        comparison_period: "last_7_days"
+      warn: "> 0.10"    # Dissonance if drift p-value > 0.10
+      fail: "> 0.25"    # Cacophony if drift p-value > 0.25
+      schedule: "@weekly"
+    
+    # =============================================================================
+    # LEVEL 3: ADVANCED DECLARATIVE CHECKS
+    # =============================================================================
+    
+    # Cross-system integrity validation
+    - check: "lookup_validation"
+      name: "User API vs Database Reconciliation"
+      lookup:
+        pulse: "stave-users"
+        query: "SELECT DISTINCT id FROM users WHERE active = true"
+        key_column: "id"
+      validation:
+        pulse: "stave-api"
+        query: "SELECT DISTINCT user_id FROM active_users WHERE user_id IN ({{ lookup_keys }})"
+        key_column: "user_id"
+      enforce: "existence_for_all"    # All users in DB must exist in API
+      warn: "> 5%"    # Dissonance if more than 5% missing in API
+      fail: "> 20%"   # Cacophony if more than 20% missing in API
+      schedule: "@hourly"
+    
+    # =============================================================================
+    # LEVEL 4: CUSTOM CODE
+    # =============================================================================
+    
+    # Custom Python script for complex business logic
+    - check: "python"
+      name: "Complex User Business Rules Validation"
+      script_path: "datametronome_scripts/user_business_rules.py"
+      params:
+        min_age: 18
+        required_fields: ["email", "name", "phone"]
+        business_rules: "premium_user_validation"
+        compliance_threshold: 0.95
+      warn: "> 0"     # Dissonance if any violations found
+      fail: "> 10"    # Cacophony if more than 10 violations
+      schedule: "@daily"
+
+# =============================================================================
+# SEVERITY CONFIGURATION EXAMPLES
+# =============================================================================
+# The TDD specification uses simple condition strings for warn/fail
+
+severity_examples:
+  # Conservative (strict) thresholds
+  conservative:
+    warn: "> 1%"
+    fail: "> 5%"
+  
+  # Moderate thresholds  
+  moderate:
+    warn: "> 5%"
+    fail: "> 20%"
+  
+  # Lenient thresholds
+  lenient:
+    warn: "> 10%"
+    fail: "> 50%"
+  
+  # Volume-specific thresholds
+  volume_strict:
+    warn: "> 1000"
+    fail: "< 100"
+  
+  # Time-based thresholds
+  time_sensitive:
+    warn: "> 1 hour"
+    fail: "> 5 hours"
+
+# =============================================================================
+# CONDITION STRING SYNTAX
+# =============================================================================
+# The TDD specification supports various condition string formats:
+
+condition_examples:
+  # Numeric comparisons
+  numeric:
+    - "> 1000"        # Greater than 1000
+    - "< 100"         # Less than 100
+    - ">= 50"         # Greater than or equal to 50
+    - "<= 200"        # Less than or equal to 200
+    - "== 0"          # Equal to 0
+    - "!= 1"          # Not equal to 1
+  
+  # Percentage comparisons
+  percentage:
+    - "> 5%"          # Greater than 5%
+    - "< 1%"          # Less than 1%
+    - ">= 10%"        # Greater than or equal to 10%
+  
+  # Time-based comparisons
+  time:
+    - "> 12 hours"    # Greater than 12 hours
+    - "< 1 hour"      # Less than 1 hour
+    - "> 2 days"      # Greater than 2 days
+    - "< 30 minutes"  # Less than 30 minutes
+  
+  # Range comparisons
+  range:
+    - "between 1000 and 2000"    # Between 1000 and 2000 (inclusive)
+    - "outside 0 and 100"        # Outside the range 0-100
+  
+  # List comparisons
+  list:
+    - "in: ['A', 'B', 'C']"      # Value must be in the list
+    - "not_in: ['X', 'Y', 'Z']"  # Value must not be in the list
