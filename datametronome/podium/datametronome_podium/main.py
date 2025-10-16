@@ -140,31 +140,12 @@ async def lifespan(app: FastAPI):
     # Startup
     logging.info("Starting DataMetronome Podium...")
     
-    # Validate and print configuration
-    from .core.config import validate_and_report_config, print_startup_banner
-    print_startup_banner()
-    validate_and_report_config()
-    
-    # Initialize metrics
-    from .core.metrics import initialize_metrics, set_component_health
-    initialize_metrics()
-    logging.info("Metrics initialized")
-    
     # Initialize database
     await init_db()
-    set_component_health('database', True)
     logging.info("Database initialized")
     
-    # Create default staves and clefs
-    try:
-        from .services.default_setup import create_default_staves_and_clefs
-        await create_default_staves_and_clefs()
-    except Exception as e:
-        logger.error(f"Failed to create default staves and clefs: {e}")
-
     # Initialize scheduler
     await init_scheduler()
-    set_component_health('scheduler', True)
     logging.info("Scheduler initialized")
     
     yield
