@@ -1,0 +1,32 @@
+{
+  "name": "datametronome-ui-nuxt",
+  "version": "1.0.0",
+  "description": "Modern Nuxt-based UI for DataMetronome - Data Quality & Anomaly Detection Platform",
+  "private": true,
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "generate": "nuxt generate",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare"
+  },
+  "devDependencies": {
+    "@iconify-json/lucide": "^1.2.69",
+    "@nuxt/devtools": "latest",
+    "@nuxt/ui": "^2.15.0",
+    "@nuxtjs/tailwindcss": "^6.8.4",
+    "nuxt": "^3.8.0",
+    "typescript": "^5.2.2"
+  },
+  "dependencies": {
+    "@nuxtjs/color-mode": "^3.3.0",
+    "@pinia/nuxt": "^0.5.1",
+    "@vueuse/core": "^10.5.0",
+    "@vueuse/nuxt": "^10.5.0",
+    "axios": "^1.6.0",
+    "chart.js": "^4.4.0",
+    "date-fns": "^2.30.0",
+    "vue-chartjs": "^5.2.0",
+    "zod": "^3.25.76"
+  }
+}
