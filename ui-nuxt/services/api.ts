@@ -17,7 +17,7 @@ class ApiService {
   private defaultHeaders: Record<string, string>
 
   constructor() {
-    this.baseURL = 'http://localhost:8001/api/v1'
+    this.baseURL = 'http://localhost:8000/api/v1'
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     }
@@ -48,7 +48,10 @@ class ApiService {
 
     try {
       const response = await fetch(url, config)
+      console.log(`API Response [${endpoint}]:`, response.status, response.statusText)
+      
       const data = await response.json()
+      console.log(`API Data [${endpoint}]:`, data)
 
       if (!response.ok) {
         throw new Error(data.message || `HTTP ${response.status}`)

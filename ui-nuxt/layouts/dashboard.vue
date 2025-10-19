@@ -43,8 +43,8 @@
       <div class="p-4 border-t border-gray-200 dark:border-gray-700">
         <div class="flex items-center gap-3">
           <UAvatar
-            :src="user?.avatar"
-            :alt="user?.name"
+            :src="user?.avatar || undefined"
+            :alt="user?.name || 'Admin User'"
             size="sm"
           />
           <div class="flex-1 min-w-0">

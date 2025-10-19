@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { ref, computed, readonly } from 'vue'
 
 export interface User {
   username: string
@@ -31,33 +32,41 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      // Simulate API call - in real app this would call your Podium API
-      await new Promise(resolve => setTimeout(resolve, 500))
+      // Call the real backend API
+      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(credentials),
+      })
 
-      // Simple demo authentication
-      if (credentials.username === 'admin' && credentials.password === 'admin') {
-        const authToken = 'demo-token-' + Date.now()
-        const userData: User = {
-          username: credentials.username,
-          email: 'admin@datametronome.dev',
-          name: 'Admin User'
-        }
-
-        token.value = authToken
-        user.value = userData
-
-        // Store token in localStorage
-        if (process.client) {
-          localStorage.setItem('auth_token', authToken)
-          localStorage.setItem('user_info', JSON.stringify(userData))
-        }
-
-        return { success: true, user: userData, token: authToken }
-      } else {
-        const errorMsg = 'Invalid credentials'
+      if (!response.ok) {
+        const errorData = await response.json()
+        const errorMsg = errorData.detail || 'Login failed'
         error.value = errorMsg
         return { success: false, error: errorMsg }
       }
+
+      const data = await response.json()
+      const authToken = data.access_token
+      
+      const userData: User = {
+        username: credentials.username,
+        email: 'admin@datametronome.dev',
+        name: 'Admin User'
+      }
+
+      token.value = authToken
+      user.value = userData
+
+      // Store token in localStorage
+      if (process.client) {
+        localStorage.setItem('auth_token', authToken)
+        localStorage.setItem('user_info', JSON.stringify(userData))
+      }
+
+      return { success: true, user: userData, token: authToken }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Login failed'
       error.value = errorMsg
@@ -135,11 +144,11 @@ export const useAuthStore = defineStore('auth', () => {
   initializeAuth()
 
   return {
-    // State
-    user: readonly(user),
-    token: readonly(token),
-    isLoading: readonly(isLoading),
-    error: readonly(error),
+    // State - don't use readonly for Pinia stores
+    user,
+    token,
+    isLoading,
+    error,
     
     // Computed
     isAuthenticated,

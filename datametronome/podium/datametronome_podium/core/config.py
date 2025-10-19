@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # Server
     host: str = Field(default="0.0.0.0", env="DATAMETRONOME_HOST")
-    port: int = Field(default=8000, env="DATAMETRONOME_PORT", ge=1, le=65535)
+    port: int = Field(default=8001, env="DATAMETRONOME_PORT", ge=1, le=65535)
     
     # Security
     secret_key: str = Field(default="test-secret-key-for-development-only-32-chars", env="DATAMETRONOME_SECRET_KEY", min_length=32)
