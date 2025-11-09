@@ -79,16 +79,20 @@ datametronome/
 │   │       └── plugins/
 │   │           └── plugin_loader.py   # Plugin discovery
 │   │
-│   ├── ui-streamlit/                  # Decoupled UI client
-│   │   ├── pyproject.toml
-│   │   ├── README.md
-│   │   ├── Dockerfile
-│   │   ├── streamlit_app.py           # Main UI entry point
-│   │   └── pages/
-│   │       ├── 1_🏠_Dashboard.py
-│   │       ├── 2_📋_Staves.py
-│   │       ├── 3_✅_Checks.py
-│   │       └── 4_📊_Reports.py
+│   ├── ui-nuxt/                       # Decoupled UI client
+│   │   ├── package.json
+│   │   ├── nuxt.config.ts
+│   │   ├── app.vue                    # Root layout
+│   │   ├── pages/
+│   │   │   ├── index.vue              # Dashboard overview
+│   │   │   ├── anomalies.vue          # Anomaly insights
+│   │   │   ├── staves.vue             # Data source management
+│   │   │   └── clefs.vue              # Quality rule configuration
+│   │   ├── components/
+│   │   │   ├── TrendChart.vue
+│   │   │   └── ClefConfigForm.vue
+│   │   └── stores/
+│   │       └── auth.ts
 │   │
 │   ├── brain/                         # Analysis libraries
 │   │   ├── base/                      # Standard algorithms
@@ -571,92 +575,90 @@ async def my_data_pipeline():
         })
 ```
 
-### 2.3 The Streamlit UI (`datametronome-ui-streamlit`)
+### 2.3 The UI (`ui-nuxt`)
 
 #### 2.3.1 Architecture
 
 The UI is a **pure client** that:
-- ✅ Communicates with Podium via API only
-- ✅ Manages its own authentication state
-- ✅ No direct database access
-- ✅ Can be deployed separately
+- ✅ Communicates with Podium via REST using a shared typed `apiService`
+- ✅ Manages its own authentication state with Pinia + localStorage hydration
+- ✅ Ships as a standalone SPA build artifact
+- ✅ Can be deployed independently alongside the API
 
 #### 2.3.2 Authentication Flow
 
-```python
-# streamlit_app.py
-import streamlit as st
-import httpx
+```ts
+// stores/auth.ts
+import { defineStore } from 'pinia'
+import { ref, computed } from 'vue'
+import { buildApiUrl } from '~/config/app'
 
-PODIUM_API_BASE = os.getenv("PODIUM_API_BASE", "http://localhost:8000")
+export const useAuthStore = defineStore('auth', () => {
+  const token = ref<string | null>(null)
+  const user = ref<User | null>(null)
+  const isAuthenticated = computed(() => !!token.value && !!user.value)
 
-def login(username: str, password: str) -> str | None:
-    """Login via Podium API and get JWT token."""
-    response = httpx.post(
-        f"{PODIUM_API_BASE}/api/v1/auth/login",
-        json={"username": username, "password": password}
-    )
-    
-    if response.status_code == 200:
-        return response.json()["access_token"]
-    return None
+  async function login(credentials: LoginCredentials) {
+    const response = await fetch(buildApiUrl('/auth/login'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(credentials),
+    })
 
-def get_auth_headers() -> dict:
-    """Get authentication headers from session state."""
-    if "token" not in st.session_state:
-        return {}
-    return {"Authorization": f"Bearer {st.session_state.token}"}
+    if (!response.ok) {
+      throw new Error('Login failed')
+    }
 
-# Main app
-if "token" not in st.session_state:
-    # Show login page
-    st.title("DataMetronome Login")
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
-    
-    if st.button("Login"):
-        token = login(username, password)
-        if token:
-            st.session_state.token = token
-            st.rerun()
-        else:
-            st.error("Invalid credentials")
-else:
-    # Show main dashboard
-    show_dashboard()
+    const data = await response.json()
+    token.value = data.access_token
+    user.value = { username: credentials.username, email: 'admin@datametronome.dev', name: 'Admin User' }
+
+    if (process.client) {
+      localStorage.setItem('auth_token', token.value)
+      localStorage.setItem('user_info', JSON.stringify(user.value))
+    }
+
+    return { success: true, token: token.value, user: user.value }
+  }
+
+  function initializeAuth(): void {
+    if (process.client) {
+      token.value = localStorage.getItem('auth_token')
+      const stored = localStorage.getItem('user_info')
+      user.value = stored ? JSON.parse(stored) : null
+    }
+  }
+
+  initializeAuth()
+
+  return { token, user, isAuthenticated, login, logout, refreshUserData }
+})
 ```
 
 #### 2.3.3 API Communication
 
-```python
-# pages/2_📋_Staves.py
-import streamlit as st
-import httpx
+```ts
+// services/staves.ts
+class StavesService {
+  private readonly endpoint = '/staves'
 
-def list_staves() -> list[dict]:
-    """Fetch staves from Podium API."""
-    response = httpx.get(
-        f"{PODIUM_API_BASE}/api/v1/staves",
-        headers=get_auth_headers()
-    )
-    return response.json()
+  async getAll(): Promise<Stave[]> {
+    const response = await apiService.get<Stave[]>(this.endpoint)
+    return response.data
+  }
 
-def create_stave(stave_config: dict):
-    """Create a new stave via API."""
-    response = httpx.post(
-        f"{PODIUM_API_BASE}/api/v1/staves",
-        headers=get_auth_headers(),
-        json=stave_config
-    )
-    return response.json()
+  async create(stave: CreateStaveRequest): Promise<Stave> {
+    const response = await apiService.post<Stave>(this.endpoint, stave)
+    return response.data
+  }
 
-# UI
-st.title("📋 Staves")
+  async testConnection(id: string) {
+    const response = await apiService.post(`${this.endpoint}/${id}/test-connection`)
+    return response.data
+  }
+}
 
-staves = list_staves()
-for stave in staves:
-    with st.expander(stave["name"]):
-        st.json(stave)
+export const stavesService = new StavesService()
 ```
 
 ### 2.4 The Brain Libraries (`datametronome-brain-*`)
@@ -1970,17 +1972,6 @@ services:
       - ./datametronome_scripts:/app/datametronome_scripts
     depends_on:
       - postgres
-  
-  ui:
-    build:
-      context: .
-      dockerfile: datametronome/ui-streamlit/Dockerfile
-    ports:
-      - "8501:8501"
-    environment:
-      - PODIUM_API_BASE=http://podium:8000
-    depends_on:
-      - podium
   
   postgres:
     image: postgres:15

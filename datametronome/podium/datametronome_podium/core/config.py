@@ -56,6 +56,14 @@ class Settings(BaseSettings):
             raise ValueError(f'log_level must be one of {valid_levels}')
         return v.upper()
     
+    @field_validator('allowed_origins', mode='before')
+    @classmethod
+    def parse_allowed_origins(cls, value):
+        """Allow comma-separated strings from env vars."""
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(',') if origin.strip()]
+        return value
+
     @field_validator('allowed_origins')
     @classmethod
     def validate_allowed_origins(cls, v: list[str]) -> list[str]:

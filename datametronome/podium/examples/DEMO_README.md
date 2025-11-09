@@ -1,6 +1,6 @@
 # DataMetronome Demo Configurations
 
-This directory contains demo configurations for showcasing the DataMetronome podium system and Streamlit UI.
+This directory contains demo configurations for showcasing the DataMetronome podium system and UI.
 
 ## 🎵 Quick Start
 
@@ -22,25 +22,24 @@ python3 -m datametronome_podium.scripts.import_staves examples/demo-simple-monit
 
 ## 📊 Demo Configurations
 
-### `demo-simple-monitoring.yaml`
+### `demo-clickstream.yaml`
 **Perfect for quick testing and demonstrations**
 - 2 staves (SQLite + PostgreSQL)
 - 4 basic clefs (Level 1: Declarative)
 - Simple checks: NULL validation, row count, freshness
 
-### `demo-streamlit-ui.yaml`
-**Designed to showcase all UI features and severity levels**
-- 1 stave (PostgreSQL)
-- 8 clefs across all levels (1, 2, 4)
-- Shows Harmony ✅, Dissonance ⚠️, and Cacophony ❌ states
-- Perfect for UI demonstrations
+### `demo-complete.yaml`
+**Designed to showcase all tiers and severity levels**
+- 3 staves across multiple systems
+- Clefs spanning Levels 1-4
+- Demonstrates Harmony ✅, Dissonance ⚠️, and Cacophony ❌ states
+- Ideal for UI walkthroughs
 
-### `demo-ecommerce-monitoring.yaml`
-**Realistic e-commerce monitoring setup**
-- 4 staves (PostgreSQL, Redis, MongoDB)
-- 14 clefs across all 4 levels
-- Complete monitoring for users, orders, products, inventory
-- Production-ready configuration
+### `tiered-checks-examples.yaml`
+**Focused on the Tiered Check experience**
+- Organized by Level 1 → Level 4
+- Great for understanding the progression model
+- Complements the UI configuration forms
 
 ## 🎼 Check Types Demonstrated
 
@@ -81,7 +80,7 @@ The demo configurations use environment variables for flexibility:
 # Demo Database
 DEMO_HOST=localhost
 DEMO_PORT=5432
-DEMO_DB=streamlit_demo
+DEMO_DB=nuxt_demo
 DEMO_USER=demo
 DEMO_PASSWORD=demo123
 
@@ -101,9 +100,9 @@ The setup script creates:
 - **Sample Check Results** (`sample_check_results.json`)
 - **Environment File** (`demo.env`)
 
-## 🚀 Integration with Streamlit UI
+## 🚀 Integration with the UI
 
-These configurations are designed to work seamlessly with the Streamlit UI:
+These configurations are designed to work seamlessly with the UI:
 
 1. **Visualization**: See all staves and clefs in the UI
 2. **Status Monitoring**: Real-time severity level display
@@ -112,9 +111,9 @@ These configurations are designed to work seamlessly with the Streamlit UI:
 
 ## 💡 Demo Tips
 
-1. **Start Simple**: Use `demo-simple-monitoring.yaml` first
-2. **Show Severity Levels**: Use `demo-streamlit-ui.yaml` for UI demos
-3. **Production Example**: Use `demo-ecommerce-monitoring.yaml` for realistic scenarios
+1. **Start Simple**: Use `demo-clickstream.yaml` first
+2. **Show Severity Levels**: Use `demo-complete.yaml` for UI demos
+3. **Tier Walkthrough**: Use `tiered-checks-examples.yaml` to highlight Levels 1-4
 4. **Custom Checks**: Modify the Python scripts in Level 4 checks
 5. **Environment**: Use the provided environment variables or modify as needed
 

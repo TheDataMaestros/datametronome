@@ -194,6 +194,7 @@ declare global {
   const useCached: typeof import('@vueuse/core').useCached
   const useCarouselScroll: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useCarouselScroll').useCarouselScroll
   const useCeil: typeof import('../../node_modules/@vueuse/math').useCeil
+  const useChecks: typeof import('../../composables/useChecks').useChecks
   const useClamp: typeof import('../../node_modules/@vueuse/math').useClamp
   const useClefs: typeof import('../../composables/useClefs').useClefs
   const useClipboard: typeof import('@vueuse/core').useClipboard
@@ -397,6 +398,7 @@ declare global {
   const useToggle: typeof import('@vueuse/core').useToggle
   const useTransition: typeof import('@vueuse/core').useTransition
   const useTransitionState: typeof import('../../node_modules/vue').useTransitionState
+  const useTrends: typeof import('../../composables/useTrends').useTrends
   const useTrunc: typeof import('../../node_modules/@vueuse/math').useTrunc
   const useUI: typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useUI').useUI
   const useUrlSearchParams: typeof import('@vueuse/core').useUrlSearchParams
@@ -642,6 +644,7 @@ declare module 'vue' {
     readonly useCached: UnwrapRef<typeof import('@vueuse/core')['useCached']>
     readonly useCarouselScroll: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useCarouselScroll')['useCarouselScroll']>
     readonly useCeil: UnwrapRef<typeof import('../../node_modules/@vueuse/math')['useCeil']>
+    readonly useChecks: UnwrapRef<typeof import('../../composables/useChecks')['useChecks']>
     readonly useClamp: UnwrapRef<typeof import('../../node_modules/@vueuse/math')['useClamp']>
     readonly useClefs: UnwrapRef<typeof import('../../composables/useClefs')['useClefs']>
     readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>
@@ -845,6 +848,7 @@ declare module 'vue' {
     readonly useToggle: UnwrapRef<typeof import('@vueuse/core')['useToggle']>
     readonly useTransition: UnwrapRef<typeof import('@vueuse/core')['useTransition']>
     readonly useTransitionState: UnwrapRef<typeof import('../../node_modules/vue')['useTransitionState']>
+    readonly useTrends: UnwrapRef<typeof import('../../composables/useTrends')['useTrends']>
     readonly useTrunc: UnwrapRef<typeof import('../../node_modules/@vueuse/math')['useTrunc']>
     readonly useUI: UnwrapRef<typeof import('../../node_modules/@nuxt/ui/dist/runtime/composables/useUI')['useUI']>
     readonly useUrlSearchParams: UnwrapRef<typeof import('@vueuse/core')['useUrlSearchParams']>

@@ -41,21 +41,21 @@ def fix_postgres_stave():
     cursor = conn.cursor()
     
     # Delete the problematic stave
-    cursor.execute('DELETE FROM staves WHERE id = "stave-streamlit-demo"')
+    cursor.execute('DELETE FROM staves WHERE id = "stave-legacy-ui-demo"')
     
     # Also delete any clefs that reference this stave
-    cursor.execute('DELETE FROM clefs WHERE stave_id = "stave-streamlit-demo"')
+    cursor.execute('DELETE FROM clefs WHERE stave_id = "stave-legacy-ui-demo"')
     
     conn.commit()
     
     # Verify deletion
-    cursor.execute('SELECT COUNT(*) FROM staves WHERE id = "stave-streamlit-demo"')
+    cursor.execute('SELECT COUNT(*) FROM staves WHERE id = "stave-legacy-ui-demo"')
     remaining = cursor.fetchone()[0]
     
     conn.close()
     
     if remaining == 0:
-        print("✅ Successfully deleted problematic Streamlit Demo Database stave")
+        print("✅ Successfully deleted problematic legacy UI demo stave")
         print("✅ Also deleted any associated clefs")
     else:
         print("❌ Failed to delete the stave")

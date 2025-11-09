@@ -9,6 +9,23 @@ if [ -f "config.env" ]; then
     export $(grep -v '^#' config.env | xargs)
 fi
 
+# Normalize comma-separated CORS origins into JSON array for Pydantic
+if [ -n "${DATAMETRONOME_ALLOWED_ORIGINS:-}" ]; then
+    if [[ "${DATAMETRONOME_ALLOWED_ORIGINS}" != \[*\] ]]; then
+        IFS=',' read -ra __origins <<< "${DATAMETRONOME_ALLOWED_ORIGINS}"
+        __json_origins="["
+        for __origin in "${__origins[@]}"; do
+            __trimmed_origin="$(echo "${__origin}" | xargs)"
+            if [ -n "${__trimmed_origin}" ]; then
+                __json_origins="${__json_origins}\"${__trimmed_origin}\","
+            fi
+        done
+        __json_origins="${__json_origins%,}]"
+        DATAMETRONOME_ALLOWED_ORIGINS="${__json_origins}"
+    fi
+    export DATAMETRONOME_ALLOWED_ORIGINS
+fi
+
 # Set default environment variables
 export DATAMETRONOME_SECRET_KEY="${DATAMETRONOME_SECRET_KEY:-demo-secret-key-for-development-only}"
 export PODIUM_PORT="${PODIUM_PORT:-8001}"

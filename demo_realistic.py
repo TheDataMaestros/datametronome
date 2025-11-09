@@ -332,7 +332,7 @@ class DataMetronomeDemo:
         
         print("\nNext steps:")
         print("  1. Run checks manually or wait for scheduled execution")
-        print("  2. View results in Streamlit UI: http://localhost:8501")
+        print("  2. View results in the UI: http://localhost:3000")
         print("  3. Monitor metrics in Grafana: http://localhost:3000")
         print("  4. Check API docs: http://localhost:8000/docs")
         

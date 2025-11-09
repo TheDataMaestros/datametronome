@@ -58,7 +58,7 @@ Thank you for your interest in contributing to DataMetronome! This document prov
 ```
 datametronome/
 ├── podium/                 # Core backend API
-├── ui-streamlit/           # Default Streamlit UI
+├── ui-nuxt/                # Default UI
 ├── plugins/                # Integration plugins
 ├── brain/                  # Analytics libraries
 ├── pulse/                  # Data connectors

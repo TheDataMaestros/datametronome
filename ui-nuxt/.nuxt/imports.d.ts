@@ -32,8 +32,10 @@ export { computedAsync, asyncComputed, computedEager, eagerComputed, computedInj
 export { createGenericProjection, createProjection, logicAnd, logicNot, logicOr, useAbs, useAverage, useCeil, useClamp, useFloor, useMath, useMax, useMin, usePrecision, useProjection, useRound, useSum, useTrunc } from '@vueuse/math';
 export { definePageMeta } from '../node_modules/nuxt/dist/pages/runtime/composables';
 export { defineLazyHydrationComponent } from '#app/composables/lazy-hydration';
+export { useChecks } from '../composables/useChecks';
 export { useClefs } from '../composables/useClefs';
 export { useStaves } from '../composables/useStaves';
+export { useTrends } from '../composables/useTrends';
 export { defineShortcuts } from '../node_modules/@nuxt/ui/dist/runtime/composables/defineShortcuts';
 export { useProvideButtonGroup, useInjectButtonGroup } from '../node_modules/@nuxt/ui/dist/runtime/composables/useButtonGroup';
 export { useCarouselScroll } from '../node_modules/@nuxt/ui/dist/runtime/composables/useCarouselScroll';

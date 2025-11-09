@@ -1,9 +1,10 @@
 import { ref, computed, readonly } from 'vue'
-import { clefsService, type Clef, type CreateClefRequest, type UpdateClefRequest, type CheckResult } from '~/services/clefs'
+import { clefsService, type Clef, type CreateClefRequest, type UpdateClefRequest, type RunClefResponse } from '~/services/clefs'
+import type { Check } from '~/services/checks'
 
 export const useClefs = () => {
   const clefs = ref<Clef[]>([])
-  const checkResults = ref<CheckResult[]>([])
+  const checkResults = ref<Check[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
@@ -85,7 +86,7 @@ export const useClefs = () => {
     }
   }
 
-  const runCheck = async (id: string) => {
+  const runCheck = async (id: string): Promise<RunClefResponse> => {
     try {
       return await clefsService.runCheck(id)
     } catch (err) {
@@ -103,12 +104,12 @@ export const useClefs = () => {
     }
   }
 
-  const fetchLatestResults = async () => {
+  const fetchLatestResults = async (limit = 20) => {
     isLoading.value = true
     error.value = null
     
     try {
-      checkResults.value = await clefsService.getLatestResults()
+      checkResults.value = await clefsService.getLatestResults(limit)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch latest results'
       console.error('Error fetching latest results:', err)
@@ -130,15 +131,18 @@ export const useClefs = () => {
   }
 
   const getFailedChecks = computed(() => {
-    return checkResults.value.filter(r => r.status === 'failed')
+    return checkResults.value.filter(r => r.status?.toLowerCase() === 'fail' || r.status?.toLowerCase() === 'failed')
   })
 
   const getPassedChecks = computed(() => {
-    return checkResults.value.filter(r => r.status === 'passed')
+    return checkResults.value.filter(r => r.status?.toLowerCase() === 'pass' || r.status?.toLowerCase() === 'passed')
   })
 
   const getWarningChecks = computed(() => {
-    return checkResults.value.filter(r => r.status === 'warning')
+    return checkResults.value.filter(r => {
+      const status = r.status?.toLowerCase()
+      return status === 'warn' || status === 'warning'
+    })
   })
 
   return {

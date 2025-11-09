@@ -175,6 +175,22 @@
             <span class="text-gray-500">Schedule:</span>
             <span class="font-medium">{{ clef.schedule || 'Manual' }}</span>
           </div>
+
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">Last Result:</span>
+            <div v-if="latestStatusByClef[clef.id]" class="flex items-center gap-2">
+              <UBadge 
+                :color="getStatusBadgeColor(latestStatusByClef[clef.id]?.status)" 
+                variant="soft"
+              >
+                {{ formatStatusLabel(latestStatusByClef[clef.id]?.status) }}
+              </UBadge>
+              <span class="text-xs text-gray-500">
+                {{ formatRelativeTime(latestStatusByClef[clef.id]?.timestamp) }}
+              </span>
+            </div>
+            <span v-else class="text-gray-400">No runs yet</span>
+          </div>
           
           <div class="flex items-center justify-between text-sm">
             <span class="text-gray-500">Status:</span>
@@ -202,6 +218,15 @@
                 :loading="runningChecks.has(clef.id)"
               >
                 Run
+              </UButton>
+              <UButton
+                size="xs"
+                color="purple"
+                variant="ghost"
+                icon="i-heroicons-clock"
+                @click="viewCheckHistory(clef)"
+              >
+                History
               </UButton>
               <UButton 
                 size="xs" 
@@ -391,14 +416,79 @@
         />
       </UCard>
     </UModal>
+
+    <!-- Check History Modal -->
+    <UModal v-model="showHistoryModal" :ui="{ width: 'w-full sm:max-w-3xl' }">
+      <UCard>
+        <template #header>
+          <div class="flex items-start justify-between">
+            <div>
+              <h3 class="text-lg font-semibold">
+                {{ selectedClefHistory?.name || 'Check History' }}
+              </h3>
+              <p class="text-sm text-gray-500">
+                Latest executions for {{ selectedClefHistory?.name || 'this clef' }}
+              </p>
+            </div>
+            <UButton 
+              color="gray" 
+              variant="ghost" 
+              icon="i-heroicons-x-mark"
+              @click="closeHistoryModal"
+            />
+          </div>
+        </template>
+
+        <div v-if="isHistoryLoading" class="py-10 text-center text-gray-500">
+          <Icon name="i-heroicons-arrow-path" class="w-6 h-6 mx-auto mb-3 animate-spin" />
+          Loading history...
+        </div>
+
+        <div v-else-if="historyError" class="py-10 text-center text-red-500">
+          {{ historyError }}
+        </div>
+
+        <div v-else>
+          <UTable 
+            v-if="checkHistory.length > 0"
+            :rows="checkHistory"
+            :columns="historyColumns"
+            class="w-full"
+          >
+            <template #timestamp-data="{ row }">
+              {{ formatTimestamp(row.timestamp) }}
+            </template>
+            <template #status-data="{ row }">
+              <UBadge :color="getStatusBadgeColor(row.status)" variant="soft">
+                {{ formatStatusLabel(row.status) }}
+              </UBadge>
+            </template>
+            <template #message-data="{ row }">
+              {{ row.message || '—' }}
+            </template>
+            <template #execution_time-data="{ row }">
+              {{ formatExecutionTime(row.execution_time) }}
+            </template>
+            <template #anomalies_count-data="{ row }">
+              {{ row.anomalies_count ?? 0 }}
+            </template>
+          </UTable>
+
+          <p v-else class="py-10 text-center text-gray-500">
+            No check executions recorded yet.
+          </p>
+        </div>
+      </UCard>
+    </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useClefs } from '~/composables/useClefs'
 import { useStaves } from '~/composables/useStaves'
 import type { Clef, CreateClefRequest } from '~/services/clefs'
+import type { Check } from '~/services/checks'
 
 // Use middleware for authentication
 definePageMeta({
@@ -410,7 +500,19 @@ useHead({
 })
 
 // Composables
-const { clefs, isLoading, error, fetchClefs, createClef, updateClef, deleteClef, runCheck: executeCheck } = useClefs()
+const { 
+  clefs, 
+  checkResults,
+  isLoading, 
+  error, 
+  fetchClefs, 
+  createClef, 
+  updateClef, 
+  deleteClef, 
+  runCheck: executeCheck,
+  fetchLatestResults,
+  fetchCheckResults
+} = useClefs()
 const { staves, fetchStaves } = useStaves()
 
 // State
@@ -420,6 +522,19 @@ const showVisualBuilder = ref(false)
 const editingClef = ref<Clef | null>(null)
 const isSaving = ref(false)
 const runningChecks = ref(new Set<string>())
+const showHistoryModal = ref(false)
+const selectedClefHistory = ref<Clef | null>(null)
+const checkHistory = ref<Check[]>([])
+const isHistoryLoading = ref(false)
+const historyError = ref<string | null>(null)
+
+watch(showHistoryModal, (value) => {
+  if (!value) {
+    selectedClefHistory.value = null
+    checkHistory.value = []
+    historyError.value = null
+  }
+})
 
 // Filters
 const filters = ref({
@@ -535,6 +650,16 @@ const failedChecksCount = computed(() =>
   0
 )
 
+const latestStatusByClef = computed<Record<string, Check | undefined>>(() => {
+  const map: Record<string, Check | undefined> = {}
+  checkResults.value.forEach(result => {
+    if (!map[result.clef_id]) {
+      map[result.clef_id] = result
+    }
+  })
+  return map
+})
+
 // Options for selects
 const checkTypeOptions = computed(() => [
   { label: 'All Types', value: '' },
@@ -575,6 +700,14 @@ const scheduleOptions = [
   { label: 'Monthly', value: '0 0 1 * *' }
 ]
 
+const historyColumns = [
+  { key: 'timestamp', label: 'Timestamp' },
+  { key: 'status', label: 'Status' },
+  { key: 'message', label: 'Message' },
+  { key: 'execution_time', label: 'Duration' },
+  { key: 'anomalies_count', label: 'Anomalies' }
+]
+
 // Methods
 const getClefTier = (checkType: string): number => {
   const template = clefTemplates.value.find(t => t.type === checkType)
@@ -607,6 +740,52 @@ const getCheckTypeColor = (checkType: string): string => {
 const formatCheckType = (checkType: string): string => {
   const template = clefTemplates.value.find(t => t.type === checkType)
   return template?.name || checkType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+}
+
+const getStatusBadgeColor = (status?: string): string => {
+  const normalized = status?.toLowerCase()
+  if (normalized === 'pass' || normalized === 'passed') return 'green'
+  if (normalized === 'warn' || normalized === 'warning') return 'yellow'
+  if (normalized === 'fail' || normalized === 'failed') return 'red'
+  return 'gray'
+}
+
+const formatStatusLabel = (status?: string): string => {
+  if (!status) return 'Unknown'
+  const normalized = status.toLowerCase()
+  if (normalized === 'pass') return 'Passed'
+  if (normalized === 'passed') return 'Passed'
+  if (normalized === 'warn' || normalized === 'warning') return 'Warning'
+  if (normalized === 'fail' || normalized === 'failed') return 'Failed'
+  return status
+}
+
+const formatRelativeTime = (timestamp?: string): string => {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return timestamp
+
+  const diffMs = Date.now() - date.getTime()
+  const diffMinutes = Math.floor(diffMs / (1000 * 60))
+  if (diffMinutes < 1) return 'Just now'
+  if (diffMinutes < 60) return `${diffMinutes} min ago`
+  const diffHours = Math.floor(diffMinutes / 60)
+  if (diffHours < 24) return `${diffHours} hr${diffHours > 1 ? 's' : ''} ago`
+  const diffDays = Math.floor(diffHours / 24)
+  if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+  return date.toLocaleString()
+}
+
+const formatTimestamp = (timestamp?: string): string => {
+  if (!timestamp) return '—'
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return timestamp
+  return date.toLocaleString()
+}
+
+const formatExecutionTime = (seconds?: number | null): string => {
+  if (seconds === undefined || seconds === null) return '—'
+  return `${seconds.toFixed(2)}s`
 }
 
 const getStaveName = (staveId: string): string => {
@@ -695,9 +874,32 @@ const duplicateClef = (clef: Clef) => {
   showCreateModal.value = true
 }
 
+const viewCheckHistory = async (clef: Clef) => {
+  selectedClefHistory.value = clef
+  showHistoryModal.value = true
+  isHistoryLoading.value = true
+  historyError.value = null
+
+  try {
+    const results = await fetchCheckResults(clef.id, 10)
+    checkHistory.value = results
+  } catch (error) {
+    historyError.value = error instanceof Error ? error.message : 'Failed to load check history'
+    checkHistory.value = []
+    console.error('Failed to load check history:', error)
+  } finally {
+    isHistoryLoading.value = false
+  }
+}
+
+const closeHistoryModal = () => {
+  showHistoryModal.value = false
+}
+
 const toggleClefStatus = async (clef: Clef) => {
   try {
     await updateClef(clef.id, { is_active: !clef.is_active })
+    await refreshLatestResults()
   } catch (error) {
     console.error('Failed to toggle clef status:', error)
   }
@@ -707,6 +909,7 @@ const deleteClefAction = async (clef: Clef) => {
   if (confirm(`Are you sure you want to delete "${clef.name}"?`)) {
     try {
       await deleteClef(clef.id)
+      await refreshLatestResults()
     } catch (error) {
       console.error('Failed to delete clef:', error)
     }
@@ -717,6 +920,7 @@ const runCheck = async (clefId: string) => {
   runningChecks.value.add(clefId)
   try {
     await executeCheck(clefId)
+    await refreshLatestResults()
   } catch (error) {
     console.error('Failed to run check:', error)
   } finally {
@@ -733,6 +937,7 @@ const saveClef = async () => {
       await createClef(newClef.value)
     }
     closeModal()
+    await refreshLatestResults()
   } catch (error) {
     console.error('Failed to save clef:', error)
   } finally {
@@ -745,6 +950,7 @@ const handleVisualBuilderCreate = async (clefData: CreateClefRequest) => {
   try {
     await createClef(clefData)
     closeModal()
+    await refreshLatestResults()
   } catch (error) {
     console.error('Failed to create clef from visual builder:', error)
   } finally {
@@ -769,11 +975,20 @@ const closeModal = () => {
   }
 }
 
+const refreshLatestResults = async () => {
+  try {
+    await fetchLatestResults(30)
+  } catch (error) {
+    console.error('Failed to refresh latest check results:', error)
+  }
+}
+
 // Lifecycle
 onMounted(async () => {
   await Promise.all([
     fetchClefs(),
-    fetchStaves()
+    fetchStaves(),
+    refreshLatestResults()
   ])
 })
 </script>

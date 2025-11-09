@@ -22,7 +22,7 @@ DataMetronome follows a modular, layered architecture designed for scalability, 
 ```mermaid
 graph TB
     subgraph "Presentation Layer"
-        UI[Streamlit UI]
+        UI[Web UI]
         API_DOCS[API Documentation]
     end
     
@@ -161,16 +161,16 @@ classDiagram
 - Async request handling
 - Role-based access control
 
-### 3. Streamlit UI
+### 3. UI
 
 **Purpose**: Interactive dashboard for visualization and monitoring
 
 **Features**:
-- Real-time data quality monitoring
-- ML-powered anomaly detection
-- Interactive visualizations (Plotly)
-- Custom SQL query interface
-- Data profiling tools
+- Real-time data quality monitoring with shared UI components
+- ML-powered anomaly detection overlays
+- Interactive visualizations (Chart.js + Vue Chart.js)
+- Custom API-driven exploration flows
+- Data profiling tools and clef configuration forms
 
 **Tabs**:
 1. **Overview** - System health and metrics
@@ -262,7 +262,7 @@ flowchart TD
 ```mermaid
 sequenceDiagram
     actor User
-    participant UI as Streamlit UI
+    participant UI as Web UI
     participant API as Podium API
     participant DB as Internal DB
     participant Pulse as DataPulse
@@ -303,7 +303,7 @@ sequenceDiagram
 |-----------|-----------|---------|---------|
 | Backend | Python | 3.11+ | Core language |
 | API Framework | FastAPI | 0.104+ | REST API |
-| UI Framework | Streamlit | 1.28+ | Dashboard |
+| UI Framework | Web UI (SPA) | — | Dashboard |
 | Data Validation | Pydantic | 2.5+ | Schema validation |
 | ML | scikit-learn | 1.3+ | Anomaly detection |
 | Async Runtime | asyncio | Built-in | Async operations |
@@ -432,7 +432,7 @@ System continues operating even if components fail:
 graph LR
     DEV[Developer Machine]
     subgraph "Docker Compose"
-        UI[Streamlit:8501]
+        UI[UI:3000]
         API[Podium:8000]
         DB[(PostgreSQL:5432)]
     end
@@ -449,8 +449,8 @@ graph LR
 graph TB
     subgraph "Frontend"
         LB[Load Balancer]
-        UI1[Streamlit Instance 1]
-        UI2[Streamlit Instance 2]
+        UI1[UI Instance 1]
+        UI2[UI Instance 2]
     end
     
     subgraph "Backend"
@@ -591,7 +591,7 @@ sequenceDiagram
 
 | Component | Scaling Strategy | Considerations |
 |-----------|-----------------|----------------|
-| Streamlit UI | Multiple instances behind LB | Session state in Redis |
+| UI | Multiple instances behind LB | Session state in Redis |
 | Podium API | Multiple instances (stateless) | Easy to scale |
 | Database | Read replicas, sharding | Most critical bottleneck |
 | Workers | Task queue (Celery/RQ) | For long-running checks |

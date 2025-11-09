@@ -6,7 +6,6 @@ help: ## Show this help message
 
 install: ## Install all packages in development mode
 	uv pip install -e ./datametronome/podium
-	uv pip install -e ./datametronome/ui-streamlit
 	uv pip install -e ./datametronome/pulse/core
 	uv pip install -e ./datametronome/brain/base
 
@@ -50,8 +49,8 @@ docker-prototype: ## Quick prototype setup with Docker
 	$(MAKE) docker-build
 	$(MAKE) docker-up
 	@echo "🎉 Docker prototype ready!"
-	@echo "🚀 Backend: http://localhost:8000"
-	@echo "🎨 UI: http://localhost:8501"
+	@echo "🚀 Backend: http://localhost:8001"
+	@echo "🎨 UI: run 'npm run dev' inside ui-nuxt/ (default port 3000)"
 	@echo "🔑 Login with: admin / admin"
 	@echo ""
 	@echo "📊 To see logs: docker-compose logs -f"
@@ -71,8 +70,8 @@ prototype: ## Quick prototype setup and start (local)
 start-podium: ## Start the Podium backend
 	cd datametronome/podium && python -m datametronome_podium.main
 
-start-ui: ## Start the Streamlit UI
-	cd datametronome/ui-streamlit && streamlit run datametronome_ui_streamlit/main.py
+start-ui: ## Start the UI
+	cd ui-nuxt && npm install && npm run dev
 
 setup-db: ## Initialize the database
 	cd datametronome/podium && DATAMETRONOME_SECRET_KEY="dev-secret-key-change-in-production-32-chars" DATAMETRONOME_DATABASE_URL="sqlite+aiosqlite:///$(PWD)/data/datametronome.db" python -c "import asyncio; from datametronome_podium.core.database import init_db; asyncio.run(init_db())"

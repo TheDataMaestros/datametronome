@@ -184,27 +184,28 @@ async def demo_reporting():
         logger.error(f"❌ Reporting demo failed: {e}")
         return False
 
-async def demo_streamlit_ui():
-    """Demonstrate Streamlit UI capabilities."""
-    print("\n🎨 Streamlit UI Demo")
+async def demo_ui():
+    """Demonstrate UI capabilities."""
+    print("\n🎨 UI Demo")
     print("=" * 50)
     
     try:
-        # Check if Streamlit UI package is available
-        try:
-            from datametronome_ui_streamlit import main
-            logger.info("✅ Streamlit UI package available")
-            logger.info("💡 To start the UI: make start-ui")
-            logger.info("💡 Or visit: http://localhost:8501")
-        except ImportError:
-            logger.warning("⚠️ Streamlit UI package not available")
-            logger.info("💡 Install with: make install")
+        ui_root = Path(__file__).parent / "ui-nuxt"
+
+        if ui_root.exists() and (ui_root / "package.json").exists():
+            logger.info("✅ UI project detected")
+            logger.info("💡 Install dependencies: cd ui-nuxt && npm install")
+            logger.info("💡 Start the UI: npm run dev -- --port 3000")
+            logger.info("💡 Visit: http://localhost:3000")
+        else:
+            logger.warning("⚠️ UI project not found")
+            logger.info("💡 Ensure ui-nuxt/ exists and run npm install")
         
-        logger.info("✅ Streamlit UI demo completed")
+        logger.info("✅ UI demo completed")
         return True
         
     except Exception as e:
-        logger.error(f"❌ Streamlit UI demo failed: {e}")
+        logger.error(f"❌ UI demo failed: {e}")
         return False
 
 async def demo_podium_api():
@@ -258,7 +259,7 @@ async def main():
         ("Data Quality Monitoring", demo_data_quality_checks),
         ("Anomaly Detection", demo_anomaly_detection),
         ("Reporting", demo_reporting),
-        ("Streamlit UI", demo_streamlit_ui),
+        ("UI", demo_ui),
         ("Podium API", demo_podium_api)
     ]
     

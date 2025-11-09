@@ -18,7 +18,7 @@ Transform DataMetronome into the **leading open-source data quality and anomaly 
 **Achievements:**
 - ✅ Core DataPulse connectors (asyncpg, psycopg3, SQLAlchemy, SQLite)
 - ✅ Basic anomaly detection with Isolation Forest
-- ✅ Streamlit UI with 5 interactive tabs
+- ✅ UI with 5 interactive tabs
 - ✅ FastAPI Podium backend
 - ✅ Comprehensive testing infrastructure (October 2024)
 - ✅ CI/CD pipeline with multi-Python support (October 2024)

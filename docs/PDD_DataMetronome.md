@@ -37,7 +37,7 @@ To make data quality monitoring intuitive, efficient, and proactive through thre
 
 1. **Component Reusability:** Data connectors (`DataPulse` connectors) are high-quality, standalone libraries designed to reduce code duplication across an organization's entire data stack.
 
-2. **Architectural Flexibility:** A headless core application (`Podium`) exposes a robust API, allowing any number of UIs or tools to be built on top of it. An official Streamlit UI is provided as the default.
+2. **Architectural Flexibility:** A headless core application (`Podium`) exposes a robust API, allowing any number of UIs or tools to be built on top of it. An official UI is provided as the default.
 
 3. **A Full Spectrum of Monitoring:** The platform provides a tiered system of checks, from simple declarative rules for analysts to stateful, ML-driven anomaly detection and a secure "escape hatch" for complex, developer-written logic.
 
@@ -49,7 +49,7 @@ To make data quality monitoring intuitive, efficient, and proactive through thre
 |---|---|---|
 | **Metronome** | The Project | The complete ecosystem. |
 | **Podium** | Headless Backend | `datametronome-podium` |
-| **User Interface** | Streamlit UI Client | `datametronome-ui-streamlit` |
+| **User Interface** | Web UI Client | `datametronome-ui-nuxt` |
 | **DataPulse** | Connection Library | `metronome-pulse-*` |
 | **Brain** | Analysis Libraries | `datametronome-brain-*` |
 | **Stave** | Unit of Monitoring | A complete configuration for a single data asset to be monitored. |
@@ -83,7 +83,7 @@ This metaphor makes the system approachable while maintaining technical precisio
 
 ### 3.2 Decoupled User Interface
 
-**Principle**: The official UI is a Streamlit application that operates as a separate client. It handles user login state and communicates with the Podium exclusively via its public API, demonstrating the headless nature of the backend.
+**Principle**: The official UI operates as a separate client. It handles user login state and communicates with the Podium exclusively via its public API, demonstrating the headless nature of the backend.
 
 **Benefits**:
 - **Independent Development**: UI and backend can evolve separately
@@ -384,19 +384,19 @@ Empower data teams with:
 - Automate via API calls
 - Scale independently
 
-#### 7.1.2 Decoupled Streamlit UI
+#### 7.1.2 Decoupled UI
 **Description**: Official web UI as a separate client
 
 **Features**:
-- Login/authentication flow
-- Stave management interface
-- Real-time monitoring dashboard
-- Check result visualization
-- Historical trend analysis
+- Login/authentication flow (Pinia + JWT)
+- Stave and clef management interfaces
+- Real-time monitoring dashboard with Chart.js
+- Check result visualization and trend overlays
+- Historical analysis views
 - Anomaly investigation tools
 
 **User Value**:
-- Beautiful, interactive dashboards
+- Beautiful, responsive dashboards
 - No code required for basic usage
 - Real-time visibility
 - Shareable dashboards
@@ -536,7 +536,7 @@ Empower data teams with:
 | Feature | User Value | Complexity | Priority |
 |---------|------------|------------|----------|
 | Podium Backend | High | Medium | P0 |
-| Streamlit UI | High | Medium | P0 |
+| Web UI | High | Medium | P0 |
 | PostgreSQL Connector | High | Low | P0 |
 | SQLite Connector | Medium | Low | P0 |
 | Level 1 Checks | High | Low | P0 |
@@ -558,15 +558,17 @@ Empower data teams with:
 
 #### 8.1.1 First-Time Setup (5 minutes)
 ```
-1. User installs DataMetronome
-   └─> pip install datametronome-podium datametronome-ui-streamlit
-2. User starts Podium backend
+1. User installs DataMetronome backend
+   └─> pip install datametronome-podium
+2. User installs UI dependencies
+   └─> cd ui-nuxt && npm install
+3. User starts Podium backend
    └─> datametronome-podium start
-3. User starts UI
-   └─> datametronome-ui-streamlit start
-4. User creates first Stave (via UI or YAML)
+4. User starts UI
+   └─> npm run dev --prefix ui-nuxt
+5. User creates first Stave (via UI or YAML)
    └─> Defines source, checks, schedule
-5. User sees first check results
+6. User sees first check results
    └─> Dashboard shows real-time status
 ```
 
@@ -704,7 +706,7 @@ Empower data teams with:
 - ✅ SQLite connector
 - ✅ Podium backend with FastAPI
 - ✅ JWT authentication
-- ✅ Streamlit UI
+- ✅ UI
 - ✅ Basic Stave configuration
 - ✅ Level 1 checks (declarative)
 - ✅ Docker deployment
@@ -997,7 +999,7 @@ Empower data teams with:
 - **Hot Reload**: Configuration changes without restart
 
 **4. User Experience**
-- **Beautiful UI**: Modern, responsive Streamlit app
+- **Beautiful UI**: Modern, responsive web app
 - **Progressive Complexity**: Simple to advanced checks
 - **Real-Time**: Live dashboard updates
 - **Intuitive**: Self-explanatory interface
@@ -1188,7 +1190,6 @@ Empower data teams with:
 ### B. References
 
 - FastAPI: https://fastapi.tiangolo.com/
-- Streamlit: https://streamlit.io/
 - asyncpg: https://magicstack.github.io/asyncpg/
 - APScheduler: https://apscheduler.readthedocs.io/
 - dbt: https://www.getdbt.com/

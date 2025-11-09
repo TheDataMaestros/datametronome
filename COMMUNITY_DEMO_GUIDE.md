@@ -14,7 +14,7 @@ Welcome to the DataMetronome Community Demo! This guide will help you get the co
 
 - **Podium API**: Running on http://localhost:8001
 - **API Documentation**: http://localhost:8001/docs  
-- **Streamlit UI**: Running on http://localhost:8501
+- **UI**: Running on http://localhost:3000
 - **Login Credentials**: `admin` / `admin`
 
 ### 1. Clone and Setup
@@ -76,7 +76,7 @@ The community demo showcases the complete DataMetronome ecosystem with both **co
 - Anomaly summary reporting
 - Real-time status updates
 
-### ✅ Streamlit UI Integration
+### ✅ UI Integration
 - Modern web-based interface at http://localhost:8501
 - Real-time data visualization and dashboards
 - Configuration management for staves and clefs
@@ -123,10 +123,11 @@ source .venv/bin/activate
 cd datametronome/podium
 DATAMETRONOME_SECRET_KEY="dev-secret-key-change-in-production-32-chars" DATAMETRONOME_DATABASE_URL="sqlite+aiosqlite:///$(pwd)/data/datametronome.db" python -m datametronome_podium.main
 
-# In another terminal, start Streamlit UI
+# In another terminal, start the UI
 source .venv/bin/activate
-cd datametronome/ui-streamlit
-streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+cd ui-nuxt
+npm install
+npm run dev -- --port 3000 --host
 ```
 
 **Or use the automated setup:**
@@ -138,7 +139,7 @@ streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
 Access the services:
 - 🚀 **Podium API**: http://localhost:8001
 - 📚 **API Docs**: http://localhost:8001/docs
-- 🎨 **Streamlit UI**: http://localhost:8501
+- 🎨 **UI**: http://localhost:3000
 - 🔑 **Login**: admin / admin
 
 ## 📊 Demo Results
@@ -178,8 +179,8 @@ When everything is working, you should see:
    Passed: 21 ✅
    Failed: 3 ❌
 
-🎨 Streamlit UI Demo
-✅ Streamlit UI package available
+🎨 UI Demo
+✅ UI frontend available
 
 🚀 Podium API Demo
 ✅ Podium API package available
@@ -192,7 +193,7 @@ When everything is working, you should see:
 ✅ PASS Data Quality Monitoring
 ✅ PASS Anomaly Detection
 ✅ PASS Reporting
-✅ PASS Streamlit UI
+✅ PASS UI
 ✅ PASS Podium API
 
 🎯 Overall: 7/7 demos passed
@@ -226,11 +227,11 @@ cd ../../podium && uv pip install -e .
 ```bash
 # Check if services are running
 curl http://localhost:8001/health  # Podium API
-curl http://localhost:8501         # Streamlit UI
+curl http://localhost:3000         # UI
 
 # Restart services manually
 pkill -f "datametronome_podium"    # Kill Podium API
-pkill -f "streamlit"               # Kill Streamlit UI
+pkill -f "nuxt"                    # Kill UI (Nuxt process)
 
 # Then restart using the commands in section 4
 ```
@@ -252,7 +253,7 @@ After running the community demo:
    - Explore all API endpoints
    - Try creating staves and clefs
 
-2. **Streamlit Dashboard**: Visit http://localhost:8501
+2. **Dashboard UI**: Visit http://localhost:3000
    - Login with `admin`/`admin`
    - Explore all dashboard tabs
    - Run data quality checks

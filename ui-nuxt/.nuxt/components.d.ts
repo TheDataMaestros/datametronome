@@ -14,6 +14,10 @@ type HydrationStrategies = {
 type LazyComponent<T> = DefineComponent<HydrationStrategies, {}, {}, {}, {}, {}, {}, { hydrated: () => void }> & T
 
 
+export const ClefAnalytics: typeof import("../components/ClefAnalytics.vue")['default']
+export const ClefConfigForm: typeof import("../components/ClefConfigForm.vue")['default']
+export const ClefVisualBuilder: typeof import("../components/ClefVisualBuilder.vue")['default']
+export const TrendChart: typeof import("../components/TrendChart.vue")['default']
 export const UAccordion: typeof import("../node_modules/@nuxt/ui/dist/runtime/components/elements/Accordion.vue")['default']
 export const UAlert: typeof import("../node_modules/@nuxt/ui/dist/runtime/components/elements/Alert.vue")['default']
 export const UAvatar: typeof import("../node_modules/@nuxt/ui/dist/runtime/components/elements/Avatar.vue")['default']
@@ -88,6 +92,10 @@ export const Head: typeof import("../node_modules/nuxt/dist/head/runtime/compone
 export const Html: typeof import("../node_modules/nuxt/dist/head/runtime/components")['Html']
 export const Body: typeof import("../node_modules/nuxt/dist/head/runtime/components")['Body']
 export const NuxtIsland: typeof import("../node_modules/nuxt/dist/app/components/nuxt-island")['default']
+export const LazyClefAnalytics: LazyComponent<typeof import("../components/ClefAnalytics.vue")['default']>
+export const LazyClefConfigForm: LazyComponent<typeof import("../components/ClefConfigForm.vue")['default']>
+export const LazyClefVisualBuilder: LazyComponent<typeof import("../components/ClefVisualBuilder.vue")['default']>
+export const LazyTrendChart: LazyComponent<typeof import("../components/TrendChart.vue")['default']>
 export const LazyUAccordion: LazyComponent<typeof import("../node_modules/@nuxt/ui/dist/runtime/components/elements/Accordion.vue")['default']>
 export const LazyUAlert: LazyComponent<typeof import("../node_modules/@nuxt/ui/dist/runtime/components/elements/Alert.vue")['default']>
 export const LazyUAvatar: LazyComponent<typeof import("../node_modules/@nuxt/ui/dist/runtime/components/elements/Avatar.vue")['default']>

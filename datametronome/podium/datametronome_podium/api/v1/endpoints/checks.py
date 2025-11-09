@@ -1,8 +1,9 @@
 """Check endpoints for DataMetronome Podium using DataPulse connectors."""
 
-from typing import Any, List
+from datetime import datetime, timezone
+from typing import Any
 
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, Query, status
 
 from datametronome_podium.core.database import get_db
 from datametronome_podium.core.exceptions import ValidationError
@@ -11,8 +12,27 @@ from datametronome_podium.api.schemas.check import CheckCreate, CheckUpdate, Che
 router = APIRouter()
 
 
-@router.get("/", response_model=List[CheckResponse])
-async def get_checks(skip: int = 0, limit: int = 100) -> List[CheckResponse]:
+def _isoformat(value: datetime) -> str:
+    """Format datetimes so they align with stored UTC ISO strings."""
+    if value.tzinfo is None:
+        value = value.replace(tzinfo=timezone.utc)
+    else:
+        value = value.astimezone(timezone.utc)
+    return value.isoformat().replace("+00:00", "Z")
+
+
+@router.get("/", response_model=list[CheckResponse])
+async def get_checks(
+    skip: int = 0,
+    limit: int = 100,
+    status: str | None = Query(default=None, description="Filter by check status"),
+    severity: str | None = Query(default=None, description="Filter by severity level"),
+    check_type: str | None = Query(default=None, description="Filter by check type"),
+    stave_id: str | None = Query(default=None, description="Filter by stave identifier"),
+    clef_id: str | None = Query(default=None, description="Filter by clef identifier"),
+    started_after: datetime | None = Query(default=None, description="Return checks executed on/after this timestamp"),
+    started_before: datetime | None = Query(default=None, description="Return checks executed on/before this timestamp"),
+) -> list[CheckResponse]:
     """Get all checks using DataPulse connector.
     
     Args:
@@ -24,9 +44,39 @@ async def get_checks(skip: int = 0, limit: int = 100) -> List[CheckResponse]:
     """
     try:
         db = await get_db()
+
+        filters: list[str] = []
+        params: list[Any] = []
+
+        if status:
+            filters.append("status = ?")
+            params.append(status)
+        if severity:
+            filters.append("severity = ?")
+            params.append(severity)
+        if check_type:
+            filters.append("check_type = ?")
+            params.append(check_type)
+        if stave_id:
+            filters.append("stave_id = ?")
+            params.append(stave_id)
+        if clef_id:
+            filters.append("clef_id = ?")
+            params.append(clef_id)
+        if started_after:
+            filters.append("timestamp >= ?")
+            params.append(_isoformat(started_after))
+        if started_before:
+            filters.append("timestamp <= ?")
+            params.append(_isoformat(started_before))
+
+        where_clause = f"WHERE {' AND '.join(filters)}" if filters else ""
+
+        params.extend([limit, skip])
+
         checks = await db.query({
-            "sql": "SELECT * FROM checks ORDER BY timestamp DESC LIMIT ? OFFSET ?", 
-            "params": [limit, skip]
+            "sql": f"SELECT * FROM checks {where_clause} ORDER BY timestamp DESC LIMIT ? OFFSET ?",
+            "params": params
         })
         return [CheckResponse(**check) for check in checks]
     except Exception as e:

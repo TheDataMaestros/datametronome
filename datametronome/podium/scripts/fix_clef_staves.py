@@ -15,7 +15,7 @@ def fix_clef_staves():
     
     # Mapping of old stave to new stave
     stave_mapping = {
-        'stave-streamlit-demo': 'stave-demo-sqlite'
+        'stave-nuxt-demo': 'stave-demo-sqlite'
     }
     
     # Mapping of non-existent tables to existing tables

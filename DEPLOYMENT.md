@@ -27,8 +27,8 @@ This guide covers deploying DataMetronome in various environments, from local de
    # Install Podium API
    pip install -e ./datametronome/podium
    
-   # Install Streamlit UI
-   pip install -e ./datametronome/ui-streamlit
+   # Install UI dependencies
+npm install --prefix ui-nuxt
    ```
 
 2. **Start Podium API:**
@@ -43,16 +43,17 @@ This guide covers deploying DataMetronome in various environments, from local de
    python -m datametronome_podium.main
    ```
 
-3. **Start Streamlit UI (new terminal):**
+3. **Start the UI (new terminal):**
    ```bash
-   cd datametronome/ui-streamlit
-   streamlit run streamlit_app.py --server.port 8501
+   cd ui-nuxt
+   npm install
+   npm run dev -- --port 3000 --host
    ```
 
 4. **Access the system:**
    - Podium API: http://localhost:8000
    - API Docs: http://localhost:8000/docs
-   - Streamlit UI: http://localhost:8501
+   - UI: http://localhost:3000
 
 ## 🐳 Docker Development
 
@@ -76,8 +77,8 @@ This guide covers deploying DataMetronome in various environments, from local de
 
 3. **Access services:**
    - Podium API: http://localhost:8000
-   - Streamlit UI: http://localhost:8501
    - PostgreSQL: localhost:5432
+   - UI: run locally via `npm run dev --prefix ui-nuxt`
 
 ### Individual Services
 
@@ -88,8 +89,6 @@ docker-compose up -d postgres
 # Start only Podium API
 docker-compose up -d podium
 
-# Start only Streamlit UI
-docker-compose up -d ui
 ```
 
 ## 🚀 Production Deployment
@@ -101,11 +100,8 @@ docker-compose up -d ui
    # Build Podium API
    cd datametronome/podium
    docker build -t datametronome-podium:latest .
-   
-   # Build Streamlit UI
-   cd ../ui-streamlit
-   docker build -t datametronome-ui:latest .
    ```
+   > ℹ️ Build the UI separately with `cd ui-nuxt && npm run build` and deploy using your preferred Node hosting or static deployment workflow.
 
 2. **Create production docker-compose:**
    ```yaml
@@ -133,15 +129,6 @@ docker-compose up -d ui
          timeout: 10s
          retries: 3
    
-     ui:
-       image: datametronome-ui:latest
-       ports:
-         - "8501:8501"
-       environment:
-         - PODIUM_API_BASE=http://podium:8000
-       depends_on:
-         - podium
-       restart: unless-stopped
    ```
 
 3. **Deploy:**
@@ -352,7 +339,7 @@ curl http://localhost:8000/metrics
 ```bash
 # Firewall rules (example)
 ufw allow 8000/tcp  # Podium API
-ufw allow 8501/tcp  # Streamlit UI
+ufw allow 3000/tcp  # UI
 ufw allow 5432/tcp  # PostgreSQL (if external)
 ```
 
@@ -504,7 +491,7 @@ kubectl get pods -n datametronome
 
 - [Podium API Documentation](datametronome/podium/README.md)
 - [DataPulse Connectors](datametronome/pulse/README.md)
-- [Streamlit UI Guide](datametronome/ui-streamlit/README.md)
+- [UI Guide](ui-nuxt/README.md)
 - [API Reference](http://localhost:8000/docs)
 
 ## 🤝 Support

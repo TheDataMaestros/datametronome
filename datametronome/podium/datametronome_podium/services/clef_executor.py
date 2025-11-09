@@ -27,6 +27,7 @@ from datametronome_podium.models.severity import (
     SeverityConfig,
     evaluate_severity
 )
+from datametronome_podium.services.connection_tester import ConnectionTester
 
 
 logger = logging.getLogger(__name__)
@@ -71,6 +72,15 @@ class CheckResult:
     def __str__(self) -> str:
         """String representation using severity icons."""
         return f"{self.severity}: {self.message}"
+    
+    @property
+    def details(self) -> Dict[str, Any]:
+        """Backward compatibility alias for metadata."""
+        return self.metadata
+    
+    @details.setter
+    def details(self, value: Dict[str, Any]):
+        self.metadata = value or {}
 
 
 class ClefExecutor:
@@ -88,7 +98,8 @@ class ClefExecutor:
             "harmony": 0,
             "dissonance": 0,
             "cacophony": 0,
-            "total_time": 0.0
+            "total_time": 0.0,
+            "errors": 0
         }
     
     async def execute_clef(
@@ -114,45 +125,53 @@ class ClefExecutor:
             >>> print(f"Check {result.status}: {result.message}")
         """
         start_time = datetime.now()
+        connector = db_connector
+        managed_connector = False
+        result: CheckResult | None = None
         
         try:
+            if connector is None:
+                tester = ConnectionTester()
+                connector = await tester.get_connector(stave, read_only=True)
+                managed_connector = True
+            
             logger.info(f"Executing clef '{clef.name}' on stave '{stave.name}'")
             
             # Route to appropriate check handler
             # TDD-compliant check types (new)
             if clef.check_type == "column_values":
-                result = await self._execute_column_values_check(clef, stave, db_connector)
+                result = await self._execute_column_values_check(clef, stave, connector)
             elif clef.check_type == "row_count":
-                result = await self._execute_row_count_check(clef, stave, db_connector)
+                result = await self._execute_row_count_check(clef, stave, connector)
             elif clef.check_type == "freshness":
-                result = await self._execute_freshness_check(clef, stave, db_connector)
+                result = await self._execute_freshness_check(clef, stave, connector)
             elif clef.check_type == "forecast":
-                result = await self._execute_forecast_check(clef, stave, db_connector)
+                result = await self._execute_forecast_check(clef, stave, connector)
             elif clef.check_type == "data_profile_drift":
-                result = await self._execute_data_profile_drift_check(clef, stave, db_connector)
+                result = await self._execute_data_profile_drift_check(clef, stave, connector)
             elif clef.check_type == "lookup_validation":
-                result = await self._execute_lookup_validation_check(clef, stave, db_connector)
+                result = await self._execute_lookup_validation_check(clef, stave, connector)
             elif clef.check_type == "python":
-                result = await self._execute_python_check(clef, stave, db_connector)
+                result = await self._execute_python_check(clef, stave, connector)
             # Legacy check types (for backward compatibility)
             elif clef.check_type == "null_check":
-                result = await self._execute_null_check(clef, stave, db_connector)
+                result = await self._execute_null_check(clef, stave, connector)
             elif clef.check_type == "uniqueness_check":
-                result = await self._execute_uniqueness_check(clef, stave, db_connector)
+                result = await self._execute_uniqueness_check(clef, stave, connector)
             elif clef.check_type == "range_check":
-                result = await self._execute_range_check(clef, stave, db_connector)
+                result = await self._execute_range_check(clef, stave, connector)
             elif clef.check_type == "pattern_check":
-                result = await self._execute_pattern_check(clef, stave, db_connector)
+                result = await self._execute_pattern_check(clef, stave, connector)
             elif clef.check_type == "freshness_check":
-                result = await self._execute_freshness_check(clef, stave, db_connector)
+                result = await self._execute_freshness_check(clef, stave, connector)
             elif clef.check_type == "volume_check":
-                result = await self._execute_volume_check(clef, stave, db_connector)
+                result = await self._execute_volume_check(clef, stave, connector)
             elif clef.check_type == "custom_sql":
-                result = await self._execute_custom_sql_check(clef, stave, db_connector)
+                result = await self._execute_custom_sql_check(clef, stave, connector)
             elif clef.check_type == "schema_check":
-                result = await self._execute_schema_check(clef, stave, db_connector)
+                result = await self._execute_schema_check(clef, stave, connector)
             elif clef.check_type == "referential_check":
-                result = await self._execute_referential_check(clef, stave, db_connector)
+                result = await self._execute_referential_check(clef, stave, connector)
             else:
                 result = CheckResult(
                     clef_id=clef.id,
@@ -161,35 +180,43 @@ class ClefExecutor:
                     observed_value=None,
                     message=f"Unknown check type: {clef.check_type}",
                     metadata={"error": "unsupported_check_type"},
-                    execution_time=0.0,
                     timestamp=start_time
                 )
-            
-            # Update execution time
-            result.execution_time = (datetime.now() - start_time).total_seconds()
-            
-            # Update stats
-            self._update_stats(result)
-            
-            logger.info(f"Clef '{clef.name}' completed: {result.severity}")
-            return result
-            
+        
         except Exception as e:
-            execution_time = (datetime.now() - start_time).total_seconds()
             logger.error(f"Error executing clef '{clef.name}': {e}")
-            
             result = CheckResult(
                 clef_id=clef.id,
                 stave_id=stave.id,
-                status="fail", observed_value=None,
+                status="fail",
+                observed_value=None,
                 message=f"Execution failed: {str(e)}",
                 metadata={"error": str(e), "exception_type": type(e).__name__},
-                execution_time=execution_time,
                 timestamp=start_time
             )
-            
-            self._update_stats(result)
-            return result
+        
+        finally:
+            if managed_connector and connector is not None:
+                try:
+                    await connector.close()
+                except Exception as close_error:
+                    logger.warning(f"Failed to close connector for stave '{stave.name}': {close_error}")
+        
+        if result is None:
+            result = CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status="fail",
+                observed_value=None,
+                message="Clef execution did not produce a result",
+                metadata={"error": "no_result"},
+                timestamp=start_time
+            )
+        
+        result.execution_time = (datetime.now() - start_time).total_seconds()
+        self._update_stats(result)
+        logger.info(f"Clef '{clef.name}' completed: {result.severity}")
+        return result
     
     async def _execute_null_check(
         self,
@@ -380,7 +407,7 @@ class ClefExecutor:
             return CheckResult(
                 clef_id=clef.id,
                 stave_id=stave.id,
-                status="warning",
+                status="warn",
                 message="No non-null values found",
                 metadata={"total_rows": 0, "out_of_range_rows": 0},
                 execution_time=0.0,
@@ -527,7 +554,7 @@ class ClefExecutor:
                 return CheckResult(
                     clef_id=clef.id,
                     stave_id=stave.id,
-                    status="warning",
+                    status="warn",
                     message="Custom SQL returned no results",
                     metadata={"query": sql, "results": []},
                     execution_time=0.0,
@@ -716,7 +743,7 @@ class ClefExecutor:
             return CheckResult(
                 clef_id=clef.id,
                 stave_id=stave.id,
-                status="warning",
+                status="warn",
                 message="Pattern check not fully supported in SQLite",
                 metadata={"error": "limited_regex_support"},
                 execution_time=0.0,
@@ -755,7 +782,7 @@ class ClefExecutor:
             return CheckResult(
                 clef_id=clef.id,
                 stave_id=stave.id,
-                status="warning",
+                status="warn",
                 message="No non-null values found",
                 metadata={"total_rows": 0, "non_matching_rows": 0},
                 execution_time=0.0,
@@ -785,106 +812,6 @@ class ClefExecutor:
             execution_time=0.0,
             timestamp=datetime.now(),
             anomalies_count=non_matching_rows if status == "fail" else 0
-        )
-    
-    async def _execute_freshness_check(
-        self,
-        clef: Clef,
-        stave: Stave,
-        db_connector: Any
-    ) -> CheckResult:
-        """Execute a data freshness check."""
-        config = clef.config
-        table = config["table"]
-        column = config["column"]  # Timestamp column
-        max_age_hours = config.get("max_age_hours", 24)
-        
-        # Build SQL query to check data age
-        if stave.data_source_type in ["postgres", "postgresql"]:
-            sql = f"""
-            SELECT 
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} > NOW() - INTERVAL '{max_age_hours} hours' THEN 1 END) as recent_rows,
-                COUNT(CASE WHEN {column} <= NOW() - INTERVAL '{max_age_hours} hours' THEN 1 END) as stale_rows,
-                MAX({column}) as latest_timestamp
-            FROM {table}
-            WHERE {column} IS NOT NULL
-            """
-        elif stave.data_source_type == "mysql":
-            sql = f"""
-            SELECT 
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} > DATE_SUB(NOW(), INTERVAL {max_age_hours} HOUR) THEN 1 END) as recent_rows,
-                COUNT(CASE WHEN {column} <= DATE_SUB(NOW(), INTERVAL {max_age_hours} HOUR) THEN 1 END) as stale_rows,
-                MAX({column}) as latest_timestamp
-            FROM {table}
-            WHERE {column} IS NOT NULL
-            """
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="warning",
-                message=f"Freshness check may not be meaningful for {stave.data_source_type}",
-                metadata={"warning": "limited_freshness_support"},
-                execution_time=0.0,
-                timestamp=datetime.now()
-            )
-        
-        # Execute query
-        result_rows = await db_connector.query({"sql": sql})
-        
-        if not result_rows:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message="Query returned no results",
-                metadata={"error": "empty_result"},
-                execution_time=0.0,
-                timestamp=datetime.now()
-            )
-        
-        row = result_rows[0]
-        total_rows = row["total_rows"]
-        stale_rows = row["stale_rows"]
-        latest_timestamp = row["latest_timestamp"]
-        
-        if total_rows == 0:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="warning",
-                message="No timestamp data found",
-                metadata={"total_rows": 0, "stale_rows": 0},
-                execution_time=0.0,
-                timestamp=datetime.now()
-            )
-        
-        # Evaluate result
-        if stale_rows == 0:
-            status = "pass"
-            message = f"Freshness check passed: all data is within {max_age_hours} hours"
-        else:
-            status = "fail"
-            message = f"Freshness check failed: {stale_rows} rows are older than {max_age_hours} hours"
-        
-        return CheckResult(
-            clef_id=clef.id,
-            stave_id=stave.id,
-            status=status,
-            message=message,
-            metadata={
-                "total_rows": total_rows,
-                "stale_rows": stale_rows,
-                "latest_timestamp": latest_timestamp,
-                "max_age_hours": max_age_hours,
-                "table": table,
-                "column": column
-            },
-            execution_time=0.0,
-            timestamp=datetime.now(),
-            anomalies_count=stale_rows if status == "fail" else 0
         )
     
     async def _execute_schema_check(
@@ -949,12 +876,15 @@ class ClefExecutor:
         self.execution_stats["total_checks"] += 1
         self.execution_stats["total_time"] += result.execution_time
         
-        if result.severity == SeverityLevel.HARMONY:
+        status = result.status
+        if status == "pass":
             self.execution_stats["harmony"] += 1
-        elif result.severity == SeverityLevel.DISSONANCE:
+        elif status == "warn":
             self.execution_stats["dissonance"] += 1
-        elif result.severity == SeverityLevel.CACOPHONY:
+        elif status == "fail":
             self.execution_stats["cacophony"] += 1
+        else:
+            self.execution_stats["errors"] += 1
     
     def get_execution_stats(self) -> Dict[str, Any]:
         """Get execution statistics."""
@@ -970,6 +900,11 @@ class ClefExecutor:
             stats["dissonance_rate"] = 0.0
             stats["cacophony_rate"] = 0.0
         
+        stats["passed"] = stats["harmony"]
+        stats["warned"] = stats["dissonance"]
+        stats["failed"] = stats["cacophony"]
+        stats["pass_rate"] = stats["harmony_rate"]
+        
         return stats
 
 
@@ -977,6 +912,16 @@ class ClefExecutor:
     async def _execute_column_values_check(self, clef: Clef, stave: Stave, db_connector: Any = None) -> CheckResult:
         """Execute column values check (TDD Level 1: Simple Declarative)."""
         try:
+            if db_connector is None:
+                return CheckResult(
+                    clef_id=clef.id,
+                    stave_id=stave.id,
+                    status="fail",
+                    observed_value=None,
+                    message="Column values check requires a connected data source",
+                    metadata={"error": "missing_connector"}
+                )
+            
             config = clef.config
             table = config.get("table")
             column = config.get("column")
@@ -992,118 +937,91 @@ class ClefExecutor:
                     metadata={"error": "missing_config"}
                 )
             
-            # Create proper database connection based on stave type using DataPulse connectors
-            if stave.data_source_type == "sqlite":
-                from metronome_pulse_sqlite import SQLiteReadonlyPulse
-                db_path = stave.connection_config.get('database_path', stave.connection_config.get('path'))
-                connector = SQLiteReadonlyPulse(db_path)
-                await connector.connect()
-            elif stave.data_source_type in ["postgres", "postgresql"]:
-                from metronome_pulse_postgres import PostgresReadOnlyPulse
-                config = stave.connection_config
-                connector = PostgresReadOnlyPulse(
-                    host=config['host'],
-                    port=config.get('port', 5432),
-                    database=config['database'],
-                    user=config['user'],
-                    password=config['password']
-                )
-                await connector.connect()
-            elif stave.data_source_type == "bigquery":
-                from metronome_pulse_bigquery import BigQueryReadonlyPulse
-                config = stave.connection_config
-                connector = BigQueryReadonlyPulse(
-                    project_id=config['project_id'],
-                    credentials_path=config.get('credentials_path'),
-                    credentials_json=config.get('credentials_json'),
-                    dataset=config.get('dataset'),
-                    location=config.get('location', 'US')
-                )
-                await connector.connect()
-            else:
+            if condition != "if_null":
                 return CheckResult(
                     clef_id=clef.id,
                     stave_id=stave.id,
                     status="fail",
                     observed_value=None,
-                    message=f"Unsupported data source type: {stave.data_source_type}",
-                    metadata={"error": "unsupported_data_source", "type": stave.data_source_type}
+                    message=f"Unsupported condition '{condition}' for column_values check",
+                    metadata={"error": "unsupported_condition", "condition": condition}
                 )
             
-            try:
-                # For now, implement a basic null check
-                if condition == "if_null":
-                    # Build SQL query to count NULLs
-                    sql = f"""
-                    SELECT 
-                        COUNT(*) as total_rows,
-                        COUNT({column}) as non_null_rows,
-                        COUNT(*) - COUNT({column}) as null_rows
-                    FROM {table}
-                    """
-                    
-                    # Execute query using DataPulse connector
-                    results = await connector.query(sql)
-                    
-                    if not results or len(results) == 0:
-                        return CheckResult(
-                            clef_id=clef.id,
-                            stave_id=stave.id,
-                            status="fail",
-                            observed_value=None,
-                            message="Query returned no results",
-                            metadata={"error": "empty_result"}
-                        )
-                    
-                    # DataPulse SQLite returns results as list of dictionaries
-                    result = results[0]
-                    total_rows = result['total_rows']
-                    non_null_rows = result['non_null_rows']
-                    null_rows = result['null_rows']
-                    null_percentage = (null_rows / total_rows * 100) if total_rows > 0 else 0
-                    
-                    # Evaluate against warn/fail conditions
-                    if clef.fail and self._evaluate_condition(null_percentage, clef.fail):
-                        status = "fail"
-                        message = f"NULL check failed: {null_percentage:.2f}% NULL values in {column}"
-                    elif clef.warn and self._evaluate_condition(null_percentage, clef.warn):
-                        status = "warn"
-                        message = f"NULL check warning: {null_percentage:.2f}% NULL values in {column}"
-                    else:
-                        status = "pass"
-                        message = f"NULL check passed: {null_percentage:.2f}% NULL values in {column}"
-                    
-                    return CheckResult(
-                        clef_id=clef.id,
-                        stave_id=stave.id,
-                        status=status,
-                        observed_value=null_percentage,
-                        message=message,
-                        metadata={
-                            "table": table,
-                            "column": column,
-                            "condition": condition,
-                            "total_rows": total_rows,
-                            "null_rows": null_rows,
-                            "null_percentage": null_percentage,
-                            "warn_condition": clef.warn,
-                            "fail_condition": clef.fail
-                        }
-                    )
-                else:
-                    return CheckResult(
-                        clef_id=clef.id,
-                        stave_id=stave.id,
-                        status="fail",
-                        observed_value=None,
-                        message=f"Unsupported condition '{condition}' for column_values check",
-                        metadata={"error": "unsupported_condition", "condition": condition}
-                    )
+            sql = f"""
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT({column}) as non_null_rows,
+                COUNT(*) - COUNT({column}) as null_rows
+            FROM {table}
+            """
             
-            finally:
-                # Always close the connector
-                await connector.close()
-                
+            results = await db_connector.query(sql)
+            
+            if not results:
+                return CheckResult(
+                    clef_id=clef.id,
+                    stave_id=stave.id,
+                    status="fail",
+                    observed_value=None,
+                    message="Query returned no results",
+                    metadata={"error": "empty_result"}
+                )
+            
+            row = results[0]
+            total_rows = row.get("total_rows", 0)
+            null_rows = row.get("null_rows", 0)
+            non_null_rows = row.get("non_null_rows", 0)
+            
+            if total_rows == 0:
+                return CheckResult(
+                    clef_id=clef.id,
+                    stave_id=stave.id,
+                    status="warn",
+                    observed_value=0.0,
+                    message=f"Table '{table}' returned no rows to evaluate",
+                    metadata={
+                        "table": table,
+                        "column": column,
+                        "total_rows": 0,
+                        "null_rows": 0,
+                        "non_null_rows": 0,
+                        "note": "Consider running a volume check to ensure data is present"
+                    }
+                )
+            
+            null_rate = null_rows / total_rows if total_rows else 0.0
+            null_percentage_display = null_rate * 100.0
+            
+            if clef.fail and self._evaluate_condition(null_rate, clef.fail):
+                status = "fail"
+                message = f"NULL rate {null_percentage_display:.2f}% violates fail condition ({clef.fail})"
+            elif clef.warn and self._evaluate_condition(null_rate, clef.warn):
+                status = "warn"
+                message = f"NULL rate {null_percentage_display:.2f}% breaches warning condition ({clef.warn})"
+            else:
+                status = "pass"
+                message = f"NULL rate {null_percentage_display:.2f}% within acceptable limits"
+            
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status=status,
+                observed_value=null_rate,
+                message=message,
+                metadata={
+                    "table": table,
+                    "column": column,
+                    "total_rows": total_rows,
+                    "non_null_rows": non_null_rows,
+                    "null_rows": null_rows,
+                    "null_percentage": null_rate,
+                    "null_percentage_display": null_percentage_display,
+                    "warn_condition": clef.warn,
+                    "fail_condition": clef.fail
+                },
+                anomalies_count=null_rows if status == "fail" else 0
+            )
+        
         except Exception as e:
             return CheckResult(
                 clef_id=clef.id,
@@ -1117,6 +1035,16 @@ class ClefExecutor:
     async def _execute_row_count_check(self, clef: Clef, stave: Stave, db_connector: Any = None) -> CheckResult:
         """Execute row count check (TDD Level 1: Simple Declarative)."""
         try:
+            if db_connector is None:
+                return CheckResult(
+                    clef_id=clef.id,
+                    stave_id=stave.id,
+                    status="fail",
+                    observed_value=None,
+                    message="Row count check requires a connected data source",
+                    metadata={"error": "missing_connector"}
+                )
+            
             config = clef.config
             table = config.get("table")
             
@@ -1130,93 +1058,57 @@ class ClefExecutor:
                     metadata={"error": "missing_table"}
                 )
             
-            # Create proper database connection based on stave type using DataPulse connectors
-            if stave.data_source_type == "sqlite":
-                from metronome_pulse_sqlite import SQLiteReadonlyPulse
-                db_path = stave.connection_config.get('database_path', stave.connection_config.get('path'))
-                connector = SQLiteReadonlyPulse(db_path)
-                await connector.connect()
-            elif stave.data_source_type in ["postgres", "postgresql"]:
-                from metronome_pulse_postgres import PostgresReadOnlyPulse
-                config = stave.connection_config
-                connector = PostgresReadOnlyPulse(
-                    host=config['host'],
-                    port=config.get('port', 5432),
-                    database=config['database'],
-                    user=config['user'],
-                    password=config['password']
-                )
-                await connector.connect()
-            elif stave.data_source_type == "bigquery":
-                from metronome_pulse_bigquery import BigQueryReadonlyPulse
-                config = stave.connection_config
-                connector = BigQueryReadonlyPulse(
-                    project_id=config['project_id'],
-                    credentials_path=config.get('credentials_path'),
-                    credentials_json=config.get('credentials_json'),
-                    dataset=config.get('dataset'),
-                    location=config.get('location', 'US')
-                )
-                await connector.connect()
-            else:
+            sql = f"SELECT COUNT(*) as row_count FROM {table}"
+            results = await db_connector.query(sql)
+            
+            if not results:
                 return CheckResult(
                     clef_id=clef.id,
                     stave_id=stave.id,
                     status="fail",
                     observed_value=None,
-                    message=f"Unsupported data source type: {stave.data_source_type}",
-                    metadata={"error": "unsupported_data_source", "type": stave.data_source_type}
+                    message="Query returned no results",
+                    metadata={"error": "empty_result"}
                 )
             
-            try:
-                # Build SQL query to count rows
-                sql = f"SELECT COUNT(*) as row_count FROM {table}"
-                
-                # Execute query using DataPulse connector
-                results = await connector.query(sql)
-                
-                if not results or len(results) == 0:
-                    return CheckResult(
-                        clef_id=clef.id,
-                        stave_id=stave.id,
-                        status="fail",
-                        observed_value=None,
-                        message="Query returned no results",
-                        metadata={"error": "empty_result"}
-                    )
-                
-                # DataPulse SQLite returns results as list of dictionaries
-                row_count = results[0]['row_count']
-                
-                # Evaluate against warn/fail conditions
-                if clef.fail and self._evaluate_condition(row_count, clef.fail):
-                    status = "fail"
-                    message = f"Row count {row_count} failed condition: {clef.fail}"
-                elif clef.warn and self._evaluate_condition(row_count, clef.warn):
-                    status = "warn"
-                    message = f"Row count {row_count} warned condition: {clef.warn}"
-                else:
-                    status = "pass"
-                    message = f"Row count {row_count} is within acceptable range"
-                
+            row = results[0]
+            row_count = row.get("row_count")
+            
+            if row_count is None:
                 return CheckResult(
                     clef_id=clef.id,
                     stave_id=stave.id,
-                    status=status,
-                    observed_value=row_count,
-                    message=message,
-                    metadata={
-                        "table": table,
-                        "row_count": row_count,
-                        "warn_condition": clef.warn,
-                        "fail_condition": clef.fail
-                    }
+                    status="fail",
+                    observed_value=None,
+                    message="Row count query did not return 'row_count' column",
+                    metadata={"error": "missing_row_count"}
                 )
             
-            finally:
-                # Always close the connector
-                await connector.close()
-                
+            if clef.fail and self._evaluate_condition(row_count, clef.fail):
+                status = "fail"
+                message = f"Row count {row_count} violates fail condition ({clef.fail})"
+            elif clef.warn and self._evaluate_condition(row_count, clef.warn):
+                status = "warn"
+                message = f"Row count {row_count} triggers warning condition ({clef.warn})"
+            else:
+                status = "pass"
+                message = f"Row count {row_count} within acceptable range"
+            
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status=status,
+                observed_value=row_count,
+                message=message,
+                metadata={
+                    "table": table,
+                    "row_count": row_count,
+                    "warn_condition": clef.warn,
+                    "fail_condition": clef.fail
+                },
+                anomalies_count=1 if status == "fail" else 0
+            )
+        
         except Exception as e:
             return CheckResult(
                 clef_id=clef.id,
@@ -1240,10 +1132,8 @@ class ClefExecutor:
                 return True
             parts = condition_str.split(' ', 1)
             if len(parts) > 1:
-                # Evaluate a condition on the null percentage
                 null_percentage_condition = parts[1].strip()
-                # Assuming observed_value is the null percentage when 'if_null' is used
-                return self._evaluate_condition_numeric(observed_value, null_percentage_condition)
+                return self._evaluate_condition(observed_value, null_percentage_condition)
             return observed_value is None # if no further condition, just check if it's null
         
         # Handle percentage values in condition string
@@ -1403,10 +1293,60 @@ class ClefExecutor:
     async def _execute_freshness_check(self, clef: Clef, stave: Stave, db_connector: Any = None) -> CheckResult:
         """Execute freshness check (TDD Level 1: Simple Declarative)."""
         try:
+            if db_connector is None:
+                return CheckResult(
+                    clef_id=clef.id,
+                    stave_id=stave.id,
+                    status="fail",
+                    observed_value=None,
+                    message="Freshness check requires a connected data source",
+                    metadata={"error": "missing_connector"}
+                )
+            
+            def _parse_duration_to_hours(value):
+                if value is None:
+                    return None
+                if isinstance(value, (int, float)):
+                    return float(value)
+                if isinstance(value, str):
+                    text = value.strip().lower()
+                    if not text:
+                        return None
+                    parts = text.split()
+                    try:
+                        quantity = float(parts[0])
+                    except ValueError:
+                        return None
+                    unit = parts[1] if len(parts) > 1 else "hours"
+                    if unit.startswith("hour"):
+                        return quantity
+                    if unit.startswith("day"):
+                        return quantity * 24.0
+                    if unit.startswith("min"):
+                        return quantity / 60.0
+                    if unit.startswith("sec"):
+                        return quantity / 3600.0
+                    return quantity
+                return None
+            
+            def _normalize_duration_condition(condition):
+                if not condition:
+                    return None
+                condition = condition.strip()
+                import re
+                match = re.match(r"([<>=!]+)\s*(.+)", condition)
+                if not match:
+                    hours_value = _parse_duration_to_hours(condition)
+                    return None if hours_value is None else f"== {hours_value}"
+                operator, value_part = match.groups()
+                hours_value = _parse_duration_to_hours(value_part)
+                if hours_value is None:
+                    return None
+                return f"{operator} {hours_value}"
+            
             config = clef.config
             table = config.get("table")
             column = config.get("column", "updated_at")
-            max_age = config.get("max_age", "1 hour")
             
             if not table:
                 return CheckResult(
@@ -1418,94 +1358,84 @@ class ClefExecutor:
                     metadata={"error": "missing_table"}
                 )
             
-            # Create proper database connection based on stave type using DataPulse connectors
-            if stave.data_source_type == "sqlite":
-                from metronome_pulse_sqlite import SQLiteReadonlyPulse
-                from datetime import datetime, timedelta
-                db_path = stave.connection_config.get('database_path', stave.connection_config.get('path'))
-                connector = SQLiteReadonlyPulse(db_path)
-                await connector.connect()
-            elif stave.data_source_type in ["postgres", "postgresql"]:
-                from metronome_pulse_postgres import PostgresReadOnlyPulse
-                from datetime import datetime, timedelta
-                config = stave.connection_config
-                connector = PostgresReadOnlyPulse(
-                    host=config['host'],
-                    port=config.get('port', 5432),
-                    database=config['database'],
-                    user=config['user'],
-                    password=config['password']
+            max_age_input = config.get("max_age_hours", config.get("max_age", 24))
+            max_age_hours = _parse_duration_to_hours(max_age_input) or 24.0
+            
+            sql = f"SELECT MAX({column}) as latest_timestamp FROM {table}"
+            results = await db_connector.query(sql)
+            
+            if not results or results[0].get("latest_timestamp") is None:
+                return CheckResult(
+                    clef_id=clef.id,
+                    stave_id=stave.id,
+                    status="warn",
+                    observed_value=None,
+                    message=f"No timestamp data found in '{table}.{column}'",
+                    metadata={
+                        "table": table,
+                        "column": column,
+                        "warn_condition": clef.warn,
+                        "fail_condition": clef.fail,
+                        "note": "Consider backfilling timestamp column or verifying data ingestion"
+                    }
                 )
-                await connector.connect()
-            else:
+            
+            latest_raw = results[0]["latest_timestamp"]
+            latest_timestamp = latest_raw
+            if isinstance(latest_raw, str):
+                try:
+                    latest_timestamp = datetime.fromisoformat(latest_raw.replace("Z", "+00:00"))
+                except ValueError:
+                    latest_timestamp = None
+            elif isinstance(latest_raw, datetime):
+                latest_timestamp = latest_raw
+            
+            if latest_timestamp is None:
                 return CheckResult(
                     clef_id=clef.id,
                     stave_id=stave.id,
                     status="fail",
                     observed_value=None,
-                    message=f"Unsupported data source type: {stave.data_source_type}",
-                    metadata={"error": "unsupported_data_source", "type": stave.data_source_type}
+                    message=f"Unable to parse timestamp returned from '{column}'",
+                    metadata={"raw_value": latest_raw}
                 )
             
-            try:
-                # Build SQL query to get the latest timestamp
-                sql = f"SELECT MAX({column}) as latest_timestamp FROM {table}"
-                
-                # Execute query using DataPulse connector
-                results = await connector.query(sql)
-                
-                if not results or len(results) == 0 or not results[0]['latest_timestamp']:
-                    return CheckResult(
-                        clef_id=clef.id,
-                        stave_id=stave.id,
-                        status="fail",
-                        observed_value=None,
-                        message="No timestamp data found",
-                        metadata={"error": "no_timestamp_data"}
-                    )
-                
-                latest_timestamp_str = results[0]['latest_timestamp']
-                
-                # Parse timestamp (SQLite stores as ISO string)
-                try:
-                    latest_timestamp = datetime.fromisoformat(latest_timestamp_str.replace('Z', '+00:00'))
-                    now = datetime.now()
-                    age_hours = (now - latest_timestamp).total_seconds() / 3600
-                except:
-                    # If parsing fails, assume it's fresh
-                    age_hours = 0
-                
-                # Evaluate against warn/fail conditions
-                if clef.fail and self._evaluate_condition(age_hours, clef.fail):
-                    status = "fail"
-                    message = f"Data freshness check failed: data is {age_hours:.1f} hours old"
-                elif clef.warn and self._evaluate_condition(age_hours, clef.warn):
-                    status = "warn"
-                    message = f"Data freshness check warning: data is {age_hours:.1f} hours old"
-                else:
-                    status = "pass"
-                    message = f"Data freshness check passed: data is {age_hours:.1f} hours old"
-                
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status=status,
-                    observed_value=age_hours,
-                    message=message,
-                    metadata={
-                        "table": table,
-                        "column": column,
-                        "latest_timestamp": latest_timestamp_str,
-                        "age_hours": age_hours,
-                        "max_age": max_age,
-                        "warn_condition": clef.warn,
-                        "fail_condition": clef.fail
-                    }
-                )
+            now = datetime.utcnow()
+            age_hours = max((now - latest_timestamp).total_seconds() / 3600.0, 0.0)
             
-            finally:
-                # Always close the connector
-                await connector.close()
+            normalized_fail = _normalize_duration_condition(clef.fail)
+            normalized_warn = _normalize_duration_condition(clef.warn)
+            
+            if normalized_fail and self._evaluate_condition(age_hours, normalized_fail):
+                status = "fail"
+                message = f"Data freshness breached fail condition ({clef.fail}); age {age_hours:.2f} hours"
+            elif normalized_warn and self._evaluate_condition(age_hours, normalized_warn):
+                status = "warn"
+                message = f"Data freshness breached warn condition ({clef.warn}); age {age_hours:.2f} hours"
+            elif age_hours <= max_age_hours:
+                status = "pass"
+                message = f"Newest record {age_hours:.2f} hours old (threshold ≤ {max_age_hours} hours)"
+            else:
+                status = "warn"
+                message = f"Data older than configured target ({age_hours:.2f} hours > {max_age_hours} hours)"
+            
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status=status,
+                observed_value=age_hours,
+                message=message,
+                metadata={
+                    "table": table,
+                    "column": column,
+                    "latest_timestamp": latest_timestamp.isoformat(),
+                    "age_hours": age_hours,
+                    "expected_max_age_hours": max_age_hours,
+                    "warn_condition": clef.warn,
+                    "fail_condition": clef.fail
+                },
+                anomalies_count=1 if status == "fail" else 0
+            )
                 
         except Exception as e:
             return CheckResult(
@@ -1516,3 +1446,44 @@ class ClefExecutor:
                 message=f"Freshness check failed: {str(e)}",
                 metadata={"error": str(e)}
             )
+
+
+# =============================================================================
+# Module-level helper functions (backward compatible API)
+# =============================================================================
+
+_default_executor = ClefExecutor()
+
+
+async def execute_clef(clef: Clef, stave: Stave, db_connector: Any = None) -> CheckResult:
+    """Convenience helper to execute a single clef using the shared executor."""
+    return await _default_executor.execute_clef(clef, stave, db_connector)
+
+
+async def execute_stave_clefs(
+    stave: Stave,
+    clefs: list[Clef],
+    db_connector: Any = None
+) -> list[CheckResult]:
+    """
+    Execute multiple clefs for a stave, reusing the same data connector when possible.
+    """
+    connector = db_connector
+    managed_connector = False
+    
+    if connector is None:
+        tester = ConnectionTester()
+        connector = await tester.get_connector(stave, read_only=True)
+        managed_connector = True
+    
+    try:
+        results: list[CheckResult] = []
+        for clef in clefs:
+            results.append(await _default_executor.execute_clef(clef, stave, connector))
+        return results
+    finally:
+        if managed_connector and connector is not None:
+            try:
+                await connector.close()
+            except Exception as close_error:
+                logger.warning(f"Failed to close connector for stave '{stave.name}': {close_error}")

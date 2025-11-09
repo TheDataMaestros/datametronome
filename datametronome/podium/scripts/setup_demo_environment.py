@@ -142,7 +142,7 @@ def create_demo_environment_file():
 # Demo Database Configuration
 DEMO_HOST=localhost
 DEMO_PORT=5432
-DEMO_DB=streamlit_demo
+DEMO_DB=nuxt_demo
 DEMO_USER=demo
 DEMO_PASSWORD=demo123
 
@@ -247,17 +247,17 @@ def main():
         print(f"📈 Sample Check Results: {results_file}")
         
         print(f"\n🚀 Next Steps:")
-        print(f"  1. Start your Streamlit UI")
+        print(f"  1. Start the UI (cd ui-nuxt && npm run dev)")
         print(f"  2. Load a demo configuration:")
         print(f"     python3 scripts/load_demo_configs.py")
         print(f"  3. Import configurations into your database:")
         print(f"     python3 -m datametronome_podium.scripts.import_staves examples/demo-simple-monitoring.yaml")
-        print(f"  4. View the configurations in your Streamlit UI!")
+        print(f"  4. View the configurations in the UI!")
         
         print(f"\n💡 Demo Configurations Available:")
         print(f"  - demo-simple-monitoring.yaml (Basic checks)")
-        print(f"  - demo-streamlit-ui.yaml (UI showcase)")
-        print(f"  - demo-ecommerce-monitoring.yaml (Full e-commerce setup)")
+        print(f"  - demo-clickstream.yaml (Clickstream monitoring)")
+        print(f"  - demo-complete.yaml (Full e-commerce setup)")
         
     except Exception as e:
         print(f"❌ Error setting up demo environment: {e}")

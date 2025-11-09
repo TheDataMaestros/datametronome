@@ -1,4 +1,5 @@
-import { apiService, type ApiResponse } from './api'
+import { apiService } from './api'
+import type { Check } from './checks'
 
 export interface Clef {
   id: string
@@ -31,14 +32,16 @@ export interface UpdateClefRequest extends Partial<CreateClefRequest> {
   is_active?: boolean
 }
 
-export interface CheckResult {
-  id: string
+export interface RunClefResponse {
+  success: boolean
   clef_id: string
-  status: 'passed' | 'failed' | 'warning'
-  message?: string
-  executed_at: string
-  execution_time_ms: number
-  details?: Record<string, any>
+  stave_id: string
+  status: string
+  observed_value?: number | null
+  message?: string | null
+  execution_time?: number | null
+  metadata?: Record<string, any> | null
+  check_id?: string
 }
 
 class ClefsService {
@@ -73,19 +76,19 @@ class ClefsService {
     await apiService.delete(`${this.endpoint}/${id}`)
   }
 
-  async runCheck(id: string): Promise<CheckResult> {
-    const response = await apiService.post<CheckResult>(`${this.endpoint}/${id}/run`)
+  async runCheck(id: string): Promise<RunClefResponse> {
+    const response = await apiService.post<RunClefResponse>(`${this.endpoint}/${id}/run-now`)
     return response.data
   }
 
-  async getResults(id: string, limit = 50): Promise<CheckResult[]> {
-    const response = await apiService.get<CheckResult[]>(`${this.endpoint}/${id}/results?limit=${limit}`)
-    return response.data
+  async getResults(id: string, limit = 50): Promise<Check[]> {
+    const response = await apiService.get<{ results: Check[] }>(`${this.endpoint}/${id}/results?limit=${limit}`)
+    return response.data.results
   }
 
-  async getLatestResults(): Promise<CheckResult[]> {
-    const response = await apiService.get<CheckResult[]>('/check-results/latest')
-    return response.data
+  async getLatestResults(limit = 20): Promise<Check[]> {
+    const response = await apiService.get<{ results: Check[] }>(`${this.endpoint}/results/latest?limit=${limit}`)
+    return response.data.results
   }
 }
 

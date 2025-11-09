@@ -143,7 +143,7 @@ Here is the updated, final TDD that integrates this tiered concept directly into
 The system is a decoupled client-server architecture.
 
 1.  **The Podium (Backend):** A headless FastAPI application. It is the single source of truth for logic and state.
-2.  **The UI (Frontend):** A Streamlit application that acts as a pure client to the Podium's API.
+2.  **The UI (Frontend):** A standalone web application that acts as a pure client to the Podium's API.
 3.  **The Storage Layer:** A database (default: SQLite) that is accessed *only* by the Podium. It stores configuration, run history, and the historical metrics required for intelligent checks.
 
 #### **2. Package & Repository Naming Convention**
@@ -151,7 +151,7 @@ The system is a decoupled client-server architecture.
 *   **Official Project Name:** **DataMetronome**
 *   **GitHub Repository Name:** `datametronome`
 *   **Core Backend Package:** `datametronome-podium`
-*   **Default UI Package:** `datametronome-ui-streamlit`
+*   **Default UI Package:** `datametronome-ui-nuxt`
 *   **Connector Interface Package:** `metronome-pulse-core`
 *   **Connector Packages:** `metronome-pulse-postgres`, `metronome-pulse-api`, etc.
 
@@ -166,8 +166,8 @@ The system is a decoupled client-server architecture.
     5.  **Scheduler & Job Queue:** Manages scheduled checks (APScheduler) and handles on-demand requests via an internal, asynchronous job queue (`asyncio.Queue`).
     6.  **Plugin System:** Discovers and loads optional plugins (e.g., `datametronome-dbt-plugin`) via `entry_points`.
 
-##### **3.2 The UI (`datametronome-ui-streamlit`)**
-*   **Responsibilities:** Manages the user login flow (JWTs) and makes authenticated, asynchronous calls to the Podium API. Critically, its "Create Check" interface **must** guide the user through the **Tiered Check Architecture**, presenting simple options first and progressively revealing more complex check types.
+##### **3.2 The UI (`datametronome-ui-nuxt`)**
+*   **Responsibilities:** Provides the tiered configuration UX using shared component patterns, manages JWT authentication via Pinia, and orchestrates authenticated calls to the Podium API. Critically, its "Create Check" interface **must** guide the user through the **Tiered Check Architecture**, presenting simple options first and progressively revealing more complex check types.
 
 ##### **3.3 The DataPulse Ecosystem**
 *   **Core Principle:** All connectors are independent, `pip` installable, async-first libraries that manage their own connection pools.
@@ -204,6 +204,6 @@ The `Clef` defines the set of rules for a `Stave`. The power of the system comes
 #### **5. Development Roadmap**
 
 *   **Phase 1: The Headless Core (MVP):** Build the Podium with its API, secure credential management, and core connectors. Implement the **Tier 1** and **Tier 3** check types.
-*   **Phase 2: The Integrated Experience:** Build the Streamlit UI with a smooth, tiered interface for creating checks. Implement the scheduler and job queue. Implement the **Tier 4** (`python`) check.
+*   **Phase 2: The Integrated Experience:** Build the UI with a smooth, tiered interface for creating checks. Implement the scheduler and job queue. Implement the **Tier 4** (`python`) check.
 *   **Phase 3: Intelligence and Integration:** Build the stateful metric collection. Develop `datametronome-brain-advanced` and implement the **Tier 2** checks. Build the `dbt` and `GX` plugins.
 *   **Phase 4: Hardening & Expansion:** Implement local TLS for UI-to-Podium communication. Formalize API versioning and add more connectors.

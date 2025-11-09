@@ -1,14 +1,13 @@
 # 🎵 DataMetronome
 
 <div align="center">
-  <img src="datametronome/ui-streamlit/assets/logo_datametronome.svg" alt="DataMetronome Logo" width="400">
+  <img src="ui-nuxt/public/favicon.svg" alt="DataMetronome Logo" width="160">
 </div>
 
 **Real-time Data Quality & Anomaly Detection Platform**
 
 [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Streamlit](https://img.shields.io/badge/Streamlit-1.28+-red.svg)](https://streamlit.io/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
 
 ## 🚀 **What is DataMetronome?**
@@ -32,12 +31,11 @@ DataMetronome is an **open-source, community-driven platform** that provides rea
 - **Automated alerting** for data quality issues
 
 ### 📊 **Beautiful Interactive Dashboard**
-- **Streamlit-based** real-time monitoring interface
-- **Interactive Plotly charts** with professional styling
-- **Data distribution analysis** with anomaly highlighting
-- **Time series visualization** for trend analysis
-- **Correlation analysis** with statistical insights
-- **Anomaly pattern heatmaps** for quick insights
+- **Modern web UI** built for real-time monitoring
+- **Responsive layouts** tuned for analysts and SREs
+- **Chart.js visualizations** for trends, anomalies, and forecasting
+- **Interactive drilldowns** across clefs, staves, and incident timelines
+- **Dark/light themes** with professional styling out of the box
 
 ### 🏗️ **Modern Architecture**
 - **Modular design** - Easy to extend and customize
@@ -49,25 +47,20 @@ DataMetronome is an **open-source, community-driven platform** that provides rea
 ## 🖼️ **Visual Showcase**
 
 <div align="center">
-  
-### 📊 Interactive Dashboard
-<img src=".cursor/screenshots/streamlit-ui-after-login.png" alt="DataMetronome Dashboard" width="800">
 
-*Real-time data quality monitoring with beautiful visualizations*
+### 📊 Web Dashboard
+<img src="docs/images/overview.png" alt="DataMetronome Dashboard" width="800">
 
-### 🚨 System Status & Monitoring
-<img src=".cursor/screenshots/streamlit-ui-status.png" alt="System Status" width="800">
-
-*Live system health monitoring and performance metrics*
-
-### 📈 Data Analysis & Insights
-<img src=".cursor/screenshots/page-2025-10-04T18-19-49-798Z.png" alt="Data Analysis" width="800">
-
-*Comprehensive data analysis with interactive visualizations*
+*UI experience showcasing trends, anomaly insights, and clef status*
 
 </div>
 
-> **🎯 See it in action!** Launch the dashboard with `streamlit run datametronome/ui-streamlit/streamlit_app.py` and explore all features in real-time.
+> **🎯 See it in action!**
+> ```bash
+> cd ui-nuxt
+> npm install
+> npm run dev
+> ```
 
 ## 🎯 **Perfect For**    
 
@@ -96,19 +89,20 @@ cd datametronome
 docker-compose -f docker-compose.test.yml up -d
 ```
 
-### 3. Install Dependencies
+### 3. Install Python Dependencies
 ```bash
 uv pip install -e ./datametronome/pulse/core
 uv pip install -e ./datametronome/pulse/postgres
-uv pip install -e ./datametronome/ui-streamlit
 ```
 
-### 4. Launch the Dashboard
+### 4. Launch the UI
 ```bash
-streamlit run datametronome/ui-streamlit/streamlit_app.py
+cd ui-nuxt
+npm install
+npm run dev
 ```
 
-The dashboard will open at `http://localhost:8501` with full anomaly detection capabilities!
+The dashboard will open at `http://localhost:3000` with full anomaly detection capabilities!
 
 ## 🧪 **Testing Architecture**
 
@@ -190,15 +184,15 @@ The DataMetronome dashboard provides **5 powerful tabs** that showcase the compl
 - **DataPulse Core** - Abstract interfaces and base classes
 - **PostgreSQL Connectors** - High-performance database drivers
 - **Anomaly Detection Engine** - Statistical + ML algorithms
-- **Web Dashboard** - Streamlit-based real-time monitoring
+- **Web Dashboard** - Dedicated operational console
 - **API Layer** - FastAPI backend for integrations
 
 ### **Technology Stack**
 - **Language**: Python 3.13 (latest features)
 - **Database**: PostgreSQL 15+ with UUID extensions
 - **ML Framework**: scikit-learn for anomaly detection
-- **Web Framework**: Streamlit for rapid UI development
-- **Charts**: Plotly for interactive visualizations
+- **Frontend**: SPA web application
+- **Charts**: Chart.js for interactive visualizations
 - **Containerization**: Docker for easy deployment
 - **Package Management**: uv for fast dependency resolution
 
@@ -207,7 +201,7 @@ The DataMetronome dashboard provides **5 powerful tabs** that showcase the compl
 ```mermaid
 graph TB
     subgraph "DataMetronome Platform"
-        A[📊 Streamlit Dashboard] --> B[🔌 DataPulse Connectors]
+        A[📊 UI Dashboard] --> B[🔌 DataPulse Connectors]
         B --> C[📈 PostgreSQL Database]
         B --> D[🤖 Anomaly Detection Engine]
         D --> E[📊 ML Algorithms]
@@ -303,7 +297,7 @@ Our comprehensive testing shows DataMetronome's superior performance:
 
 ## 📈 **Roadmap**
 
-- **Q1 2024** ✅ - Core DataPulse connectors, basic anomaly detection, Streamlit UI
+- **Q1 2024** ✅ - Core DataPulse connectors, basic anomaly detection, UI prototype
 - **Q2 2024** 🔄 - Advanced ML algorithms, real-time streaming, alert system
 - **Q3 2024** 📋 - Multi-database support, advanced analytics, API integrations
 - **Q4 2024** 📋 - Community features, plugin system, advanced reporting

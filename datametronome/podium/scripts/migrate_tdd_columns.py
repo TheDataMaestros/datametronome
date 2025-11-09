@@ -71,7 +71,7 @@ async def main():
         print("\n🚀 Next Steps:")
         print("   1. Import demo configurations:")
         print("      python3 scripts/import_staves.py examples/demo-sqlite-only.yaml")
-        print("   2. Check your Streamlit UI - you should now see staves and clefs!")
+        print("   2. Check the UI - you should now see staves and clefs!")
         return 0
     else:
         print("\n💡 Troubleshooting:")

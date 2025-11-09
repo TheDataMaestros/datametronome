@@ -62,8 +62,8 @@ pip install -e ./datametronome/pulse/sqlite
 # Install podium
 pip install -e ./datametronome/podium
 
-# Install UI
-pip install -e ./datametronome/ui-streamlit
+# Install UI dependencies
+npm install --prefix ui-nuxt
 
 # Install development dependencies
 pip install pytest pytest-asyncio pytest-cov pytest-mock
@@ -94,7 +94,6 @@ docker-compose up -d
 
 # Access running containers
 docker-compose exec podium bash
-docker-compose exec ui bash
 
 # View logs
 docker-compose logs -f
@@ -135,7 +134,7 @@ datametronome/
 │   │   ├── postgres-psycopg3/  # PostgreSQL (psycopg3)
 │   │   ├── postgres-sqlalchemy/  # PostgreSQL (SQLAlchemy)
 │   │   └── sqlite/         # SQLite connector
-│   └── ui-streamlit/       # Streamlit dashboard (application)
+│   └── ui-nuxt/            # UI dashboard (application)
 ├── docs/                   # Documentation
 ├── scripts/                # Utility scripts
 ├── tests/                  # End-to-end tests
@@ -156,7 +155,7 @@ Following [PACKAGE_STRUCTURE.md](../datametronome/PACKAGE_STRUCTURE.md):
 
 **Applications** (run standalone):
 - `podium/` - FastAPI backend
-- `ui-streamlit/` - Streamlit dashboard
+- `ui-nuxt/` - UI dashboard
 
 **Internal** (not distributed):
 - `brain/base/` - Internal utilities

@@ -80,9 +80,9 @@ async def main():
     
     # Demo configurations to load
     demo_configs = [
-        ("demo-simple-monitoring.yaml", "Simple Demo Monitoring"),
-        ("demo-streamlit-ui.yaml", "Streamlit UI Demo"),
-        ("demo-ecommerce-monitoring.yaml", "E-Commerce Monitoring"),
+        ("demo-clickstream.yaml", "Clickstream Monitoring"),
+        ("demo-complete.yaml", "Comprehensive Demo"),
+        ("tiered-checks-examples.yaml", "Tiered Checks Examples"),
     ]
     
     successful_loads = 0
@@ -103,7 +103,7 @@ async def main():
     
     if successful_loads > 0:
         print(f"\n📋 Next Steps:")
-        print(f"  1. Use the Streamlit UI to visualize these configurations")
+        print(f"  1. Use the UI to visualize these configurations")
         print(f"  2. Run the import script to load into your database:")
         print(f"     python -m datametronome_podium.scripts.import_staves examples/demo-simple-monitoring.yaml")
         print(f"  3. Test the configurations with your demo environment")

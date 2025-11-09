@@ -26,10 +26,10 @@ These are complete applications that run independently:
   - Not meant to be imported as a library
 
 ### Frontend Applications
-- **`ui-streamlit/`** - Streamlit-based user interface
+- **`ui-nuxt/`** - Web user interface
   - Complete web application
   - Communicates with podium backend
-  - Not meant to be installed via pip
+  - Managed via npm/yarn, not pip
 
 ## 🔧 Internal Infrastructure (NOT PyPI Packages)
 
@@ -66,8 +66,9 @@ pip install -e .
 cd podium
 python -m datametronome_podium.main
 
-cd ui-streamlit
-streamlit run datametronome_ui_streamlit/main.py
+cd ui-nuxt
+npm install
+npm run dev
 ```
 
 ### For Infrastructure
@@ -89,7 +90,7 @@ Each non-PyPI directory contains:
 
 - **`brain/base/`** might become a public package if there's demand
 - **`podium/`** could be containerized and distributed via Docker
-- **`ui-streamlit/`** could be distributed as a standalone executable
+- **`ui-nuxt/`** ships as a standalone frontend bundle
 
 ---
 

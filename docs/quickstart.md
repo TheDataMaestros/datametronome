@@ -98,7 +98,7 @@ Welcome to DataMetronome! This guide will help you get started based on your rol
 
 ### Next Steps
 
-- 📊 [Launch the Streamlit Dashboard](#launch-the-dashboard) for visual monitoring
+- 📊 [Launch the UI](#launch-the-dashboard) for visual monitoring
 - 🔔 [Set up alerts](#set-up-alerts) for critical data quality issues
 - 📈 [View API Documentation](api.md) for advanced queries
 
@@ -131,7 +131,7 @@ Welcome to DataMetronome! This guide will help you get started based on your rol
 3. **Access the services:**
    - 🎯 **Podium API**: http://localhost:8000
    - 📚 **API Docs**: http://localhost:8000/docs
-   - 📊 **Streamlit UI**: http://localhost:8501
+   - 📊 **UI**: http://localhost:3000 (run via `npm run dev --prefix ui-nuxt`)
    - 🗄️ **PostgreSQL**: localhost:5432
 
 4. **Verify health:**
@@ -446,7 +446,7 @@ asyncio.run(api_example())
 
 ## 🎨 Launch the Dashboard
 
-For all users, the Streamlit dashboard provides a beautiful visual interface:
+For all users, the UI dashboard provides a beautiful visual interface:
 
 ### Installation
 
@@ -456,20 +456,18 @@ git clone https://github.com/datametronome/datametronome.git
 cd datametronome
 
 # Install UI dependencies
-pip install -e ./datametronome/ui-streamlit
+cd ui-nuxt
+npm install
 ```
 
 ### Launch
 
 ```bash
-# Navigate to UI directory
-cd datametronome/ui-streamlit
-
-# Start Streamlit
-streamlit run streamlit_app.py
+# Start the UI in dev mode (defaults to http://localhost:3000)
+npm run dev
 ```
 
-The dashboard will open at **http://localhost:8501** with:
+The dashboard will open at **http://localhost:3000** with:
 
 - 📊 **Overview Tab** - Real-time system health and data quality scores
 - 🚨 **Anomalies Tab** - Live anomaly detection and alerts

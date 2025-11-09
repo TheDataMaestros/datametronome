@@ -2,8 +2,9 @@
 
 from datetime import datetime
 from typing import Any
+import json
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class CheckBase(BaseModel):
@@ -19,6 +20,18 @@ class CheckBase(BaseModel):
     execution_time: float | None = None
     anomalies_count: int = 0
     severity: str = "medium"
+
+    @field_validator("details", mode="before")
+    @classmethod
+    def parse_details(cls, value):
+        """Allow JSON strings persisted in the database."""
+        if isinstance(value, str) and value:
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                # Return original string if it is not valid JSON
+                return {"raw": value}
+        return value
 
 
 class CheckCreate(CheckBase):

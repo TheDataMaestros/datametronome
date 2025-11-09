@@ -86,7 +86,7 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
         
         # Execute the clef
         executor = ClefExecutor()
-        result = await executor.execute_clef(clef, stave, db)
+        result = await executor.execute_clef(clef, stave)
         
         # Store the result in database
         import json
@@ -100,7 +100,7 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
             "details": json.dumps(result.metadata) if result.metadata else None,
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "execution_time": result.execution_time,
-            "anomalies_count": len(result.metadata.get('anomalies', [])) if result.metadata else 0,
+            "anomalies_count": result.anomalies_count,
             "severity": result.severity.value  # Store the severity value: "harmony", "dissonance", "cacophony"
         }
         

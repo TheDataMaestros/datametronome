@@ -3,11 +3,10 @@
 # Core Backend (Podium)
 datametronome-podium @ file://./datametronome/podium
 
-# Default UI
-datametronome-ui-streamlit @ file://./datametronome/ui-streamlit
-
 # Data Connectors
 metronome-pulse-core @ file://./datametronome/pulse/core
+
+# UI (lives under `ui-nuxt/` and uses npm for dependencies)
 
 # Analytics Libraries
 datametronome-brain-base @ file://./datametronome/brain/base
@@ -21,3 +20,4 @@ isort>=5.12.0
 flake8>=6.0.0
 mypy>=1.5.0
 pre-commit>=3.4.0
+python-multipart

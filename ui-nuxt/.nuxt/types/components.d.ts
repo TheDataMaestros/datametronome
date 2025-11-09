@@ -14,6 +14,10 @@ type HydrationStrategies = {
 type LazyComponent<T> = DefineComponent<HydrationStrategies, {}, {}, {}, {}, {}, {}, { hydrated: () => void }> & T
 
 interface _GlobalComponents {
+  'ClefAnalytics': typeof import("../../components/ClefAnalytics.vue")['default']
+  'ClefConfigForm': typeof import("../../components/ClefConfigForm.vue")['default']
+  'ClefVisualBuilder': typeof import("../../components/ClefVisualBuilder.vue")['default']
+  'TrendChart': typeof import("../../components/TrendChart.vue")['default']
   'UAccordion': typeof import("../../node_modules/@nuxt/ui/dist/runtime/components/elements/Accordion.vue")['default']
   'UAlert': typeof import("../../node_modules/@nuxt/ui/dist/runtime/components/elements/Alert.vue")['default']
   'UAvatar': typeof import("../../node_modules/@nuxt/ui/dist/runtime/components/elements/Avatar.vue")['default']
@@ -88,6 +92,10 @@ interface _GlobalComponents {
   'Html': typeof import("../../node_modules/nuxt/dist/head/runtime/components")['Html']
   'Body': typeof import("../../node_modules/nuxt/dist/head/runtime/components")['Body']
   'NuxtIsland': typeof import("../../node_modules/nuxt/dist/app/components/nuxt-island")['default']
+  'LazyClefAnalytics': LazyComponent<typeof import("../../components/ClefAnalytics.vue")['default']>
+  'LazyClefConfigForm': LazyComponent<typeof import("../../components/ClefConfigForm.vue")['default']>
+  'LazyClefVisualBuilder': LazyComponent<typeof import("../../components/ClefVisualBuilder.vue")['default']>
+  'LazyTrendChart': LazyComponent<typeof import("../../components/TrendChart.vue")['default']>
   'LazyUAccordion': LazyComponent<typeof import("../../node_modules/@nuxt/ui/dist/runtime/components/elements/Accordion.vue")['default']>
   'LazyUAlert': LazyComponent<typeof import("../../node_modules/@nuxt/ui/dist/runtime/components/elements/Alert.vue")['default']>
   'LazyUAvatar': LazyComponent<typeof import("../../node_modules/@nuxt/ui/dist/runtime/components/elements/Avatar.vue")['default']>

@@ -30,7 +30,7 @@ Example Usage:
 
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from datametronome_podium.models.stave import Stave, SUPPORTED_DATA_SOURCES
@@ -90,8 +90,8 @@ def create_stave(
         data_source_type=data_source_type,
         connection_config=connection_config,
         is_active=is_active,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
 
 
@@ -249,8 +249,8 @@ def create_clef(
         is_active=is_active,
         warn=warn,
         fail=fail,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
 
 

@@ -183,7 +183,7 @@
                 variant="subtle"
                 size="sm"
               >
-                {{ activity.status }}
+                {{ activity.statusLabel }}
               </UBadge>
             </div>
           </div>
@@ -298,7 +298,7 @@ definePageMeta({
 })
 
 const { staves, isLoading: stavesLoading, fetchStaves } = useStaves()
-const { checkResults, fetchLatestResults } = useClefs()
+const { checks, fetchLatest } = useChecks()
 
 const isRunningChecks = ref(false)
 
@@ -313,30 +313,23 @@ const systemMetrics = ref({
   anomalies: 7
 })
 
-// Recent activity
-const recentActivity = ref([
-  {
-    id: 1,
-    description: 'Age outlier detected in users table',
-    source: 'PostgreSQL Users Monitor',
-    status: 'warning',
-    timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000)
-  },
-  {
-    id: 2,
-    description: 'Amount spike detected in orders table',
-    source: 'PostgreSQL Orders Monitor',
-    status: 'error',
-    timestamp: new Date(Date.now() - 1 * 60 * 60 * 1000)
-  },
-  {
-    id: 3,
-    description: 'Schema validation passed',
-    source: 'PostgreSQL Events Monitor',
-    status: 'success',
-    timestamp: new Date(Date.now() - 3 * 60 * 60 * 1000)
-  }
-])
+// Recent activity from latest checks
+const recentActivity = computed(() => {
+  return checks.value.slice(0, 10).map((check) => {
+    const normalizedStatus = normalizeActivityStatus(check.status)
+    const source = check.clef_name
+      ? `${check.clef_name}${check.stave_name ? ` • ${check.stave_name}` : ''}`
+      : `Clef ${check.clef_id}`
+    return {
+      id: check.id,
+      description: check.message || `${humanizeCheckType(check.check_type)} check ${formatStatusLabel(check.status)}`,
+      source,
+      status: normalizedStatus,
+      statusLabel: formatStatusLabel(check.status),
+      timestamp: check.timestamp
+    }
+  })
+})
 
 // Transform staves data for display
 const dataSources = computed(() => {
@@ -360,7 +353,16 @@ const dataSourceColumns = [
 ]
 
 // Helper functions
+function normalizeActivityStatus(status?: string) {
+  const normalized = status?.toLowerCase()
+  if (normalized === 'pass' || normalized === 'passed' || normalized === 'success') return 'success'
+  if (normalized === 'warn' || normalized === 'warning') return 'warning'
+  if (normalized === 'fail' || normalized === 'failed' || normalized === 'error') return 'error'
+  return status ?? 'unknown'
+}
+
 function getStatusColor(status: string) {
+  const normalized = normalizeActivityStatus(status)
   const colors: Record<string, string> = {
     success: 'green',
     healthy: 'green',
@@ -368,10 +370,11 @@ function getStatusColor(status: string) {
     error: 'red',
     failed: 'red'
   }
-  return colors[status] || 'gray'
+  return colors[normalized] || 'gray'
 }
 
 function getStatusIcon(status: string) {
+  const normalized = normalizeActivityStatus(status)
   const icons: Record<string, string> = {
     success: 'i-heroicons-check-circle',
     healthy: 'i-heroicons-check-circle',
@@ -379,10 +382,14 @@ function getStatusIcon(status: string) {
     error: 'i-heroicons-x-circle',
     failed: 'i-heroicons-x-circle'
   }
-  return icons[status] || 'i-heroicons-question-mark-circle'
+  return icons[normalized] || 'i-heroicons-question-mark-circle'
 }
 
-function formatTimeAgo(date: Date) {
+function formatTimeAgo(dateInput: Date | string) {
+  const date = dateInput instanceof Date ? dateInput : new Date(dateInput)
+  if (Number.isNaN(date.getTime())) {
+    return 'Unknown'
+  }
   const now = new Date()
   const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
   
@@ -395,6 +402,23 @@ function formatTimeAgo(date: Date) {
     const days = Math.floor(diffInMinutes / 1440)
     return `${days} day${days > 1 ? 's' : ''} ago`
   }
+}
+
+function formatStatusLabel(status?: string) {
+  if (!status) return 'Unknown'
+  const normalized = status.toLowerCase()
+  if (normalized === 'pass' || normalized === 'passed' || normalized === 'success') return 'Passed'
+  if (normalized === 'warn' || normalized === 'warning') return 'Warning'
+  if (normalized === 'fail' || normalized === 'failed' || normalized === 'error') return 'Failed'
+  return status.charAt(0).toUpperCase() + status.slice(1)
+}
+
+function humanizeCheckType(checkType?: string) {
+  if (!checkType) return 'Data quality'
+  return checkType
+    .split('_')
+    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
 }
 
 // Actions
@@ -416,7 +440,7 @@ async function refreshData() {
     refreshHealthChart(),
     refreshAnomalyChart(),
     fetchStaves(),
-    fetchLatestResults()
+    fetchLatest(20)
   ])
 }
 
@@ -451,6 +475,6 @@ useHead({
 // Load initial data
 onMounted(() => {
   fetchStaves()
-  fetchLatestResults()
+  fetchLatest(20)
 })
 </script>

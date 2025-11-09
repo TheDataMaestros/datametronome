@@ -43,20 +43,5 @@ services:
       timeout: 10s
       retries: 3
 
-  # Streamlit UI (optional, for development)
-  ui:
-    build:
-      context: .
-      dockerfile: datametronome/ui-streamlit/Dockerfile
-    ports:
-      - "8501:8501"
-    environment:
-      - PODIUM_API_BASE=http://podium:8001
-    depends_on:
-      podium:
-        condition: service_healthy
-    volumes:
-      - ./reports:/app/reports
-
 volumes:
   postgres_data:
