@@ -1,4 +1,5 @@
 import { apiService, type ApiResponse } from './api'
+import { buildApiUrl } from '~/config/app'
 
 export interface TrendDataPoint {
   timestamp: string
@@ -78,7 +79,7 @@ class TrendsService {
     days: number = 7, 
     granularity: string = 'hour'
   ): Promise<StaveTrends> {
-    const response = await fetch(`http://localhost:8000/api/v1/trends/stave/${staveId}?days=${days}&granularity=${granularity}`, {
+    const response = await fetch(buildApiUrl(`/trends/stave/${staveId}?days=${days}&granularity=${granularity}`), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -94,7 +95,7 @@ class TrendsService {
 
   async getTrendsOverview(days: number = 7): Promise<TrendsOverview> {
     console.log('Making API call to trends overview...')
-    const response = await fetch(`http://localhost:8000/api/v1/trends/overview?days=${days}`, {
+    const response = await fetch(buildApiUrl(`/trends/overview?days=${days}`), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

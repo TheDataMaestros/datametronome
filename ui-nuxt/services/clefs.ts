@@ -10,6 +10,9 @@ export interface Clef {
   created_at: string
   updated_at: string
   configuration: Record<string, any>
+  schedule?: string
+  warn?: string
+  fail?: string
 }
 
 export interface CreateClefRequest {
@@ -18,6 +21,10 @@ export interface CreateClefRequest {
   stave_id: string
   check_type: string
   configuration: Record<string, any>
+  schedule?: string
+  is_active?: boolean
+  warn?: string
+  fail?: string
 }
 
 export interface UpdateClefRequest extends Partial<CreateClefRequest> {

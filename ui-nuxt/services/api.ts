@@ -1,4 +1,5 @@
 import { useAuthStore } from '~/stores/auth'
+import { config, buildApiUrl } from '~/config/app'
 
 interface ApiResponse<T = any> {
   data: T
@@ -17,7 +18,7 @@ class ApiService {
   private defaultHeaders: Record<string, string>
 
   constructor() {
-    this.baseURL = 'http://localhost:8000/api/v1'
+    this.baseURL = config.apiBase
     this.defaultHeaders = {
       'Content-Type': 'application/json',
     }
@@ -27,7 +28,7 @@ class ApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
-    const url = `${this.baseURL}${endpoint}`
+    const url = buildApiUrl(endpoint)
     
     const config: RequestInit = {
       ...options,

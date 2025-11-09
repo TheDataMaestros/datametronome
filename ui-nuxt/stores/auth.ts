@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
+import { config, buildApiUrl } from '~/config/app'
 
 export interface User {
   username: string
@@ -33,7 +34,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       // Call the real backend API
-      const response = await fetch('http://localhost:8000/api/v1/auth/login', {
+      const response = await fetch(buildApiUrl('/auth/login'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -69,7 +69,7 @@ DataMetronome is an **open-source, community-driven platform** that provides rea
 
 > **🎯 See it in action!** Launch the dashboard with `streamlit run datametronome/ui-streamlit/streamlit_app.py` and explore all features in real-time.
 
-## 🎯 **Perfect For**
+## 🎯 **Perfect For**    
 
 - **Data Engineers** - Build robust, monitored data pipelines
 - **DevOps Teams** - Monitor data infrastructure health

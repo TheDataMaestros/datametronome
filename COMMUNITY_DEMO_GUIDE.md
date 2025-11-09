@@ -12,8 +12,8 @@ Welcome to the DataMetronome Community Demo! This guide will help you get the co
 ### 🎯 **Current Status** 
 ✅ **All services are working and accessible via browser!**
 
-- **Podium API**: Running on http://localhost:8000
-- **API Documentation**: http://localhost:8000/docs  
+- **Podium API**: Running on http://localhost:8001
+- **API Documentation**: http://localhost:8001/docs  
 - **Streamlit UI**: Running on http://localhost:8501
 - **Login Credentials**: `admin` / `admin`
 
@@ -85,11 +85,11 @@ The community demo showcases the complete DataMetronome ecosystem with both **co
 - Report generation and download
 
 ### ✅ Podium API
-- RESTful API endpoints at http://localhost:8000
-- Interactive API documentation at http://localhost:8000/docs
+- RESTful API endpoints at http://localhost:8001
+- Interactive API documentation at http://localhost:8001/docs
 - JWT authentication (admin/admin)
-- Prometheus metrics at http://localhost:8000/metrics
-- Health monitoring at http://localhost:8000/health
+- Prometheus metrics at http://localhost:8001/metrics
+- Health monitoring at http://localhost:8001/health
 
 ## 🐳 Full Showcase with Docker
 
@@ -136,8 +136,8 @@ streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
 ```
 
 Access the services:
-- 🚀 **Podium API**: http://localhost:8000
-- 📚 **API Docs**: http://localhost:8000/docs
+- 🚀 **Podium API**: http://localhost:8001
+- 📚 **API Docs**: http://localhost:8001/docs
 - 🎨 **Streamlit UI**: http://localhost:8501
 - 🔑 **Login**: admin / admin
 
@@ -225,7 +225,7 @@ cd ../../podium && uv pip install -e .
 ### Services Not Starting
 ```bash
 # Check if services are running
-curl http://localhost:8000/health  # Podium API
+curl http://localhost:8001/health  # Podium API
 curl http://localhost:8501         # Streamlit UI
 
 # Restart services manually
@@ -247,7 +247,7 @@ which python3  # Should point to .venv/bin/python3
 After running the community demo:
 
 ### 🌐 **Browser Exploration:**
-1. **API Documentation**: Visit http://localhost:8000/docs
+1. **API Documentation**: Visit http://localhost:8001/docs
    - Test authentication with `admin`/`admin`
    - Explore all API endpoints
    - Try creating staves and clefs

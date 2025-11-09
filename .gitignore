@@ -319,3 +319,6 @@ brain/base/dist/
 brain/base/build/
 ui-react/node_modules/
 .cursor/
+
+# Nuxt build artifacts
+ui-nuxt/.nuxt/
