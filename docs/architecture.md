@@ -594,7 +594,7 @@ sequenceDiagram
 | UI | Multiple instances behind LB | Session state in Redis |
 | Podium API | Multiple instances (stateless) | Easy to scale |
 | Database | Read replicas, sharding | Most critical bottleneck |
-| Workers | Task queue (Celery/RQ) | For long-running checks |
+| Workers | Thread pool executor (APScheduler) | For concurrent check execution |
 
 ### Performance Optimization
 
@@ -617,7 +617,8 @@ sequenceDiagram
 
 **Q1 2025:**
 - Real-time streaming with WebSockets
-- Distributed task queue (Celery)
+- In-process scheduler (APScheduler) - **Current implementation**
+- Distributed task queue (Celery) - **Not needed currently, future option if scaling requires it**
 - Alert service with multiple channels
 
 **Q2 2025:**
