@@ -473,6 +473,9 @@ def serialize_clef(clef: Clef) -> dict[str, Any]:
         "created_at": clef.created_at.isoformat(),
         "updated_at": clef.updated_at.isoformat()
     }
+    # Add retry_config if present
+    if clef.retry_config:
+        data["retry_config"] = json.dumps(clef.retry_config)
     return data
 
 
@@ -480,7 +483,7 @@ def deserialize_clef(data: dict[str, Any]) -> Clef:
     """
     Deserialize a Clef from database storage.
     
-    Converts config JSON string back to dict.
+    Converts config and retry_config JSON strings back to dicts.
     
     Args:
         data: Database row dict
@@ -494,6 +497,14 @@ def deserialize_clef(data: dict[str, Any]) -> Clef:
     # Convert config JSON string to dict
     if isinstance(data.get("config"), str):
         data["config"] = json.loads(data["config"])
+    
+    # Convert retry_config JSON string to dict if present
+    if "retry_config" in data and isinstance(data.get("retry_config"), str):
+        try:
+            data["retry_config"] = json.loads(data["retry_config"])
+        except (json.JSONDecodeError, TypeError):
+            # If parsing fails, set to None
+            data["retry_config"] = None
     
     # Keep datetime fields as strings for API compatibility
     # (The API schemas expect strings, not datetime objects)

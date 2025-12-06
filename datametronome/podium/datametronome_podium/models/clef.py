@@ -152,6 +152,11 @@ class Clef(BaseModel):
         description="Optional cron expression for automatic scheduling (e.g., '0 * * * *' for hourly)",
         examples=["0 * * * *", "@hourly", "@daily", "*/15 * * * *"]
     )
+    retry_config: dict[str, Any] | None = Field(
+        None,
+        description="Retry configuration for failed executions",
+        examples=[{"max_retries": 3, "backoff_factor": 2.0, "max_delay_seconds": 300}]
+    )
     is_active: bool = Field(
         default=True,
         description="Whether this check is actively running"

@@ -38,6 +38,8 @@ class Settings(BaseSettings):
     # Scheduler
     scheduler_enabled: bool = Field(default=True, env="DATAMETRONOME_SCHEDULER_ENABLED")
     scheduler_timezone: str = Field(default="UTC", env="DATAMETRONOME_SCHEDULER_TIMEZONE")
+    scheduler_max_instances: int = Field(default=3, env="DATAMETRONOME_SCHEDULER_MAX_INSTANCES", ge=1)
+    scheduler_max_workers: int = Field(default=10, env="DATAMETRONOME_SCHEDULER_MAX_WORKERS", ge=1)
     
     # Job Queue
     job_queue_size: int = Field(default=1000, env="DATAMETRONOME_JOB_QUEUE_SIZE", ge=1)

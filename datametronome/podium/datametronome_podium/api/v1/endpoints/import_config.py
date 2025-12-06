@@ -4,16 +4,36 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 import json
 import uuid
+import logging
+from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, HTTPException, status, UploadFile, File, Form
 from pydantic import BaseModel
 import yaml
 
 from datametronome_podium.core.database import get_db
 from datametronome_podium.api.schemas.stave import StaveCreate
 from datametronome_podium.api.schemas.clef import ClefCreate
+from datametronome_podium.services.yaml_loader import (
+    load_yaml_file,
+    load_and_parse_yaml,
+    validate_yaml_structure,
+    YAMLLoadError
+)
+from datametronome_podium.services.env_interpolator import (
+    interpolate_yaml_data,
+    extract_env_vars,
+    validate_required_vars,
+    InterpolationError
+)
+from datametronome_podium.services.yaml_watcher import (
+    get_watcher,
+    reload_yaml_file,
+    ReloadResult
+)
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 class ImportConfig(BaseModel):
@@ -252,5 +272,307 @@ async def import_json_file(file: UploadFile = File(...), clean: bool = False) ->
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Import failed: {str(e)}"
+        )
+
+
+class YAMLImportRequest(BaseModel):
+    """Request model for YAML import with environment variable interpolation."""
+    yaml_content: Optional[str] = None
+    file_path: Optional[str] = None
+    interpolate_env: bool = True
+    strict_validation: bool = True
+
+
+class ValidationResponse(BaseModel):
+    """Response model for YAML validation."""
+    is_valid: bool
+    errors: List[str]
+    warnings: List[str]
+    env_vars_required: List[str]
+    env_vars_optional: List[str]
+
+
+@router.post("/import/yaml/advanced", response_model=ImportResult)
+async def import_yaml_advanced(request: YAMLImportRequest) -> ImportResult:
+    """
+    Import staves and clefs from YAML with environment variable interpolation.
+    
+    Supports both flat format (staves/clefs arrays) and nested format (clef.checks).
+    
+    Args:
+        request: Import request with YAML content or file path
+        
+    Returns:
+        Import result with counts and any errors
+    """
+    try:
+        # Load YAML data
+        if request.yaml_content:
+            yaml_data = yaml.safe_load(request.yaml_content)
+        elif request.file_path:
+            yaml_data = load_yaml_file(request.file_path)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Either 'yaml_content' or 'file_path' must be provided"
+            )
+        
+        # Interpolate environment variables if requested
+        if request.interpolate_env:
+            try:
+                yaml_data = interpolate_yaml_data(yaml_data, strict=request.strict_validation)
+            except InterpolationError as e:
+                if request.strict_validation:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Environment variable interpolation failed: {str(e)}"
+                    )
+                else:
+                    logger.warning(f"Interpolation warnings: {str(e)}")
+        
+        # Validate structure
+        validation = validate_yaml_structure(yaml_data)
+        if not validation.is_valid:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"YAML validation failed: {', '.join(validation.errors)}"
+            )
+        
+        # Parse staves and clefs using the new loader
+        from datametronome_podium.services.yaml_loader import parse_staves, parse_clefs
+        
+        staves = parse_staves(yaml_data)
+        stave_id_map = {}
+        for stave in staves:
+            if stave.id:
+                stave_id_map[stave.id] = stave.id
+                if stave.name:
+                    stave_id_map[stave.name] = stave.id
+        
+        clefs = parse_clefs(yaml_data, stave_id_map)
+        
+        # Convert to ImportConfig format
+        staves_data = []
+        for stave in staves:
+            staves_data.append({
+                "id": stave.id,
+                "name": stave.name,
+                "description": stave.description,
+                "data_source_type": stave.data_source_type,
+                "connection_config": stave.connection_config,
+                "is_active": stave.is_active
+            })
+        
+        clefs_data = []
+        for clef in clefs:
+            clefs_data.append({
+                "id": clef.id,
+                "stave_id": clef.stave_id,
+                "name": clef.name,
+                "description": clef.description,
+                "check_type": clef.check_type,
+                "config": clef.config,
+                "warn": clef.warn,
+                "fail": clef.fail,
+                "schedule": clef.schedule,
+                "is_active": clef.is_active
+            })
+        
+        import_config = ImportConfig(
+            staves=staves_data,
+            clefs=clefs_data,
+            clean=False
+        )
+        
+        return await import_configuration(import_config)
+        
+    except YAMLLoadError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"YAML load error: {str(e)}"
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error importing YAML config")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to import YAML config: {str(e)}"
+        )
+
+
+@router.post("/validate", response_model=ValidationResponse)
+async def validate_yaml_config(
+    yaml_content: Optional[str] = None,
+    file_path: Optional[str] = None
+) -> ValidationResponse:
+    """
+    Validate YAML structure without importing.
+    
+    Args:
+        yaml_content: YAML content as string
+        file_path: Path to YAML file
+        
+    Returns:
+        Validation result with errors and environment variable info
+    """
+    try:
+        # Load YAML
+        if yaml_content:
+            yaml_data = yaml.safe_load(yaml_content)
+        elif file_path:
+            yaml_data = load_yaml_file(file_path)
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Either 'yaml_content' or 'file_path' must be provided"
+            )
+        
+        # Validate structure
+        validation = validate_yaml_structure(yaml_data)
+        
+        # Extract environment variables
+        all_vars = extract_env_vars(yaml_data)
+        required_vars = validate_required_vars(yaml_data)
+        optional_vars = list(all_vars - set(required_vars))
+        
+        return ValidationResponse(
+            is_valid=validation.is_valid,
+            errors=validation.errors,
+            warnings=validation.warnings,
+            env_vars_required=required_vars,
+            env_vars_optional=optional_vars
+        )
+        
+    except YAMLLoadError as e:
+        return ValidationResponse(
+            is_valid=False,
+            errors=[str(e)],
+            warnings=[],
+            env_vars_required=[],
+            env_vars_optional=[]
+        )
+    except Exception as e:
+        logger.exception("Error validating YAML")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to validate YAML: {str(e)}"
+        )
+
+
+@router.post("/reload")
+async def reload_config() -> Dict[str, Any]:
+    """
+    Reload all watched YAML files.
+    
+    Returns:
+        Reload results for each file
+    """
+    try:
+        watcher = get_watcher()
+        results = []
+        
+        # Get all watched paths
+        for path in watcher.watched_paths:
+            path_obj = Path(path)
+            if path_obj.is_file() and path_obj.suffix in ('.yaml', '.yml'):
+                result = reload_yaml_file(str(path_obj))
+                results.append({
+                    "file_path": result.file_path,
+                    "success": result.success,
+                    "staves_count": result.staves_count,
+                    "clefs_count": result.clefs_count,
+                    "error": result.error
+                })
+        
+        return {
+            "success": all(r["success"] for r in results),
+            "results": results
+        }
+        
+    except Exception as e:
+        logger.exception("Error reloading config")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reload config: {str(e)}"
+        )
+
+
+@router.get("/files")
+async def get_watched_files() -> Dict[str, Any]:
+    """
+    Get list of currently watched YAML files.
+    
+    Returns:
+        List of watched file paths
+    """
+    try:
+        watcher = get_watcher()
+        files = []
+        
+        for path in watcher.watched_paths:
+            path_obj = Path(path)
+            if path_obj.is_file():
+                files.append(str(path_obj))
+            elif path_obj.is_dir():
+                # List all YAML files in directory
+                for yaml_file in path_obj.rglob("*.yaml"):
+                    files.append(str(yaml_file))
+                for yaml_file in path_obj.rglob("*.yml"):
+                    files.append(str(yaml_file))
+        
+        return {
+            "watched_paths": list(watcher.watched_paths),
+            "files": files,
+            "count": len(files)
+        }
+        
+    except Exception as e:
+        logger.exception("Error getting watched files")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get watched files: {str(e)}"
+        )
+
+
+@router.post("/watch")
+async def watch_directory(path: str) -> Dict[str, Any]:
+    """
+    Add a directory or file to the watch list for hot reload.
+    
+    Args:
+        path: Directory or file path to watch
+        
+    Returns:
+        Success status
+    """
+    try:
+        path_obj = Path(path)
+        if not path_obj.exists():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Path does not exist: {path}"
+            )
+        
+        watcher = get_watcher()
+        watcher.watch_path(str(path_obj.absolute()))
+        
+        # Start watcher if not already running
+        if not watcher.observer or not watcher.observer.is_alive():
+            watcher.start(reload_yaml_file)
+        
+        return {
+            "success": True,
+            "path": str(path_obj.absolute()),
+            "message": f"Now watching: {path}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("Error adding watch path")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to add watch path: {str(e)}"
         )
 
