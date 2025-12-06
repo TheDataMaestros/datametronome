@@ -909,8 +909,91 @@ class ClefExecutor:
 
 
 
+    def _parse_column_values_condition(self, condition_str: str) -> Dict[str, Any]:
+        """
+        Parse column_values condition strings per TDD specification.
+        
+        Examples:
+            "if_null > 5%" -> {"type": "if_null", "operator": ">", "value": 0.05, "is_percentage": True}
+            "if_not_unique > 0" -> {"type": "if_not_unique", "operator": ">", "value": 0}
+            "if_not_in: ['A', 'B', 'C'] > 0" -> {"type": "if_not_in", "values": ['A','B','C'], "operator": ">", "value": 0}
+        """
+        import re
+        import ast
+        
+        if not condition_str:
+            return {"type": "unknown", "error": "empty_condition"}
+        
+        condition_str = condition_str.strip()
+        
+        # Parse if_not_in: ['val1', 'val2'] > 0
+        if_not_in_match = re.match(r"if_not_in:\s*(\[[^\]]+\])\s*([<>=!]+)\s*(.+)", condition_str)
+        if if_not_in_match:
+            try:
+                values_list_str = if_not_in_match.group(1)
+                operator = if_not_in_match.group(2)
+                threshold_str = if_not_in_match.group(3).strip()
+                values = ast.literal_eval(values_list_str)
+                threshold = float(threshold_str)
+                return {
+                    "type": "if_not_in",
+                    "values": values,
+                    "operator": operator,
+                    "value": threshold
+                }
+            except (ValueError, SyntaxError) as e:
+                return {"type": "unknown", "error": f"failed_to_parse_if_not_in: {str(e)}"}
+        
+        # Parse if_not_unique > 0
+        if condition_str.startswith("if_not_unique"):
+            parts = condition_str.split(' ', 1)
+            if len(parts) > 1:
+                operator_value = parts[1].strip()
+                op_match = re.match(r"([<>=!]+)\s*(.+)", operator_value)
+                if op_match:
+                    operator = op_match.group(1)
+                    threshold = float(op_match.group(2))
+                    return {"type": "if_not_unique", "operator": operator, "value": threshold}
+                else:
+                    threshold = float(operator_value)
+                    return {"type": "if_not_unique", "operator": ">", "value": threshold}
+            return {"type": "if_not_unique", "operator": ">", "value": 0}
+        
+        # Parse if_null > 5% or if_null > 0.05
+        if condition_str.startswith("if_null"):
+            parts = condition_str.split(' ', 1)
+            if len(parts) > 1:
+                operator_value = parts[1].strip()
+                # Check for percentage
+                pct_match = re.match(r"([<>=!]+)\s*(\d+(\.\d+)?)\s*%", operator_value)
+                if pct_match:
+                    operator = pct_match.group(1)
+                    threshold_pct = float(pct_match.group(2))
+                    threshold = threshold_pct / 100.0
+                    return {"type": "if_null", "operator": operator, "value": threshold, "is_percentage": True}
+                else:
+                    # Regular numeric
+                    op_match = re.match(r"([<>=!]+)\s*(.+)", operator_value)
+                    if op_match:
+                        operator = op_match.group(1)
+                        threshold = float(op_match.group(2))
+                        return {"type": "if_null", "operator": operator, "value": threshold}
+                    else:
+                        threshold = float(operator_value)
+                        return {"type": "if_null", "operator": ">", "value": threshold}
+            return {"type": "if_null", "operator": ">", "value": 0.0}
+        
+        return {"type": "unknown", "error": f"unrecognized_condition_format: {condition_str}"}
+
     async def _execute_column_values_check(self, clef: Clef, stave: Stave, db_connector: Any = None) -> CheckResult:
-        """Execute column values check (TDD Level 1: Simple Declarative)."""
+        """
+        Execute column values check (TDD Level 1: Simple Declarative).
+        
+        Supports conditions from TDD spec:
+        - "if_null > 5%" - Check for NULL values
+        - "if_not_unique > 0" - Check for duplicate values
+        - "if_not_in: ['A', 'B', 'C'] > 0" - Check for values not in allowed list
+        """
         try:
             if db_connector is None:
                 return CheckResult(
@@ -925,7 +1008,6 @@ class ClefExecutor:
             config = clef.config
             table = config.get("table")
             column = config.get("column")
-            condition = config.get("condition", "if_null")
             
             if not table or not column:
                 return CheckResult(
@@ -937,100 +1019,384 @@ class ClefExecutor:
                     metadata={"error": "missing_config"}
                 )
             
-            if condition != "if_null":
+            # Get condition from fail field (per TDD spec) or warn field
+            condition_str = clef.fail or clef.warn
+            if not condition_str:
                 return CheckResult(
                     clef_id=clef.id,
                     stave_id=stave.id,
                     status="fail",
                     observed_value=None,
-                    message=f"Unsupported condition '{condition}' for column_values check",
-                    metadata={"error": "unsupported_condition", "condition": condition}
+                    message="Column values check requires a condition in 'fail' or 'warn' field",
+                    metadata={"error": "missing_condition"}
                 )
             
-            sql = f"""
-            SELECT 
-                COUNT(*) as total_rows,
-                COUNT({column}) as non_null_rows,
-                COUNT(*) - COUNT({column}) as null_rows
-            FROM {table}
-            """
+            # Parse the condition
+            parsed = self._parse_column_values_condition(condition_str)
+            condition_type = parsed.get("type")
             
-            results = await db_connector.query(sql)
-            
-            if not results:
+            if condition_type == "unknown":
                 return CheckResult(
                     clef_id=clef.id,
                     stave_id=stave.id,
                     status="fail",
                     observed_value=None,
-                    message="Query returned no results",
-                    metadata={"error": "empty_result"}
+                    message=f"Failed to parse condition: {condition_str}. Error: {parsed.get('error', 'unknown')}",
+                    metadata={"error": "condition_parse_error", "condition": condition_str, "parsed": parsed}
                 )
             
-            row = results[0]
-            total_rows = row.get("total_rows", 0)
-            null_rows = row.get("null_rows", 0)
-            non_null_rows = row.get("non_null_rows", 0)
-            
-            if total_rows == 0:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="warn",
-                    observed_value=0.0,
-                    message=f"Table '{table}' returned no rows to evaluate",
-                    metadata={
-                        "table": table,
-                        "column": column,
-                        "total_rows": 0,
-                        "null_rows": 0,
-                        "non_null_rows": 0,
-                        "note": "Consider running a volume check to ensure data is present"
-                    }
-                )
-            
-            null_rate = null_rows / total_rows if total_rows else 0.0
-            null_percentage_display = null_rate * 100.0
-            
-            if clef.fail and self._evaluate_condition(null_rate, clef.fail):
-                status = "fail"
-                message = f"NULL rate {null_percentage_display:.2f}% violates fail condition ({clef.fail})"
-            elif clef.warn and self._evaluate_condition(null_rate, clef.warn):
-                status = "warn"
-                message = f"NULL rate {null_percentage_display:.2f}% breaches warning condition ({clef.warn})"
+            # Execute appropriate check based on condition type
+            if condition_type == "if_null":
+                return await self._execute_column_values_if_null(clef, stave, db_connector, table, column, parsed)
+            elif condition_type == "if_not_unique":
+                return await self._execute_column_values_if_not_unique(clef, stave, db_connector, table, column, parsed)
+            elif condition_type == "if_not_in":
+                return await self._execute_column_values_if_not_in(clef, stave, db_connector, table, column, parsed)
             else:
-                status = "pass"
-                message = f"NULL rate {null_percentage_display:.2f}% within acceptable limits"
-            
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status=status,
-                observed_value=null_rate,
-                message=message,
-                metadata={
-                    "table": table,
-                    "column": column,
-                    "total_rows": total_rows,
-                    "non_null_rows": non_null_rows,
-                    "null_rows": null_rows,
-                    "null_percentage": null_rate,
-                    "null_percentage_display": null_percentage_display,
-                    "warn_condition": clef.warn,
-                    "fail_condition": clef.fail
-                },
-                anomalies_count=null_rows if status == "fail" else 0
-            )
+                return CheckResult(
+                    clef_id=clef.id,
+                    stave_id=stave.id,
+                    status="fail",
+                    observed_value=None,
+                    message=f"Unsupported condition type: {condition_type}",
+                    metadata={"error": "unsupported_condition_type", "condition": condition_str, "parsed": parsed}
+                )
         
         except Exception as e:
+            logger.exception(f"Error in column_values check: {e}")
             return CheckResult(
                 clef_id=clef.id,
                 stave_id=stave.id,
                 status="fail",
                 observed_value=None,
                 message=f"Column values check failed: {str(e)}",
-                metadata={"error": str(e)}
+                metadata={"error": str(e), "exception_type": type(e).__name__}
             )
+
+    async def _execute_column_values_if_null(
+        self, clef: Clef, stave: Stave, db_connector: Any, table: str, column: str, parsed: Dict[str, Any]
+    ) -> CheckResult:
+        """Execute if_null condition check."""
+        sql = f"""
+        SELECT 
+            COUNT(*) as total_rows,
+            COUNT({column}) as non_null_rows,
+            COUNT(*) - COUNT({column}) as null_rows
+        FROM {table}
+        """
+        
+        results = await db_connector.query({"sql": sql})
+        
+        if not results:
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status="fail",
+                observed_value=None,
+                message="Query returned no results",
+                metadata={"error": "empty_result", "sql": sql}
+            )
+        
+        row = results[0]
+        total_rows = row.get("total_rows", 0)
+        null_rows = row.get("null_rows", 0)
+        non_null_rows = row.get("non_null_rows", 0)
+        
+        if total_rows == 0:
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status="warn",
+                observed_value=0.0,
+                message=f"Table '{table}' returned no rows to evaluate",
+                metadata={
+                    "table": table,
+                    "column": column,
+                    "total_rows": 0,
+                    "null_rows": 0,
+                    "non_null_rows": 0,
+                    "note": "Consider running a volume check to ensure data is present"
+                }
+            )
+        
+        null_rate = null_rows / total_rows if total_rows else 0.0
+        null_percentage_display = null_rate * 100.0
+        
+        # Evaluate against parsed condition
+        operator = parsed.get("operator", ">")
+        threshold = parsed.get("value", 0.0)
+        condition_met = self._evaluate_condition_numeric(null_rate, f"{operator} {threshold}")
+        
+        # Also check warn/fail conditions if specified
+        if clef.fail and self._evaluate_condition(null_rate, clef.fail):
+            status = "fail"
+            message = f"NULL rate {null_percentage_display:.2f}% violates fail condition ({clef.fail})"
+        elif clef.warn and self._evaluate_condition(null_rate, clef.warn):
+            status = "warn"
+            message = f"NULL rate {null_percentage_display:.2f}% breaches warning condition ({clef.warn})"
+        elif condition_met:
+            status = "fail" if clef.fail else "warn"
+            message = f"NULL rate {null_percentage_display:.2f}% violates condition ({clef.fail or clef.warn})"
+        else:
+            status = "pass"
+            message = f"NULL rate {null_percentage_display:.2f}% within acceptable limits"
+        
+        return CheckResult(
+            clef_id=clef.id,
+            stave_id=stave.id,
+            status=status,
+            observed_value=null_rate,
+            message=message,
+            metadata={
+                "table": table,
+                "column": column,
+                "total_rows": total_rows,
+                "non_null_rows": non_null_rows,
+                "null_rows": null_rows,
+                "null_percentage": null_rate,
+                "null_percentage_display": null_percentage_display,
+                "warn_condition": clef.warn,
+                "fail_condition": clef.fail,
+                "condition_type": "if_null"
+            },
+            anomalies_count=null_rows if status != "pass" else 0
+        )
+
+    async def _execute_column_values_if_not_unique(
+        self, clef: Clef, stave: Stave, db_connector: Any, table: str, column: str, parsed: Dict[str, Any]
+    ) -> CheckResult:
+        """Execute if_not_unique condition check - finds duplicate values."""
+        # Build SQL to find duplicates
+        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
+            sql = f"""
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT(DISTINCT {column}) as unique_values,
+                COUNT(*) - COUNT(DISTINCT {column}) as duplicate_rows
+            FROM {table}
+            WHERE {column} IS NOT NULL
+            """
+        elif stave.data_source_type == "sqlite":
+            sql = f"""
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT(DISTINCT {column}) as unique_values,
+                COUNT(*) - COUNT(DISTINCT {column}) as duplicate_rows
+            FROM {table}
+            WHERE {column} IS NOT NULL
+            """
+        else:
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status="fail",
+                observed_value=None,
+                message=f"Uniqueness check not supported for {stave.data_source_type}",
+                metadata={"error": "unsupported_data_source"}
+            )
+        
+        results = await db_connector.query({"sql": sql})
+        
+        if not results:
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status="fail",
+                observed_value=None,
+                message="Query returned no results",
+                metadata={"error": "empty_result", "sql": sql}
+            )
+        
+        row = results[0]
+        total_rows = row.get("total_rows", 0)
+        unique_values = row.get("unique_values", 0)
+        duplicate_rows = row.get("duplicate_rows", 0)
+        
+        if total_rows == 0:
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status="warn",
+                observed_value=0,
+                message=f"Table '{table}' has no non-null values to check for uniqueness",
+                metadata={
+                    "table": table,
+                    "column": column,
+                    "total_rows": 0,
+                    "duplicate_rows": 0
+                }
+            )
+        
+        # Evaluate condition
+        operator = parsed.get("operator", ">")
+        threshold = parsed.get("value", 0)
+        condition_met = self._evaluate_condition_numeric(duplicate_rows, f"{operator} {threshold}")
+        
+        if clef.fail and self._evaluate_condition(duplicate_rows, clef.fail):
+            status = "fail"
+            message = f"Found {duplicate_rows} duplicate rows (violates fail condition: {clef.fail})"
+        elif clef.warn and self._evaluate_condition(duplicate_rows, clef.warn):
+            status = "warn"
+            message = f"Found {duplicate_rows} duplicate rows (breaches warning condition: {clef.warn})"
+        elif condition_met:
+            status = "fail" if clef.fail else "warn"
+            message = f"Found {duplicate_rows} duplicate rows (violates condition: {clef.fail or clef.warn})"
+        else:
+            status = "pass"
+            message = f"Uniqueness check passed: {unique_values} unique values, {duplicate_rows} duplicates"
+        
+        return CheckResult(
+            clef_id=clef.id,
+            stave_id=stave.id,
+            status=status,
+            observed_value=duplicate_rows,
+            message=message,
+            metadata={
+                "table": table,
+                "column": column,
+                "total_rows": total_rows,
+                "unique_values": unique_values,
+                "duplicate_rows": duplicate_rows,
+                "warn_condition": clef.warn,
+                "fail_condition": clef.fail,
+                "condition_type": "if_not_unique"
+            },
+            anomalies_count=duplicate_rows if status != "pass" else 0
+        )
+
+    async def _execute_column_values_if_not_in(
+        self, clef: Clef, stave: Stave, db_connector: Any, table: str, column: str, parsed: Dict[str, Any]
+    ) -> CheckResult:
+        """Execute if_not_in condition check - finds values not in allowed list."""
+        allowed_values = parsed.get("values", [])
+        if not allowed_values:
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status="fail",
+                observed_value=None,
+                message="if_not_in condition requires a list of allowed values",
+                metadata={"error": "missing_allowed_values"}
+            )
+        
+        # Build SQL to count values not in allowed list
+        # Escape values for SQL injection safety
+        if stave.data_source_type in ["postgres", "postgresql"]:
+            # Use array syntax for PostgreSQL
+            values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
+            sql = f"""
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT(CASE WHEN {column} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
+            FROM {table}
+            WHERE {column} IS NOT NULL
+            """
+        elif stave.data_source_type == "mysql":
+            values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
+            sql = f"""
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT(CASE WHEN {column} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
+            FROM {table}
+            WHERE {column} IS NOT NULL
+            """
+        elif stave.data_source_type == "sqlite":
+            values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
+            sql = f"""
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNT(CASE WHEN {column} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
+            FROM {table}
+            WHERE {column} IS NOT NULL
+            """
+        elif stave.data_source_type == "bigquery":
+            # BigQuery uses different syntax
+            values_list = ", ".join(f"'{str(v).replace("'", "''")}'" for v in allowed_values)
+            sql = f"""
+            SELECT 
+                COUNT(*) as total_rows,
+                COUNTIF({column} NOT IN ({values_list})) as not_in_list_rows
+            FROM {table}
+            WHERE {column} IS NOT NULL
+            """
+        else:
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status="fail",
+                observed_value=None,
+                message=f"if_not_in check not supported for {stave.data_source_type}",
+                metadata={"error": "unsupported_data_source"}
+            )
+        
+        results = await db_connector.query({"sql": sql})
+        
+        if not results:
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status="fail",
+                observed_value=None,
+                message="Query returned no results",
+                metadata={"error": "empty_result", "sql": sql}
+            )
+        
+        row = results[0]
+        total_rows = row.get("total_rows", 0)
+        not_in_list_rows = row.get("not_in_list_rows", 0)
+        
+        if total_rows == 0:
+            return CheckResult(
+                clef_id=clef.id,
+                stave_id=stave.id,
+                status="warn",
+                observed_value=0,
+                message=f"Table '{table}' has no non-null values to check",
+                metadata={
+                    "table": table,
+                    "column": column,
+                    "total_rows": 0,
+                    "not_in_list_rows": 0,
+                    "allowed_values": allowed_values
+                }
+            )
+        
+        # Evaluate condition
+        operator = parsed.get("operator", ">")
+        threshold = parsed.get("value", 0)
+        condition_met = self._evaluate_condition_numeric(not_in_list_rows, f"{operator} {threshold}")
+        
+        if clef.fail and self._evaluate_condition(not_in_list_rows, clef.fail):
+            status = "fail"
+            message = f"Found {not_in_list_rows} rows with values not in allowed list (violates fail condition: {clef.fail})"
+        elif clef.warn and self._evaluate_condition(not_in_list_rows, clef.warn):
+            status = "warn"
+            message = f"Found {not_in_list_rows} rows with values not in allowed list (breaches warning condition: {clef.warn})"
+        elif condition_met:
+            status = "fail" if clef.fail else "warn"
+            message = f"Found {not_in_list_rows} rows with values not in allowed list (violates condition: {clef.fail or clef.warn})"
+        else:
+            status = "pass"
+            message = f"All values are in allowed list: {allowed_values}"
+        
+        return CheckResult(
+            clef_id=clef.id,
+            stave_id=stave.id,
+            status=status,
+            observed_value=not_in_list_rows,
+            message=message,
+            metadata={
+                "table": table,
+                "column": column,
+                "total_rows": total_rows,
+                "not_in_list_rows": not_in_list_rows,
+                "allowed_values": allowed_values,
+                "warn_condition": clef.warn,
+                "fail_condition": clef.fail,
+                "condition_type": "if_not_in"
+            },
+            anomalies_count=not_in_list_rows if status != "pass" else 0
+        )
 
     async def _execute_row_count_check(self, clef: Clef, stave: Stave, db_connector: Any = None) -> CheckResult:
         """Execute row count check (TDD Level 1: Simple Declarative)."""
@@ -1059,7 +1425,7 @@ class ClefExecutor:
                 )
             
             sql = f"SELECT COUNT(*) as row_count FROM {table}"
-            results = await db_connector.query(sql)
+            results = await db_connector.query({"sql": sql})
             
             if not results:
                 return CheckResult(
@@ -1084,10 +1450,14 @@ class ClefExecutor:
                     metadata={"error": "missing_row_count"}
                 )
             
-            if clef.fail and self._evaluate_condition(row_count, clef.fail):
+            # Evaluate conditions - fail takes precedence over warn
+            fail_condition_met = clef.fail and self._evaluate_condition_numeric(row_count, clef.fail)
+            warn_condition_met = clef.warn and self._evaluate_condition_numeric(row_count, clef.warn)
+            
+            if fail_condition_met:
                 status = "fail"
                 message = f"Row count {row_count} violates fail condition ({clef.fail})"
-            elif clef.warn and self._evaluate_condition(row_count, clef.warn):
+            elif warn_condition_met:
                 status = "warn"
                 message = f"Row count {row_count} triggers warning condition ({clef.warn})"
             else:
@@ -1153,32 +1523,57 @@ class ClefExecutor:
         return self._evaluate_condition_numeric(observed_value, condition_str)
 
     def _evaluate_condition_numeric(self, observed_value: Any, condition_str: str) -> bool:
-        """Helper for numeric condition evaluation."""
+        """
+        Helper for numeric condition evaluation.
+        
+        Supports:
+        - "> 5000", "< 100", ">= 1000", "<= 5000"
+        - "between 1000 and 2000" or "between 1000 and 2000"
+        - "5000" (equality)
+        """
+        if not condition_str:
+            return False
+        
+        condition_str = condition_str.strip()
+        
+        # Handle "between X and Y" syntax
+        import re
+        between_match = re.match(r"between\s+(\d+(?:\.\d+)?)\s+and\s+(\d+(?:\.\d+)?)", condition_str, re.IGNORECASE)
+        if between_match:
+            try:
+                min_val = float(between_match.group(1))
+                max_val = float(between_match.group(2))
+                return min_val <= observed_value <= max_val
+            except (ValueError, TypeError):
+                return False
+        
+        # Handle operators
         import operator
         ops = {
-            '>': operator.gt,
-            '<': operator.lt,
             '>=': operator.ge,
             '<=': operator.le,
+            '!=': operator.ne,
             '==': operator.eq,
-            '!=': operator.ne
+            '>': operator.gt,
+            '<': operator.lt,
         }
         
-        for op_str, op_func in ops.items():
+        # Check longer operators first (>=, <=, !=, ==) before single char ones
+        for op_str, op_func in sorted(ops.items(), key=lambda x: -len(x[0])):
             if condition_str.startswith(op_str):
                 try:
                     threshold_str = condition_str[len(op_str):].strip()
                     threshold = float(threshold_str)
                     return op_func(observed_value, threshold)
-                except ValueError:
-                    return False # Cannot convert threshold to float
+                except (ValueError, TypeError):
+                    return False
         
         # Default to equality if no operator found
         try:
             threshold = float(condition_str)
             return observed_value == threshold
-        except ValueError:
-            return False # Cannot convert condition to float
+        except (ValueError, TypeError):
+            return False
 
     async def _execute_data_profile_drift_check(self, clef: Clef, stave: Stave, db_connector: Any = None) -> CheckResult:
         """Execute data profile drift check (TDD Level 3: Advanced Declarative)."""
@@ -1362,7 +1757,12 @@ class ClefExecutor:
             max_age_hours = _parse_duration_to_hours(max_age_input) or 24.0
             
             sql = f"SELECT MAX({column}) as latest_timestamp FROM {table}"
-            results = await db_connector.query(sql)
+            # Try dict format first, fallback to string if needed
+            try:
+                results = await db_connector.query({"sql": sql})
+            except (TypeError, AttributeError):
+                # Fallback for connectors that only accept strings
+                results = await db_connector.query(sql)
             
             if not results or results[0].get("latest_timestamp") is None:
                 return CheckResult(

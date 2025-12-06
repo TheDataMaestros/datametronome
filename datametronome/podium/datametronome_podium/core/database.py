@@ -110,6 +110,35 @@ async def _create_tables() -> None:
         )
         """,
         """
+        CREATE TABLE IF NOT EXISTS scheduler_jobs (
+            id TEXT PRIMARY KEY,
+            clef_id TEXT NOT NULL,
+            schedule TEXT NOT NULL,
+            enabled BOOLEAN DEFAULT TRUE,
+            last_run_time TEXT,
+            next_run_time TEXT,
+            execution_count INTEGER DEFAULT 0,
+            failure_count INTEGER DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY (clef_id) REFERENCES clefs (id) ON DELETE CASCADE
+        )
+        """,
+        """
+        CREATE TABLE IF NOT EXISTS job_executions (
+            id TEXT PRIMARY KEY,
+            job_id TEXT NOT NULL,
+            clef_id TEXT NOT NULL,
+            status TEXT NOT NULL,
+            execution_time REAL,
+            error_message TEXT,
+            started_at TEXT NOT NULL,
+            completed_at TEXT,
+            FOREIGN KEY (job_id) REFERENCES scheduler_jobs (id) ON DELETE CASCADE,
+            FOREIGN KEY (clef_id) REFERENCES clefs (id) ON DELETE CASCADE
+        )
+        """,
+        """
         CREATE TABLE IF NOT EXISTS anomalies (
             id TEXT PRIMARY KEY,
             check_id TEXT NOT NULL,

@@ -26,11 +26,22 @@ async def init_scheduler():
         return
     
     try:
+        # Get advanced scheduler settings
+        max_instances = getattr(settings, 'scheduler_max_instances', 3)
+        max_workers = getattr(settings, 'scheduler_max_workers', 10)
+        
         scheduler = AsyncIOScheduler(
             timezone=settings.scheduler_timezone,
             job_defaults={
                 'coalesce': False,
-                'max_instances': 3
+                'max_instances': max_instances,
+                'misfire_grace_time': 60  # Grace period for missed executions
+            },
+            executors={
+                'default': {
+                    'type': 'threadpool',
+                    'max_workers': max_workers
+                }
             }
         )
         
@@ -63,8 +74,39 @@ async def _load_and_schedule_clefs():
     """Load and schedule all clefs from the database."""
     try:
         from datametronome_podium.services.clef_scheduler import load_and_schedule_all_clefs
+        from datametronome_podium.services.scheduler_persistence import (
+            get_all_scheduler_jobs,
+            SchedulerJob
+        )
         
         logger.info("🔄 Loading and scheduling clefs...")
+        
+        # First, try to restore persisted jobs
+        persisted_jobs = await get_all_scheduler_jobs(enabled_only=True)
+        restored_count = 0
+        
+        for job in persisted_jobs:
+            try:
+                # Restore job to scheduler
+                trigger = CronTrigger.from_crontab(job.schedule)
+                from datametronome_podium.services.clef_scheduler import execute_scheduled_clef
+                
+                scheduler.add_job(
+                    execute_scheduled_clef,
+                    trigger=trigger,
+                    args=[job.clef_id],
+                    id=job.id,
+                    replace_existing=True
+                )
+                restored_count += 1
+                logger.debug(f"Restored persisted job: {job.id}")
+            except Exception as e:
+                logger.warning(f"Failed to restore job {job.id}: {e}")
+        
+        if restored_count > 0:
+            logger.info(f"✅ Restored {restored_count} persisted jobs")
+        
+        # Then load and schedule any new clefs
         result = await load_and_schedule_all_clefs()
         
         if result["scheduled"] > 0:
@@ -86,8 +128,18 @@ async def shutdown_scheduler():
         logger.info("Scheduler shutdown")
 
 
-def add_scheduled_job(clef_id: str, schedule: str, func, *args, **kwargs):
-    """Add a scheduled job to the scheduler."""
+def add_scheduled_job(clef_id: str, schedule: str, func, priority: str = "medium", *args, **kwargs):
+    """
+    Add a scheduled job to the scheduler and persist it.
+    
+    Args:
+        clef_id: Clef ID
+        schedule: Cron schedule expression
+        func: Function to execute
+        priority: Job priority ('high', 'medium', 'low') - affects execution order
+        *args: Additional positional arguments
+        **kwargs: Additional keyword arguments
+    """
     if not scheduler:
         logger.warning("Scheduler not initialized")
         return None
@@ -95,15 +147,65 @@ def add_scheduled_job(clef_id: str, schedule: str, func, *args, **kwargs):
     try:
         # Parse cron expression
         trigger = CronTrigger.from_crontab(schedule)
+        job_id = f"clef_{clef_id}"
+        
+        # Map priority to jobstore (for future priority queue implementation)
+        # For now, all jobs go to default store
+        jobstore = 'default'
+        
+        # Add job with priority metadata in kwargs
+        job_kwargs = kwargs.copy()
+        job_kwargs['priority'] = priority
         
         job = scheduler.add_job(
             func,
             trigger=trigger,
             args=[clef_id] + list(args),
-            kwargs=kwargs,
-            id=f"clef_{clef_id}",
-            replace_existing=True
+            kwargs=job_kwargs,
+            id=job_id,
+            replace_existing=True,
+            jobstore=jobstore
         )
+        
+        # Persist job to database
+        async def persist_job():
+            from datametronome_podium.services.scheduler_persistence import (
+                get_scheduler_job_by_clef_id,
+                save_scheduler_job,
+                SchedulerJob
+            )
+            from datetime import datetime
+            
+            # Check if job already exists
+            existing_job = await get_scheduler_job_by_clef_id(clef_id)
+            if existing_job:
+                # Update existing
+                existing_job.schedule = schedule
+                existing_job.next_run_time = job.next_run_time
+                existing_job.updated_at = datetime.utcnow()
+                await save_scheduler_job(existing_job)
+            else:
+                # Create new
+                new_job = SchedulerJob(
+                    id=job_id,
+                    clef_id=clef_id,
+                    schedule=schedule,
+                    enabled=True,
+                    next_run_time=job.next_run_time
+                )
+                await save_scheduler_job(new_job)
+        
+        # Run persistence in background
+        import asyncio
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(persist_job())
+            else:
+                loop.run_until_complete(persist_job())
+        except:
+            # If we can't persist, log but don't fail
+            logger.warning(f"Could not persist job {job_id}, but job is scheduled")
         
         logger.info(f"Added scheduled job for clef {clef_id}: {schedule}")
         return job

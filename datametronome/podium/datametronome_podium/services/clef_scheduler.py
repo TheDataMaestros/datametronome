@@ -2,6 +2,7 @@
 Clef Scheduler Service for DataMetronome Podium.
 
 This service handles scheduling clefs for automatic execution based on their cron expressions.
+Includes retry logic with exponential backoff for failed executions.
 """
 
 import asyncio
@@ -13,22 +14,37 @@ from datametronome_podium.core.database import get_db
 from datametronome_podium.core.scheduler import add_scheduled_job, remove_scheduled_job, get_scheduler_status
 from datametronome_podium.services.clef_executor import ClefExecutor
 from datametronome_podium.services.stave_service import deserialize_clef, deserialize_stave
+from datametronome_podium.services.scheduler_persistence import (
+    get_scheduler_job_by_clef_id,
+    update_job_run_time,
+    increment_job_execution_count,
+    create_scheduler_job
+)
+from datametronome_podium.services.job_monitor import (
+    record_job_execution,
+    calculate_job_health_metrics
+)
 from datametronome_podium.api.schemas.clef import ClefResponse
 
 logger = logging.getLogger(__name__)
 
 
-async def execute_scheduled_clef(clef_id: str) -> Dict[str, Any]:
+async def execute_scheduled_clef(clef_id: str, retry_attempt: int = 0) -> Dict[str, Any]:
     """
     Execute a clef on schedule and store the result.
+    Includes retry logic with exponential backoff.
     
     Args:
         clef_id: The ID of the clef to execute
+        retry_attempt: Current retry attempt number (0 = first attempt)
         
     Returns:
         Dict with execution result information
     """
-    logger.info(f"🔄 Executing scheduled clef: {clef_id}")
+    job_id = f"job_{clef_id}"
+    execution_start = datetime.utcnow()
+    
+    logger.info(f"🔄 Executing scheduled clef: {clef_id} (attempt {retry_attempt + 1})")
     
     try:
         # Get database connection
@@ -42,6 +58,8 @@ async def execute_scheduled_clef(clef_id: str) -> Dict[str, Any]:
         
         if not clef_result:
             logger.error(f"❌ Clef not found: {clef_id}")
+            await record_job_execution(job_id, clef_id, "failure", error_message="Clef not found")
+            await increment_job_execution_count(job_id, success=False)
             return {"success": False, "error": "Clef not found"}
         
         # Deserialize the clef
@@ -55,6 +73,8 @@ async def execute_scheduled_clef(clef_id: str) -> Dict[str, Any]:
         
         if not stave_result:
             logger.error(f"❌ Stave not found for clef {clef_id}: {clef.stave_id}")
+            await record_job_execution(job_id, clef_id, "failure", error_message="Stave not found")
+            await increment_job_execution_count(job_id, success=False)
             return {"success": False, "error": "Associated stave not found"}
         
         # Deserialize the stave
@@ -64,25 +84,99 @@ async def execute_scheduled_clef(clef_id: str) -> Dict[str, Any]:
         executor = ClefExecutor()
         result = await executor.execute_clef(clef, stave)
         
+        execution_time = (datetime.utcnow() - execution_start).total_seconds()
+        
+        # Determine if execution was successful
+        is_success = result.status in ["pass", "warn"]
+        
         # Store the result
         await _store_clef_result(clef_id, result, clef, db)
         
+        # Record execution
+        await record_job_execution(
+            job_id,
+            clef_id,
+            "success" if is_success else "failure",
+            execution_time=execution_time,
+            error_message=None if is_success else result.message
+        )
+        
+        # Update job stats
+        await increment_job_execution_count(job_id, success=is_success)
+        await update_job_run_time(job_id, last_run=execution_start)
+        
+        # Handle retry logic if failed
+        if not is_success and retry_attempt == 0:
+            # Check if retry is configured
+            retry_config = clef.retry_config or {}
+            max_retries = retry_config.get("max_retries", 0)
+            
+            if max_retries > 0:
+                # Schedule retry with exponential backoff
+                backoff_factor = retry_config.get("backoff_factor", 2.0)
+                max_delay = retry_config.get("max_delay_seconds", 300)
+                
+                delay_seconds = min(backoff_factor ** retry_attempt, max_delay)
+                
+                logger.info(f"⏳ Scheduling retry for clef {clef_id} in {delay_seconds} seconds")
+                
+                # Schedule retry
+                await asyncio.sleep(delay_seconds)
+                return await execute_scheduled_clef(clef_id, retry_attempt=retry_attempt + 1)
+        
         logger.info(f"✅ Scheduled execution completed for clef {clef_id}: {result.severity}")
         return {
-            "success": True,
+            "success": is_success,
             "clef_id": clef_id,
             "severity": result.severity,
+            "status": result.status,
             "message": result.message,
-            "executed_at": datetime.utcnow().isoformat()
+            "execution_time": execution_time,
+            "retry_attempt": retry_attempt,
+            "executed_at": execution_start.isoformat()
         }
         
     except Exception as e:
+        execution_time = (datetime.utcnow() - execution_start).total_seconds()
+        error_msg = str(e)
+        
         logger.error(f"❌ Failed to execute scheduled clef {clef_id}: {e}")
+        
+        # Record failure
+        await record_job_execution(job_id, clef_id, "failure", execution_time=execution_time, error_message=error_msg)
+        await increment_job_execution_count(job_id, success=False)
+        
+        # Handle retry on exception
+        if retry_attempt == 0:
+            # Get clef to check retry config
+            try:
+                clef_result = await db.query({
+                    "sql": "SELECT * FROM clefs WHERE id = ?",
+                    "params": [clef_id]
+                })
+                if clef_result:
+                    clef = deserialize_clef(clef_result[0])
+                    retry_config = clef.retry_config or {}
+                    max_retries = retry_config.get("max_retries", 0)
+                    
+                    if max_retries > 0:
+                        backoff_factor = retry_config.get("backoff_factor", 2.0)
+                        max_delay = retry_config.get("max_delay_seconds", 300)
+                        delay_seconds = min(backoff_factor ** retry_attempt, max_delay)
+                        
+                        logger.info(f"⏳ Scheduling retry for clef {clef_id} after exception in {delay_seconds} seconds")
+                        await asyncio.sleep(delay_seconds)
+                        return await execute_scheduled_clef(clef_id, retry_attempt=retry_attempt + 1)
+            except:
+                pass  # If we can't get clef, just return error
+        
         return {
             "success": False,
             "clef_id": clef_id,
-            "error": str(e),
-            "executed_at": datetime.utcnow().isoformat()
+            "error": error_msg,
+            "execution_time": execution_time,
+            "retry_attempt": retry_attempt,
+            "executed_at": execution_start.isoformat()
         }
 
 
