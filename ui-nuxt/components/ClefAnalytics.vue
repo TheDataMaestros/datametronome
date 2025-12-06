@@ -20,7 +20,7 @@
           </div>
           <Icon name="i-heroicons-musical-note" class="w-8 h-8 text-blue-500" />
         </div>
-        <div class="mt-2">
+        <div class="mt-2" v-if="analytics.newThisWeek > 0">
           <span class="text-sm text-green-600">+{{ analytics.newThisWeek }} this week</span>
         </div>
       </UCard>
@@ -33,8 +33,8 @@
           </div>
           <Icon name="i-heroicons-check-circle" class="w-8 h-8 text-green-500" />
         </div>
-        <div class="mt-2">
-          <span class="text-sm text-green-600">↗ +2.3% vs last week</span>
+        <div class="mt-2" v-if="props.checkResults.length > 0">
+          <span class="text-sm text-gray-600 dark:text-gray-400">{{ props.checkResults.length }} total checks</span>
         </div>
       </UCard>
 
@@ -46,8 +46,8 @@
           </div>
           <Icon name="i-heroicons-clock" class="w-8 h-8 text-purple-500" />
         </div>
-        <div class="mt-2">
-          <span class="text-sm text-red-600">↘ -15ms vs last week</span>
+        <div class="mt-2" v-if="analytics.avgExecutionTime > 0">
+          <span class="text-sm text-gray-600 dark:text-gray-400">Average execution time</span>
         </div>
       </UCard>
 
@@ -59,8 +59,8 @@
           </div>
           <Icon name="i-heroicons-exclamation-triangle" class="w-8 h-8 text-red-500" />
         </div>
-        <div class="mt-2">
-          <span class="text-sm text-red-600">↗ +3 since yesterday</span>
+        <div class="mt-2" v-if="analytics.activeAlerts > 0">
+          <span class="text-sm text-red-600">Failed checks in last 24h</span>
         </div>
       </UCard>
     </div>
@@ -81,10 +81,18 @@
         </template>
         
         <div class="h-64">
+          <div v-if="performanceData.length === 0" class="flex items-center justify-center h-full text-gray-500">
+            <div class="text-center">
+              <Icon name="i-heroicons-chart-bar" class="w-12 h-12 mx-auto mb-2 text-gray-400" />
+              <p>No performance data available</p>
+            </div>
+          </div>
           <TrendChart 
+            v-else
             :data="performanceData"
             :height="250"
             :show-legend="true"
+            type="line"
           />
         </div>
       </UCard>
@@ -129,6 +137,9 @@
         </template>
         
         <div class="space-y-3">
+          <div v-if="topPerformers.length === 0" class="text-center py-4 text-gray-500 text-sm">
+            No performance data available yet
+          </div>
           <div 
             v-for="(clef, index) in topPerformers" 
             :key="clef.id"
@@ -158,6 +169,9 @@
         </template>
         
         <div class="space-y-3">
+          <div v-if="needsAttention.length === 0" class="text-center py-4 text-green-600 text-sm">
+            🎉 All clefs are performing well!
+          </div>
           <div 
             v-for="clef in needsAttention" 
             :key="clef.id"
@@ -184,6 +198,9 @@
         </template>
         
         <div class="space-y-3">
+          <div v-if="recentActivity.length === 0" class="text-center py-4 text-gray-500 text-sm">
+            No recent activity
+          </div>
           <div 
             v-for="activity in recentActivity" 
             :key="activity.id"
@@ -251,12 +268,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import type { Clef } from '~/services/clefs'
+import type { Check } from '~/services/checks'
 
 // Props
 interface Props {
-  clefs: any[]
-  checkResults: any[]
+  clefs: Clef[]
+  checkResults: Check[]
 }
 
 const props = defineProps<Props>()
@@ -264,13 +283,48 @@ const props = defineProps<Props>()
 // State
 const selectedTimeRange = ref('7d')
 
-// Mock data - in real app, this would come from API
-const analytics = ref({
-  totalClefs: 24,
-  newThisWeek: 3,
-  successRate: 94.2,
-  avgExecutionTime: 245,
-  activeAlerts: 2
+// Computed analytics from real data
+const analytics = computed(() => {
+  const totalClefs = props.clefs.length
+  const activeClefs = props.clefs.filter(c => c.is_active).length
+  
+  // Calculate new clefs this week
+  const oneWeekAgo = new Date()
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+  const newThisWeek = props.clefs.filter(c => {
+    const createdAt = new Date(c.created_at)
+    return createdAt >= oneWeekAgo
+  }).length
+  
+  // Calculate success rate from check results
+  const totalChecks = props.checkResults.length
+  const successfulChecks = props.checkResults.filter(c => c.status === 'success' || c.status === 'passed').length
+  const successRate = totalChecks > 0 ? (successfulChecks / totalChecks) * 100 : 0
+  
+  // Calculate average execution time
+  const executionTimes = props.checkResults
+    .filter(c => c.execution_time !== null && c.execution_time !== undefined)
+    .map(c => c.execution_time!)
+  const avgExecutionTime = executionTimes.length > 0
+    ? Math.round(executionTimes.reduce((a, b) => a + b, 0) / executionTimes.length)
+    : 0
+  
+  // Count active alerts (failed checks in last 24 hours)
+  const oneDayAgo = new Date()
+  oneDayAgo.setDate(oneDayAgo.getDate() - 1)
+  const activeAlerts = props.checkResults.filter(c => {
+    const timestamp = new Date(c.timestamp)
+    return timestamp >= oneDayAgo && (c.status === 'failed' || c.status === 'failure')
+  }).length
+  
+  return {
+    totalClefs,
+    activeClefs,
+    newThisWeek,
+    successRate: Math.round(successRate * 10) / 10,
+    avgExecutionTime,
+    activeAlerts
+  }
 })
 
 const timeRangeOptions = [
@@ -279,49 +333,277 @@ const timeRangeOptions = [
   { label: 'Last 90 days', value: '90d' }
 ]
 
-const performanceData = ref([
-  { date: '2024-01-01', success: 95, failures: 2, warnings: 3 },
-  { date: '2024-01-02', success: 97, failures: 1, warnings: 2 },
-  { date: '2024-01-03', success: 94, failures: 3, warnings: 3 },
-  { date: '2024-01-04', success: 96, failures: 2, warnings: 2 },
-  { date: '2024-01-05', success: 98, failures: 1, warnings: 1 },
-  { date: '2024-01-06', success: 93, failures: 4, warnings: 3 },
-  { date: '2024-01-07', success: 95, failures: 2, warnings: 3 }
-])
+// Compute performance data from check results
+const performanceData = computed(() => {
+  const days = selectedTimeRange.value === '7d' ? 7 : selectedTimeRange.value === '30d' ? 30 : 90
+  const startDate = new Date()
+  startDate.setDate(startDate.getDate() - days)
+  
+  // Group check results by date
+  const resultsByDate = new Map<string, { success: number; failures: number; warnings: number }>()
+  
+  props.checkResults.forEach(check => {
+    const checkDate = new Date(check.timestamp)
+    if (checkDate < startDate) return
+    
+    const dateKey = checkDate.toISOString().split('T')[0]
+    if (!resultsByDate.has(dateKey)) {
+      resultsByDate.set(dateKey, { success: 0, failures: 0, warnings: 0 })
+    }
+    
+    const dayData = resultsByDate.get(dateKey)!
+    if (check.status === 'success' || check.status === 'passed') {
+      dayData.success++
+    } else if (check.status === 'failed' || check.status === 'failure') {
+      dayData.failures++
+    } else if (check.status === 'warning' || check.severity === 'warning') {
+      dayData.warnings++
+    }
+  })
+  
+  // Fill in missing dates with zeros
+  const data: Array<{ date: string; success: number; failures: number; warnings: number }> = []
+  for (let i = 0; i < days; i++) {
+    const date = new Date(startDate)
+    date.setDate(date.getDate() + i)
+    const dateKey = date.toISOString().split('T')[0]
+    const dayData = resultsByDate.get(dateKey) || { success: 0, failures: 0, warnings: 0 }
+    data.push({
+      date: dateKey,
+      ...dayData
+    })
+  }
+  
+  return data
+})
 
-const clefTypeStats = ref([
-  { name: 'Row Count', count: 8, percentage: 33, tier: 1, color: '#3B82F6' },
-  { name: 'Column Values', count: 6, percentage: 25, tier: 1, color: '#10B981' },
-  { name: 'Freshness', count: 4, percentage: 17, tier: 1, color: '#F59E0B' },
-  { name: 'Forecast', count: 3, percentage: 12, tier: 2, color: '#8B5CF6' },
-  { name: 'Data Drift', count: 2, percentage: 8, tier: 2, color: '#EF4444' },
-  { name: 'Lookup Validation', count: 1, percentage: 4, tier: 3, color: '#06B6D4' }
-])
+// Compute clef type statistics from real data
+const clefTypeStats = computed(() => {
+  const typeCounts = new Map<string, number>()
+  
+  props.clefs.forEach(clef => {
+    const count = typeCounts.get(clef.check_type) || 0
+    typeCounts.set(clef.check_type, count + 1)
+  })
+  
+  const typeInfo: Record<string, { name: string; tier: number; color: string }> = {
+    'row_count': { name: 'Row Count', tier: 1, color: '#3B82F6' },
+    'column_values': { name: 'Column Values', tier: 1, color: '#10B981' },
+    'freshness': { name: 'Freshness', tier: 1, color: '#F59E0B' },
+    'forecast': { name: 'Forecast', tier: 2, color: '#8B5CF6' },
+    'data_profile_drift': { name: 'Data Drift', tier: 2, color: '#EF4444' },
+    'lookup_validation': { name: 'Lookup Validation', tier: 3, color: '#06B6D4' },
+    'python': { name: 'Python Script', tier: 4, color: '#EC4899' }
+  }
+  
+  const total = props.clefs.length
+  const stats = Array.from(typeCounts.entries())
+    .map(([type, count]) => {
+      const info = typeInfo[type] || { name: type, tier: 1, color: '#6B7280' }
+      return {
+        name: info.name,
+        count,
+        percentage: total > 0 ? Math.round((count / total) * 100) : 0,
+        tier: info.tier,
+        color: info.color
+      }
+    })
+    .sort((a, b) => b.count - a.count)
+  
+  return stats
+})
 
-const topPerformers = ref([
-  { id: '1', name: 'User Email Validation', type: 'Column Values', successRate: 99.8, runs: 168 },
-  { id: '2', name: 'Order Count Monitor', type: 'Row Count', successRate: 99.5, runs: 144 },
-  { id: '3', name: 'Data Freshness Check', type: 'Freshness', successRate: 99.2, runs: 120 }
-])
+// Compute top performers from real data
+const topPerformers = computed(() => {
+  const clefPerformance = new Map<string, { success: number; total: number; name: string; type: string }>()
+  
+  props.checkResults.forEach(check => {
+    if (!check.clef_id) return
+    
+    if (!clefPerformance.has(check.clef_id)) {
+      const clef = props.clefs.find(c => c.id === check.clef_id)
+      clefPerformance.set(check.clef_id, {
+        success: 0,
+        total: 0,
+        name: clef?.name || 'Unknown',
+        type: clef?.check_type || 'unknown'
+      })
+    }
+    
+    const perf = clefPerformance.get(check.clef_id)!
+    perf.total++
+    if (check.status === 'success' || check.status === 'passed') {
+      perf.success++
+    }
+  })
+  
+  return Array.from(clefPerformance.entries())
+    .map(([id, perf]) => ({
+      id,
+      name: perf.name,
+      type: formatCheckType(perf.type),
+      successRate: perf.total > 0 ? Math.round((perf.success / perf.total) * 100 * 10) / 10 : 0,
+      runs: perf.total
+    }))
+    .filter(p => p.runs > 0)
+    .sort((a, b) => b.successRate - a.successRate)
+    .slice(0, 3)
+})
 
-const needsAttention = ref([
-  { id: '1', name: 'Payment Amount Range', issue: 'High failure rate (15%)' },
-  { id: '2', name: 'User Age Validation', issue: 'Slow execution (2.3s)' },
-  { id: '3', name: 'Inventory Reconciliation', issue: 'Frequent timeouts' }
-])
+const formatCheckType = (type: string) => {
+  const typeMap: Record<string, string> = {
+    'row_count': 'Row Count',
+    'column_values': 'Column Values',
+    'freshness': 'Freshness',
+    'forecast': 'Forecast',
+    'data_profile_drift': 'Data Drift',
+    'lookup_validation': 'Lookup Validation',
+    'python': 'Python Script'
+  }
+  return typeMap[type] || type
+}
 
-const recentActivity = ref([
-  { id: '1', type: 'success', message: 'Email validation check passed', time: '2 min ago' },
-  { id: '2', type: 'warning', message: 'Order count slightly high', time: '5 min ago' },
-  { id: '3', type: 'failure', message: 'Payment validation failed', time: '8 min ago' },
-  { id: '4', type: 'info', message: 'New clef created: User Age Check', time: '12 min ago' }
-])
+// Compute clefs needing attention from real data
+const needsAttention = computed(() => {
+  const clefIssues = new Map<string, { name: string; issues: string[] }>()
+  
+  props.checkResults.forEach(check => {
+    if (!check.clef_id) return
+    
+    const clef = props.clefs.find(c => c.id === check.clef_id)
+    if (!clef) return
+    
+    if (!clefIssues.has(check.clef_id)) {
+      clefIssues.set(check.clef_id, { name: clef.name, issues: [] })
+    }
+    
+    const issue = clefIssues.get(check.clef_id)!
+    
+    // Check for high failure rate
+    const recentChecks = props.checkResults
+      .filter(c => c.clef_id === check.clef_id)
+      .slice(-20) // Last 20 checks
+    const failureRate = recentChecks.filter(c => c.status === 'failed' || c.status === 'failure').length / recentChecks.length
+    if (failureRate > 0.1 && !issue.issues.some(i => i.includes('failure rate'))) {
+      issue.issues.push(`High failure rate (${Math.round(failureRate * 100)}%)`)
+    }
+    
+    // Check for slow execution
+    if (check.execution_time && check.execution_time > 2000 && !issue.issues.some(i => i.includes('Slow execution'))) {
+      issue.issues.push(`Slow execution (${Math.round(check.execution_time)}ms)`)
+    }
+  })
+  
+  return Array.from(clefIssues.entries())
+    .filter(([_, issue]) => issue.issues.length > 0)
+    .map(([id, issue]) => ({
+      id,
+      name: issue.name,
+      issue: issue.issues[0] // Show first issue
+    }))
+    .slice(0, 5)
+})
 
-const healthMetrics = ref({
-  reliability: 94,
-  performance: 87,
-  coverage: 76,
-  maintainability: 82
+// Compute recent activity from real data
+const recentActivity = computed(() => {
+  const activities: Array<{ id: string; type: string; message: string; time: string }> = []
+  
+  // Add recent check results
+  const recentChecks = [...props.checkResults]
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    .slice(0, 10)
+  
+  recentChecks.forEach(check => {
+    const clef = props.clefs.find(c => c.id === check.clef_id)
+    const clefName = clef?.name || 'Unknown clef'
+    
+    let type = 'info'
+    let message = ''
+    
+    if (check.status === 'success' || check.status === 'passed') {
+      type = 'success'
+      message = `${clefName} check passed`
+    } else if (check.status === 'failed' || check.status === 'failure') {
+      type = 'failure'
+      message = `${clefName} check failed${check.message ? `: ${check.message}` : ''}`
+    } else if (check.status === 'warning' || check.severity === 'warning') {
+      type = 'warning'
+      message = `${clefName} check warning${check.message ? `: ${check.message}` : ''}`
+    } else {
+      message = `${clefName} check completed`
+    }
+    
+    const timestamp = new Date(check.timestamp)
+    const now = new Date()
+    const diffMs = now.getTime() - timestamp.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+    
+    let time = ''
+    if (diffMins < 1) {
+      time = 'Just now'
+    } else if (diffMins < 60) {
+      time = `${diffMins} min ago`
+    } else if (diffHours < 24) {
+      time = `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`
+    } else {
+      time = `${diffDays} day${diffDays > 1 ? 's' : ''} ago`
+    }
+    
+    activities.push({
+      id: check.id,
+      type,
+      message,
+      time
+    })
+  })
+  
+  return activities.slice(0, 5)
+})
+
+// Compute health metrics from real data
+const healthMetrics = computed(() => {
+  // Reliability: based on success rate
+  const totalChecks = props.checkResults.length
+  const successfulChecks = props.checkResults.filter(c => c.status === 'success' || c.status === 'passed').length
+  const reliability = totalChecks > 0 ? Math.round((successfulChecks / totalChecks) * 100) : 0
+  
+  // Performance: based on execution time (inverse - faster is better)
+  const executionTimes = props.checkResults
+    .filter(c => c.execution_time !== null && c.execution_time !== undefined)
+    .map(c => c.execution_time!)
+  const avgExecutionTime = executionTimes.length > 0
+    ? executionTimes.reduce((a, b) => a + b, 0) / executionTimes.length
+    : 0
+  // Score: 100 if < 100ms, decreasing to 0 at 5000ms
+  const performance = avgExecutionTime > 0
+    ? Math.max(0, Math.min(100, Math.round(100 - ((avgExecutionTime - 100) / 4900) * 100)))
+    : 100
+  
+  // Coverage: percentage of active clefs that have run checks
+  const activeClefs = props.clefs.filter(c => c.is_active)
+  const clefsWithChecks = new Set(props.checkResults.map(c => c.clef_id).filter(Boolean))
+  const coverage = activeClefs.length > 0
+    ? Math.round((clefsWithChecks.size / activeClefs.length) * 100)
+    : 0
+  
+  // Maintainability: based on clef age and activity (newer and more active = better)
+  const now = new Date()
+  const clefAges = props.clefs.map(c => {
+    const age = (now.getTime() - new Date(c.created_at).getTime()) / (1000 * 60 * 60 * 24) // days
+    return age
+  })
+  const avgAge = clefAges.length > 0 ? clefAges.reduce((a, b) => a + b, 0) / clefAges.length : 0
+  // Score: 100 if avg age < 30 days, decreasing to 50 at 365 days
+  const maintainability = avgAge < 30 ? 100 : Math.max(50, Math.round(100 - ((avgAge - 30) / 335) * 50))
+  
+  return {
+    reliability,
+    performance,
+    coverage,
+    maintainability
+  }
 })
 
 // Computed
@@ -348,6 +630,7 @@ const getHealthScoreColor = (score: number) => {
   return 'bg-red-500'
 }
 </script>
+
 
 
 
