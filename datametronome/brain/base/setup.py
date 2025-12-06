@@ -37,6 +37,7 @@ setup(
         "scikit-learn>=1.3.0",
         "matplotlib>=3.7.0",
         "seaborn>=0.12.0",
+        "statsmodels>=0.14.0",
     ],
     extras_require={
         "dev": [
