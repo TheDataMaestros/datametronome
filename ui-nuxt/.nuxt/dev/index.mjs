@@ -869,8 +869,8 @@ const _inlineRuntimeConfig = {
     }
   },
   "public": {
-    "apiBase": "http://localhost:8001/api/v1",
-    "podiumApiBase": "http://localhost:8001"
+    "apiBase": "http://localhost:8000/api/v1",
+    "podiumApiBase": "http://localhost:8000"
   },
   "icon": {
     "serverKnownCssClasses": []
