@@ -15,7 +15,7 @@ staves:
       password: ${POSTGRES_PASSWORD}  # Use environment variable
       ssl_mode: require
     is_active: true
-    
+
   # SQLite Database
   - id: stave-local-sqlite-001
     name: Local Analytics DB
@@ -24,7 +24,7 @@ staves:
     connection_config:
       path: /data/analytics.db
     is_active: true
-    
+
   # MySQL Database
   - id: stave-app-mysql-001
     name: Application MySQL
@@ -37,7 +37,7 @@ staves:
       user: readonly_user
       password: ${MYSQL_PASSWORD}
     is_active: true
-    
+
   # Redis Cache
   - id: stave-cache-redis-001
     name: Production Cache
@@ -50,7 +50,7 @@ staves:
       password: ${REDIS_PASSWORD}
       ssl: true
     is_active: true
-    
+
   # MongoDB
   - id: stave-docs-mongo-001
     name: Document Store
@@ -76,7 +76,7 @@ clefs:
     fail: if_null > 0%
     schedule: "@hourly"
     is_active: true
-    
+
   # Range Check (Level 1: Declarative)
   - id: clef-age-range-001
     stave_id: stave-prod-postgres-001
@@ -90,7 +90,7 @@ clefs:
       max: 150
     schedule: "@daily"
     is_active: true
-    
+
   # Row Count Check (Level 1: Declarative)
   - id: clef-events-volume-001
     stave_id: stave-prod-postgres-001
@@ -103,7 +103,7 @@ clefs:
     fail: "< 1000"
     schedule: "0 8 * * *"  # Daily at 8 AM
     is_active: true
-    
+
   # Pattern Check (Level 1: Declarative)
   - id: clef-email-format-001
     stave_id: stave-prod-postgres-001
@@ -116,4 +116,3 @@ clefs:
       pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
     schedule: "0 2 * * *"  # Daily at 2 AM
     is_active: true
-

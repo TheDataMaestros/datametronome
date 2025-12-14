@@ -4,7 +4,7 @@ Database initialization and management for DataMetronome Podium.
 
 import asyncio
 import logging
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 from metronome_pulse_sqlite import SQLitePulse
 
@@ -17,34 +17,61 @@ sqlite_connector: SQLitePulse | None = None
 async def init_db() -> None:
     """Initialize database with tables and default data."""
     global sqlite_connector
-    
+
     try:
         # Create SQLite connector using configured database URL
-        from datametronome_podium.core.config import settings
         import os
-        db_path = settings.database_url.replace("sqlite:///", "").replace("./", "")
+
+        from datametronome_podium.core.config import settings
+
+        db_path = (
+            settings.database_url.replace("sqlite+aiosqlite:///", "")
+            .replace("sqlite:///", "")
+            .replace("./", "")
+        )
         full_path = os.path.abspath(db_path)
-        logger.info(f"Initializing database with file: {db_path}")
-        logger.info(f"Full path: {full_path}")
-        logger.info(f"File exists: {os.path.exists(full_path)}")
+        print(f"DEBUG: init_db using path: {full_path}")
+        print(f"DEBUG: File exists? {os.path.exists(full_path)}")
         sqlite_connector = SQLitePulse(db_path)
-        
+
         # Connect to the database
         await sqlite_connector.connect()
-        logger.info(f"Connected to database: {sqlite_connector.database_path}")
-        
+        print(f"DEBUG: Connected. Connector path: {sqlite_connector.database_path}")
+
+        # Check columns of clefs table
+        try:
+            cols = await sqlite_connector.query(
+                {"sql": "PRAGMA table_info(clefs)", "params": []}
+            )
+            print(f"DEBUG: Clefs table columns: {[c['name'] for c in cols]}")
+        except Exception as e:
+            print(f"DEBUG: Could not check schema: {e}")
+
         # Immediately check if clefs table has data
-        test_count = await sqlite_connector.query({"sql": "SELECT COUNT(*) as count FROM clefs", "params": []})
-        logger.info(f"Clefs in database RIGHT AFTER CONNECT: {test_count[0]['count']}")
-        
+        try:
+            test_count = await sqlite_connector.query(
+                {"sql": "SELECT COUNT(*) as count FROM clefs", "params": []}
+            )
+            print(
+                f"DEBUG: Clefs in database RIGHT AFTER CONNECT: {test_count[0]['count']}"
+            )
+            staves_count = await sqlite_connector.query(
+                {"sql": "SELECT COUNT(*) as count FROM staves", "params": []}
+            )
+            print(
+                f"DEBUG: Staves in database RIGHT AFTER CONNECT: {staves_count[0]['count']}"
+            )
+        except Exception as e:
+            print(f"DEBUG: Could not check data counts: {e}")
+
         # Create tables
         await _create_tables()
-        
+
         # Create default admin user
         await _create_default_admin()
-        
+
         logger.info("✅ Database initialized successfully")
-        
+
     except Exception as e:
         logger.error(f"❌ Database initialization failed: {e}")
         raise
@@ -85,6 +112,9 @@ async def _create_tables() -> None:
             description TEXT,
             check_type TEXT NOT NULL,
             config TEXT NOT NULL,
+            warn TEXT,
+            fail TEXT,
+            retry_config TEXT,
             schedule TEXT,
             is_active BOOLEAN DEFAULT TRUE,
             created_at TEXT NOT NULL,
@@ -152,9 +182,9 @@ async def _create_tables() -> None:
             resolution_status TEXT DEFAULT 'investigating',
             FOREIGN KEY (check_id) REFERENCES checks (id)
         )
-        """
+        """,
     ]
-    
+
     for table_sql in tables:
         await sqlite_connector.execute(table_sql)
 
@@ -163,18 +193,17 @@ async def _create_default_admin() -> None:
     """Create default admin user for showcase and development."""
     try:
         # Check if admin user already exists
-        existing_users = await sqlite_connector.query({
-            "sql": "SELECT * FROM users WHERE username = ?",
-            "params": ["admin"]
-        })
-        
+        existing_users = await sqlite_connector.query(
+            {"sql": "SELECT * FROM users WHERE username = ?", "params": ["admin"]}
+        )
+
         if existing_users:
             logger.info("Admin user already exists")
             return
-        
+
         # Import here to avoid circular imports
         from datametronome_podium.api.v1.endpoints.auth import get_password_hash
-        
+
         # Create admin user
         admin_user = {
             "id": "admin-001",
@@ -184,11 +213,13 @@ async def _create_default_admin() -> None:
             "is_active": True,
             "is_superuser": True,
             "created_at": "2025-01-01T00:00:00Z",
-            "updated_at": "2025-01-01T00:00:00Z"
+            "updated_at": "2025-01-01T00:00:00Z",
         }
-        
-        success = await sqlite_connector.write([{"table": "users", **admin_user}], "users")
-        
+
+        success = await sqlite_connector.write(
+            [{"table": "users", **admin_user}], "users"
+        )
+
         if success:
             logger.info("✅ Default admin user created successfully")
             logger.info("   Username: admin")
@@ -196,7 +227,7 @@ async def _create_default_admin() -> None:
             logger.info("   Email: admin@datametronome.dev")
         else:
             logger.warning("⚠️ Failed to create default admin user")
-            
+
     except Exception as e:
         logger.warning(f"⚠️ Could not create default admin user: {e}")
 
@@ -239,15 +270,17 @@ async def insert_data(table: str, data: Dict[str, Any]) -> bool:
     return await connector.write([{"table": table, **data}], table)
 
 
-async def update_data(table: str, data: Dict[str, Any], where_clause: str, where_params: List[Any]) -> bool:
+async def update_data(
+    table: str, data: Dict[str, Any], where_clause: str, where_params: List[Any]
+) -> bool:
     """Update data in a table."""
     # Build UPDATE SQL
     set_clauses = [f"{k} = ?" for k in data.keys()]
     set_values = list(data.values())
-    
+
     sql = f"UPDATE {table} SET {', '.join(set_clauses)} WHERE {where_clause}"
     params = set_values + where_params
-    
+
     connector = await get_db()
     return await connector.execute(sql, params)
 
@@ -262,7 +295,7 @@ async def delete_data(table: str, where_clause: str, where_params: List[Any]) ->
 async def get_db_connection_status() -> bool:
     """
     Check database connection health.
-    
+
     Returns:
         bool: True if database is connected and responsive, False otherwise.
     """
@@ -270,7 +303,7 @@ async def get_db_connection_status() -> bool:
     try:
         if not sqlite_connector:
             return False
-        
+
         # Try a simple query to verify connectivity
         result = await sqlite_connector.query("SELECT 1")
         return result is not None

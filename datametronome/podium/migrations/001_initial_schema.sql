@@ -101,4 +101,3 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
     name TEXT NOT NULL,
     applied_at TEXT NOT NULL
 );
-

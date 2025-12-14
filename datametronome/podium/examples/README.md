@@ -227,4 +227,3 @@ Validate your YAML syntax using a YAML validator or `python3 -c "import yaml; ya
 ## 🎵 Happy Monitoring!
 
 For more information, see the main DataMetronome documentation.
-

@@ -489,4 +489,3 @@ stave = Stave(
 - `tests/test_stave_examples.py` - Working code examples
 - `STAVES_QUICKSTART.md` - Quick start guide
 - `models/stave.py` - Model source with docstrings
-

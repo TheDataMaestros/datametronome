@@ -61,7 +61,7 @@ class CheckResult:
 
 # Mapping:
 # pass -> Harmony
-# warn -> Dissonance  
+# warn -> Dissonance
 # fail -> Cacophony
 ```
 

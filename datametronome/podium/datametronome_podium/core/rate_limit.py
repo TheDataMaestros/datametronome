@@ -4,21 +4,21 @@ Rate limiting for DataMetronome Podium API.
 Prevents API abuse and ensures fair resource allocation.
 """
 
+from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from fastapi import Request
 
 
 def get_identifier(request: Request) -> str:
     """
     Get identifier for rate limiting.
-    
+
     Uses remote address as primary identifier.
     Can be extended to use API keys or user IDs.
-    
+
     Args:
         request: FastAPI request object
-        
+
     Returns:
         Identifier string for rate limiting
     """
@@ -26,7 +26,7 @@ def get_identifier(request: Request) -> str:
     forwarded = request.headers.get("X-Forwarded-For")
     if forwarded:
         return forwarded.split(",")[0].strip()
-    
+
     # Fallback to direct remote address
     return get_remote_address(request)
 
@@ -53,12 +53,11 @@ RATE_LIMITS = {
 def get_rate_limit(endpoint_type: str = "default") -> str:
     """
     Get rate limit for specific endpoint type.
-    
+
     Args:
         endpoint_type: Type of endpoint (auth, read, write, health, metrics)
-        
+
     Returns:
         Rate limit string (e.g., "10 per minute")
     """
     return RATE_LIMITS.get(endpoint_type, "100 per minute")
-

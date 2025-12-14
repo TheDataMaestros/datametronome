@@ -2,87 +2,82 @@
 Pydantic schemas for Clef operations.
 """
 
-from typing import Any
 import re
-from pydantic import BaseModel, Field, field_validator, ConfigDict
+from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 VALID_CHECK_TYPES = [
     "row_count",
-    "freshness", 
+    "freshness",
     "column_values",
     "forecast",
     "data_profile_drift",
     "lookup_validation",
-    "python"
+    "python",
 ]
 
 
 class ClefBase(BaseModel):
     """Base clef schema."""
-    
-    model_config = ConfigDict(json_schema_extra={
-        "example": {
-            "name": "Check for NULL emails",
-            "description": "Ensures all users have valid email addresses",
-            "check_type": "null_check",
-            "config": {
-                "table": "users",
-                "column": "email",
-                "threshold": 0.01
-            },
-            "schedule": "0 * * * *",
-            "is_active": True
+
+    model_config = ConfigDict(
+        json_schema_extra={
+            "example": {
+                "name": "Check for NULL emails",
+                "description": "Ensures all users have valid email addresses",
+                "check_type": "null_check",
+                "config": {"table": "users", "column": "email", "threshold": 0.01},
+                "schedule": "0 * * * *",
+                "is_active": True,
+            }
         }
-    })
-    
+    )
+
     stave_id: str = Field(..., description="ID of the associated stave")
     name: str = Field(
-        ..., 
-        min_length=1, 
+        ...,
+        min_length=1,
         max_length=255,
         description="Human-readable name for the data quality check",
-        examples=["Check for NULL emails", "Validate age range", "Check duplicate IDs"]
+        examples=["Check for NULL emails", "Validate age range", "Check duplicate IDs"],
     )
     description: str | None = Field(
         None,
         max_length=1000,
         description="Detailed description of what this check validates",
-        examples=["Ensures all user records have valid, non-null email addresses"]
+        examples=["Ensures all user records have valid, non-null email addresses"],
     )
     check_type: str = Field(
-        ..., 
-        min_length=1, 
+        ...,
+        min_length=1,
         max_length=100,
         description=f"Type of data quality check. Supported: {', '.join(VALID_CHECK_TYPES)}",
-        examples=["null_check"]
+        examples=["null_check"],
     )
     config: dict[str, Any] = Field(
-        ..., 
+        ...,
         description="Check-specific configuration parameters",
-        examples=[{"table": "users", "column": "email", "threshold": 0.01}]
+        examples=[{"table": "users", "column": "email", "threshold": 0.01}],
     )
     schedule: str | None = Field(
-        None, 
+        None,
         description="Cron expression for automatic scheduling (e.g., '0 * * * *' for hourly)",
-        examples=["0 * * * *", "0 0 * * *", "*/15 * * * *"]
+        examples=["0 * * * *", "0 0 * * *", "*/15 * * * *"],
     )
-    is_active: bool = Field(
-        True,
-        description="Whether this check is actively running"
-    )
+    is_active: bool = Field(True, description="Whether this check is actively running")
     warn: str | None = Field(
         None,
         description="Warning condition (e.g., '> 5000', 'if_null > 5%')",
-        examples=["> 5000", "if_null > 5%", "< 20%"]
+        examples=["> 5000", "if_null > 5%", "< 20%"],
     )
     fail: str | None = Field(
         None,
         description="Failure condition (e.g., '< 1000', 'if_null > 10%')",
-        examples=["< 1000", "if_null > 10%", "> 50%"]
+        examples=["< 1000", "if_null > 10%", "> 50%"],
     )
-    
-    @field_validator('check_type')
+
+    @field_validator("check_type")
     @classmethod
     def validate_check_type(cls, v: str) -> str:
         """Validate check type is supported."""
@@ -91,24 +86,31 @@ class ClefBase(BaseModel):
                 f"check_type must be one of {VALID_CHECK_TYPES}, got '{v}'"
             )
         return v.lower()
-    
-    @field_validator('schedule')
+
+    @field_validator("schedule")
     @classmethod
     def validate_schedule(cls, v: str | None) -> str | None:
         """Validate cron expression format."""
         if v is None:
             return v
-        
+
         # Accept shorthand formats like @hourly, @daily, etc.
-        if v.startswith('@'):
-            valid_shorthands = ['@yearly', '@monthly', '@weekly', '@daily', '@hourly', '@minutely']
+        if v.startswith("@"):
+            valid_shorthands = [
+                "@yearly",
+                "@monthly",
+                "@weekly",
+                "@daily",
+                "@hourly",
+                "@minutely",
+            ]
             if v.lower() in valid_shorthands:
                 return v.lower()
             else:
                 raise ValueError(
                     f"Invalid cron shorthand: '{v}'. Valid shorthands: {', '.join(valid_shorthands)}"
                 )
-        
+
         # Basic cron validation (5 or 6 fields separated by spaces)
         parts = v.split()
         if len(parts) not in [5, 6]:
@@ -116,17 +118,24 @@ class ClefBase(BaseModel):
                 f"Invalid cron expression: '{v}'. Must have 5 or 6 fields. "
                 "Example: '0 * * * *' (hourly) or '0 0 * * *' (daily)"
             )
-        
+
         # Check if it's a shorthand like @hourly, @daily, etc.
-        shorthands = ['@yearly', '@annually', '@monthly', '@weekly', '@daily', '@hourly']
-        if v.startswith('@') and v.lower() not in shorthands:
+        shorthands = [
+            "@yearly",
+            "@annually",
+            "@monthly",
+            "@weekly",
+            "@daily",
+            "@hourly",
+        ]
+        if v.startswith("@") and v.lower() not in shorthands:
             raise ValueError(
                 f"Invalid cron shorthand: '{v}'. Supported: {', '.join(shorthands)}"
             )
-        
+
         return v
-    
-    @field_validator('config')
+
+    @field_validator("config")
     @classmethod
     def validate_config(cls, v: dict[str, Any]) -> dict[str, Any]:
         """Validate config has required fields."""
@@ -137,12 +146,13 @@ class ClefBase(BaseModel):
 
 class ClefCreate(ClefBase):
     """Schema for creating a clef."""
+
     pass
 
 
 class ClefUpdate(BaseModel):
     """Schema for updating a clef."""
-    
+
     name: str | None = Field(None, min_length=1, max_length=255)
     description: str | None = None
     check_type: str | None = Field(None, min_length=1, max_length=100)
@@ -154,10 +164,10 @@ class ClefUpdate(BaseModel):
 
 class ClefResponse(ClefBase):
     """Schema for clef responses."""
-    
+
     id: str
     created_at: str
     updated_at: str
-    
+
     class Config:
         from_attributes = True

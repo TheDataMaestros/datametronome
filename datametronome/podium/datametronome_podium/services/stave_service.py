@@ -14,16 +14,16 @@ Example Usage:
         user="monitor",
         password="secret"
     )
-    
+
     # Create a SQLite stave
     stave = create_sqlite_stave(
         name="Local Analytics",
         path="/data/analytics.db"
     )
-    
+
     # Serialize for database storage
     stave_dict = serialize_stave(stave)
-    
+
     # Deserialize from database
     stave = deserialize_stave(stave_dict)
 """
@@ -33,13 +33,13 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from datametronome_podium.models.stave import Stave, SUPPORTED_DATA_SOURCES
-from datametronome_podium.models.clef import Clef, SUPPORTED_CHECK_TYPES
-
+from datametronome_podium.models.clef import SUPPORTED_CHECK_TYPES, Clef
+from datametronome_podium.models.stave import SUPPORTED_DATA_SOURCES, Stave
 
 # =============================================================================
 # Stave Creation Helpers
 # =============================================================================
+
 
 def generate_stave_id() -> str:
     """Generate a unique stave ID."""
@@ -56,21 +56,21 @@ def create_stave(
     data_source_type: str,
     connection_config: dict[str, Any],
     description: str | None = None,
-    is_active: bool = True
+    is_active: bool = True,
 ) -> Stave:
     """
     Create a new Stave with auto-generated ID and timestamps.
-    
+
     Args:
         name: Human-readable name for the data source
         data_source_type: Type of data source (postgres, mysql, sqlite, etc.)
         connection_config: Connection parameters dict
         description: Optional description
         is_active: Whether monitoring is active
-        
+
     Returns:
         Stave instance ready to be saved
-        
+
     Example:
         >>> stave = create_stave(
         ...     name="Production Database",
@@ -91,7 +91,7 @@ def create_stave(
         connection_config=connection_config,
         is_active=is_active,
         created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc)
+        updated_at=datetime.now(timezone.utc),
     )
 
 
@@ -103,11 +103,11 @@ def create_postgres_stave(
     password: str | None = None,
     port: int = 5432,
     description: str | None = None,
-    **kwargs
+    **kwargs,
 ) -> Stave:
     """
     Create a PostgreSQL Stave with sensible defaults.
-    
+
     Example:
         >>> stave = create_postgres_stave(
         ...     name="Production DB",
@@ -126,24 +126,21 @@ def create_postgres_stave(
     if password:
         config["password"] = password
     config.update(kwargs)
-    
+
     return create_stave(
         name=name,
         data_source_type="postgres",
         connection_config=config,
-        description=description
+        description=description,
     )
 
 
 def create_sqlite_stave(
-    name: str,
-    path: str,
-    description: str | None = None,
-    **kwargs
+    name: str, path: str, description: str | None = None, **kwargs
 ) -> Stave:
     """
     Create a SQLite Stave.
-    
+
     Example:
         >>> stave = create_sqlite_stave(
         ...     name="Local Analytics",
@@ -152,12 +149,12 @@ def create_sqlite_stave(
     """
     config = {"path": path}
     config.update(kwargs)
-    
+
     return create_stave(
         name=name,
         data_source_type="sqlite",
         connection_config=config,
-        description=description
+        description=description,
     )
 
 
@@ -169,11 +166,11 @@ def create_mysql_stave(
     password: str | None = None,
     port: int = 3306,
     description: str | None = None,
-    **kwargs
+    **kwargs,
 ) -> Stave:
     """
     Create a MySQL Stave with sensible defaults.
-    
+
     Example:
         >>> stave = create_mysql_stave(
         ...     name="MySQL DB",
@@ -191,18 +188,19 @@ def create_mysql_stave(
     if password:
         config["password"] = password
     config.update(kwargs)
-    
+
     return create_stave(
         name=name,
         data_source_type="mysql",
         connection_config=config,
-        description=description
+        description=description,
     )
 
 
 # =============================================================================
 # Clef Creation Helpers
 # =============================================================================
+
 
 def create_clef(
     stave_id: str,
@@ -213,11 +211,11 @@ def create_clef(
     schedule: str | None = None,
     is_active: bool = True,
     warn: str | None = None,
-    fail: str | None = None
+    fail: str | None = None,
 ) -> Clef:
     """
     Create a new Clef with auto-generated ID and timestamps.
-    
+
     Args:
         stave_id: ID of the Stave this check belongs to
         name: Human-readable name for the check
@@ -226,10 +224,10 @@ def create_clef(
         description: Optional description
         schedule: Optional cron expression for scheduling
         is_active: Whether check is active
-        
+
     Returns:
         Clef instance ready to be saved
-        
+
     Example:
         >>> clef = create_clef(
         ...     stave_id="stave-123",
@@ -250,7 +248,7 @@ def create_clef(
         warn=warn,
         fail=fail,
         created_at=datetime.now(timezone.utc),
-        updated_at=datetime.now(timezone.utc)
+        updated_at=datetime.now(timezone.utc),
     )
 
 
@@ -260,11 +258,11 @@ def create_null_check(
     table: str,
     column: str,
     threshold: float = 0.0,
-    schedule: str | None = None
+    schedule: str | None = None,
 ) -> Clef:
     """
     Create a NULL value check.
-    
+
     Args:
         stave_id: ID of the Stave
         name: Name for this check
@@ -272,7 +270,7 @@ def create_null_check(
         column: Column name to check
         threshold: Maximum allowed percentage of NULL values (0.0 = no NULLs allowed)
         schedule: Optional cron schedule
-        
+
     Example:
         >>> check = create_null_check(
         ...     stave_id="stave-123",
@@ -286,14 +284,10 @@ def create_null_check(
         stave_id=stave_id,
         name=name,
         check_type="column_values",
-        config={
-            "table": table,
-            "column": column,
-            "condition": "if_null"
-        },
+        config={"table": table, "column": column, "condition": "if_null"},
         warn=f"if_null > {threshold * 100:.1f}%" if threshold > 0 else None,
         fail="if_null > 0%" if threshold == 0 else None,
-        schedule=schedule
+        schedule=schedule,
     )
 
 
@@ -304,11 +298,11 @@ def create_range_check(
     column: str,
     min_value: float | None = None,
     max_value: float | None = None,
-    schedule: str | None = None
+    schedule: str | None = None,
 ) -> Clef:
     """
     Create a range validation check.
-    
+
     Args:
         stave_id: ID of the Stave
         name: Name for this check
@@ -317,7 +311,7 @@ def create_range_check(
         min_value: Minimum allowed value (optional)
         max_value: Maximum allowed value (optional)
         schedule: Optional cron schedule
-        
+
     Example:
         >>> check = create_range_check(
         ...     stave_id="stave-123",
@@ -333,13 +327,13 @@ def create_range_check(
         config["min"] = min_value
     if max_value is not None:
         config["max"] = max_value
-        
+
     return create_clef(
         stave_id=stave_id,
         name=name,
         check_type="column_values",
         config=config,
-        schedule=schedule
+        schedule=schedule,
     )
 
 
@@ -349,11 +343,11 @@ def create_volume_check(
     table: str,
     expected_min: int | None = None,
     expected_max: int | None = None,
-    schedule: str | None = None
+    schedule: str | None = None,
 ) -> Clef:
     """
     Create a row count check.
-    
+
     Args:
         stave_id: ID of the Stave
         name: Name for this check
@@ -361,7 +355,7 @@ def create_volume_check(
         expected_min: Minimum expected row count (optional)
         expected_max: Maximum expected row count (optional)
         schedule: Optional cron schedule
-        
+
     Example:
         >>> check = create_volume_check(
         ...     stave_id="stave-123",
@@ -376,13 +370,13 @@ def create_volume_check(
         config["expected_min"] = expected_min
     if expected_max is not None:
         config["expected_max"] = expected_max
-        
+
     return create_clef(
         stave_id=stave_id,
         name=name,
         check_type="row_count",
         config=config,
-        schedule=schedule
+        schedule=schedule,
     )
 
 
@@ -390,18 +384,19 @@ def create_volume_check(
 # Serialization Helpers (for database storage)
 # =============================================================================
 
+
 def serialize_stave(stave: Stave) -> dict[str, Any]:
     """
     Serialize a Stave for database storage.
-    
+
     Converts connection_config dict to JSON string for TEXT column storage.
-    
+
     Args:
         stave: Stave instance
-        
+
     Returns:
         Dict ready for database insertion
-        
+
     Example:
         >>> stave = create_postgres_stave("DB", "localhost", "db", "user")
         >>> data = serialize_stave(stave)
@@ -419,42 +414,42 @@ def serialize_stave(stave: Stave) -> dict[str, Any]:
 def deserialize_stave(data: dict[str, Any]) -> Stave:
     """
     Deserialize a Stave from database storage.
-    
+
     Converts connection_config JSON string back to dict.
-    
+
     Args:
         data: Database row dict
-        
+
     Returns:
         Stave instance
-        
+
     Example:
         >>> db_row = {"id": "...", "connection_config": "{...}", ...}
         >>> stave = deserialize_stave(db_row)
     """
     # Make a copy so we don't modify the original
     data = dict(data)
-    
+
     # Convert connection_config JSON string to dict
     if isinstance(data.get("connection_config"), str):
         data["connection_config"] = json.loads(data["connection_config"])
-    
+
     # Keep datetime fields as strings for API compatibility
     # (The API schemas expect strings, not datetime objects)
-    
+
     return Stave(**data)
 
 
 def serialize_clef(clef: Clef) -> dict[str, Any]:
     """
     Serialize a Clef for database storage.
-    
+
     Converts config dict to JSON string for TEXT column storage.
     Only includes fields that exist in the database schema.
-    
+
     Args:
         clef: Clef instance
-        
+
     Returns:
         Dict ready for database insertion
     """
@@ -471,7 +466,7 @@ def serialize_clef(clef: Clef) -> dict[str, Any]:
         "warn": clef.warn,
         "fail": clef.fail,
         "created_at": clef.created_at.isoformat(),
-        "updated_at": clef.updated_at.isoformat()
+        "updated_at": clef.updated_at.isoformat(),
     }
     # Add retry_config if present
     if clef.retry_config:
@@ -482,22 +477,22 @@ def serialize_clef(clef: Clef) -> dict[str, Any]:
 def deserialize_clef(data: dict[str, Any]) -> Clef:
     """
     Deserialize a Clef from database storage.
-    
+
     Converts config and retry_config JSON strings back to dicts.
-    
+
     Args:
         data: Database row dict
-        
+
     Returns:
         Clef instance
     """
     # Make a copy so we don't modify the original
     data = dict(data)
-    
+
     # Convert config JSON string to dict
     if isinstance(data.get("config"), str):
         data["config"] = json.loads(data["config"])
-    
+
     # Convert retry_config JSON string to dict if present
     if "retry_config" in data and isinstance(data.get("retry_config"), str):
         try:
@@ -505,16 +500,17 @@ def deserialize_clef(data: dict[str, Any]) -> Clef:
         except (json.JSONDecodeError, TypeError):
             # If parsing fails, set to None
             data["retry_config"] = None
-    
+
     # Keep datetime fields as strings for API compatibility
     # (The API schemas expect strings, not datetime objects)
-    
+
     return Clef(**data)
 
 
 # =============================================================================
 # Validation Helpers
 # =============================================================================
+
 
 def is_valid_data_source_type(data_source_type: str) -> bool:
     """Check if a data source type is supported."""
@@ -534,4 +530,3 @@ def get_supported_data_sources() -> list[str]:
 def get_supported_check_types() -> list[str]:
     """Get list of all supported check types."""
     return list(SUPPORTED_CHECK_TYPES)
-

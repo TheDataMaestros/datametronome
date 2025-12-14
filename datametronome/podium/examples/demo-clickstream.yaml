@@ -27,7 +27,7 @@ clefs:
     fail: null  # No threshold - any data is acceptable for demo
     schedule: "*/2 * * * *"  # Run every 2 minutes
     is_active: true
-  
+
   # Row Count Check
   - id: clef-clicks-row-count
     stave_id: stave-demo-clickstream
@@ -40,7 +40,7 @@ clefs:
     fail: "< 10"     # Fail if less than 10 clicks
     schedule: "@hourly"
     is_active: true
-  
+
   # Freshness Check
   - id: clef-clicks-freshness
     stave_id: stave-demo-clickstream
@@ -55,4 +55,3 @@ clefs:
     fail: "> 6 hours"   # Fail if data is older than 6 hours
     schedule: "@hourly"
     is_active: true
-

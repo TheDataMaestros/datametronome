@@ -7,15 +7,17 @@ their execution results.
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
 from datetime import datetime
-
-from fastapi import APIRouter, HTTPException, status, Query
+from typing import Any, Dict, List, Optional
 
 from datametronome_podium.core.database import get_db, insert_data
-from datametronome_podium.services.stave_service import deserialize_stave, deserialize_clef
 from datametronome_podium.services.clef_executor import ClefExecutor
 from datametronome_podium.services.connection_tester import ConnectionTester
+from datametronome_podium.services.stave_service import (
+    deserialize_clef,
+    deserialize_stave,
+)
+from fastapi import APIRouter, HTTPException, Query, status
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -25,16 +27,16 @@ logger = logging.getLogger(__name__)
 async def run_clef_now(clef_id: str) -> Dict[str, Any]:
     """
     Execute a clef immediately.
-    
+
     This endpoint runs a data quality check immediately, bypassing the schedule.
     It returns the execution result with status, observed value, and metadata.
-    
+
     Args:
         clef_id: ID of the clef to execute
-        
+
     Returns:
         Check execution result with status, message, and metadata
-        
+
     Example Response:
         {
             "success": true,
@@ -55,41 +57,39 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
     try:
         # Get the clef and its stave from database
         db = await get_db()
-        
+
         # Get clef
-        clefs = await db.query({
-            "sql": "SELECT * FROM clefs WHERE id = ?", 
-            "params": [clef_id]
-        })
-        
+        clefs = await db.query(
+            {"sql": "SELECT * FROM clefs WHERE id = ?", "params": [clef_id]}
+        )
+
         if not clefs:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Clef not found"
+                status_code=status.HTTP_404_NOT_FOUND, detail="Clef not found"
             )
-        
+
         clef = deserialize_clef(clefs[0])
-        
+
         # Get stave
-        staves = await db.query({
-            "sql": "SELECT * FROM staves WHERE id = ?", 
-            "params": [clef.stave_id]
-        })
-        
+        staves = await db.query(
+            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [clef.stave_id]}
+        )
+
         if not staves:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Associated stave not found"
+                detail="Associated stave not found",
             )
-        
+
         stave = deserialize_stave(staves[0])
-        
+
         # Execute the clef
         executor = ClefExecutor()
         result = await executor.execute_clef(clef, stave)
-        
+
         # Store the result in database
         import json
+
         check_data = {
             "id": f"check-{clef_id}-{datetime.utcnow().isoformat()}",
             "stave_id": stave.id,
@@ -101,14 +101,14 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "execution_time": result.execution_time,
             "anomalies_count": result.anomalies_count,
-            "severity": result.severity.value  # Store the severity value: "harmony", "dissonance", "cacophony"
+            "severity": result.severity.value,  # Store the severity value: "harmony", "dissonance", "cacophony"
         }
-        
+
         await insert_data("checks", check_data)
-        
+
         # Log the execution
         logger.info(f"Clef {clef_id} executed: {result.status}")
-        
+
         return {
             "success": True,
             "clef_id": clef.id,
@@ -118,91 +118,103 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
             "message": result.message,
             "execution_time": result.execution_time,
             "metadata": result.metadata,
-            "check_id": check_data["id"]
+            "check_id": check_data["id"],
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Clef execution failed for {clef_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Clef execution failed: {str(e)}"
+            detail=f"Clef execution failed: {str(e)}",
         )
 
 
 @router.get("/{clef_id}/results")
 async def get_clef_results(
-    clef_id: str,
-    limit: int = Query(10, ge=1, le=100),
-    offset: int = Query(0, ge=0)
+    clef_id: str, limit: int = Query(10, ge=1, le=100), offset: int = Query(0, ge=0)
 ) -> Dict[str, Any]:
     """
     Get execution results for a clef.
-    
+
     This endpoint returns the historical execution results for a specific clef,
     including status, execution time, and metadata.
-    
+
     Args:
         clef_id: ID of the clef
         limit: Maximum number of results to return (1-100)
         offset: Number of results to skip
-        
+
     Returns:
         List of check execution results with pagination info
     """
     try:
         db = await get_db()
-        
+
         # Get total count
-        count_result = await db.query({
-            "sql": "SELECT COUNT(*) as total FROM checks WHERE clef_id = ?",
-            "params": [clef_id]
-        })
+        count_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as total FROM checks WHERE clef_id = ?",
+                "params": [clef_id],
+            }
+        )
         total = count_result[0]["total"] if count_result else 0
-        
+
         # Get results
-        results = await db.query({
-            "sql": """
-                SELECT * FROM checks 
-                WHERE clef_id = ? 
-                ORDER BY timestamp DESC 
+        results = await db.query(
+            {
+                "sql": """
+                SELECT * FROM checks
+                WHERE clef_id = ?
+                ORDER BY timestamp DESC
                 LIMIT ? OFFSET ?
             """,
-            "params": [clef_id, limit, offset]
-        })
-        
+                "params": [clef_id, limit, offset],
+            }
+        )
+
         # Format results with consistent UTC timestamps
         import json
-        from datametronome_podium.core.timestamp_utils import to_utc_isoformat, add_timezone_info_to_response
-        
+
+        from datametronome_podium.core.timestamp_utils import (
+            add_timezone_info_to_response,
+            to_utc_isoformat,
+        )
+
         formatted_results = []
         for result in results:
             # Parse metadata from JSON string if it exists
             metadata = None
             if result["details"]:
                 try:
-                    metadata = json.loads(result["details"]) if isinstance(result["details"], str) else result["details"]
+                    metadata = (
+                        json.loads(result["details"])
+                        if isinstance(result["details"], str)
+                        else result["details"]
+                    )
                 except (json.JSONDecodeError, TypeError):
                     metadata = result["details"]  # Keep as-is if parsing fails
-            
+
             # Ensure timestamp is in UTC format
             timestamp = result["timestamp"]
-            if timestamp and not timestamp.endswith('Z'):
+            if timestamp and not timestamp.endswith("Z"):
                 # Convert to UTC format if not already
                 timestamp = to_utc_isoformat(timestamp)
-            
-            formatted_results.append({
-                "id": result["id"],
-                "status": result["status"],
-                "message": result["message"],
-                "timestamp": timestamp,
-                "execution_time": result["execution_time"],
-                "anomalies_count": result["anomalies_count"],
-                "severity": result["severity"],
-                "metadata": metadata
-            })
-        
+
+            formatted_results.append(
+                {
+                    "id": result["id"],
+                    "status": result["status"],
+                    "message": result["message"],
+                    "timestamp": timestamp,
+                    "execution_time": result["execution_time"],
+                    "anomalies_count": result["anomalies_count"],
+                    "severity": result["severity"],
+                    "metadata": metadata,
+                }
+            )
+
         response_data = {
             "clef_id": clef_id,
             "results": formatted_results,
@@ -210,48 +222,47 @@ async def get_clef_results(
                 "total": total,
                 "limit": limit,
                 "offset": offset,
-                "has_more": offset + limit < total
+                "has_more": offset + limit < total,
             },
             "_timezone_info": {
                 "backend_timezone": "UTC",
                 "timestamp_format": "ISO 8601 with Z suffix (e.g., 2025-10-08T22:30:00Z)",
-                "note": "All timestamps are stored and processed in UTC. UI converts to local timezone for display."
-            }
+                "note": "All timestamps are stored and processed in UTC. UI converts to local timezone for display.",
+            },
         }
-        
+
         return response_data
-        
+
     except Exception as e:
         logger.error(f"Failed to get results for clef {clef_id}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get clef results: {str(e)}"
+            detail=f"Failed to get clef results: {str(e)}",
         )
 
 
 @router.get("/results/latest")
-async def get_latest_results(
-    limit: int = Query(20, ge=1, le=100)
-) -> Dict[str, Any]:
+async def get_latest_results(limit: int = Query(20, ge=1, le=100)) -> Dict[str, Any]:
     """
     Get the latest execution results across all clefs.
-    
+
     This endpoint returns the most recent check execution results,
     useful for monitoring the overall health of data quality checks.
-    
+
     Args:
         limit: Maximum number of results to return (1-100)
-        
+
     Returns:
         List of latest check execution results with clef and stave info
     """
     try:
         db = await get_db()
-        
+
         # Get latest results with clef and stave info
-        results = await db.query({
-            "sql": """
-                SELECT 
+        results = await db.query(
+            {
+                "sql": """
+                SELECT
                     c.*,
                     cl.name as clef_name,
                     cl.check_type,
@@ -263,36 +274,36 @@ async def get_latest_results(
                 ORDER BY c.timestamp DESC
                 LIMIT ?
             """,
-            "params": [limit]
-        })
-        
+                "params": [limit],
+            }
+        )
+
         # Format results
         formatted_results = []
         for result in results:
-            formatted_results.append({
-                "id": result["id"],
-                "clef_id": result["clef_id"],
-                "clef_name": result["clef_name"],
-                "check_type": result["check_type"],
-                "stave_id": result["stave_id"],
-                "stave_name": result["stave_name"],
-                "data_source_type": result["data_source_type"],
-                "status": result["status"],
-                "message": result["message"],
-                "timestamp": result["timestamp"],
-                "execution_time": result["execution_time"],
-                "anomalies_count": result["anomalies_count"],
-                "severity": result["severity"]
-            })
-        
-        return {
-            "results": formatted_results,
-            "count": len(formatted_results)
-        }
-        
+            formatted_results.append(
+                {
+                    "id": result["id"],
+                    "clef_id": result["clef_id"],
+                    "clef_name": result["clef_name"],
+                    "check_type": result["check_type"],
+                    "stave_id": result["stave_id"],
+                    "stave_name": result["stave_name"],
+                    "data_source_type": result["data_source_type"],
+                    "status": result["status"],
+                    "message": result["message"],
+                    "timestamp": result["timestamp"],
+                    "execution_time": result["execution_time"],
+                    "anomalies_count": result["anomalies_count"],
+                    "severity": result["severity"],
+                }
+            )
+
+        return {"results": formatted_results, "count": len(formatted_results)}
+
     except Exception as e:
         logger.error(f"Failed to get latest results: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get latest results: {str(e)}"
+            detail=f"Failed to get latest results: {str(e)}",
         )

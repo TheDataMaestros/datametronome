@@ -9,7 +9,7 @@ Our Clef implementation now **fully aligns** with the TDD Clefs specification. H
 ### 1. **Check Types** ✅
 **TDD Specification → Our Implementation**
 - `row_count` ← `volume_check` (renamed)
-- `freshness` ← `freshness_check` (renamed)  
+- `freshness` ← `freshness_check` (renamed)
 - `column_values` ← `null_check`, `range_check`, `pattern_check` (consolidated)
 - `forecast` ✅ (matches exactly)
 - `data_profile_drift` ← `drift_detection` (renamed)
@@ -33,7 +33,7 @@ clef:
 ```python
 Clef(
     check_type: "row_count",
-    name: "Daily row count check", 
+    name: "Daily row count check",
     warn: "> 5000",    # TDD-compliant
     fail: "< 1000",    # TDD-compliant
     config: {"table": "users"}
@@ -58,7 +58,7 @@ class CheckResult:
     observed_value: Any
     message: str
     metadata: Dict[str, Any] = None
-    
+
     @property
     def severity(self) -> SeverityLevel:
         # Maps: pass->Harmony, warn->Dissonance, fail->Cacophony
@@ -67,7 +67,7 @@ class CheckResult:
 ### 4. **Severity Mapping** ✅
 **TDD Specification:**
 - `pass` → **Harmony** ✅
-- `warn` → **Dissonance** ✅  
+- `warn` → **Dissonance** ✅
 - `fail` → **Cacophony** ✅
 
 ### 5. **Level Organization** ✅
@@ -84,7 +84,7 @@ We maintain full backward compatibility with legacy check types:
 ```python
 LEGACY_CHECK_MAPPING = {
     "volume_check": "row_count",
-    "freshness_check": "freshness", 
+    "freshness_check": "freshness",
     "null_check": "column_values",
     # ... etc
 }

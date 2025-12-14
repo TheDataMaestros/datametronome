@@ -1,15 +1,15 @@
 """Check schemas for DataMetronome Podium."""
 
+import json
 from datetime import datetime
 from typing import Any
-import json
 
 from pydantic import BaseModel, Field, field_validator
 
 
 class CheckBase(BaseModel):
     """Base check schema."""
-    
+
     stave_id: str
     clef_id: str
     check_type: str
@@ -36,13 +36,13 @@ class CheckBase(BaseModel):
 
 class CheckCreate(CheckBase):
     """Schema for creating a check."""
-    
+
     id: str
 
 
 class CheckUpdate(BaseModel):
     """Schema for updating a check."""
-    
+
     status: str | None = None
     message: str | None = None
     details: dict[str, Any] | None = None
@@ -53,13 +53,13 @@ class CheckUpdate(BaseModel):
 
 class CheckResponse(CheckBase):
     """Schema for check response."""
-    
+
     id: str
 
 
 class CheckRunBase(BaseModel):
     """Base check run schema."""
-    
+
     clef_id: str
     status: str = Field(..., description="Check status: success, failure, error")
     started_at: datetime
@@ -71,15 +71,11 @@ class CheckRunBase(BaseModel):
 
 class CheckRunCreate(CheckRunBase):
     """Schema for creating a check run."""
-    
+
     pass
 
 
 class CheckRunResponse(CheckRunBase):
     """Schema for check run response."""
-    
+
     id: str
-
-
-
-

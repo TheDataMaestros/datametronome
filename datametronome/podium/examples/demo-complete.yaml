@@ -52,7 +52,7 @@ clefs:
   # ============================================================================
   # Clickstream Monitoring Clefs
   # ============================================================================
-  
+
   - id: clef-clicks-user-id-null
     stave_id: stave-demo-clickstream
     name: Clicks NULL Value Check
@@ -66,7 +66,7 @@ clefs:
     fail: null
     schedule: "*/2 * * * *"  # Run every 2 minutes
     is_active: true
-  
+
   - id: clef-clicks-volume
     stave_id: stave-demo-clickstream
     name: Clickstream Volume Check
@@ -78,7 +78,7 @@ clefs:
     fail: "< 10"     # Fail if less than 10 clicks
     schedule: "@hourly"
     is_active: true
-  
+
   - id: clef-clicks-freshness
     stave_id: stave-demo-clickstream
     name: Clickstream Data Freshness
@@ -92,11 +92,11 @@ clefs:
     fail: "> 6 hours"   # Fail if data is older than 6 hours
     schedule: "@hourly"
     is_active: true
-  
+
   # ============================================================================
   # E-commerce Monitoring Clefs
   # ============================================================================
-  
+
   # Users table checks
   - id: clef-users-email-null
     stave_id: stave-demo-ecommerce
@@ -111,7 +111,7 @@ clefs:
     fail: "if_null > 20%"  # Fail if more than 20% NULL
     schedule: "@hourly"
     is_active: true
-  
+
   - id: clef-users-row-count
     stave_id: stave-demo-ecommerce
     name: ✅ Users Table Volume
@@ -123,7 +123,7 @@ clefs:
     fail: "< 10"     # Fail if less than 10 users
     schedule: "@hourly"
     is_active: true
-  
+
   # Products table checks
   - id: clef-products-price-validation
     stave_id: stave-demo-ecommerce
@@ -138,7 +138,7 @@ clefs:
     fail: "< 0.01"  # Fail if price is zero or negative
     schedule: "@hourly"
     is_active: true
-  
+
   - id: clef-products-row-count
     stave_id: stave-demo-ecommerce
     name: ⚠️ Products Availability Check
@@ -150,7 +150,7 @@ clefs:
     fail: "< 1"      # Fail if no products
     schedule: "@hourly"
     is_active: true
-  
+
   # Orders table checks
   - id: clef-orders-volume
     stave_id: stave-demo-ecommerce
@@ -163,7 +163,7 @@ clefs:
     fail: "< 1"      # Fail if no orders
     schedule: "@daily"
     is_active: true
-  
+
   - id: clef-orders-freshness
     stave_id: stave-demo-ecommerce
     name: Orders Data Freshness
@@ -177,11 +177,11 @@ clefs:
     fail: "> 7 days"   # Fail if no orders in a week
     schedule: "@daily"
     is_active: true
-  
+
   # ============================================================================
   # BigQuery Cloud Analytics Clefs (when BigQuery is configured)
   # ============================================================================
-  
+
   - id: clef-bigquery-users-email-null
     stave_id: stave-demo-bigquery
     name: 🌐 BigQuery Email NULL Check
@@ -193,7 +193,7 @@ clefs:
       threshold: 0.0
     schedule: "0 */6 * * *"  # Every 6 hours
     is_active: true  # ✅ ENABLED
-  
+
   - id: clef-bigquery-events-freshness
     stave_id: stave-demo-bigquery
     name: 🌐 BigQuery Events Freshness
@@ -205,7 +205,7 @@ clefs:
       max_age_hours: 24
     schedule: "0 */1 * * *"  # Hourly
     is_active: false
-  
+
   - id: clef-bigquery-orders-range
     stave_id: stave-demo-bigquery
     name: 🌐 BigQuery Order Amount Range
@@ -219,7 +219,7 @@ clefs:
       threshold: 0.01
     schedule: "0 */4 * * *"  # Every 4 hours
     is_active: false
-  
+
   - id: clef-bigquery-email-pattern
     stave_id: stave-demo-bigquery
     name: 🌐 BigQuery Email Pattern Check
@@ -236,7 +236,7 @@ clefs:
   # ============================================================================
   # Advanced Monitoring Clefs (ML and Analytics)
   # ============================================================================
-  
+
   - id: clef-ml-anomaly-detection
     stave_id: stave-demo-ecommerce
     name: 🤖 ML Anomaly Detection
@@ -250,7 +250,7 @@ clefs:
         confidence: 95
     schedule: "@daily"
     is_active: true
-  
+
   - id: clef-data-drift-detection
     stave_id: stave-demo-ecommerce
     name: 📊 Data Drift Detection
@@ -263,4 +263,3 @@ clefs:
       drift_threshold: 0.1
     schedule: "@daily"
     is_active: true
-

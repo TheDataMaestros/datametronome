@@ -11,7 +11,7 @@ staves:
       port: 5432
       database: prod_db
       user: monitor
-      
+
   - id: stave-002
     name: Production Database  # Duplicate name!
     data_source_type: postgres
@@ -20,7 +20,7 @@ staves:
       port: 5432
       database: prod_db
       user: monitor
-      
+
   # Same connection as above (conflict warning)
   - id: stave-003
     name: Main DB
@@ -30,7 +30,7 @@ staves:
       port: 5432
       database: prod_db
       user: monitor
-      
+
   # Hardcoded password (warning)
   - id: stave-004
     name: Local Development DB
@@ -41,7 +41,7 @@ staves:
       database: dev_db
       user: dev_user
       password: hardcoded_password_123  # Bad!
-      
+
   # Production name with localhost (warning)
   - id: stave-005
     name: Production Cache
@@ -50,7 +50,7 @@ staves:
       host: localhost  # Production using localhost?
       port: 6379
       db: 0
-      
+
   # Too many connections to same host
   - id: stave-006
     name: Analytics DB
@@ -60,7 +60,7 @@ staves:
       port: 5432
       database: analytics
       user: monitor
-      
+
   - id: stave-007
     name: Logs DB
     data_source_type: postgres
@@ -69,7 +69,7 @@ staves:
       port: 5432
       database: logs
       user: monitor
-      
+
   - id: stave-008
     name: Metrics DB
     data_source_type: postgres
@@ -88,7 +88,7 @@ clefs:
     config:
       table: users
       column: email
-      
+
   # Invalid range check (error)
   - id: clef-002
     stave_id: stave-001
@@ -99,7 +99,7 @@ clefs:
       column: age
       min: 150
       max: 0  # min > max!
-      
+
   # Invalid null threshold (error)
   - id: clef-003
     stave_id: stave-001
@@ -109,7 +109,7 @@ clefs:
       table: users
       column: email
       threshold: 2.0  # Should be 0-1!
-      
+
   # Inappropriate check type for Redis
   - id: clef-004
     stave_id: stave-005
@@ -118,7 +118,7 @@ clefs:
     config:
       table: users
       column: email
-      
+
   # Too many checks with same name on same stave
   - id: clef-005
     stave_id: stave-001
@@ -127,7 +127,7 @@ clefs:
     config:
       table: users
       column: email
-      
+
   - id: clef-006
     stave_id: stave-001
     name: Email Check  # Duplicate name!
@@ -136,7 +136,7 @@ clefs:
       table: users
       column: email
       pattern: "^[^@]+@[^@]+$"
-      
+
   # Many checks scheduled at same time (performance warning)
   - id: clef-007
     stave_id: stave-001
@@ -145,7 +145,7 @@ clefs:
     config:
       table: users
     schedule: "@hourly"
-    
+
   - id: clef-008
     stave_id: stave-001
     name: Hourly Check 2
@@ -153,7 +153,7 @@ clefs:
     config:
       table: orders
     schedule: "@hourly"
-    
+
   - id: clef-009
     stave_id: stave-001
     name: Hourly Check 3
@@ -161,7 +161,7 @@ clefs:
     config:
       table: products
     schedule: "@hourly"
-    
+
   - id: clef-010
     stave_id: stave-001
     name: Hourly Check 4
@@ -169,7 +169,7 @@ clefs:
     config:
       table: categories
     schedule: "@hourly"
-    
+
   - id: clef-011
     stave_id: stave-001
     name: Hourly Check 5
@@ -177,7 +177,7 @@ clefs:
     config:
       table: reviews
     schedule: "@hourly"
-    
+
   # More hourly checks to trigger the warning
   - id: clef-012
     stave_id: stave-001
@@ -186,7 +186,7 @@ clefs:
     config:
       table: payments
     schedule: "@hourly"
-    
+
   - id: clef-013
     stave_id: stave-001
     name: Hourly Check 7
@@ -194,7 +194,7 @@ clefs:
     config:
       table: invoices
     schedule: "@hourly"
-    
+
   - id: clef-014
     stave_id: stave-001
     name: Hourly Check 8
@@ -202,7 +202,7 @@ clefs:
     config:
       table: customers
     schedule: "@hourly"
-    
+
   - id: clef-015
     stave_id: stave-001
     name: Hourly Check 9
@@ -210,7 +210,7 @@ clefs:
     config:
       table: suppliers
     schedule: "@hourly"
-    
+
   - id: clef-016
     stave_id: stave-001
     name: Hourly Check 10
@@ -218,7 +218,7 @@ clefs:
     config:
       table: inventory
     schedule: "@hourly"
-    
+
   - id: clef-017
     stave_id: stave-001
     name: Hourly Check 11

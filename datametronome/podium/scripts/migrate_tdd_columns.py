@@ -13,19 +13,20 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 from datametronome_podium.core.database import get_db
 
+
 async def migrate_clefs_table():
     """Add TDD-compliant columns to the clefs table."""
     print("🎵 DataMetronome TDD Migration")
     print("=" * 35)
     print("Adding TDD-compliant columns to clefs table...")
-    
+
     try:
         # Get database connection
         db = await get_db()
-        
+
         # Check if columns already exist
         print("🔍 Checking current table structure...")
-        
+
         # Add warn column if it doesn't exist
         try:
             await db.execute("ALTER TABLE clefs ADD COLUMN warn TEXT")
@@ -35,7 +36,7 @@ async def migrate_clefs_table():
                 print("ℹ️  'warn' column already exists")
             else:
                 raise
-        
+
         # Add fail column if it doesn't exist
         try:
             await db.execute("ALTER TABLE clefs ADD COLUMN fail TEXT")
@@ -45,7 +46,7 @@ async def migrate_clefs_table():
                 print("ℹ️  'fail' column already exists")
             else:
                 raise
-        
+
         # Verify the migration by trying to query the new columns
         print("\n🔍 Verifying migration...")
         try:
@@ -58,15 +59,16 @@ async def migrate_clefs_table():
         except Exception as e:
             print(f"❌ Migration verification failed: {e}")
             return False
-            
+
     except Exception as e:
         print(f"\n❌ Migration failed: {e}")
         return False
 
+
 async def main():
     """Main migration function."""
     success = await migrate_clefs_table()
-    
+
     if success:
         print("\n🚀 Next Steps:")
         print("   1. Import demo configurations:")
@@ -79,6 +81,7 @@ async def main():
         print("   - Check database connection")
         print("   - Verify database permissions")
         return 1
+
 
 if __name__ == "__main__":
     exit_code = asyncio.run(main())

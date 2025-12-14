@@ -26,7 +26,7 @@ stave = create_postgres_stave(
     description="Main production database"
 )
 
-print(stave)  
+print(stave)
 # Output: 🟢 Active Production Database (postgres)
 ```
 
@@ -254,10 +254,10 @@ def test_my_stave_feature():
         name="Test DB",
         path="/tmp/test.db"
     )
-    
+
     # Use it in your code
     result = my_function(stave)
-    
+
     # Assert expected behavior
     assert result.is_active
 ```
@@ -300,4 +300,3 @@ pytest tests/test_stave_examples.py -v -s
 ```
 
 Happy monitoring! 🎵
-

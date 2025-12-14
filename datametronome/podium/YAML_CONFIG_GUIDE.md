@@ -49,7 +49,7 @@ staves:
       user: monitor_user
       password: ${POSTGRES_PASSWORD}
     is_active: true
-    
+
   - id: stave-cache-001
     name: Redis Cache
     data_source_type: redis
@@ -93,7 +93,7 @@ clefs:
       table: users
       column: email
     schedule: "@hourly"
-    
+
   - name: Age Range Check
     check_type: range_check
     config:
@@ -222,7 +222,7 @@ clefs:
       column: email
       threshold: 0.0
     schedule: "@hourly"
-    
+
   - name: User Age Range
     check_type: range_check
     config:
@@ -231,7 +231,7 @@ clefs:
       min: 0
       max: 150
     schedule: "@daily"
-    
+
   - name: Minimum User Count
     check_type: volume_check
     config:
@@ -253,7 +253,7 @@ staves:
       database: ${PG_DB}
       user: ${PG_USER}
       password: ${PG_PASSWORD}
-      
+
   # Redis Cache
   - name: Session Cache
     data_source_type: redis
@@ -261,7 +261,7 @@ staves:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:-6379}
       password: ${REDIS_PASSWORD}
-      
+
   # MongoDB
   - name: Document Store
     data_source_type: mongodb
@@ -463,7 +463,7 @@ clefs:
   - stave_id: wrong-id  # Doesn't exist
 ```
 
-**Solution:** 
+**Solution:**
 - Use correct stave_id from staves section
 - Or omit stave_id in single-stave format (auto-assigned)
 
@@ -529,4 +529,3 @@ python scripts/import_staves.py examples/staves.yaml --validate-only
 ```
 
 Happy monitoring! 🎵
-

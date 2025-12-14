@@ -77,7 +77,7 @@ import asyncio
 import yaml
 from datametronome_podium.core.database import get_db
 from datametronome_podium.services.stave_service import (
-    create_stave, serialize_stave, 
+    create_stave, serialize_stave,
     create_clef, serialize_clef
 )
 
@@ -85,9 +85,9 @@ async def import_demo_config():
     """Import demo configuration from YAML."""
     with open('examples/demo-complete.yaml', 'r') as f:
         config = yaml.safe_load(f)
-    
+
     db = await get_db()
-    
+
     # Create staves
     for stave_config in config['staves']:
         stave = create_stave(
@@ -98,10 +98,10 @@ async def import_demo_config():
         )
         if 'id' in stave_config:
             stave.id = stave_config['id']
-        
+
         await db.write([serialize_stave(stave)], "staves")
         print(f"✅ Created stave: {stave.name}")
-    
+
     # Create clefs
     for clef_config in config['clefs']:
         clef = create_clef(
@@ -117,10 +117,10 @@ async def import_demo_config():
         )
         if 'id' in clef_config:
             clef.id = clef_config['id']
-        
+
         await db.write([serialize_clef(clef)], "clefs")
         print(f"✅ Created clef: {clef.name}")
-    
+
     print("✅ Demo configuration imported successfully!")
 
 # Run the import
@@ -236,4 +236,3 @@ curl http://localhost:8001/api/v1/clefs/ -H "Authorization: Bearer YOUR_TOKEN"
 5. **Run checks manually** using the "▶️ Run" button
 
 Your DataMetronome demo environment is now fully configured and ready to showcase! 🎉
-

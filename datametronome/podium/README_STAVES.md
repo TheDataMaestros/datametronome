@@ -353,16 +353,16 @@ datametronome/podium/
 
 ## 💬 Questions?
 
-- **"How do I configure a PostgreSQL database?"**  
+- **"How do I configure a PostgreSQL database?"**
   See `STAVE_CONFIGURATIONS.md` → PostgreSQL section
 
-- **"Can I use YAML?"**  
+- **"Can I use YAML?"**
   Yes! See `YAML_CONFIG_GUIDE.md` for complete guide
 
-- **"Where are code examples?"**  
+- **"Where are code examples?"**
   In the test files: `test_stave_examples.py` and `test_yaml_loader.py`
 
-- **"How do I create checks programmatically?"**  
+- **"How do I create checks programmatically?"**
   See `STAVES_QUICKSTART.md` → Creating Clefs section
 
 ---
@@ -375,4 +375,3 @@ cat STAVES_QUICKSTART.md
 ```
 
 Happy monitoring! 🎵
-

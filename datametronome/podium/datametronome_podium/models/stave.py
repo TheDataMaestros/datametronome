@@ -1,7 +1,7 @@
 """
 Stave model - represents a data source to be monitored.
 
-A Stave is the core unit of monitoring in DataMetronome. It represents a single 
+A Stave is the core unit of monitoring in DataMetronome. It represents a single
 data source (database, API, file, etc.) that you want to monitor for quality issues.
 
 Example Usage:
@@ -18,7 +18,7 @@ Example Usage:
             "password": "secure_password"
         }
     )
-    
+
     # Create a Stave for a SQLite database
     stave = Stave(
         name="Local Analytics DB",
@@ -27,15 +27,15 @@ Example Usage:
     )
 """
 
-from pydantic import BaseModel, Field, field_validator, ConfigDict
 from datetime import datetime
 from typing import Any
 
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 # Supported data source types
 SUPPORTED_DATA_SOURCES = [
     "postgres",
-    "postgresql", 
+    "postgresql",
     "mysql",
     "sqlite",
     "mongodb",
@@ -43,18 +43,18 @@ SUPPORTED_DATA_SOURCES = [
     "snowflake",
     "bigquery",
     "api",
-    "http"
+    "http",
 ]
 
 
 class Stave(BaseModel):
     """
     A Stave represents a data source to be monitored.
-    
+
     Think of a Stave as a musical staff where you write notes - here, it's where
     you define what data source to monitor. Each Stave can have multiple Clefs
     (data quality checks) attached to it.
-    
+
     Attributes:
         id: Unique identifier (generated automatically if not provided)
         name: Human-readable name for this data source
@@ -64,7 +64,7 @@ class Stave(BaseModel):
         is_active: Whether monitoring is active for this source
         created_at: Timestamp when this stave was created
         updated_at: Timestamp of last update
-        
+
     Connection Config Examples:
         Postgres/MySQL: {"host": "...", "port": 5432, "database": "...", "user": "...", "password": "..."}
         SQLite: {"path": "/path/to/database.db"}
@@ -72,41 +72,38 @@ class Stave(BaseModel):
         Redis: {"host": "...", "port": 6379, "db": 0}
         API: {"base_url": "https://api.example.com", "api_key": "..."}
     """
-    
+
     id: str | None = None
     name: str = Field(
         ...,
         min_length=1,
         max_length=255,
         description="Human-readable name for the data source",
-        examples=["Production Database", "User Service API", "Analytics Cache"]
+        examples=["Production Database", "User Service API", "Analytics Cache"],
     )
     description: str | None = Field(
         None,
         max_length=1000,
-        description="Optional description explaining what this data source is for"
+        description="Optional description explaining what this data source is for",
     )
     data_source_type: str = Field(
         ...,
-        description=f"Type of data source. Supported: {', '.join(SUPPORTED_DATA_SOURCES)}"
+        description=f"Type of data source. Supported: {', '.join(SUPPORTED_DATA_SOURCES)}",
     )
     connection_config: dict[str, Any] = Field(
         default_factory=dict,
-        description="Connection parameters specific to the data source type"
+        description="Connection parameters specific to the data source type",
     )
     is_active: bool = Field(
-        default=True,
-        description="Whether monitoring is active for this data source"
+        default=True, description="Whether monitoring is active for this data source"
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="When this stave was created"
+        default_factory=datetime.utcnow, description="When this stave was created"
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="When this stave was last updated"
+        default_factory=datetime.utcnow, description="When this stave was last updated"
     )
-    
+
     model_config = ConfigDict(
         extra="forbid",  # Don't allow extra fields
         json_schema_extra={
@@ -119,21 +116,21 @@ class Stave(BaseModel):
                         "host": "db.example.com",
                         "port": 5432,
                         "database": "prod_db",
-                        "user": "monitor"
+                        "user": "monitor",
                     },
-                    "is_active": True
+                    "is_active": True,
                 },
                 {
                     "name": "Local SQLite",
                     "data_source_type": "sqlite",
                     "connection_config": {"path": "./data.db"},
-                    "is_active": True
-                }
+                    "is_active": True,
+                },
             ]
-        }
+        },
     )
-    
-    @field_validator('data_source_type')
+
+    @field_validator("data_source_type")
     @classmethod
     def validate_data_source_type(cls, v: str) -> str:
         """Validate that the data source type is supported."""
@@ -144,8 +141,8 @@ class Stave(BaseModel):
                 f"Supported types: {', '.join(SUPPORTED_DATA_SOURCES)}"
             )
         return v_lower
-    
-    @field_validator('connection_config')
+
+    @field_validator("connection_config")
     @classmethod
     def validate_connection_config(cls, v: dict[str, Any]) -> dict[str, Any]:
         """Validate that connection config is not empty."""
@@ -155,15 +152,15 @@ class Stave(BaseModel):
                 "Provide connection parameters for the data source."
             )
         return v
-    
-    @field_validator('name')
+
+    @field_validator("name")
     @classmethod
     def validate_name(cls, v: str) -> str:
         """Validate that name is not just whitespace."""
         if not v or not v.strip():
             raise ValueError("name cannot be empty or whitespace")
         return v.strip()
-    
+
     def __repr__(self) -> str:
         """Pretty representation for debugging."""
         return (
@@ -171,7 +168,7 @@ class Stave(BaseModel):
             f"type='{self.data_source_type}', "
             f"active={self.is_active})"
         )
-    
+
     def __str__(self) -> str:
         """Human-readable string representation."""
         status = "🟢 Active" if self.is_active else "🔴 Inactive"

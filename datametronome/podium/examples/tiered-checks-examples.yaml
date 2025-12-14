@@ -280,11 +280,11 @@ clefs:
     check_type: "custom_sql"
     config:
       query: |
-        SELECT 
+        SELECT
           COUNT(*) as total_users,
           COUNT(CASE WHEN age >= 18 AND age <= 65 THEN 1 END) as working_age_users,
           COUNT(CASE WHEN email LIKE '%@gmail.com' THEN 1 END) as gmail_users
-        FROM users 
+        FROM users
         WHERE created_at >= CURRENT_DATE - INTERVAL '30 days'
       expected_min: 1000
       expected_max: 50000
@@ -303,22 +303,22 @@ severity_examples:
   conservative:
     warn: "> 1%"       # Dissonance at 1%
     fail: "> 5%"       # Cacophony at 5%
-  
+
   # Moderate thresholds
   moderate:
     warn: "> 5%"       # Dissonance at 5%
     fail: "> 20%"      # Cacophony at 20%
-  
+
   # Lenient thresholds
   lenient:
     warn: "> 10%"      # Dissonance at 10%
     fail: "> 50%"      # Cacophony at 50%
-  
+
   # Volume-specific thresholds
   volume_strict:
     warn: "> 1000"     # Dissonance if count > 1000
     fail: "< 100"      # Cacophony if count < 100
-  
+
   # Time-based thresholds
   time_sensitive:
     warn: "> 1"        # Dissonance if any delay

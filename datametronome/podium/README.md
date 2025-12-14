@@ -1,6 +1,6 @@
 # DataMetronome Podium API
 
-> **📁 DIRECTORY TYPE**: Standalone FastAPI Backend Service  
+> **📁 DIRECTORY TYPE**: Standalone FastAPI Backend Service
 > **🚫 NOT A PYPI PACKAGE** - This is a backend service, not a Python library
 
 The Podium API is the core backend service for DataMetronome, providing data quality monitoring, anomaly detection, and reporting capabilities.
@@ -60,7 +60,7 @@ The Podium API is the core backend service for DataMetronome, providing data qua
    # Build Podium API
    cd datametronome/podium
    docker build -t datametronome-podium .
-   
+
    # Run Podium API
    docker run -d \
      --name podium-api \
@@ -142,12 +142,12 @@ The API uses JWT tokens for authentication:
    ```bash
    # Health check
    curl http://localhost:8000/health
-   
+
    # Login
    curl -X POST "http://localhost:8000/api/v1/auth/login" \
      -H "Content-Type: application/json" \
      -d '{"username": "admin", "password": "admin"}'
-   
+
    # Get reports (use token from login)
    curl -H "Authorization: Bearer TOKEN" \
      "http://localhost:8000/api/v1/reports/health"
@@ -258,7 +258,7 @@ spec:
    ```bash
    # Check what's using port 8000
    lsof -i :8000
-   
+
    # Kill the process
    kill -9 PID
    ```
@@ -267,7 +267,7 @@ spec:
    ```bash
    # Check SQLite file
    ls -la datametronome.db
-   
+
    # Remove and recreate if corrupted
    rm datametronome.db
    python -m datametronome_podium.main
@@ -277,7 +277,7 @@ spec:
    ```bash
    # Check secret key length
    echo $DATAMETRONOME_SECRET_KEY | wc -c
-   
+
    # Generate new secret key
    export DATAMETRONOME_SECRET_KEY="$(openssl rand -hex 32)"
    ```
