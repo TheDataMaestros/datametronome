@@ -24,17 +24,20 @@ Thank you for your interest in contributing to DataMetronome! This document prov
    # Create virtual environment
    python -m venv venv
    source venv/bin/activate  # On Windows: venv\Scripts\activate
-   
+
    # Install packages in development mode
    make install
    make install-dev
+
+   # Install pre-commit hooks
+   pre-commit install
    ```
 
 3. **Set up environment variables**
    ```bash
    # Copy example environment file
    cp .env.example .env
-   
+
    # Edit .env with your configuration
    # Make sure to set DATAMETRONOME_SECRET_KEY
    ```
@@ -48,7 +51,7 @@ Thank you for your interest in contributing to DataMetronome! This document prov
    ```bash
    # Terminal 1: Start backend
    make start-podium
-   
+
    # Terminal 2: Start UI
    make start-ui
    ```
