@@ -26,18 +26,18 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.11', '3.12', '3.13']
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
       with:
         fetch-depth: 0
-    
+
     - name: Set up Python ${{ matrix.python-version }}
       uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    
+
     - name: Cache pip dependencies
       uses: actions/cache@v3
       with:
@@ -45,7 +45,7 @@ jobs:
         key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ hashFiles('**/requirements*.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-${{ matrix.python-version }}-
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -55,7 +55,7 @@ jobs:
         pip install fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic-settings>=2.1.0
         pip install python-jose[cryptography]>=3.3.0 passlib>=1.7.4 bcrypt==4.0.1 apscheduler>=3.10.0
         pip install sqlalchemy>=2.0.0 psycopg[binary]>=3.0.0 asyncpg>=0.28.0 redis>=4.5.0
-    
+
     - name: Install packages in development mode
       run: |
         # Install packages in dependency order so cross-dependencies work
@@ -65,32 +65,32 @@ jobs:
         pip install -e ./datametronome/pulse/postgres-sqlalchemy --no-deps
         pip install -e ./datametronome/pulse/postgres --no-deps
         pip install -e ./datametronome/podium --no-deps
-    
+
     - name: Run Core Unit Tests
       run: |
         cd datametronome/pulse/core
         pytest tests/ -v --cov=metronome_pulse_core --cov-report=xml --cov-report=term-missing
-    
+
     - name: Run Postgres Unit Tests
       run: |
         cd datametronome/pulse/postgres
         pytest tests/ -v --cov=metronome_pulse_postgres --cov-report=xml --cov-report=term-missing
-    
+
     - name: Run Postgres-Psycopg3 Unit Tests
       run: |
         cd datametronome/pulse/postgres-psycopg3
         pytest tests/ -v --cov=metronome_pulse_postgres_psycopg3 --cov-report=xml --cov-report=term-missing
-    
+
     - name: Run Postgres-SQLAlchemy Unit Tests
       run: |
         cd datametronome/pulse/postgres-sqlalchemy
         pytest tests/ -v --cov=metronome_pulse_postgres_sqlalchemy --cov-report=xml --cov-report=term-missing
-    
+
     - name: Run Podium Unit Tests
       run: |
         cd datametronome/podium
         pytest tests/test_unit.py -v --cov=datametronome_podium --cov-report=xml --cov-report=term-missing
-    
+
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v3
       with:
@@ -119,7 +119,7 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-      
+
       redis:
         image: redis:7-alpine
         options: >-
@@ -129,16 +129,16 @@ jobs:
           --health-retries 5
         ports:
           - 6379:6379
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -148,35 +148,35 @@ jobs:
         pip install pydantic>=2.5.0 pandas>=2.0.0 numpy>=1.24.0 asyncio-mqtt>=0.13.0
         pip install fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic-settings>=2.1.0
         pip install python-jose[cryptography]>=3.3.0 passlib>=1.7.4 bcrypt==4.0.1 apscheduler>=3.10.0
-    
+
     - name: Wait for PostgreSQL
       run: |
         until pg_isready -h localhost -p 5432 -U testuser; do
           echo "Waiting for PostgreSQL..."
           sleep 2
         done
-    
+
     - name: Wait for Redis
       run: |
         until redis-cli -h localhost ping; do
           echo "Waiting for Redis..."
           sleep 2
         done
-    
+
     - name: Generate test data
       run: |
         cd scripts
         python generate_test_data.py
-    
+
     - name: Run Podium Integration Tests
       run: |
         cd datametronome/podium
         pytest tests/test_integration_database.py -v --cov=datametronome_podium --cov-report=xml --cov-report=term-missing
-    
+
     - name: Run End-to-End System Tests
       run: |
         pytest tests/test_e2e_system.py -v --cov=datametronome --cov-report=xml --cov-report=term-missing
-    
+
     - name: Upload integration coverage
       uses: codecov/codecov-action@v3
       with:
@@ -191,7 +191,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: integration-tests
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+
     services:
       postgres:
         image: postgres:15
@@ -206,16 +206,16 @@ jobs:
           --health-retries 5
         ports:
           - 5432:5432
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
@@ -225,23 +225,23 @@ jobs:
         pip install pydantic>=2.5.0 pandas>=2.0.0 numpy>=1.24.0 asyncio-mqtt>=0.13.0
         pip install fastapi>=0.104.0 uvicorn[standard]>=0.24.0 pydantic-settings>=2.1.0
         pip install python-jose[cryptography]>=3.3.0 passlib>=1.7.4 bcrypt==4.0.1 apscheduler>=3.10.0
-    
+
     - name: Wait for PostgreSQL
       run: |
         until pg_isready -h localhost -p 5432 -U testuser; do
           echo "Waiting for PostgreSQL..."
           sleep 2
         done
-    
+
     - name: Generate performance test data
       run: |
         cd scripts
         python generate_test_data.py
-    
+
     - name: Run Performance Tests
       run: |
         pytest tests/test_e2e_system.py::TestDataMetronomePerformance -v --benchmark-only
-    
+
     - name: Upload performance results
       uses: actions/upload-artifact@v3
       with:
@@ -253,29 +253,29 @@ jobs:
     name: Security Tests
     runs-on: ubuntu-latest
     needs: unit-tests
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: Install security tools
       run: |
         python -m pip install --upgrade pip
         pip install bandit safety
-    
+
     - name: Run Bandit security scan
       run: |
         bandit -r datametronome/ -f json -o bandit-report.json || true
-    
+
     - name: Run Safety check
       run: |
         safety check --json --output safety-report.json || true
-    
+
     - name: Upload security reports
       uses: actions/upload-artifact@v3
       with:
@@ -289,33 +289,33 @@ jobs:
     name: Code Quality
     runs-on: ubuntu-latest
     needs: unit-tests
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: Install quality tools
       run: |
         python -m pip install --upgrade pip
         pip install black isort flake8 mypy
-    
+
     - name: Check code formatting with Black
       run: |
         black --check --diff datametronome/
-    
+
     - name: Check import sorting with isort
       run: |
         isort --check-only --diff datametronome/
-    
+
     - name: Lint with flake8
       run: |
         flake8 datametronome/ --count --select=E9,F63,F7,F82 --show-source --statistics
-    
+
     - name: Type check with mypy
       run: |
         mypy datametronome/ --ignore-missing-imports
@@ -326,11 +326,11 @@ jobs:
     runs-on: ubuntu-latest
     needs: [unit-tests, integration-tests, performance-tests, security-tests, code-quality]
     if: always()
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-    
+
     - name: Create test summary
       run: |
         echo "## 🧪 DataMetronome Test Results" >> $GITHUB_STEP_SUMMARY
@@ -341,19 +341,19 @@ jobs:
         echo "### Security Tests: ${{ needs.security-tests.result }}" >> $GITHUB_STEP_SUMMARY
         echo "### Code Quality: ${{ needs.code-quality.result }}" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
-        
+
         if [[ "${{ needs.unit-tests.result }}" == "success" ]]; then
           echo "✅ **Unit Tests PASSED** - Core logic is working correctly" >> $GITHUB_STEP_SUMMARY
         else
           echo "❌ **Unit Tests FAILED** - Critical issues detected" >> $GITHUB_STEP_SUMMARY
         fi
-        
+
         if [[ "${{ needs.integration-tests.result }}" == "success" ]]; then
           echo "✅ **Integration Tests PASSED** - System components work together" >> $GITHUB_STEP_SUMMARY
         else
           echo "❌ **Integration Tests FAILED** - System integration issues" >> $GITHUB_STEP_SUMMARY
         fi
-        
+
         echo "" >> $GITHUB_STEP_SUMMARY
         echo "---" >> $GITHUB_STEP_SUMMARY
         echo "**Note:** Unit tests are the MOST IMPORTANT tests and must pass for any deployment." >> $GITHUB_STEP_SUMMARY

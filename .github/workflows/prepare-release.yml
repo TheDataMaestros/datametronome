@@ -19,20 +19,20 @@ jobs:
           - datametronome/pulse/postgres-sqlalchemy
           - datametronome/pulse/sqlite
           - datametronome/ui-streamlit
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.11'
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install build twine pytest
-    
+
     - name: Build package ${{ matrix.package-dir }}
       working-directory: ${{ matrix.package-dir }}
       run: |
@@ -43,7 +43,7 @@ jobs:
         else
           echo "⚠️ No setup.py found in ${{ matrix.package-dir }}, skipping"
         fi
-    
+
     - name: Run tests ${{ matrix.package-dir }}
       working-directory: ${{ matrix.package-dir }}
       run: |
@@ -53,7 +53,7 @@ jobs:
         else
           echo "⚠️ No tests found in ${{ matrix.package-dir }}, skipping"
         fi
-    
+
     - name: Create Release Assets
       if: matrix.package-dir == 'datametronome/podium'  # Main package
       run: |
