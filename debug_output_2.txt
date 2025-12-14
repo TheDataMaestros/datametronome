@@ -1,0 +1,15 @@
+🚀 Importing Retail Demo configuration to main DB...
+Using DB Path: /Users/totolasso/repos/personal/datametronome/datametronome/podium/data/datametronome.db
+DEBUG: init_db using path: /Users/totolasso/repos/personal/datametronome/datametronome/podium/data/datametronome.db
+DEBUG: File exists? False
+DEBUG: Connected. Connector path: /Users/totolasso/repos/personal/datametronome/datametronome/podium/data/datametronome.db
+DEBUG: Clefs table columns: []
+DEBUG: Loaded 1 staves from YAML:
+ - retail-db-001: Retail Production DB (SQLite)
+DEBUG: Staves in DB before import: 0
+✅ Imported stave: Retail Production DB (SQLite)
+✅ Imported clef: User Email Integrity
+✅ Imported clef: Significant Order Volume
+✅ Imported clef: Order Volume Anomaly (Forecast)
+✅ Imported clef: Order Amount Drift (Distribution)
+✅ Import complete: {'staves': 1, 'clefs': 4}

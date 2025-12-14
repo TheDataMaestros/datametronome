@@ -1,0 +1,59 @@
+🚀 Importing Retail Demo configuration to main DB...
+Using DB Path: /Users/totolasso/repos/personal/datametronome/datametronome/podium/data/datametronome.db
+DEBUG: init_db using path: /Users/totolasso/repos/personal/datametronome/sqlite+aio/Users/totolasso/repos/personal/datametronome/datametronome/podium/data/datametronome.db
+DEBUG: File exists? True
+DEBUG: Connected. Connector path: sqlite+aio/Users/totolasso/repos/personal/datametronome/datametronome/podium/data/datametronome.db
+DEBUG: Clefs table columns: ['id', 'stave_id', 'name', 'description', 'check_type', 'config', 'schedule', 'is_active', 'created_at', 'updated_at']
+DEBUG: Loaded 1 staves from YAML:
+ - retail-db-001: Retail Production DB (SQLite)
+DEBUG: Staves in DB before import: 1
+⚠️  Skipping existing stave: Retail Production DB (SQLite) (id=retail-db-001)
+Traceback (most recent call last):
+  File "/Users/totolasso/repos/personal/datametronome/datametronome/pulse/sqlite/metronome_pulse_sqlite/writeonly_connector.py", line 86, in _insert_data
+    cursor.execute(sql, values)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^
+sqlite3.OperationalError: table clefs has no column named warn
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/totolasso/repos/personal/datametronome/datametronome/pulse/sqlite/metronome_pulse_sqlite/writeonly_connector.py", line 55, in write
+    return await self._insert_data(data)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/totolasso/repos/personal/datametronome/datametronome/pulse/sqlite/metronome_pulse_sqlite/writeonly_connector.py", line 92, in _insert_data
+    raise RuntimeError(f"Insert failed: {e}")
+RuntimeError: Insert failed: table clefs has no column named warn
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/Users/totolasso/repos/personal/datametronome/scripts/import_retail_to_db.py", line 56, in <module>
+    asyncio.run(import_demo())
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py", line 194, in run
+    return runner.run(main)
+           ~~~~~~~~~~^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/runners.py", line 118, in run
+    return self._loop.run_until_complete(task)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.13/lib/python3.13/asyncio/base_events.py", line 721, in run_until_complete
+    return future.result()
+           ~~~~~~~~~~~~~^^
+  File "/Users/totolasso/repos/personal/datametronome/scripts/import_retail_to_db.py", line 46, in import_demo
+    result = await import_staves_from_yaml(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+    )
+    ^
+  File "/Users/totolasso/repos/personal/datametronome/datametronome/podium/datametronome_podium/services/stave_yaml_loader.py", line 345, in import_staves_from_yaml
+    success = await db.write([{
+              ^^^^^^^^^^^^^^^^^
+    ...<2 lines>...
+    }], "clefs")
+    ^^^^^^^^^^^^
+  File "/Users/totolasso/repos/personal/datametronome/datametronome/pulse/sqlite/metronome_pulse_sqlite/connector.py", line 95, in write
+    return await self._writeonly.write(data, config)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/totolasso/repos/personal/datametronome/datametronome/pulse/sqlite/metronome_pulse_sqlite/writeonly_connector.py", line 63, in write
+    raise RuntimeError(f"Write operation failed: {e}")
+RuntimeError: Write operation failed: Insert failed: table clefs has no column named warn
