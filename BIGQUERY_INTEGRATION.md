@@ -148,7 +148,7 @@ async def main():
         credentials_path="/path/to/credentials.json",
         dataset="analytics"
     )
-    
+
     await pulse.connect()
     results = await pulse.query("SELECT * FROM users LIMIT 10")
     print(f"Found {len(results)} users")
@@ -180,7 +180,7 @@ The BigQuery stave is included in `demo-complete.yaml`. To use it:
    # Change is_active from false to true for BigQuery stave and clefs
    - id: stave-demo-bigquery
      is_active: true  # Enable this
-   
+
    - id: clef-bigquery-users-email-null
      is_active: true  # Enable this
    ```
@@ -343,7 +343,7 @@ clefs:
    ```python
    from metronome_pulse_bigquery import BigQueryPulse
    import asyncio
-   
+
    async def test():
        pulse = BigQueryPulse(
            project_id="your-project",
@@ -352,7 +352,7 @@ clefs:
        await pulse.connect()
        print(f"Connected: {await pulse.is_connected()}")
        await pulse.close()
-   
+
    asyncio.run(test())
    ```
 
@@ -361,15 +361,15 @@ clefs:
    async def test_query():
        pulse = BigQueryPulse(...)
        await pulse.connect()
-       
+
        # List tables
        tables = await pulse.list_tables("your_dataset")
        print(f"Tables: {tables}")
-       
+
        # Query data
        results = await pulse.query("SELECT COUNT(*) as count FROM users")
        print(f"Results: {results}")
-       
+
        await pulse.close()
    ```
 
@@ -435,4 +435,3 @@ To add features or improvements:
 ---
 
 **Happy data quality monitoring with BigQuery! 🎵📊**
-

@@ -9,11 +9,11 @@ Welcome to the DataMetronome Community Demo! This guide will help you get the co
 - Docker and Docker Compose (optional, for full showcase)
 - Git
 
-### 🎯 **Current Status** 
+### 🎯 **Current Status**
 ✅ **All services are working and accessible via browser!**
 
 - **Podium API**: Running on http://localhost:8001
-- **API Documentation**: http://localhost:8001/docs  
+- **API Documentation**: http://localhost:8001/docs
 - **UI**: Running on http://localhost:3000
 - **Login Credentials**: `admin` / `admin`
 
@@ -52,7 +52,7 @@ The community demo showcases the complete DataMetronome ecosystem with both **co
 - Basic query execution
 - Connection management
 
-### ✅ PostgreSQL DataPulse Connector  
+### ✅ PostgreSQL DataPulse Connector
 - Enterprise-grade PostgreSQL connectivity
 - Connection pooling with asyncpg
 - Version detection and health checks
@@ -157,7 +157,7 @@ When everything is working, you should see:
 ✅ Basic query test: [{'test': 1}]
 ✅ SQLite connector is operational
 
-🔌 PostgreSQL DataPulse Connector Demo  
+🔌 PostgreSQL DataPulse Connector Demo
 ✅ Connected to PostgreSQL database
 ✅ PostgreSQL version: PostgreSQL 15.14 (Debian 15.14-1.pgdg13+1)...
 
@@ -189,7 +189,7 @@ When everything is working, you should see:
 ============================================================
 📊 Demo Results Summary
 ✅ PASS SQLite Connector
-✅ PASS PostgreSQL Connector  
+✅ PASS PostgreSQL Connector
 ✅ PASS Data Quality Monitoring
 ✅ PASS Anomaly Detection
 ✅ PASS Reporting

@@ -95,6 +95,3 @@ Each non-PyPI directory contains:
 ---
 
 **Remember**: Only the `pulse/*` directories are meant to be PyPI packages. Everything else is either a standalone application or internal infrastructure.
-
-
-

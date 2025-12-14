@@ -16,17 +16,17 @@ This guide covers deploying DataMetronome in various environments, from local de
    ```bash
    git clone <repository-url>
    cd datametronome
-   
+
    # Install DataPulse connectors
    pip install -e ./datametronome/pulse/core
    pip install -e ./datametronome/pulse/sqlite
    pip install -e ./datametronome/pulse/postgres
    pip install -e ./datametronome/pulse/postgres-sqlalchemy
    pip install -e ./datametronome/pulse/postgres-psycopg3
-   
+
    # Install Podium API
    pip install -e ./datametronome/podium
-   
+
    # Install UI dependencies
 npm install --prefix ui-nuxt
    ```
@@ -38,7 +38,7 @@ npm install --prefix ui-nuxt
    export DATAMETRONOME_DEBUG="true"
    export DATAMETRONOME_HOST="0.0.0.0"
    export DATAMETRONOME_PORT="8000"
-   
+
    cd datametronome/podium
    python -m datametronome_podium.main
    ```
@@ -107,7 +107,7 @@ docker-compose up -d podium
    ```yaml
    # docker-compose.prod.yml
    version: '3.8'
-   
+
    services:
      podium:
        image: datametronome-podium:latest
@@ -128,7 +128,7 @@ docker-compose up -d podium
          interval: 30s
          timeout: 10s
          retries: 3
-   
+
    ```
 
 3. **Deploy:**
@@ -136,7 +136,7 @@ docker-compose up -d podium
    # Set production environment variables
    export DATAMETRONOME_SECRET_KEY="$(openssl rand -hex 32)"
    export DATAMETRONOME_DATABASE_URL="postgresql://user:pass@host:5432/db"
-   
+
    # Deploy
    docker-compose -f docker-compose.prod.yml up -d
    ```
@@ -352,10 +352,10 @@ For production, use a reverse proxy (nginx, traefik) or load balancer with SSL t
 server {
     listen 443 ssl;
     server_name api.datametronome.com;
-    
+
     ssl_certificate /path/to/cert.pem;
     ssl_certificate_key /path/to/key.pem;
-    
+
     location / {
         proxy_pass http://localhost:8000;
         proxy_set_header Host $host;
@@ -390,7 +390,7 @@ services:
       - ./nginx.conf:/etc/nginx/nginx.conf
     depends_on:
       - podium
-  
+
   podium:
     image: datametronome-podium:latest
     environment:
@@ -414,7 +414,7 @@ services:
    ```bash
    # Test database connection
    python -c "import sqlite3; sqlite3.connect('datametronome.db')"
-   
+
    # Check PostgreSQL
    psql -h host -U user -d database
    ```
@@ -423,7 +423,7 @@ services:
    ```bash
    # Check secret key
    echo $DATAMETRONOME_SECRET_KEY | wc -c
-   
+
    # Generate new key
    export DATAMETRONOME_SECRET_KEY="$(openssl rand -hex 32)"
    ```
@@ -503,5 +503,3 @@ For deployment issues:
 3. Test individual components
 4. Check the troubleshooting section above
 5. Open an issue with logs and configuration details
-
-
