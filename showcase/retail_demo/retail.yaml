@@ -1,0 +1,60 @@
+# Retail Showcase Configuration
+# Defines the data pipeline monitoring for our fictional store
+
+staves:
+  - id: retail-db-001
+    name: "Retail Production DB (SQLite)"
+    data_source_type: "sqlite"
+    connection_config:
+      path: "${DB_PATH:-/Users/totolasso/repos/personal/datametronome/datametronome/podium/data/retail.db}"  # Absolute path for backend access
+
+clefs:
+  # --- Level 1: Declarative Checks ---
+  
+  - name: "User Email Integrity"
+    stave_id: retail-db-001
+    check_type: "column_values"  # Replaces legacy null_check
+    schedule: "*/10 * * * *"
+    config:
+      table: "users"
+      column: "email"
+      rule: "no_nulls"
+      threshold: 0.05  # Allow up to 5% nulls (we generated ~5%)
+
+  - name: "Significant Order Volume"
+    stave_id: retail-db-001
+    check_type: "row_count"
+    schedule: "*/10 * * * *"
+    config:
+      table: "orders"
+      min_rows: 1000  # We generated ~3000
+
+  # --- Level 2: Brain / ML Checks ---
+
+  - name: "Order Volume Anomaly (Forecast)"
+    stave_id: retail-db-001
+    check_type: "forecast"
+    schedule: "@daily"
+    config:
+      # Aggregated daily volume for time-series analysis
+      query: |
+        SELECT 
+          date(created_at) as day_ts, 
+          COUNT(*) as order_count 
+        FROM orders 
+        GROUP BY date(created_at)
+        ORDER BY day_ts ASC
+      timestamp_column: "day_ts"
+      value_column: "order_count"
+
+  - name: "Order Amount Drift (Distribution)"
+    stave_id: retail-db-001
+    check_type: "data_profile_drift"
+    schedule: "@daily"
+    config:
+      table: "orders"
+      column: "amount"
+      # Compare Today vs Last 30 Days
+      baseline_condition: "created_at BETWEEN date('now', '-30 days') AND date('now', '-1 day')"
+      current_condition: "created_at >= date('now', '-1 day')"
+      critical_p_value: 0.05
