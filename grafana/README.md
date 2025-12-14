@@ -116,4 +116,3 @@ Feel free to customize the dashboards:
    - Per-team dashboards
    - Per-service dashboards
    - Executive summaries
-

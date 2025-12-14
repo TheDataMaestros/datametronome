@@ -10,4 +10,3 @@ datasources:
     jsonData:
       httpMethod: POST
       timeInterval: 15s
-
