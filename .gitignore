@@ -318,4 +318,3 @@ brain/base/*.egg-info/
 brain/base/dist/
 brain/base/build/
 ui-react/node_modules/
-.cursor/

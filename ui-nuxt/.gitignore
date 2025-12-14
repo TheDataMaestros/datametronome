@@ -1,1 +1,5 @@
 .nuxt/
+.output/
+.nitro/
+.cache/
+node_modules/
