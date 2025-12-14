@@ -28,9 +28,11 @@ fi
 
 # Set default environment variables
 export DATAMETRONOME_SECRET_KEY="${DATAMETRONOME_SECRET_KEY:-demo-secret-key-for-development-only}"
-export PODIUM_PORT="${PODIUM_PORT:-8001}"
+export PODIUM_PORT="${PODIUM_PORT:-8000}"
 export PODIUM_HOST="${PODIUM_HOST:-0.0.0.0}"
 export PODIUM_API_BASE="http://localhost:${PODIUM_PORT}"
+export DATAMETRONOME_PORT="${DATAMETRONOME_PORT:-${PODIUM_PORT}}"
+export DATAMETRONOME_HOST="${DATAMETRONOME_HOST:-${PODIUM_HOST}}"
 export ENVIRONMENT="${ENVIRONMENT:-development}"
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 
@@ -50,4 +52,3 @@ python3 -m uvicorn datametronome_podium.main:app \
     --host "${PODIUM_HOST}" \
     --port "${PODIUM_PORT}" \
     --reload
-

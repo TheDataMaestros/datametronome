@@ -1,7 +1,7 @@
 version: '3.8'
 
 # Production Docker Compose Configuration for DataMetronome
-# 
+#
 # Usage:
 #   docker-compose -f docker-compose.prod.yml up -d
 #
@@ -87,20 +87,20 @@ services:
       DATAMETRONOME_DEBUG: "false"
       DATAMETRONOME_HOST: "0.0.0.0"
       DATAMETRONOME_PORT: "8001"
-      
+
       # Redis settings
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_PASSWORD: ${REDIS_PASSWORD}
-      
+
       # Logging
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       LOG_FORMAT: json
-      
+
       # Security
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:8501,https://yourdomain.com}
       TOKEN_EXPIRE_MINUTES: ${TOKEN_EXPIRE_MINUTES:-60}
-      
+
       # Scheduler
       SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
       SCHEDULER_TIMEZONE: ${SCHEDULER_TIMEZONE:-UTC}
@@ -233,4 +233,3 @@ volumes:
     driver: local
   grafana_data:
     driver: local
-
