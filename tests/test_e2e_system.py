@@ -74,8 +74,8 @@ class TestDataMetronomeEndToEnd:
         # Find users with unusual ages
         anomalous_users = await db_connection.fetch(
             """
-            SELECT id, username, age 
-            FROM users 
+            SELECT id, username, age
+            FROM users
             WHERE age < 10 OR age > 120
             ORDER BY age
             """
@@ -93,8 +93,8 @@ class TestDataMetronomeEndToEnd:
         # Find products with unusual prices
         anomalous_products = await db_connection.fetch(
             """
-            SELECT id, name, price 
-            FROM products 
+            SELECT id, name, price
+            FROM products
             WHERE price <= 0 OR price > 50000
             ORDER BY price DESC
             """
@@ -112,7 +112,7 @@ class TestDataMetronomeEndToEnd:
         anomalous_orders = await db_connection.fetch(
             """
             SELECT id, user_id, total_amount, status
-            FROM orders 
+            FROM orders
             WHERE total_amount <= 0 OR total_amount > 50000
             ORDER BY total_amount DESC
             """
@@ -155,7 +155,7 @@ class TestDataMetronomeEndToEnd:
         # Calculate statistics for user ages
         stats = await db_connection.fetchrow(
             """
-            SELECT 
+            SELECT
                 COUNT(*) as count,
                 AVG(age) as mean_age,
                 STDDEV(age) as stddev_age,
@@ -179,7 +179,7 @@ class TestDataMetronomeEndToEnd:
         # Check for NULL values
         null_checks = await db_connection.fetch(
             """
-            SELECT 
+            SELECT
                 COUNT(*) FILTER (WHERE email IS NULL) as null_emails,
                 COUNT(*) FILTER (WHERE username IS NULL) as null_usernames,
                 COUNT(*) FILTER (WHERE age IS NULL) as null_ages
@@ -192,7 +192,7 @@ class TestDataMetronomeEndToEnd:
         # Check for duplicates
         duplicate_emails = await db_connection.fetchval(
             """
-            SELECT COUNT(*) 
+            SELECT COUNT(*)
             FROM (
                 SELECT email, COUNT(*) as cnt
                 FROM users
@@ -210,7 +210,7 @@ class TestDataMetronomeEndToEnd:
         # Get user order summary
         user_orders = await db_connection.fetch(
             """
-            SELECT 
+            SELECT
                 u.id,
                 u.username,
                 COUNT(o.id) as order_count,
@@ -237,7 +237,7 @@ class TestDataMetronomeEndToEnd:
 
         results = await db_connection.fetch(
             """
-            SELECT 
+            SELECT
                 DATE_TRUNC('day', created_at) as day,
                 COUNT(*) as order_count,
                 SUM(total_amount) as daily_total,
@@ -289,7 +289,7 @@ class TestDataMetronomePerformance:
         async def complex_query():
             return await db_connection.fetch(
                 """
-                SELECT 
+                SELECT
                     u.id,
                     u.username,
                     u.age,
@@ -316,12 +316,12 @@ class TestDataMetronomePerformance:
     @pytest.mark.asyncio
     async def test_concurrent_reads(self, db_connection):
         """Test concurrent read operations."""
-        
+
         async def read_operation(query_id: int):
             result = await db_connection.fetch(
                 f"""
-                SELECT * FROM users 
-                WHERE id % 10 = $1 
+                SELECT * FROM users
+                WHERE id % 10 = $1
                 LIMIT 100
                 """,
                 query_id,
@@ -359,12 +359,14 @@ class TestDataMetronomeIntegration:
         # 2. Calculate statistics
         ages = [float(u["age"]) for u in users if u["age"] is not None]
         mean_age = sum(ages) / len(ages)
-        
+
         # 3. Identify anomalies (simple threshold-based)
         std_dev = (sum((x - mean_age) ** 2 for x in ages) / len(ages)) ** 0.5
         threshold = mean_age + (3 * std_dev)
-        
-        anomalies = [age for age in ages if age > threshold or age < mean_age - (3 * std_dev)]
+
+        anomalies = [
+            age for age in ages if age > threshold or age < mean_age - (3 * std_dev)
+        ]
 
         # 4. Verify we can detect anomalies
         assert mean_age > 0
@@ -378,7 +380,7 @@ class TestDataMetronomeIntegration:
 
         hourly_metrics = await db_connection.fetch(
             """
-            SELECT 
+            SELECT
                 metric_name,
                 DATE_TRUNC('hour', timestamp) as hour,
                 AVG(metric_value) as avg_value,
@@ -399,5 +401,8 @@ class TestDataMetronomeIntegration:
                 assert metric["max_value"] is not None
                 assert metric["min_value"] is not None
                 assert metric["sample_count"] > 0
-                assert float(metric["min_value"]) <= float(metric["avg_value"]) <= float(metric["max_value"])
-
+                assert (
+                    float(metric["min_value"])
+                    <= float(metric["avg_value"])
+                    <= float(metric["max_value"])
+                )
