@@ -492,7 +492,7 @@ function getMLSeverityColor(severity: string) {
 function formatTimeAgo(date: Date) {
   const now = new Date()
   const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
-  
+
   if (diffInMinutes < 60) {
     return `${diffInMinutes} minutes ago`
   } else if (diffInMinutes < 1440) {

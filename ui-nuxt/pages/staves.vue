@@ -203,15 +203,15 @@ definePageMeta({
   layout: 'dashboard'
 })
 
-const { 
-  staves, 
-  isLoading, 
-  error, 
-  fetchStaves, 
-  createStave, 
-  updateStave, 
-  deleteStave: deleteStaveService, 
-  testConnection: testConnectionService 
+const {
+  staves,
+  isLoading,
+  error,
+  fetchStaves,
+  createStave,
+  updateStave,
+  deleteStave: deleteStaveService,
+  testConnection: testConnectionService
 } = useStaves()
 
 const showDetailsModal = ref(false)

@@ -75,8 +75,8 @@ class TrendsService {
   private readonly endpoint = '/trends'
 
   async getStaveTrends(
-    staveId: string, 
-    days: number = 7, 
+    staveId: string,
+    days: number = 7,
     granularity: string = 'hour'
   ): Promise<StaveTrends> {
     const response = await fetch(buildApiUrl(`/trends/stave/${staveId}?days=${days}&granularity=${granularity}`), {
@@ -85,11 +85,11 @@ class TrendsService {
         'Content-Type': 'application/json',
       },
     })
-    
+
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
-    
+
     return await response.json()
   }
 
@@ -101,16 +101,16 @@ class TrendsService {
         'Content-Type': 'application/json',
       },
     })
-    
+
     console.log('Response status:', response.status)
     console.log('Response headers:', response.headers)
-    
+
     if (!response.ok) {
       const errorText = await response.text()
       console.error('API Error:', response.status, errorText)
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
-    
+
     const data = await response.json()
     console.log('API Response data:', data)
     return data

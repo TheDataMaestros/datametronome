@@ -134,13 +134,13 @@ const schema = z.object({
 
 async function handleLogin() {
   isLoading.value = true
-  
+
   try {
     const result = await authStore.login({
       username: form.username,
       password: form.password
     })
-    
+
     if (result.success) {
       // Show success message
       console.log('Login successful!')

@@ -8,13 +8,13 @@ export const useTrends = () => {
   const error = ref<string | null>(null)
 
   const fetchStaveTrends = async (
-    staveId: string, 
-    days: number = 7, 
+    staveId: string,
+    days: number = 7,
     granularity: string = 'hour'
   ) => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       trendsData.value = await trendsService.getStaveTrends(staveId, days, granularity)
     } catch (err) {
@@ -28,7 +28,7 @@ export const useTrends = () => {
   const fetchTrendsOverview = async (days: number = 7) => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       console.log('Fetching trends overview...')
       overviewData.value = await trendsService.getTrendsOverview(days)
@@ -46,7 +46,7 @@ export const useTrends = () => {
     if (!trendsData.value?.row_count_trends) return null
 
     return {
-      labels: trendsData.value.row_count_trends.map(point => 
+      labels: trendsData.value.row_count_trends.map(point =>
         new Date(point.timestamp).toLocaleString()
       ),
       datasets: [{
@@ -92,7 +92,7 @@ export const useTrends = () => {
 
   const hasData = computed(() => {
     return !!trendsData.value && (
-      (trendsData.value.row_count_trends?.length > 0) || 
+      (trendsData.value.row_count_trends?.length > 0) ||
       (trendsData.value.check_results?.length > 0) ||
       (trendsData.value.recent_anomalies?.length > 0)
     )
@@ -128,13 +128,13 @@ export const useTrends = () => {
     overviewData: readonly(overviewData),
     isLoading: readonly(isLoading),
     error: readonly(error),
-    
+
     // Computed
     chartData,
     statusChartData,
     trendSummary,
     hasData,
-    
+
     // Actions
     fetchStaveTrends,
     fetchTrendsOverview,

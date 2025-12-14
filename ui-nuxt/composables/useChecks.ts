@@ -37,4 +37,3 @@ export const useChecks = () => {
     fetchLatest
   }
 }
-

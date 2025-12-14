@@ -11,7 +11,7 @@ export const useClefs = () => {
   const fetchClefs = async () => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       clefs.value = await clefsService.getAll()
     } catch (err) {
@@ -25,7 +25,7 @@ export const useClefs = () => {
   const fetchClefsByStave = async (staveId: string) => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       return await clefsService.getByStaveId(staveId)
     } catch (err) {
@@ -39,7 +39,7 @@ export const useClefs = () => {
   const createClef = async (clefData: CreateClefRequest) => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       const newClef = await clefsService.create(clefData)
       clefs.value.push(newClef)
@@ -55,7 +55,7 @@ export const useClefs = () => {
   const updateClef = async (id: string, updates: UpdateClefRequest) => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       const updatedClef = await clefsService.update(id, updates)
       const index = clefs.value.findIndex(c => c.id === id)
@@ -74,7 +74,7 @@ export const useClefs = () => {
   const deleteClef = async (id: string) => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       await clefsService.delete(id)
       clefs.value = clefs.value.filter(c => c.id !== id)
@@ -107,7 +107,7 @@ export const useClefs = () => {
   const fetchLatestResults = async (limit = 20) => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       checkResults.value = await clefsService.getLatestResults(limit)
     } catch (err) {
@@ -151,13 +151,13 @@ export const useClefs = () => {
     checkResults: readonly(checkResults),
     isLoading: readonly(isLoading),
     error: readonly(error),
-    
+
     // Computed
     getActiveClefs,
     getFailedChecks,
     getPassedChecks,
     getWarningChecks,
-    
+
     // Actions
     fetchClefs,
     fetchClefsByStave,

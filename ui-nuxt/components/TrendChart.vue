@@ -80,7 +80,7 @@ const chartData = computed(() => {
       const date = new Date(d.date)
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     })
-    
+
     const datasets: Array<{
       label: string
       data: number[]
@@ -89,7 +89,7 @@ const chartData = computed(() => {
       tension: number
       fill: boolean
     }> = []
-    
+
     if (trendData.some(d => d.success !== undefined)) {
       datasets.push({
         label: 'Success',
@@ -100,7 +100,7 @@ const chartData = computed(() => {
         fill: true
       })
     }
-    
+
     if (trendData.some(d => d.failures !== undefined)) {
       datasets.push({
         label: 'Failures',
@@ -111,7 +111,7 @@ const chartData = computed(() => {
         fill: true
       })
     }
-    
+
     if (trendData.some(d => d.warnings !== undefined)) {
       datasets.push({
         label: 'Warnings',
@@ -122,10 +122,10 @@ const chartData = computed(() => {
         fill: true
       })
     }
-    
+
     return { labels, datasets }
   }
-  
+
   // Otherwise, assume it's already in Chart.js format
   return props.data as ChartData
 })
@@ -199,10 +199,10 @@ const createChart = async () => {
   const ctx = chartCanvas.value.getContext('2d')
   if (!ctx) return
 
-  const baseOptions = props.type === 'doughnut' 
+  const baseOptions = props.type === 'doughnut'
     ? { ...doughnutOptions, ...props.options }
     : { ...defaultOptions, ...props.options }
-  
+
   const options = {
     ...baseOptions,
     plugins: {
@@ -257,19 +257,3 @@ onUnmounted(() => {
   }
 })
 </script>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

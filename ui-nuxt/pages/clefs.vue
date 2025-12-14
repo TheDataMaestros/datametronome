@@ -11,24 +11,24 @@
         </p>
       </div>
       <div class="flex gap-3">
-        <UButton 
-          color="gray" 
-          variant="outline" 
+        <UButton
+          color="gray"
+          variant="outline"
           icon="i-heroicons-funnel"
           @click="showFilters = !showFilters"
         >
           Filters
         </UButton>
-        <UButton 
-          color="purple" 
+        <UButton
+          color="purple"
           variant="outline"
           icon="i-heroicons-wand-magic-sparkles"
           @click="showVisualBuilder = true"
         >
           Visual Builder
         </UButton>
-        <UButton 
-          color="primary" 
+        <UButton
+          color="primary"
           icon="i-heroicons-plus"
           @click="showCreateModal = true"
         >
@@ -86,7 +86,7 @@
           <Icon name="i-heroicons-musical-note" class="w-8 h-8 text-blue-500" />
         </div>
       </UCard>
-      
+
       <UCard class="hover:shadow-lg transition-shadow">
         <div class="flex items-center justify-between">
           <div>
@@ -96,7 +96,7 @@
           <Icon name="i-heroicons-check-circle" class="w-8 h-8 text-green-500" />
         </div>
       </UCard>
-      
+
       <UCard class="hover:shadow-lg transition-shadow">
         <div class="flex items-center justify-between">
           <div>
@@ -106,7 +106,7 @@
           <Icon name="i-heroicons-exclamation-triangle" class="w-8 h-8 text-red-500" />
         </div>
       </UCard>
-      
+
       <UCard class="hover:shadow-lg transition-shadow">
         <div class="flex items-center justify-between">
           <div>
@@ -120,8 +120,8 @@
 
     <!-- Clefs Grid -->
     <div class="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-      <UCard 
-        v-for="clef in filteredClefs" 
+      <UCard
+        v-for="clef in filteredClefs"
         :key="clef.id"
         class="hover:shadow-lg transition-all duration-200 hover:scale-105"
         :class="getClefCardClass(clef)"
@@ -135,7 +135,7 @@
               </h3>
             </div>
             <div class="flex items-center gap-1">
-              <UBadge 
+              <UBadge
                 :color="getTierColor(getClefTier(clef.check_type))"
                 variant="soft"
                 size="xs"
@@ -143,9 +143,9 @@
                 T{{ getClefTier(clef.check_type) }}
               </UBadge>
               <UDropdown :items="getClefActions(clef)">
-                <UButton 
-                  color="gray" 
-                  variant="ghost" 
+                <UButton
+                  color="gray"
+                  variant="ghost"
                   icon="i-heroicons-ellipsis-vertical"
                   size="xs"
                 />
@@ -158,19 +158,19 @@
           <p class="text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
             {{ clef.description || 'No description provided' }}
           </p>
-          
+
           <div class="flex items-center justify-between text-sm">
             <span class="text-gray-500">Type:</span>
             <UBadge :color="getCheckTypeColor(clef.check_type)" variant="soft">
               {{ formatCheckType(clef.check_type) }}
             </UBadge>
           </div>
-          
+
           <div class="flex items-center justify-between text-sm">
             <span class="text-gray-500">Stave:</span>
             <span class="font-medium">{{ getStaveName(clef.stave_id) }}</span>
           </div>
-          
+
           <div class="flex items-center justify-between text-sm">
             <span class="text-gray-500">Schedule:</span>
             <span class="font-medium">{{ clef.schedule || 'Manual' }}</span>
@@ -179,8 +179,8 @@
           <div class="flex items-center justify-between text-sm">
             <span class="text-gray-500">Last Result:</span>
             <div v-if="latestStatusByClef[clef.id]" class="flex items-center gap-2">
-              <UBadge 
-                :color="getStatusBadgeColor(latestStatusByClef[clef.id]?.status)" 
+              <UBadge
+                :color="getStatusBadgeColor(latestStatusByClef[clef.id]?.status)"
                 variant="soft"
               >
                 {{ formatStatusLabel(latestStatusByClef[clef.id]?.status) }}
@@ -191,11 +191,11 @@
             </div>
             <span v-else class="text-gray-400">No runs yet</span>
           </div>
-          
+
           <div class="flex items-center justify-between text-sm">
             <span class="text-gray-500">Status:</span>
-            <UBadge 
-              :color="clef.is_active ? 'green' : 'gray'" 
+            <UBadge
+              :color="clef.is_active ? 'green' : 'gray'"
               variant="soft"
             >
               {{ clef.is_active ? 'Active' : 'Inactive' }}
@@ -209,9 +209,9 @@
               Created {{ formatDate(clef.created_at) }}
             </div>
             <div class="flex gap-2">
-              <UButton 
-                size="xs" 
-                color="blue" 
+              <UButton
+                size="xs"
+                color="blue"
                 variant="ghost"
                 icon="i-heroicons-play"
                 @click="runCheck(clef.id)"
@@ -228,9 +228,9 @@
               >
                 History
               </UButton>
-              <UButton 
-                size="xs" 
-                color="gray" 
+              <UButton
+                size="xs"
+                color="gray"
                 variant="ghost"
                 icon="i-heroicons-pencil"
                 @click="editClef(clef)"
@@ -252,9 +252,9 @@
         <p class="text-gray-600 dark:text-gray-400 mb-6">
         {{ clefs.length === 0 ? 'Create your first clef to start monitoring data quality.' : 'Try adjusting your filters to see more results.' }}
       </p>
-      <UButton 
+      <UButton
         v-if="clefs.length === 0"
-        color="primary" 
+        color="primary"
         icon="i-heroicons-plus"
         @click="showCreateModal = true"
       >
@@ -270,9 +270,9 @@
             <h3 class="text-lg font-semibold">
               {{ editingClef ? 'Edit Clef' : 'Create New Clef' }}
             </h3>
-            <UButton 
-              color="gray" 
-              variant="ghost" 
+            <UButton
+              color="gray"
+              variant="ghost"
               icon="i-heroicons-x-mark"
               @click="closeModal"
             />
@@ -284,8 +284,8 @@
           <div v-if="!editingClef">
             <h4 class="text-md font-medium mb-4">Choose Clef Type</h4>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <UCard 
-                v-for="template in clefTemplates" 
+              <UCard
+                v-for="template in clefTemplates"
                 :key="template.type"
                 class="cursor-pointer hover:shadow-lg transition-all hover:scale-105"
                 :class="{ 'ring-2 ring-blue-500': newClef.check_type === template.type }"
@@ -310,7 +310,7 @@
                 <UFormGroup label="Name" required>
                   <UInput v-model="newClef.name" placeholder="Enter clef name" />
                 </UFormGroup>
-                
+
                 <UFormGroup label="Stave" required>
                   <USelect
                     v-model="newClef.stave_id"
@@ -321,8 +321,8 @@
               </div>
 
               <UFormGroup label="Description">
-                <UTextarea 
-                  v-model="newClef.description" 
+                <UTextarea
+                  v-model="newClef.description"
                   placeholder="Describe what this clef checks"
                   rows="2"
                 />
@@ -336,7 +336,7 @@
                     placeholder="Select schedule"
                   />
                 </UFormGroup>
-                
+
                 <UFormGroup label="Status">
                   <UToggle v-model="newClef.is_active" />
                   <span class="ml-2 text-sm text-gray-600 dark:text-gray-400">
@@ -348,7 +348,7 @@
               <!-- Dynamic Configuration Based on Clef Type -->
               <div class="border-t pt-4">
                 <h4 class="text-md font-medium mb-4">Configuration</h4>
-                <ClefConfigForm 
+                <ClefConfigForm
                   :clef-type="newClef.check_type"
                   :config="newClef.configuration"
                   @update:config="newClef.configuration = $event"
@@ -360,14 +360,14 @@
                 <h4 class="text-md font-medium mb-4">Severity Thresholds</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <UFormGroup label="Warning Threshold">
-                    <UInput 
-                      v-model="newClef.warn" 
+                    <UInput
+                      v-model="newClef.warn"
                       placeholder="e.g., > 5%"
                     />
                   </UFormGroup>
                   <UFormGroup label="Failure Threshold">
-                    <UInput 
-                      v-model="newClef.fail" 
+                    <UInput
+                      v-model="newClef.fail"
                       placeholder="e.g., > 20%"
                     />
                   </UFormGroup>
@@ -378,8 +378,8 @@
                 <UButton color="gray" variant="outline" @click="closeModal">
                   Cancel
                 </UButton>
-                <UButton 
-                  type="submit" 
+                <UButton
+                  type="submit"
                   color="primary"
                   :loading="isSaving"
                 >
@@ -398,16 +398,16 @@
         <template #header>
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold">Visual Clef Builder</h3>
-            <UButton 
-              color="gray" 
-              variant="ghost" 
+            <UButton
+              color="gray"
+              variant="ghost"
               icon="i-heroicons-x-mark"
               @click="closeModal"
             />
           </div>
         </template>
 
-        <ClefVisualBuilder 
+        <ClefVisualBuilder
           :clef-templates="clefTemplates"
           :stave-options="staveOptions"
           :schedule-options="scheduleOptions"
@@ -430,9 +430,9 @@
                 Latest executions for {{ selectedClefHistory?.name || 'this clef' }}
               </p>
             </div>
-            <UButton 
-              color="gray" 
-              variant="ghost" 
+            <UButton
+              color="gray"
+              variant="ghost"
               icon="i-heroicons-x-mark"
               @click="closeHistoryModal"
             />
@@ -449,7 +449,7 @@
         </div>
 
         <div v-else>
-          <UTable 
+          <UTable
             v-if="checkHistory.length > 0"
             :rows="checkHistory"
             :columns="historyColumns"
@@ -500,15 +500,15 @@ useHead({
 })
 
 // Composables
-const { 
-  clefs, 
+const {
+  clefs,
   checkResults,
-  isLoading, 
-  error, 
-  fetchClefs, 
-  createClef, 
-  updateClef, 
-  deleteClef, 
+  isLoading,
+  error,
+  fetchClefs,
+  createClef,
+  updateClef,
+  deleteClef,
   runCheck: executeCheck,
   fetchLatestResults,
   fetchCheckResults
@@ -641,11 +641,11 @@ const filteredClefs = computed(() => {
   return result
 })
 
-const activeClefsCount = computed(() => 
+const activeClefsCount = computed(() =>
   clefs.value.filter(clef => clef.is_active).length
 )
 
-const failedChecksCount = computed(() => 
+const failedChecksCount = computed(() =>
   // This would come from check results in a real implementation
   0
 )

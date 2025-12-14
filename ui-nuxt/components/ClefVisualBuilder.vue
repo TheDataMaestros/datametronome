@@ -12,26 +12,26 @@
 
     <!-- Builder Steps -->
     <div class="flex items-center justify-center space-x-4 mb-8">
-      <div 
-        v-for="(step, index) in steps" 
+      <div
+        v-for="(step, index) in steps"
         :key="index"
         class="flex items-center"
       >
-        <div 
+        <div
           class="w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium"
           :class="getStepClass(index)"
         >
           {{ index + 1 }}
         </div>
-        <span 
+        <span
           class="ml-2 text-sm font-medium"
           :class="getStepTextClass(index)"
         >
           {{ step }}
         </span>
-        <Icon 
+        <Icon
           v-if="index < steps.length - 1"
-          name="i-heroicons-chevron-right" 
+          name="i-heroicons-chevron-right"
           class="w-4 h-4 mx-4 text-gray-400"
         />
       </div>
@@ -42,10 +42,10 @@
       <!-- Step 1: Choose Clef Type -->
       <div v-if="currentStep === 0" class="space-y-6">
         <h3 class="text-xl font-semibold text-center mb-6">Choose Your Clef Type</h3>
-        
+
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <UCard 
-            v-for="template in clefTemplates" 
+          <UCard
+            v-for="template in clefTemplates"
             :key="template.type"
             class="cursor-pointer hover:shadow-lg transition-all hover:scale-105 group"
             :class="{ 'ring-2 ring-blue-500 bg-blue-50 dark:bg-blue-900/20': selectedType === template.type }"
@@ -55,12 +55,12 @@
               <div class="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                 <Icon :name="template.icon" class="w-8 h-8 text-white" />
               </div>
-              
+
               <div>
                 <h4 class="font-semibold text-lg">{{ template.name }}</h4>
                 <p class="text-sm text-gray-600 dark:text-gray-400 mt-2">{{ template.description }}</p>
               </div>
-              
+
               <div class="flex items-center justify-center space-x-2">
                 <UBadge :color="getTierColor(template.tier)" variant="soft">
                   Tier {{ template.tier }}
@@ -69,19 +69,19 @@
                   {{ getTierDescription(template.tier) }}
                 </UBadge>
               </div>
-              
+
               <!-- Difficulty indicator -->
               <div class="flex items-center justify-center space-x-1">
-                <Icon 
-                  v-for="i in template.tier" 
+                <Icon
+                  v-for="i in template.tier"
                   :key="i"
-                  name="i-heroicons-star-solid" 
+                  name="i-heroicons-star-solid"
                   class="w-4 h-4 text-yellow-400"
                 />
-                <Icon 
-                  v-for="i in (4 - template.tier)" 
+                <Icon
+                  v-for="i in (4 - template.tier)"
                   :key="i"
-                  name="i-heroicons-star" 
+                  name="i-heroicons-star"
                   class="w-4 h-4 text-gray-300"
                 />
               </div>
@@ -93,7 +93,7 @@
       <!-- Step 2: Configure Clef -->
       <div v-if="currentStep === 1" class="space-y-6">
         <h3 class="text-xl font-semibold text-center mb-6">Configure Your {{ getSelectedTemplate()?.name }}</h3>
-        
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <!-- Configuration Form -->
           <div class="space-y-6">
@@ -101,23 +101,23 @@
               <template #header>
                 <h4 class="font-semibold">Basic Settings</h4>
               </template>
-              
+
               <div class="space-y-4">
                 <UFormGroup label="Clef Name" required>
-                  <UInput 
-                    v-model="builderConfig.name" 
+                  <UInput
+                    v-model="builderConfig.name"
                     placeholder="e.g., Email Validation Check"
                   />
                 </UFormGroup>
-                
+
                 <UFormGroup label="Description">
-                  <UTextarea 
-                    v-model="builderConfig.description" 
+                  <UTextarea
+                    v-model="builderConfig.description"
                     placeholder="Describe what this clef validates"
                     rows="3"
                   />
                 </UFormGroup>
-                
+
                 <UFormGroup label="Target Stave" required>
                   <USelect
                     v-model="builderConfig.stave_id"
@@ -133,8 +133,8 @@
               <template #header>
                 <h4 class="font-semibold">{{ getSelectedTemplate()?.name }} Configuration</h4>
               </template>
-              
-              <ClefConfigForm 
+
+              <ClefConfigForm
                 :clef-type="selectedType"
                 :config="builderConfig.configuration"
                 @update:config="builderConfig.configuration = $event"
@@ -148,7 +148,7 @@
               <template #header>
                 <h4 class="font-semibold">Preview</h4>
               </template>
-              
+
               <div class="space-y-4">
                 <div class="flex items-center space-x-3">
                   <Icon :name="getSelectedTemplate()?.icon" class="w-6 h-6 text-blue-500" />
@@ -157,7 +157,7 @@
                     <p class="text-sm text-gray-600 dark:text-gray-400">{{ builderConfig.description || 'No description' }}</p>
                   </div>
                 </div>
-                
+
                 <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
                   <h6 class="font-medium mb-2">Configuration:</h6>
                   <pre class="text-sm text-gray-700 dark:text-gray-300">{{ JSON.stringify(builderConfig.configuration, null, 2) }}</pre>
@@ -170,7 +170,7 @@
               <template #header>
                 <h4 class="font-semibold">💡 Tips</h4>
               </template>
-              
+
               <div class="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                 <div v-for="tip in getTips()" :key="tip" class="flex items-start space-x-2">
                   <Icon name="i-heroicons-light-bulb" class="w-4 h-4 text-yellow-500 mt-0.5 flex-shrink-0" />
@@ -185,14 +185,14 @@
       <!-- Step 3: Schedule & Thresholds -->
       <div v-if="currentStep === 2" class="space-y-6">
         <h3 class="text-xl font-semibold text-center mb-6">Set Schedule & Thresholds</h3>
-        
+
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <!-- Schedule Configuration -->
           <UCard>
             <template #header>
               <h4 class="font-semibold">⏰ Schedule</h4>
             </template>
-            
+
             <div class="space-y-4">
               <UFormGroup label="Run Frequency">
                 <USelect
@@ -201,7 +201,7 @@
                   placeholder="Select frequency"
                 />
               </UFormGroup>
-              
+
               <div class="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
                 <div class="flex items-center space-x-2 mb-2">
                   <Icon name="i-heroicons-information-circle" class="w-5 h-5 text-blue-500" />
@@ -219,28 +219,28 @@
             <template #header>
               <h4 class="font-semibold">⚠️ Severity Thresholds</h4>
             </template>
-            
+
             <div class="space-y-4">
               <UFormGroup label="Warning Threshold">
-                <UInput 
-                  v-model="builderConfig.warn" 
+                <UInput
+                  v-model="builderConfig.warn"
                   placeholder="e.g., > 5%"
                 />
                 <template #help>
                   <span class="text-sm text-gray-500">Triggers a warning when exceeded</span>
                 </template>
               </UFormGroup>
-              
+
               <UFormGroup label="Failure Threshold">
-                <UInput 
-                  v-model="builderConfig.fail" 
+                <UInput
+                  v-model="builderConfig.fail"
                   placeholder="e.g., > 20%"
                 />
                 <template #help>
                   <span class="text-sm text-gray-500">Triggers a failure when exceeded</span>
                 </template>
               </UFormGroup>
-              
+
               <div class="bg-yellow-50 dark:bg-yellow-900/20 rounded-lg p-4">
                 <div class="flex items-center space-x-2 mb-2">
                   <Icon name="i-heroicons-exclamation-triangle" class="w-5 h-5 text-yellow-500" />
@@ -260,7 +260,7 @@
       <!-- Step 4: Review & Create -->
       <div v-if="currentStep === 3" class="space-y-6">
         <h3 class="text-xl font-semibold text-center mb-6">Review & Create</h3>
-        
+
         <div class="max-w-2xl mx-auto">
           <UCard>
             <template #header>
@@ -269,7 +269,7 @@
                 <h4 class="font-semibold">{{ builderConfig.name }}</h4>
               </div>
             </template>
-            
+
             <div class="space-y-6">
               <!-- Summary -->
               <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -282,7 +282,7 @@
                     <div><strong>Status:</strong> {{ builderConfig.is_active ? 'Active' : 'Inactive' }}</div>
                   </div>
                 </div>
-                
+
                 <div>
                   <h5 class="font-medium text-gray-900 dark:text-white mb-2">Thresholds</h5>
                   <div class="space-y-1 text-sm text-gray-600 dark:text-gray-400">
@@ -291,7 +291,7 @@
                   </div>
                 </div>
               </div>
-              
+
               <!-- Configuration -->
               <div>
                 <h5 class="font-medium text-gray-900 dark:text-white mb-2">Configuration</h5>
@@ -299,7 +299,7 @@
                   <pre class="text-sm text-gray-700 dark:text-gray-300">{{ JSON.stringify(builderConfig.configuration, null, 2) }}</pre>
                 </div>
               </div>
-              
+
               <!-- Description -->
               <div v-if="builderConfig.description">
                 <h5 class="font-medium text-gray-900 dark:text-white mb-2">Description</h5>
@@ -312,9 +312,9 @@
 
       <!-- Navigation -->
       <div class="flex items-center justify-between pt-6">
-        <UButton 
+        <UButton
           v-if="currentStep > 0"
-          color="gray" 
+          color="gray"
           variant="outline"
           icon="i-heroicons-chevron-left"
           @click="previousStep"
@@ -322,9 +322,9 @@
           Previous
         </UButton>
         <div v-else></div>
-        
+
         <div class="flex items-center space-x-3">
-          <UButton 
+          <UButton
             v-if="currentStep < steps.length - 1"
             color="primary"
             icon="i-heroicons-chevron-right"
@@ -334,7 +334,7 @@
           >
             Next
           </UButton>
-          <UButton 
+          <UButton
             v-else
             color="green"
             icon="i-heroicons-check"
@@ -437,7 +437,7 @@ const getTierColor = (tier: number): string => {
 const getTierDescription = (tier: number): string => {
   const descriptions = {
     1: 'Basic',
-    2: 'Advanced', 
+    2: 'Advanced',
     3: 'Cross-System',
     4: 'Custom'
   }
@@ -447,7 +447,7 @@ const getTierDescription = (tier: number): string => {
 const selectType = (type: string) => {
   selectedType.value = type
   builderConfig.value.check_type = type
-  
+
   const template = props.clefTemplates.find(t => t.type === type)
   if (template) {
     builderConfig.value.configuration = { ...template.config }
@@ -461,7 +461,7 @@ const getSelectedTemplate = () => {
 const getTips = () => {
   const template = getSelectedTemplate()
   if (!template) return []
-  
+
   const tips: Record<string, string[]> = {
     'row_count': [
       'Set realistic min/max values based on your data volume',
@@ -499,7 +499,7 @@ const getTips = () => {
       'Test scripts thoroughly before deployment'
     ]
   }
-  
+
   return tips[template.type] || []
 }
 
@@ -541,18 +541,3 @@ const createClef = async () => {
   }
 }
 </script>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -20,7 +20,7 @@
           Report Generation
         </h3>
         <p class="text-gray-600 dark:text-gray-400 mb-6">
-          This feature is coming soon! It will include data quality summaries, 
+          This feature is coming soon! It will include data quality summaries,
           anomaly reports, performance metrics, and custom report generation.
         </p>
         <UButton color="primary" @click="navigateTo('/')">

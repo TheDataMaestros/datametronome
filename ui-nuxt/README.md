@@ -24,7 +24,7 @@ A modern, responsive dashboard built with Nuxt 3 and Nuxt UI for the DataMetrono
 
 ### Prerequisites
 
-- Node.js 18+ 
+- Node.js 18+
 - npm or yarn
 
 ### Installation
@@ -123,7 +123,7 @@ The UI communicates with the DataMetronome Podium API backend:
 
 - **Base URL**: `http://localhost:8001/api/v1`
 - **Authentication**: Bearer token
-- **Endpoints**: 
+- **Endpoints**:
   - `/auth/login` - User authentication
   - `/staves/` - Data source management
   - `/clefs/` - Quality check management

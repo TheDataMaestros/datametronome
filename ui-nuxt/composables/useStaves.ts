@@ -9,7 +9,7 @@ export const useStaves = () => {
   const fetchStaves = async () => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       staves.value = await stavesService.getAll()
     } catch (err) {
@@ -23,7 +23,7 @@ export const useStaves = () => {
   const createStave = async (staveData: CreateStaveRequest) => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       const newStave = await stavesService.create(staveData)
       staves.value.push(newStave)
@@ -39,7 +39,7 @@ export const useStaves = () => {
   const updateStave = async (id: string, updates: UpdateStaveRequest) => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       const updatedStave = await stavesService.update(id, updates)
       const index = staves.value.findIndex(s => s.id === id)
@@ -58,7 +58,7 @@ export const useStaves = () => {
   const deleteStave = async (id: string) => {
     isLoading.value = true
     error.value = null
-    
+
     try {
       await stavesService.delete(id)
       staves.value = staves.value.filter(s => s.id !== id)
@@ -96,10 +96,10 @@ export const useStaves = () => {
     staves: readonly(staves),
     isLoading: readonly(isLoading),
     error: readonly(error),
-    
+
     // Computed
     getActiveStaves,
-    
+
     // Actions
     fetchStaves,
     createStave,

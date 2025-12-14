@@ -3,26 +3,26 @@
     <!-- Row Count Configuration -->
     <div v-if="clefType === 'row_count'" class="space-y-4">
       <UFormGroup label="Table Name" required>
-        <UInput 
-          v-model="localConfig.table" 
+        <UInput
+          v-model="localConfig.table"
           placeholder="e.g., users"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <UFormGroup label="Minimum Expected Rows">
-          <UInput 
-            v-model.number="localConfig.expected_min" 
+          <UInput
+            v-model.number="localConfig.expected_min"
             type="number"
             placeholder="0"
             @input="updateConfig"
           />
         </UFormGroup>
-        
+
         <UFormGroup label="Maximum Expected Rows">
-          <UInput 
-            v-model.number="localConfig.expected_max" 
+          <UInput
+            v-model.number="localConfig.expected_max"
             type="number"
             placeholder="1000000"
             @input="updateConfig"
@@ -34,24 +34,24 @@
     <!-- Freshness Configuration -->
     <div v-else-if="clefType === 'freshness'" class="space-y-4">
       <UFormGroup label="Table Name" required>
-        <UInput 
-          v-model="localConfig.table" 
+        <UInput
+          v-model="localConfig.table"
           placeholder="e.g., users"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Timestamp Column" required>
-        <UInput 
-          v-model="localConfig.column" 
+        <UInput
+          v-model="localConfig.column"
           placeholder="e.g., updated_at"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Maximum Age (Hours)">
-        <UInput 
-          v-model.number="localConfig.max_age_hours" 
+        <UInput
+          v-model.number="localConfig.max_age_hours"
           type="number"
           placeholder="24"
           @input="updateConfig"
@@ -62,21 +62,21 @@
     <!-- Column Values Configuration -->
     <div v-else-if="clefType === 'column_values'" class="space-y-4">
       <UFormGroup label="Table Name" required>
-        <UInput 
-          v-model="localConfig.table" 
+        <UInput
+          v-model="localConfig.table"
           placeholder="e.g., users"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Column Name" required>
-        <UInput 
-          v-model="localConfig.column" 
+        <UInput
+          v-model="localConfig.column"
           placeholder="e.g., email"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Validation Type">
         <USelect
           v-model="localConfig.validation_type"
@@ -84,12 +84,12 @@
           @change="updateConfig"
         />
       </UFormGroup>
-      
+
       <!-- Additional fields based on validation type -->
       <div v-if="localConfig.validation_type === 'null_check'" class="space-y-4">
         <UFormGroup label="Maximum NULL Percentage">
-          <UInput 
-            v-model.number="localConfig.threshold" 
+          <UInput
+            v-model.number="localConfig.threshold"
             type="number"
             step="0.01"
             placeholder="0.01"
@@ -97,21 +97,21 @@
           />
         </UFormGroup>
       </div>
-      
+
       <div v-else-if="localConfig.validation_type === 'range_check'" class="space-y-4">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           <UFormGroup label="Minimum Value">
-            <UInput 
-              v-model.number="localConfig.min" 
+            <UInput
+              v-model.number="localConfig.min"
               type="number"
               placeholder="0"
               @input="updateConfig"
             />
           </UFormGroup>
-          
+
           <UFormGroup label="Maximum Value">
-            <UInput 
-              v-model.number="localConfig.max" 
+            <UInput
+              v-model.number="localConfig.max"
               type="number"
               placeholder="100"
               @input="updateConfig"
@@ -119,11 +119,11 @@
           </UFormGroup>
         </div>
       </div>
-      
+
       <div v-else-if="localConfig.validation_type === 'pattern_check'" class="space-y-4">
         <UFormGroup label="Regex Pattern">
-          <UInput 
-            v-model="localConfig.pattern" 
+          <UInput
+            v-model="localConfig.pattern"
             placeholder="^[a-z0-9._%+-]+@[a-z0-9.-]+\\.[a-z]{2,}$"
             @input="updateConfig"
           />
@@ -134,13 +134,13 @@
     <!-- Forecast Configuration -->
     <div v-else-if="clefType === 'forecast'" class="space-y-4">
       <UFormGroup label="Table Name" required>
-        <UInput 
-          v-model="localConfig.table" 
+        <UInput
+          v-model="localConfig.table"
           placeholder="e.g., events"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Metric to Monitor">
         <USelect
           v-model="localConfig.metric"
@@ -148,15 +148,15 @@
           @change="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Time Column" required>
-        <UInput 
-          v-model="localConfig.time_column" 
+        <UInput
+          v-model="localConfig.time_column"
           placeholder="e.g., created_at"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <UFormGroup label="Aggregation">
           <USelect
@@ -165,7 +165,7 @@
             @change="updateConfig"
           />
         </UFormGroup>
-        
+
         <UFormGroup label="Model">
           <USelect
             v-model="localConfig.model"
@@ -179,21 +179,21 @@
     <!-- Data Profile Drift Configuration -->
     <div v-else-if="clefType === 'data_profile_drift'" class="space-y-4">
       <UFormGroup label="Table Name" required>
-        <UInput 
-          v-model="localConfig.table" 
+        <UInput
+          v-model="localConfig.table"
           placeholder="e.g., users"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Column Name" required>
-        <UInput 
-          v-model="localConfig.column" 
+        <UInput
+          v-model="localConfig.column"
           placeholder="e.g., age"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <UFormGroup label="Reference Period">
           <USelect
@@ -202,7 +202,7 @@
             @change="updateConfig"
           />
         </UFormGroup>
-        
+
         <UFormGroup label="Comparison Period">
           <USelect
             v-model="localConfig.comparison_period"
@@ -216,32 +216,32 @@
     <!-- Lookup Validation Configuration -->
     <div v-else-if="clefType === 'lookup_validation'" class="space-y-4">
       <UFormGroup label="Source Table" required>
-        <UInput 
-          v-model="localConfig.source_table" 
+        <UInput
+          v-model="localConfig.source_table"
           placeholder="e.g., users"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Source Column" required>
-        <UInput 
-          v-model="localConfig.source_column" 
+        <UInput
+          v-model="localConfig.source_column"
           placeholder="e.g., id"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Lookup Source">
-        <UInput 
-          v-model="localConfig.lookup_source" 
+        <UInput
+          v-model="localConfig.lookup_source"
           placeholder="e.g., analytics_db"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Lookup Query">
-        <UTextarea 
-          v-model="localConfig.lookup_query" 
+        <UTextarea
+          v-model="localConfig.lookup_query"
           placeholder="SELECT DISTINCT user_id FROM user_events"
           rows="3"
           @input="updateConfig"
@@ -252,24 +252,24 @@
     <!-- Python Configuration -->
     <div v-else-if="clefType === 'python'" class="space-y-4">
       <UFormGroup label="Script Path" required>
-        <UInput 
-          v-model="localConfig.script_path" 
+        <UInput
+          v-model="localConfig.script_path"
           placeholder="e.g., scripts/user_validation.py"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Function Name" required>
-        <UInput 
-          v-model="localConfig.function_name" 
+        <UInput
+          v-model="localConfig.function_name"
           placeholder="e.g., check_user_compliance"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Parameters (JSON)">
-        <UTextarea 
-          v-model="parametersJson" 
+        <UTextarea
+          v-model="parametersJson"
           placeholder='{"min_age": 18, "required_fields": ["email", "name"]}'
           rows="4"
           @input="updateParameters"
@@ -280,24 +280,24 @@
     <!-- Default Configuration -->
     <div v-else class="space-y-4">
       <UFormGroup label="Table Name">
-        <UInput 
-          v-model="localConfig.table" 
+        <UInput
+          v-model="localConfig.table"
           placeholder="e.g., users"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Column Name">
-        <UInput 
-          v-model="localConfig.column" 
+        <UInput
+          v-model="localConfig.column"
           placeholder="e.g., email"
           @input="updateConfig"
         />
       </UFormGroup>
-      
+
       <UFormGroup label="Custom Configuration (JSON)">
-        <UTextarea 
-          v-model="customConfigJson" 
+        <UTextarea
+          v-model="customConfigJson"
           placeholder='{"key": "value"}'
           rows="4"
           @input="updateCustomConfig"
@@ -391,12 +391,12 @@ const updateCustomConfig = () => {
 // Watch for prop changes
 watch(() => props.config, (newConfig) => {
   localConfig.value = { ...newConfig }
-  
+
   // Update JSON representations
   if (newConfig.parameters) {
     parametersJson.value = JSON.stringify(newConfig.parameters, null, 2)
   }
-  
+
   if (Object.keys(newConfig).length > 0) {
     customConfigJson.value = JSON.stringify(newConfig, null, 2)
   }
@@ -407,19 +407,3 @@ if (props.config.parameters) {
   parametersJson.value = JSON.stringify(props.config.parameters, null, 2)
 }
 </script>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -29,7 +29,7 @@ class ApiService {
     options: RequestInit = {}
   ): Promise<ApiResponse<T>> {
     const url = buildApiUrl(endpoint)
-    
+
     const config: RequestInit = {
       ...options,
       headers: {
@@ -50,12 +50,22 @@ class ApiService {
     try {
       const response = await fetch(url, config)
       console.log(`API Response [${endpoint}]:`, response.status, response.statusText)
-      
-      const data = await response.json()
+
+      const raw = await response.text()
+      let data: any = null
+      try {
+        data = raw ? JSON.parse(raw) : null
+      } catch {
+        data = raw
+      }
       console.log(`API Data [${endpoint}]:`, data)
 
       if (!response.ok) {
-        throw new Error(data.message || `HTTP ${response.status}`)
+        throw {
+          message: (data && typeof data === 'object' && 'message' in data) ? (data as any).message : `HTTP ${response.status}`,
+          status: response.status,
+          details: data,
+        } as ApiError
       }
 
       return {
@@ -64,9 +74,12 @@ class ApiService {
       }
     } catch (error) {
       console.error(`API Error [${endpoint}]:`, error)
+      if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
+        throw error as ApiError
+      }
       throw {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        status: 500,
+        message: error instanceof Error ? error.message : 'Network or unknown error',
+        status: 0,
         details: error,
       } as ApiError
     }

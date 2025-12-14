@@ -57,4 +57,3 @@ class ChecksService {
 }
 
 export const checksService = new ChecksService()
-

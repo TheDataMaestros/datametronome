@@ -51,7 +51,7 @@ export const useAuthStore = defineStore('auth', () => {
 
       const data = await response.json()
       const authToken = data.access_token
-      
+
       const userData: User = {
         username: credentials.username,
         email: 'admin@datametronome.dev',
@@ -79,7 +79,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function logout(): Promise<void> {
     isLoading.value = true
-    
+
     try {
       // Clear state
       token.value = null
@@ -110,7 +110,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       // Simulate API call to refresh user data
       await new Promise(resolve => setTimeout(resolve, 500))
-      
+
       // In a real app, you would call your API here
       // const response = await apiService.get('/auth/me')
       // user.value = response.data
@@ -126,7 +126,7 @@ export const useAuthStore = defineStore('auth', () => {
     if (process.client) {
       const storedToken = localStorage.getItem('auth_token')
       const storedUser = localStorage.getItem('user_info')
-      
+
       if (storedToken && storedUser) {
         try {
           token.value = storedToken
@@ -150,10 +150,10 @@ export const useAuthStore = defineStore('auth', () => {
     token,
     isLoading,
     error,
-    
+
     // Computed
     isAuthenticated,
-    
+
     // Actions
     login,
     logout,

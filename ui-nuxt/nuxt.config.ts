@@ -1,5 +1,5 @@
 export default defineNuxtConfig({
-  devtools: { enabled: true },
+  devtools: { enabled: false },
   compatibilityDate: '2025-10-16',
   modules: [
     '@nuxt/ui',
@@ -20,8 +20,8 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8001/api/v1',
-      podiumApiBase: process.env.NUXT_PUBLIC_PODIUM_API_BASE || 'http://localhost:8001'
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://127.0.0.1:8001/api/v1',
+      podiumApiBase: process.env.NUXT_PUBLIC_PODIUM_API_BASE || 'http://127.0.0.1:8001'
     }
   },
   app: {

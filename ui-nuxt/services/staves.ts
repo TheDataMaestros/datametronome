@@ -23,7 +23,7 @@ export interface UpdateStaveRequest extends Partial<CreateStaveRequest> {
 }
 
 class StavesService {
-  private readonly endpoint = '/staves'
+  private readonly endpoint = '/staves/'
 
   async getAll(): Promise<Stave[]> {
     const response = await apiService.get<Stave[]>(this.endpoint)

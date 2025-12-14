@@ -20,7 +20,7 @@
           Data Investigation Tools
         </h3>
         <p class="text-gray-600 dark:text-gray-400 mb-6">
-          This feature is coming soon! It will include custom SQL queries, 
+          This feature is coming soon! It will include custom SQL queries,
           data profiling, sample data viewing, and interactive data exploration.
         </p>
         <UButton color="primary" @click="navigateTo('/')">
