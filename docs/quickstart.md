@@ -30,7 +30,7 @@ Welcome to DataMetronome! This guide will help you get started based on your rol
    ```python
    import asyncio
    from metronome_pulse_postgres import PostgresConnector
-   
+
    async def check_data_quality():
        # Connect to your PostgreSQL database
        connector = PostgresConnector(
@@ -40,17 +40,17 @@ Welcome to DataMetronome! This guide will help you get started based on your rol
            user="your_user",
            password="your_password"
        )
-       
+
        await connector.connect()
-       
+
        # Check for NULL values in critical columns
        nulls = await connector.read(
            "SELECT COUNT(*) FROM users WHERE email IS NULL"
        )
        print(f"Found {nulls[0][0]} users with NULL emails")
-       
+
        await connector.disconnect()
-   
+
    asyncio.run(check_data_quality())
    ```
 
@@ -60,7 +60,7 @@ Welcome to DataMetronome! This guide will help you get started based on your rol
    from metronome_pulse_postgres import PostgresConnector
    import pandas as pd
    from sklearn.ensemble import IsolationForest
-   
+
    async def detect_anomalies():
        connector = PostgresConnector(
            host="localhost",
@@ -68,31 +68,31 @@ Welcome to DataMetronome! This guide will help you get started based on your rol
            user="your_user",
            password="your_password"
        )
-       
+
        await connector.connect()
-       
+
        # Get recent order amounts
        query = """
-           SELECT order_amount, created_at 
-           FROM orders 
+           SELECT order_amount, created_at
+           FROM orders
            WHERE created_at > NOW() - INTERVAL '7 days'
        """
        results = await connector.read(query)
-       
+
        # Convert to DataFrame
        df = pd.DataFrame(results, columns=['amount', 'created_at'])
-       
+
        # Detect anomalies using Isolation Forest
        model = IsolationForest(contamination=0.1)
        df['anomaly'] = model.fit_predict(df[['amount']])
-       
+
        # Show anomalies
        anomalies = df[df['anomaly'] == -1]
        print(f"Found {len(anomalies)} anomalous orders:")
        print(anomalies)
-       
+
        await connector.disconnect()
-   
+
    asyncio.run(detect_anomalies())
    ```
 
@@ -120,10 +120,10 @@ Welcome to DataMetronome! This guide will help you get started based on your rol
    ```bash
    # Copy environment example
    cp env.example .env
-   
+
    # Edit .env with your settings
    nano .env
-   
+
    # Start all services
    docker-compose up -d
    ```
@@ -138,10 +138,10 @@ Welcome to DataMetronome! This guide will help you get started based on your rol
    ```bash
    # Check API health
    curl http://localhost:8000/health
-   
+
    # Check all services
    docker-compose ps
-   
+
    # View logs
    docker-compose logs -f
    ```
@@ -193,7 +193,7 @@ For production deployment, see our detailed [Deployment Guide](../DEPLOYMENT.md)
    import asyncio
    from metronome_pulse_postgres import PostgresConnector
    import pandas as pd
-   
+
    async def profile_data():
        connector = PostgresConnector(
            host="localhost",
@@ -201,16 +201,16 @@ For production deployment, see our detailed [Deployment Guide](../DEPLOYMENT.md)
            user="ml_user",
            password="password"
        )
-       
+
        await connector.connect()
-       
+
        # Get training dataset
        query = "SELECT * FROM training_data WHERE dataset = 'v1'"
        results = await connector.read(query)
-       
+
        # Convert to DataFrame for analysis
        df = pd.DataFrame(results)
-       
+
        # Get comprehensive statistics
        print("Dataset Profile:")
        print(f"Rows: {len(df)}")
@@ -219,9 +219,9 @@ For production deployment, see our detailed [Deployment Guide](../DEPLOYMENT.md)
        print(df.isnull().sum())
        print(f"\nStatistics:")
        print(df.describe())
-       
+
        await connector.disconnect()
-   
+
    asyncio.run(profile_data())
    ```
 
@@ -229,7 +229,7 @@ For production deployment, see our detailed [Deployment Guide](../DEPLOYMENT.md)
    ```python
    from sklearn.ensemble import IsolationForest
    import pandas as pd
-   
+
    async def detect_drift():
        connector = PostgresConnector(
            host="localhost",
@@ -237,37 +237,73 @@ For production deployment, see our detailed [Deployment Guide](../DEPLOYMENT.md)
            user="ml_user",
            password="password"
        )
-       
+
        await connector.connect()
-       
+
        # Compare training vs production distributions
        train_query = "SELECT feature_1, feature_2 FROM training_data"
        prod_query = "SELECT feature_1, feature_2 FROM production_data WHERE created_at > NOW() - INTERVAL '1 day'"
-       
+
        train_data = await connector.read(train_query)
        prod_data = await connector.read(prod_query)
-       
+
        train_df = pd.DataFrame(train_data, columns=['f1', 'f2'])
        prod_df = pd.DataFrame(prod_data, columns=['f1', 'f2'])
-       
+
        # Train on training data
        model = IsolationForest(contamination=0.05)
        model.fit(train_df)
-       
+
        # Detect anomalies in production data
        prod_df['drift'] = model.predict(prod_df)
        drift_pct = (prod_df['drift'] == -1).mean() * 100
-       
+
        print(f"Data drift detected: {drift_pct:.2f}% of production data is anomalous")
-       
        if drift_pct > 10:
            print("⚠️  WARNING: Significant data drift detected!")
            print("Consider retraining your model.")
-       
+
        await connector.disconnect()
-   
+
    asyncio.run(detect_drift())
    ```
+
+### Automated Monitoring (YAML)
+
+Instead of writing scripts, you can define drift and forecast checks declaratively using YAML. This enables continuous, automated monitoring without maintaining custom code:
+
+```yaml
+# data/staves/ml_monitoring.yaml
+name: "ML Data Quality"
+data_source_type: "postgres"
+connection_config:
+  host: "localhost"
+  database: "ml_db"
+schedule: "0 * * * *"  # Run hourly
+
+checks:
+  # Level 2: Time-series Forecasting (SARIMA)
+  # Automatically detects anomalies based on historical patterns
+  - type: forecast
+    name: "order_volume_anomaly"
+    config:
+      # Query should return timestamp and value columns
+      query: "SELECT created_at, amount FROM orders WHERE created_at > NOW() - INTERVAL '30 days'"
+      timestamp_column: "created_at"
+      value_column: "amount"
+
+  # Level 2: Data Drift Detection (Kolmogorov-Smirnov)
+  # Detects if the distribution of new data differs from baseline
+  - type: data_profile_drift
+    name: "feature_drift_check"
+    config:
+      table: "model_features"
+      column: "input_variable_x"
+      # Compare last 24h against historical baseline
+      baseline_condition: "created_at BETWEEN NOW() - INTERVAL '30 days' AND NOW() - INTERVAL '1 day'"
+      current_condition: "created_at > NOW() - INTERVAL '1 day'"
+      critical_p_value: 0.05  # Alert if distributions differ significantly
+```
 
 ### Advanced Features
 
@@ -313,20 +349,20 @@ async def read_example():
         user="user",
         password="password"
     )
-    
+
     await connector.connect()
-    
+
     # Simple query
     results = await connector.read("SELECT * FROM users LIMIT 10")
     for row in results:
         print(row)
-    
+
     # Parameterized query
     results = await connector.read(
         "SELECT * FROM users WHERE age > $1",
         params=[25]
     )
-    
+
     await connector.disconnect()
 
 asyncio.run(read_example())
@@ -342,27 +378,27 @@ async def write_example():
         user="user",
         password="password"
     )
-    
+
     await connector.connect()
-    
+
     # Insert data
     await connector.write(
         "INSERT INTO users (name, email, age) VALUES ($1, $2, $3)",
         params=["Alice", "alice@example.com", 30]
     )
-    
+
     # Batch insert
     users = [
         ("Bob", "bob@example.com", 25),
         ("Charlie", "charlie@example.com", 35),
     ]
-    
+
     for name, email, age in users:
         await connector.write(
             "INSERT INTO users (name, email, age) VALUES ($1, $2, $3)",
             params=[name, email, age]
         )
-    
+
     await connector.disconnect()
 
 asyncio.run(write_example())
@@ -407,14 +443,14 @@ async def api_example():
                 "database": "prod"
             }
         }
-        
+
         response = await client.post(
             f"{API_BASE}/api/v1/staves",
             json=stave_data
         )
         stave = response.json()
         print(f"Created stave: {stave['id']}")
-        
+
         # Create a check (data quality rule)
         check_data = {
             "stave_id": stave["id"],
@@ -425,7 +461,7 @@ async def api_example():
                 "column": "email"
             }
         }
-        
+
         response = await client.post(
             f"{API_BASE}/api/v1/clefs",
             json=check_data
@@ -485,19 +521,19 @@ The dashboard will open at **http://localhost:3000** with:
 async def simple_alert():
     connector = PostgresConnector(...)
     await connector.connect()
-    
+
     # Check for critical condition
     result = await connector.read(
         "SELECT COUNT(*) FROM orders WHERE amount < 0"
     )
-    
+
     negative_count = result[0][0]
-    
+
     if negative_count > 0:
         # Send alert (integrate with your notification system)
         print(f"🚨 ALERT: {negative_count} orders with negative amounts!")
         # TODO: Send email, Slack message, etc.
-    
+
     await connector.disconnect()
 ```
 
@@ -599,4 +635,3 @@ asyncio.run(test_connection())
 **🎵 Happy monitoring with DataMetronome!**
 
 *Questions or feedback? We'd love to hear from you!*
-

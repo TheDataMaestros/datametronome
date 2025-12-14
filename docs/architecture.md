@@ -25,31 +25,31 @@ graph TB
         UI[Web UI]
         API_DOCS[API Documentation]
     end
-    
+
     subgraph "API Layer"
         PODIUM[Podium FastAPI]
         AUTH[Authentication]
         ENDPOINTS[REST Endpoints]
     end
-    
+
     subgraph "Business Logic Layer"
         SERVICES[Services]
         SCHEDULER[Task Scheduler]
         DETECTOR[Anomaly Detection]
     end
-    
+
     subgraph "Data Access Layer"
         PULSE_CORE[DataPulse Core]
         PULSE_PG[PostgreSQL Pulse]
         PULSE_SQLITE[SQLite Pulse]
         PULSE_OTHER[Other Pulses]
     end
-    
+
     subgraph "Data Layer"
         DB_INTERNAL[(Internal DB)]
         DB_MONITORED[(Monitored Databases)]
     end
-    
+
     UI -->|HTTP| PODIUM
     PODIUM --> AUTH
     PODIUM --> ENDPOINTS
@@ -96,19 +96,19 @@ classDiagram
         +disconnect() async
         +execute() async
     }
-    
+
     class ReadablePulse {
         <<abstract>>
         +read() async
         +query() async
     }
-    
+
     class WritablePulse {
         <<abstract>>
         +write() async
         +batch_write() async
     }
-    
+
     class PostgresPulse {
         +asyncpg_pool
         +connect() async
@@ -116,14 +116,14 @@ classDiagram
         +write() async
         +transaction() async
     }
-    
+
     class SQLitePulse {
         +aiosqlite_conn
         +connect() async
         +read() async
         +write() async
     }
-    
+
     BasePulse <|-- ReadablePulse
     BasePulse <|-- WritablePulse
     ReadablePulse <|-- PostgresPulse
@@ -198,7 +198,7 @@ sequenceDiagram
     participant DataPulse
     participant Database
     participant AlertService
-    
+
     Scheduler->>Engine: Trigger check
     Engine->>DataPulse: Fetch data
     DataPulse->>Database: Query
@@ -207,12 +207,12 @@ sequenceDiagram
     Engine->>Engine: Apply ML model
     Engine->>Engine: Statistical analysis
     Engine->>Engine: Detect anomalies
-    
+
     alt Anomalies Found
         Engine->>AlertService: Send alerts
         AlertService-->>Engine: Confirmed
     end
-    
+
     Engine-->>Scheduler: Check complete
 ```
 
@@ -243,14 +243,14 @@ flowchart TD
     CONNECT --> EXECUTE_QUERY[Execute SQL Query]
     EXECUTE_QUERY --> COLLECT_DATA[Collect Data]
     COLLECT_DATA --> ANALYZE{Anomaly Detection}
-    
+
     ANALYZE -->|Normal| LOG_SUCCESS[Log Success]
     ANALYZE -->|Anomalies| LOG_ANOMALY[Log Anomalies]
-    
+
     LOG_ANOMALY --> ALERT{Alert Threshold?}
     ALERT -->|Yes| SEND_ALERT[Send Notifications]
     ALERT -->|No| STORE_RESULT
-    
+
     LOG_SUCCESS --> STORE_RESULT[Store in DB]
     SEND_ALERT --> STORE_RESULT
     STORE_RESULT --> DISCONNECT[Disconnect]
@@ -267,20 +267,20 @@ sequenceDiagram
     participant DB as Internal DB
     participant Pulse as DataPulse
     participant Target as Target Database
-    
+
     User->>UI: Open Dashboard
     UI->>API: GET /staves
     API->>DB: Query staves
     DB-->>API: Stave list
     API-->>UI: JSON response
     UI-->>User: Display staves
-    
+
     User->>UI: Create new check
     UI->>API: POST /clefs
     API->>DB: Store clef config
     DB-->>API: Clef created
     API-->>UI: Confirmation
-    
+
     User->>UI: Run check manually
     UI->>API: POST /clefs/{id}/run
     API->>Pulse: Execute check
@@ -394,10 +394,10 @@ DataPulse connectors implement consistent interfaces:
 class BasePulse(ABC):
     @abstractmethod
     async def connect(self) -> None: ...
-    
+
     @abstractmethod
     async def disconnect(self) -> None: ...
-    
+
     @abstractmethod
     async def execute(self, query: str) -> Any: ...
 ```
@@ -436,7 +436,7 @@ graph LR
         API[Podium:8000]
         DB[(PostgreSQL:5432)]
     end
-    
+
     DEV --> UI
     DEV --> API
     UI --> API
@@ -452,19 +452,19 @@ graph TB
         UI1[UI Instance 1]
         UI2[UI Instance 2]
     end
-    
+
     subgraph "Backend"
         API1[Podium API 1]
         API2[Podium API 2]
         API3[Podium API 3]
     end
-    
+
     subgraph "Data Layer"
         DB[(PostgreSQL Primary)]
         DB_REPLICA[(PostgreSQL Replica)]
         REDIS[(Redis Cache)]
     end
-    
+
     LB --> UI1
     LB --> UI2
     UI1 --> API1
@@ -486,56 +486,56 @@ graph TB
 graph TB
     USERS[Users] --> CDN[CDN]
     CDN --> ALB[Application Load Balancer]
-    
+
     subgraph "Kubernetes Cluster"
         subgraph "UI Namespace"
             UI_POD1[UI Pod 1]
             UI_POD2[UI Pod 2]
             UI_POD3[UI Pod 3]
         end
-        
+
         subgraph "API Namespace"
             API_POD1[API Pod 1]
             API_POD2[API Pod 2]
             API_POD3[API Pod 3]
             API_POD4[API Pod 4]
         end
-        
+
         subgraph "Worker Namespace"
             WORKER1[Worker Pod 1]
             WORKER2[Worker Pod 2]
         end
     end
-    
+
     subgraph "Data Services"
         DB_CLUSTER[(PostgreSQL Cluster)]
         REDIS_CLUSTER[(Redis Cluster)]
         S3[Object Storage]
     end
-    
+
     subgraph "Monitoring"
         PROMETHEUS[Prometheus]
         GRAFANA[Grafana]
     end
-    
+
     ALB --> UI_POD1
     ALB --> UI_POD2
     ALB --> UI_POD3
-    
+
     UI_POD1 --> API_POD1
     UI_POD2 --> API_POD2
     UI_POD3 --> API_POD3
-    
+
     API_POD1 --> DB_CLUSTER
     API_POD2 --> DB_CLUSTER
     API_POD3 --> DB_CLUSTER
-    
+
     API_POD1 --> REDIS_CLUSTER
     API_POD2 --> REDIS_CLUSTER
-    
+
     WORKER1 --> DB_CLUSTER
     WORKER2 --> DB_CLUSTER
-    
+
     API_POD1 --> PROMETHEUS
     WORKER1 --> PROMETHEUS
     PROMETHEUS --> GRAFANA
@@ -553,7 +553,7 @@ sequenceDiagram
     participant API
     participant Auth as Auth Service
     participant DB
-    
+
     Client->>API: POST /login {credentials}
     API->>Auth: Validate credentials
     Auth->>DB: Query user
@@ -562,7 +562,7 @@ sequenceDiagram
     Auth->>Auth: Generate JWT
     Auth-->>API: JWT token
     API-->>Client: {access_token}
-    
+
     Client->>API: GET /staves (Bearer token)
     API->>Auth: Verify JWT
     Auth->>Auth: Check signature
@@ -642,6 +642,5 @@ sequenceDiagram
 
 ---
 
-**Last Updated**: October 2024  
+**Last Updated**: October 2024
 **Architecture Version**: 1.0
-

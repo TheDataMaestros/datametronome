@@ -166,7 +166,7 @@ Following [PACKAGE_STRUCTURE.md](../datametronome/PACKAGE_STRUCTURE.md):
 
 DataMetronome follows **CODE RULE CLUB** principles (our coding standards):
 
-### 1. **Unit Tests First** 
+### 1. **Unit Tests First**
 Unit tests are **MOST IMPORTANT** and must pass before anything else.
 
 ```python
@@ -359,7 +359,7 @@ from datametronome_podium.models.user import User
 
 class TestUserModel:
     """Unit tests for User model."""
-    
+
     def test_user_creation_valid_data(self):
         """Test creating user with valid data."""
         user = User(
@@ -369,7 +369,7 @@ class TestUserModel:
         )
         assert user.username == "testuser"
         assert user.email == "test@example.com"
-    
+
     def test_user_validation_invalid_email(self):
         """Test that invalid email raises ValidationError."""
         with pytest.raises(ValidationError) as exc_info:
@@ -396,7 +396,7 @@ async def db_connection():
         user="testuser",
         password="testpass"
     )
-    
+
     # Setup: create test table
     await conn.execute("""
         CREATE TABLE IF NOT EXISTS test_users (
@@ -405,9 +405,9 @@ async def db_connection():
             email VARCHAR(255)
         )
     """)
-    
+
     yield conn
-    
+
     # Teardown: clean up
     await conn.execute("DROP TABLE test_users")
     await conn.close()
@@ -421,33 +421,33 @@ async def test_user_crud_operations(db_connection):
         "testuser", "test@example.com"
     )
     assert user_id is not None
-    
+
     # Read
     user = await db_connection.fetchrow(
         "SELECT * FROM test_users WHERE id = $1",
         user_id
     )
     assert user["username"] == "testuser"
-    
+
     # Update
     await db_connection.execute(
         "UPDATE test_users SET email = $1 WHERE id = $2",
         "new@example.com", user_id
     )
-    
+
     # Verify update
     updated = await db_connection.fetchrow(
         "SELECT email FROM test_users WHERE id = $1",
         user_id
     )
     assert updated["email"] == "new@example.com"
-    
+
     # Delete
     await db_connection.execute(
         "DELETE FROM test_users WHERE id = $1",
         user_id
     )
-    
+
     # Verify deletion
     deleted = await db_connection.fetchrow(
         "SELECT * FROM test_users WHERE id = $1",
@@ -537,12 +537,12 @@ repos:
     hooks:
       - id: black
         language_version: python3.11
-  
+
   - repo: https://github.com/pycqa/isort
     rev: 5.12.0
     hooks:
       - id: isort
-  
+
   - repo: https://github.com/pycqa/flake8
     rev: 6.0.0
     hooks:
@@ -686,4 +686,3 @@ python -m twine upload dist/*
 **Happy coding! 🎵**
 
 *Thanks for contributing to DataMetronome!*
-

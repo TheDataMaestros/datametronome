@@ -507,7 +507,7 @@ class DataMetronomeClient:
         self.base_url = base_url
         self.client = httpx.AsyncClient()
         self.token: str | None = None
-    
+
     async def login(self, username: str, password: str) -> None:
         """Authenticate and store token."""
         response = await self.client.post(
@@ -517,11 +517,11 @@ class DataMetronomeClient:
         response.raise_for_status()
         data = response.json()
         self.token = data["access_token"]
-    
+
     def _headers(self) -> Dict[str, str]:
         """Get headers with authentication."""
         return {"Authorization": f"Bearer {self.token}"}
-    
+
     async def create_stave(self, name: str, type: str, config: Dict[str, Any]) -> Dict[str, Any]:
         """Create a new stave (data source)."""
         response = await self.client.post(
@@ -531,7 +531,7 @@ class DataMetronomeClient:
         )
         response.raise_for_status()
         return response.json()
-    
+
     async def list_staves(self) -> List[Dict[str, Any]]:
         """List all staves."""
         response = await self.client.get(
@@ -540,7 +540,7 @@ class DataMetronomeClient:
         )
         response.raise_for_status()
         return response.json()
-    
+
     async def create_clef(
         self,
         stave_id: str,
@@ -565,7 +565,7 @@ class DataMetronomeClient:
         )
         response.raise_for_status()
         return response.json()
-    
+
     async def list_check_runs(
         self,
         clef_id: str | None = None,
@@ -575,7 +575,7 @@ class DataMetronomeClient:
         params = {"limit": limit}
         if clef_id:
             params["clef_id"] = clef_id
-        
+
         response = await self.client.get(
             f"{self.base_url}/api/v1/check-runs",
             params=params,
@@ -583,7 +583,7 @@ class DataMetronomeClient:
         )
         response.raise_for_status()
         return response.json()
-    
+
     async def close(self) -> None:
         """Close the client."""
         await self.client.aclose()
@@ -591,17 +591,17 @@ class DataMetronomeClient:
 # Usage
 async def main():
     client = DataMetronomeClient()
-    
+
     # Login
     await client.login("user@example.com", "password")
-    
+
     # Create a stave
     stave = await client.create_stave(
         name="Production DB",
         type="postgres",
         config={"host": "db.example.com", "database": "prod"}
     )
-    
+
     # Create a check
     clef = await client.create_clef(
         stave_id=stave["id"],
@@ -609,11 +609,11 @@ async def main():
         type="null_check",
         config={"table": "users", "column": "email"}
     )
-    
+
     # View check runs
     runs = await client.list_check_runs(clef_id=clef["id"])
     print(f"Found {len(runs)} check runs")
-    
+
     await client.close()
 ```
 
@@ -705,6 +705,5 @@ For API questions:
 
 ---
 
-**Last Updated**: October 2024  
+**Last Updated**: October 2024
 **API Version**: v1
-

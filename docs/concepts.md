@@ -156,13 +156,13 @@ Here's how all concepts work together:
 ```
 1. Create a STAVE (data source)
    └── Configure connection to your database
-   
+
 2. Create CLEFs (quality checks) on the stave
    └── Define what to check and when
-   
+
 3. CLEFs run automatically or manually
    └── Creates CHECK RUNS with results
-   
+
 4. Anomalies are detected and recorded
    └── You investigate and resolve issues
 ```
@@ -194,7 +194,7 @@ graph LR
 ## 💡 Why This Naming?
 
 **Traditional naming** would be:
-- Data source → "Connection" or "Database"  
+- Data source → "Connection" or "Database"
 - Quality check → "Validator" or "Rule"
 - Execution → "Job" or "Run"
 
@@ -241,13 +241,13 @@ clefs = [
 
 ## 🤔 Common Questions
 
-**Q: Why not just call them "data sources" and "checks"?**  
+**Q: Why not just call them "data sources" and "checks"?**
 A: We do in plain English, but the musical terminology creates a cohesive, memorable brand.
 
-**Q: Do I need to understand music to use DataMetronome?**  
+**Q: Do I need to understand music to use DataMetronome?**
 A: Not at all! The metaphor is just for naming. The functionality is straightforward data quality monitoring.
 
-**Q: Can I use different terminology?**  
+**Q: Can I use different terminology?**
 A: The API accepts these terms, but you can think of them however makes sense to you.
 
 ---
@@ -262,4 +262,3 @@ A: The API accepts these terms, but you can think of them however makes sense to
 ---
 
 **🎵 Now you're ready to conduct your data orchestra!**
-

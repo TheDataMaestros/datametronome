@@ -1,8 +1,8 @@
 # Technical Design Document (TDD) - DataMetronome
 
-**Version**: 2.0 (Implementation Blueprint)  
-**Date**: August 14, 2025  
-**Author**: TheDataMaestros Team  
+**Version**: 2.0 (Implementation Blueprint)
+**Date**: August 14, 2025
+**Author**: TheDataMaestros Team
 **Status**: Active
 
 ---
@@ -232,24 +232,24 @@ from pydantic_settings import BaseSettings
 
 class Settings(BaseSettings):
     """Application settings with environment variable support."""
-    
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
     debug: bool = False
-    
+
     # Security
     secret_key: str  # Required, min 32 chars
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
-    
+
     # Database
     database_url: str = "sqlite:///./datametronome.db"
-    
+
     # Staves
     staves_directory: str = "./staves"
     hot_reload: bool = True
-    
+
     class Config:
         env_prefix = "DATAMETRONOME_"
         env_file = ".env"
@@ -262,27 +262,27 @@ settings = Settings()
 # datametronome_podium/services/check_service.py
 async def execute_check_and_profile(stave: Stave) -> CheckResult:
     """Execute check and compute profile metrics."""
-    
+
     # Get data from source
     pulse = get_pulse_connector(stave.source)
     data = await pulse.query(stave.source.query)
-    
+
     # Compute current profile
     current_profile = compute_profile(data)
-    
+
     # Store in profile_history
     await store_profile(
         stave_id=stave.id,
         profile=current_profile,
         timestamp=datetime.utcnow()
     )
-    
+
     # Execute checks
     check_results = []
     for check in stave.clef.checks:
         result = await execute_single_check(check, data, current_profile)
         check_results.append(result)
-    
+
     return CheckResult(
         stave_id=stave.id,
         checks=check_results,
@@ -297,29 +297,29 @@ The Podium coordinates different check types:
 ```python
 # datametronome_podium/services/check_service.py
 async def execute_single_check(
-    check: Check, 
-    data: list[dict], 
+    check: Check,
+    data: list[dict],
     profile: Profile
 ) -> CheckResult:
     """Execute a single check based on its type."""
-    
+
     if check.type == "declarative":
         # Level 1: Simple declarative checks
         return await execute_declarative_check(check, data)
-    
+
     elif check.type == "intelligent":
         # Level 2: ML-driven checks using Brain library
         brain = get_brain_algorithm(check.strategy.model)
         return await brain.analyze(data, profile, check.strategy)
-    
+
     elif check.type == "advanced":
         # Level 3: Multi-source checks
         return await execute_advanced_check(check)
-    
+
     elif check.type == "python":
         # Level 4: Custom Python scripts
         return await execute_python_check(check)
-    
+
     else:
         raise ValueError(f"Unknown check type: {check.type}")
 ```
@@ -336,7 +336,7 @@ scheduler = AsyncIOScheduler()
 async def init_scheduler():
     """Initialize scheduler with all staves."""
     staves = await load_all_staves()
-    
+
     for stave in staves:
         if stave.schedule:
             scheduler.add_job(
@@ -346,7 +346,7 @@ async def init_scheduler():
                 id=f"stave_{stave.id}",
                 replace_existing=True
             )
-    
+
     scheduler.start()
 
 async def execute_stave_checks(stave_id: str):
@@ -365,12 +365,12 @@ from importlib.metadata import entry_points
 def load_plugins():
     """Discover and load plugins via entry_points."""
     discovered_plugins = entry_points(group='datametronome.plugins')
-    
+
     for plugin in discovered_plugins:
         plugin_class = plugin.load()
         instance = plugin_class()
         register_plugin(instance)
-        
+
         print(f"Loaded plugin: {plugin.name}")
 ```
 
@@ -403,27 +403,27 @@ from typing import Any
 
 class Pulse(ABC):
     """Base interface for all DataPulse connectors."""
-    
+
     @abstractmethod
     async def connect(self) -> None:
         """Establish connection to the data source."""
         pass
-    
+
     @abstractmethod
     async def disconnect(self) -> None:
         """Close connection to the data source."""
         pass
-    
+
     @abstractmethod
     async def is_connected(self) -> bool:
         """Check if connection is active."""
         pass
-    
+
     async def __aenter__(self):
         """Async context manager entry."""
         await self.connect()
         return self
-    
+
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit."""
         await self.disconnect()
@@ -431,7 +431,7 @@ class Pulse(ABC):
 
 class Readable(ABC):
     """Interface for read operations."""
-    
+
     @abstractmethod
     async def query(
         self,
@@ -444,7 +444,7 @@ class Readable(ABC):
 
 class Writable(ABC):
     """Interface for write operations."""
-    
+
     @abstractmethod
     async def write(
         self,
@@ -464,7 +464,7 @@ import asyncpg
 
 class PostgresPulse(Pulse, Readable, Writable):
     """High-performance PostgreSQL connector using asyncpg."""
-    
+
     def __init__(
         self,
         host: str,
@@ -483,7 +483,7 @@ class PostgresPulse(Pulse, Readable, Writable):
         self.min_pool_size = min_pool_size
         self.max_pool_size = max_pool_size
         self.pool = None
-    
+
     async def connect(self) -> None:
         """Create connection pool."""
         self.pool = await asyncpg.create_pool(
@@ -495,17 +495,17 @@ class PostgresPulse(Pulse, Readable, Writable):
             min_size=self.min_pool_size,
             max_size=self.max_pool_size
         )
-    
+
     async def disconnect(self) -> None:
         """Close connection pool."""
         if self.pool:
             await self.pool.close()
             self.pool = None
-    
+
     async def is_connected(self) -> bool:
         """Check if pool is active."""
         return self.pool is not None
-    
+
     async def query(
         self,
         query: str,
@@ -517,9 +517,9 @@ class PostgresPulse(Pulse, Readable, Writable):
                 rows = await conn.fetch(query, *params.values())
             else:
                 rows = await conn.fetch(query)
-            
+
             return [dict(row) for row in rows]
-    
+
     async def write(
         self,
         data: list[dict[str, Any]],
@@ -529,7 +529,7 @@ class PostgresPulse(Pulse, Readable, Writable):
         config = config or {}
         operation = config.get("operation", "insert")
         table = config["table"]
-        
+
         if operation == "insert":
             return await self._insert(table, data)
         elif operation == "replace":
@@ -538,7 +538,7 @@ class PostgresPulse(Pulse, Readable, Writable):
             return await self._copy(table, data, config)
         else:
             raise ValueError(f"Unknown operation: {operation}")
-    
+
     async def _insert(self, table: str, data: list[dict]) -> int:
         """Bulk insert using prepared statements."""
         # Implementation details...
@@ -555,7 +555,7 @@ from metronome_pulse_postgres import PostgresPulse
 
 async def my_data_pipeline():
     """Use DataPulse in a standalone script."""
-    
+
     async with PostgresPulse(
         host="localhost",
         user="myuser",
@@ -564,10 +564,10 @@ async def my_data_pipeline():
     ) as pulse:
         # Query data
         users = await pulse.query("SELECT * FROM users WHERE active = $1", {"active": True})
-        
+
         # Transform data
         transformed = [transform_user(u) for u in users]
-        
+
         # Write to another table
         await pulse.write(transformed, {
             "operation": "insert",
@@ -672,41 +672,41 @@ import pandas as pd
 
 class SarimaForecaster:
     """Time series forecasting using SARIMA."""
-    
+
     def __init__(self, order=(1, 1, 1), seasonal_order=(1, 1, 1, 12)):
         self.order = order
         self.seasonal_order = seasonal_order
         self.model = None
-    
+
     async def train(self, historical_data: list[dict], metric: str):
         """Train SARIMA model on historical data."""
         df = pd.DataFrame(historical_data)
         series = df[metric]
-        
+
         self.model = SARIMAX(
             series,
             order=self.order,
             seasonal_order=self.seasonal_order
         )
         self.model = self.model.fit()
-    
+
     async def forecast(self, steps: int = 1) -> dict:
         """Generate forecast and confidence intervals."""
         forecast = self.model.forecast(steps=steps)
         conf_int = self.model.get_forecast(steps=steps).conf_int()
-        
+
         return {
             "forecast": forecast.tolist(),
             "lower_bound": conf_int.iloc[:, 0].tolist(),
             "upper_bound": conf_int.iloc[:, 1].tolist()
         }
-    
+
     async def detect_anomaly(self, current_value: float, confidence: float = 0.95) -> bool:
         """Check if current value is outside forecast bounds."""
         forecast_result = await self.forecast(steps=1)
         lower = forecast_result["lower_bound"][0]
         upper = forecast_result["upper_bound"][0]
-        
+
         return current_value < lower or current_value > upper
 ```
 
@@ -719,7 +719,7 @@ import numpy as np
 
 class DriftDetector:
     """Detect distribution drift using statistical tests."""
-    
+
     async def kolmogorov_smirnov_test(
         self,
         baseline_data: list[float],
@@ -728,7 +728,7 @@ class DriftDetector:
     ) -> dict:
         """Perform KS test for distribution drift."""
         statistic, p_value = ks_2samp(baseline_data, current_data)
-        
+
         return {
             "test": "kolmogorov_smirnov",
             "statistic": statistic,
@@ -758,7 +758,7 @@ staves:
   - name: "production_users_table"
     description: "Monitor production users table for data quality"
     schedule: "*/15 * * * *"  # Every 15 minutes
-    
+
     source:
       type: metronome-pulse-postgres
       credentials:
@@ -768,23 +768,23 @@ staves:
         password: "{{ env.PROD_DB_PASSWORD }}"
         database: "production"
       query: "SELECT * FROM users WHERE updated_at >= NOW() - INTERVAL '1 hour'"
-    
+
     clef:
       owner: "@data-platform-team"
       tags: ["production", "users", "critical"]
-      
+
       checks:
         - name: "minimum_row_count"
           check: row_count
           fail: "< 1000"
           warn: "< 5000"
-        
+
         - name: "data_freshness"
           check: freshness
           column: "updated_at"
           fail: "> 24 hours"
           warn: "> 12 hours"
-        
+
         - name: "email_not_null"
           check: null_check
           column: "email"
@@ -807,30 +807,30 @@ checks:
   - check: row_count
     fail: "< 1000"
     warn: "< 5000"
-  
+
   # Freshness check
   - check: freshness
     column: "updated_at"
     fail: "> 24 hours"
     warn: "> 12 hours"
-  
+
   # Null value detection
   - check: null_check
     column: "email"
     fail: "> 0"  # Fail if any nulls
-  
+
   # Uniqueness validation
   - check: unique_check
     column: "user_id"
     fail: "< 100%"
-  
+
   # Range validation
   - check: range_check
     column: "age"
     min: 0
     max: 120
     fail: "> 1%"  # Fail if >1% out of range
-  
+
   # Value set validation
   - check: value_set_check
     column: "status"
@@ -843,12 +843,12 @@ checks:
 # datametronome_podium/services/check_service.py
 async def execute_declarative_check(check: Check, data: list[dict]) -> CheckResult:
     """Execute Level 1 declarative check."""
-    
+
     if check.check == "row_count":
         count = len(data)
         threshold = parse_threshold(check.fail)
         passed = evaluate_threshold(count, threshold)
-        
+
         return CheckResult(
             check_name=check.name,
             passed=passed,
@@ -856,13 +856,13 @@ async def execute_declarative_check(check: Check, data: list[dict]) -> CheckResu
             expected=check.fail,
             message=f"Row count: {count}"
         )
-    
+
     elif check.check == "freshness":
         latest = max(row[check.column] for row in data)
         age = datetime.utcnow() - latest
         threshold = parse_duration(check.fail)
         passed = age <= threshold
-        
+
         return CheckResult(
             check_name=check.name,
             passed=passed,
@@ -870,7 +870,7 @@ async def execute_declarative_check(check: Check, data: list[dict]) -> CheckResu
             expected=check.fail,
             message=f"Data age: {age}"
         )
-    
+
     # ... other check types
 ```
 
@@ -890,7 +890,7 @@ checks:
       confidence: 99  # 99% confidence interval
       training_period_days: 90
       seasonality: "weekly"
-  
+
   # Distribution drift detection
   - check: data_profile_drift
     column: "age"
@@ -898,7 +898,7 @@ checks:
       test: "kolmogorov_smirnov"
       critical_p_value: 0.05
       baseline_period_days: 30
-  
+
   # Multi-variate anomaly detection
   - check: anomaly_detection
     columns: ["age", "income", "transaction_amount"]
@@ -906,7 +906,7 @@ checks:
       algorithm: "isolation_forest"
       contamination: 0.01
       n_estimators: 100
-  
+
   # Trend detection
   - check: trend_analysis
     metric: "avg_transaction_amount"
@@ -920,7 +920,7 @@ checks:
 # datametronome_podium/services/check_service.py
 async def execute_intelligent_check(check: Check, data: list[dict], profile: Profile) -> CheckResult:
     """Execute Level 2 ML-driven check."""
-    
+
     if check.check == "forecast":
         # Get historical profile data
         historical = await get_profile_history(
@@ -928,20 +928,20 @@ async def execute_intelligent_check(check: Check, data: list[dict], profile: Pro
             metric=check.metric,
             days=check.strategy.training_period_days
         )
-        
+
         # Train forecaster
         forecaster = SarimaForecaster(
             seasonal_order=get_seasonal_order(check.strategy.seasonality)
         )
         await forecaster.train(historical, check.metric)
-        
+
         # Check current value against forecast
         current_value = profile[check.metric]
         is_anomaly = await forecaster.detect_anomaly(
             current_value,
             confidence=check.strategy.confidence / 100
         )
-        
+
         return CheckResult(
             check_name=check.name,
             passed=not is_anomaly,
@@ -953,7 +953,7 @@ async def execute_intelligent_check(check: Check, data: list[dict], profile: Pro
                 "training_samples": len(historical)
             }
         )
-    
+
     elif check.check == "data_profile_drift":
         # Get baseline distribution
         baseline = await get_baseline_distribution(
@@ -961,10 +961,10 @@ async def execute_intelligent_check(check: Check, data: list[dict], profile: Pro
             column=check.column,
             days=check.strategy.baseline_period_days
         )
-        
+
         # Get current distribution
         current = [row[check.column] for row in data]
-        
+
         # Perform KS test
         drift_detector = DriftDetector()
         result = await drift_detector.kolmogorov_smirnov_test(
@@ -972,7 +972,7 @@ async def execute_intelligent_check(check: Check, data: list[dict], profile: Pro
             current,
             check.strategy.critical_p_value
         )
-        
+
         return CheckResult(
             check_name=check.name,
             passed=not result["drift_detected"],
@@ -993,14 +993,14 @@ async def execute_intelligent_check(check: Check, data: list[dict], profile: Pro
 checks:
   - check: reconcile
     description: "Ensure all users in DB also exist in CRM API"
-    
+
     source_a:
       type: metronome-pulse-postgres
       credentials:
         host: "{{ env.DB_HOST }}"
         database: "production"
       query: "SELECT user_id FROM public.users"
-    
+
     source_b:
       type: metronome-pulse-api
       credentials:
@@ -1009,7 +1009,7 @@ checks:
       query:
         endpoint: "/users"
         method: "GET"
-    
+
     strategy:
       join_on: ["user_id"]
       type: "full_match"  # Both sides must match exactly
@@ -1021,7 +1021,7 @@ checks:
 checks:
   - check: lookup_validation
     description: "Ensure all campaign IDs in analytics exist in active campaigns"
-    
+
     lookup:
       pulse:
         type: metronome-pulse-api
@@ -1033,7 +1033,7 @@ checks:
         params:
           status: "active"
       key_column: "id"
-    
+
     validation:
       pulse:
         type: metronome-pulse-postgres
@@ -1041,11 +1041,11 @@ checks:
           host: "{{ env.ANALYTICS_DB_HOST }}"
           database: "analytics"
       query: |
-        SELECT DISTINCT campaign_id 
-        FROM analytics.traffic 
+        SELECT DISTINCT campaign_id
+        FROM analytics.traffic
         WHERE date >= CURRENT_DATE - INTERVAL '7 days'
       key_column: "campaign_id"
-    
+
     enforce: "existence_for_all"  # All validation keys must exist in lookup
 ```
 
@@ -1054,21 +1054,21 @@ checks:
 checks:
   - check: referential_integrity
     description: "Ensure all order.user_id values exist in users table"
-    
+
     parent:
       pulse:
         type: metronome-pulse-postgres
         credentials: "{{ env.DB_CREDS }}"
       table: "users"
       key_column: "user_id"
-    
+
     child:
       pulse:
         type: metronome-pulse-postgres
         credentials: "{{ env.DB_CREDS }}"
       table: "orders"
       key_column: "user_id"
-    
+
     fail: "> 0"  # Fail if any orphaned records
 ```
 
@@ -1077,29 +1077,29 @@ checks:
 # datametronome_podium/services/check_service.py
 async def execute_advanced_check(check: Check) -> CheckResult:
     """Execute Level 3 advanced declarative check."""
-    
+
     if check.check == "reconcile":
         # Get data from source A
         pulse_a = get_pulse_connector(check.source_a.type)
         await pulse_a.connect()
         data_a = await pulse_a.query(check.source_a.query)
-        
+
         # Get data from source B
         pulse_b = get_pulse_connector(check.source_b.type)
         await pulse_b.connect()
         data_b = await pulse_b.query(check.source_b.query)
-        
+
         # Perform reconciliation
         join_keys = check.strategy.join_on
         set_a = {tuple(row[k] for k in join_keys) for row in data_a}
         set_b = {tuple(row[k] for k in join_keys) for row in data_b}
-        
+
         only_in_a = set_a - set_b
         only_in_b = set_b - set_a
-        
+
         if check.strategy.type == "full_match":
             passed = len(only_in_a) == 0 and len(only_in_b) == 0
-        
+
         return CheckResult(
             check_name=check.name,
             passed=passed,
@@ -1112,25 +1112,25 @@ async def execute_advanced_check(check: Check) -> CheckResult:
                 "only_in_b": list(only_in_b)[:10]   # Sample
             }
         )
-    
+
     elif check.check == "lookup_validation":
         # Get lookup data (valid keys)
         lookup_pulse = get_pulse_connector(check.lookup.pulse.type)
         await lookup_pulse.connect()
         lookup_data = await lookup_pulse.query(check.lookup.query)
         valid_keys = {row[check.lookup.key_column] for row in lookup_data}
-        
+
         # Get validation data (keys to validate)
         validation_pulse = get_pulse_connector(check.validation.pulse.type)
         await validation_pulse.connect()
         validation_data = await validation_pulse.query(check.validation.query)
         keys_to_validate = {row[check.validation.key_column] for row in validation_data}
-        
+
         # Check for invalid keys
         invalid_keys = keys_to_validate - valid_keys
-        
+
         passed = len(invalid_keys) == 0
-        
+
         return CheckResult(
             check_name=check.name,
             passed=passed,
@@ -1154,10 +1154,10 @@ async def execute_advanced_check(check: Check) -> CheckResult:
 checks:
   - check: python
     description: "Validate campaign traffic matches marketing spend"
-    
+
     # YAML only REFERENCES the code
     script_path: "datametronome_scripts/check_campaign_traffic.py"
-    
+
     # Parameters passed to the script
     params:
       tag: "premium"
@@ -1174,19 +1174,19 @@ from metronome_pulse_api import APIPulse
 async def check(params: dict, context: dict) -> dict:
     """
     Custom check: Validate campaign traffic matches marketing spend.
-    
+
     Args:
         params: Parameters from YAML (tag, min_roi, lookback_days)
         context: DataMetronome context (connectors, credentials, etc.)
-    
+
     Returns:
         CheckResult dict with passed, actual_value, expected, message
     """
-    
+
     # Get connectors from context
     db_pulse = context.get_connector("analytics_db")
     api_pulse = context.get_connector("marketing_api")
-    
+
     # Query traffic data
     traffic_query = f"""
         SELECT campaign_id, SUM(conversions) as total_conversions
@@ -1196,7 +1196,7 @@ async def check(params: dict, context: dict) -> dict:
         GROUP BY campaign_id
     """
     traffic_data = await db_pulse.query(traffic_query, {"tag": params["tag"]})
-    
+
     # Query marketing spend
     spend_data = await api_pulse.query({
         "endpoint": "/campaigns/spend",
@@ -1205,7 +1205,7 @@ async def check(params: dict, context: dict) -> dict:
             "days": params["lookback_days"]
         }
     })
-    
+
     # Calculate ROI for each campaign
     failed_campaigns = []
     for traffic in traffic_data:
@@ -1214,7 +1214,7 @@ async def check(params: dict, context: dict) -> dict:
             (s["amount"] for s in spend_data if s["campaign_id"] == campaign_id),
             0
         )
-        
+
         if spend > 0:
             roi = traffic["total_conversions"] / spend
             if roi < params["min_roi"]:
@@ -1224,10 +1224,10 @@ async def check(params: dict, context: dict) -> dict:
                     "conversions": traffic["total_conversions"],
                     "spend": spend
                 })
-    
+
     # Return result
     passed = len(failed_campaigns) == 0
-    
+
     return {
         "passed": passed,
         "actual_value": f"{len(failed_campaigns)} campaigns below ROI threshold",
@@ -1246,23 +1246,23 @@ async def check(params: dict, context: dict) -> dict:
 # datametronome_podium/services/check_service.py
 async def execute_python_check(check: Check) -> CheckResult:
     """Execute Level 4 custom Python check."""
-    
+
     # Load the Python script
     script_path = Path(check.script_path)
     spec = importlib.util.spec_from_file_location("custom_check", script_path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    
+
     # Prepare context
     context = CheckContext(
         connectors=get_available_connectors(),
         credentials=get_credentials_for_stave(check.stave_id),
         profile=get_latest_profile(check.stave_id)
     )
-    
+
     # Execute the check function
     result = await module.check(check.params, context)
-    
+
     return CheckResult(
         check_name=check.name,
         passed=result["passed"],
@@ -1296,7 +1296,7 @@ import os
 
 def interpolate_env_vars(config: dict) -> dict:
     """Recursively interpolate environment variables in config."""
-    
+
     if isinstance(config, dict):
         return {k: interpolate_env_vars(v) for k, v in config.items()}
     elif isinstance(config, list):
@@ -1304,14 +1304,14 @@ def interpolate_env_vars(config: dict) -> dict:
     elif isinstance(config, str):
         # Match {{ env.VAR_NAME }}
         pattern = r'\{\{\s*env\.(\w+)\s*\}\}'
-        
+
         def replacer(match):
             var_name = match.group(1)
             value = os.getenv(var_name)
             if value is None:
                 raise ValueError(f"Environment variable not found: {var_name}")
             return value
-        
+
         return re.sub(pattern, replacer, config)
     else:
         return config
@@ -1334,7 +1334,7 @@ def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=settings.access_token_expire_minutes)
     to_encode.update({"exp": expire})
-    
+
     encoded_jwt = jwt.encode(
         to_encode,
         settings.secret_key,
@@ -1430,19 +1430,19 @@ async def create_stave(stave: StaveCreate):
     if stave.source.credentials:
         encrypted_creds = encrypt_credentials(stave.source.credentials)
         stave.source.credentials = encrypted_creds
-    
+
     # Store in database
     await store_stave(stave)
 
 # When loading credentials for execution
 async def execute_stave(stave_id: str):
     stave = await get_stave(stave_id)
-    
+
     # Decrypt credentials
     if stave.source.credentials:
         decrypted_creds = decrypt_credentials(stave.source.credentials)
         stave.source.credentials = decrypted_creds
-    
+
     # Use decrypted credentials
     pulse = get_pulse_connector(stave.source.type, **decrypted_creds)
 ```
@@ -1481,18 +1481,18 @@ sequenceDiagram
     participant Pulse
     participant Brain
     participant DB
-    
+
     Scheduler->>CheckService: execute_stave_checks(stave_id)
     CheckService->>DB: load_stave(stave_id)
     DB-->>CheckService: stave_config
-    
+
     CheckService->>Pulse: connect()
     CheckService->>Pulse: query(stave.source.query)
     Pulse-->>CheckService: raw_data
-    
+
     CheckService->>CheckService: compute_profile(raw_data)
     CheckService->>DB: store_profile(profile)
-    
+
     loop For each check in stave.clef.checks
         alt Level 1: Declarative
             CheckService->>CheckService: execute_declarative_check()
@@ -1505,10 +1505,10 @@ sequenceDiagram
         else Level 4: Custom
             CheckService->>CheckService: execute_python_script()
         end
-        
+
         CheckService->>DB: store_check_result(result)
     end
-    
+
     CheckService->>Pulse: disconnect()
     CheckService-->>Scheduler: execution_complete
 ```
@@ -1522,17 +1522,17 @@ sequenceDiagram
     participant Queue
     participant CheckService
     participant DB
-    
+
     Client->>API: POST /api/v1/staves/{id}/run
     API->>API: verify_jwt_token()
     API->>Queue: enqueue_job(stave_id)
     API-->>Client: job_id (202 Accepted)
-    
+
     Queue->>CheckService: process_job(job_id)
     CheckService->>CheckService: execute_stave_checks(stave_id)
     CheckService->>DB: store_results()
     CheckService->>Queue: mark_job_complete(job_id)
-    
+
     Client->>API: GET /api/v1/jobs/{job_id}
     API->>DB: get_job_status(job_id)
     DB-->>API: status, results
@@ -1548,7 +1548,7 @@ from watchfiles import awatch
 
 async def watch_staves_directory():
     """Watch staves directory for changes and hot-reload."""
-    
+
     async for changes in awatch(settings.staves_directory):
         for change_type, file_path in changes:
             if file_path.endswith('.yaml') or file_path.endswith('.yml'):
@@ -1560,20 +1560,20 @@ async def watch_staves_directory():
 async def reload_stave(file_path: str):
     """Reload a stave from file and update scheduler."""
     stave = await load_stave_from_yaml(file_path)
-    
+
     # Validate stave
     await validate_stave(stave)
-    
+
     # Update in database
     await upsert_stave(stave)
-    
+
     # Update scheduler
     if stave.schedule:
         scheduler.reschedule_job(
             job_id=f"stave_{stave.id}",
             trigger=CronTrigger.from_crontab(stave.schedule)
         )
-    
+
     print(f"Reloaded stave: {stave.name}")
 ```
 
@@ -1822,9 +1822,9 @@ async def test_row_count_check_passes():
     """Test that row_count check passes when threshold is met."""
     check = Check(check="row_count", fail="< 1000")
     data = [{"id": i} for i in range(1500)]
-    
+
     result = await execute_declarative_check(check, data)
-    
+
     assert result.passed == True
     assert result.actual_value == 1500
 ```
@@ -1849,21 +1849,21 @@ async def test_postgres_pulse_query(postgres_container):
         password="test",
         database="test"
     )
-    
+
     await pulse.connect()
-    
+
     # Insert test data
     await pulse.write([
         {"id": 1, "name": "Alice"},
         {"id": 2, "name": "Bob"}
     ], {"operation": "insert", "table": "users"})
-    
+
     # Query data
     results = await pulse.query("SELECT * FROM users ORDER BY id")
-    
+
     assert len(results) == 2
     assert results[0]["name"] == "Alice"
-    
+
     await pulse.disconnect()
 ```
 
@@ -1887,7 +1887,7 @@ async def test_create_and_run_stave(podium_api, postgres_container):
     )
     token = login_response.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
-    
+
     # Create stave
     stave_config = {
         "name": "test_stave",
@@ -1902,17 +1902,17 @@ async def test_create_and_run_stave(podium_api, postgres_container):
         json=stave_config
     )
     stave_id = create_response.json()["id"]
-    
+
     # Run stave
     run_response = httpx.post(
         f"{podium_api}/api/v1/staves/{stave_id}/run",
         headers=headers
     )
     job_id = run_response.json()["job_id"]
-    
+
     # Wait for completion and get results
     # ... (polling logic)
-    
+
     # Assert results
     assert results["overall_passed"] == True
 ```
@@ -1934,16 +1934,16 @@ async def test_bulk_insert_performance(postgres_container):
     """Benchmark bulk insert performance."""
     pulse = PostgresPulse(...)
     await pulse.connect()
-    
+
     data = [{"id": i, "value": f"value_{i}"} for i in range(100000)]
-    
+
     start = time.time()
     await pulse.write(data, {"operation": "copy", "table": "benchmark"})
     duration = time.time() - start
-    
+
     throughput = len(data) / duration
     print(f"Throughput: {throughput:.0f} rows/sec")
-    
+
     assert throughput > 10000  # At least 10K rows/sec
 ```
 
@@ -1972,7 +1972,7 @@ services:
       - ./datametronome_scripts:/app/datametronome_scripts
     depends_on:
       - postgres
-  
+
   postgres:
     image: postgres:15
     environment:
@@ -2111,9 +2111,9 @@ async def get_profile_history_cached(stave_id: str, days: int) -> list[dict]:
 
 ---
 
-**Document Status**: ✅ Active  
-**Last Updated**: August 14, 2025  
-**Maintained By**: TheDataMaestros Team  
+**Document Status**: ✅ Active
+**Last Updated**: August 14, 2025
+**Maintained By**: TheDataMaestros Team
 **Next Review**: November 14, 2025
 
 ---

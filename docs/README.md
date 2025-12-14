@@ -86,4 +86,3 @@ Welcome to the DataMetronome documentation!
 ---
 
 **🎵 DataMetronome - Making data quality better for everyone!**
-
