@@ -26,7 +26,7 @@ class PostgresSQLAlchemyBuilder:
             raise ValueError("key_columns cannot be empty")
         if num_rows <= 0:
             raise ValueError("num_rows must be > 0")
-            
+
         cols = ", ".join(key_columns)
         tuple_size = len(key_columns)
         value_rows: list[str] = []
@@ -39,9 +39,3 @@ class PostgresSQLAlchemyBuilder:
             f"DELETE FROM {target_table} AS t USING (VALUES {values_sql}) AS v({cols}) "
             f"WHERE {on_clause};"
         )
-
-
-
-
-
-

@@ -8,8 +8,6 @@ It contains no I/O and can be unit-tested independently from database code.
 from __future__ import annotations
 
 
-
-
 class PostgresSQLBuilder:
     """Utility to generate PostgreSQL SQL statements.
 
@@ -25,18 +23,20 @@ class PostgresSQLBuilder:
 
         The temp table will be dropped automatically at transaction end.
         """
-        return (
-            f"CREATE TEMP TABLE {temp_table} (LIKE {target_table} INCLUDING ALL) ON COMMIT DROP;"
-        )
+        return f"CREATE TEMP TABLE {temp_table} (LIKE {target_table} INCLUDING ALL) ON COMMIT DROP;"
 
-    def delete_using_temp(self, target_table: str, temp_table: str, key_columns: list[str]) -> str:
+    def delete_using_temp(
+        self, target_table: str, temp_table: str, key_columns: list[str]
+    ) -> str:
         """Delete rows from target that match keys present in temp via join."""
         on_clause = " AND ".join(
             [f"{target_table}.{col} = {temp_table}.{col}" for col in key_columns]
         )
         return f"DELETE FROM {target_table} USING {temp_table} WHERE {on_clause};"
 
-    def insert_from_temp(self, target_table: str, temp_table: str, columns: list[str]) -> str:
+    def insert_from_temp(
+        self, target_table: str, temp_table: str, columns: list[str]
+    ) -> str:
         """Insert rows from temp into target (simple append)."""
         cols = ", ".join(columns)
         return f"INSERT INTO {target_table} ({cols}) SELECT {cols} FROM {temp_table};"
@@ -116,7 +116,7 @@ class PostgresSQLBuilder:
             raise ValueError("key_columns cannot be empty")
         if num_rows <= 0:
             raise ValueError("num_rows must be > 0")
-            
+
         cols = ", ".join(key_columns)
         tuple_size = len(key_columns)
         value_rows: list[str] = []
@@ -190,8 +190,6 @@ class PostgresSQLBuilder:
 
     def set_local_statement_timeout(self, ms: int) -> str:
         return f"SET LOCAL statement_timeout = '{ms}ms';"
-    
+
     def set_local_idle_in_transaction_session_timeout(self, ms: int) -> str:
         return f"SET LOCAL idle_in_transaction_session_timeout = '{ms}ms';"
-
-

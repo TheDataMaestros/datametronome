@@ -39,15 +39,15 @@ from metronome_pulse_sqlite import SQLitePulse
 async def main():
     # Initialize connector
     pulse = SQLitePulse(database_path="my_database.db")
-    
+
     # Connect to database
     await pulse.connect()
-    
+
     try:
         # Simple query
         users = await pulse.query("SELECT * FROM users WHERE active = ?", [True])
         print(f"Found {len(users)} active users")
-        
+
         # Bulk insert
         new_users = [
             {"name": "Alice", "email": "alice@example.com", "active": True},
@@ -55,11 +55,11 @@ async def main():
         ]
         await pulse.write(new_users, "users")
         print("Users inserted successfully")
-        
+
         # Get table information
         table_info = await pulse.get_table_info("users")
         print(f"Table schema: {table_info}")
-        
+
     finally:
         await pulse.close()
 
@@ -80,7 +80,7 @@ await pulse.write(data, "users", {
 
 # Custom SQL operations
 await pulse.execute("""
-    INSERT INTO users (name, email, created_at) 
+    INSERT INTO users (name, email, created_at)
     VALUES (?, ?, ?)
 """, ["John", "john@example.com", "2024-01-01"])
 
@@ -99,13 +99,13 @@ await readonly.connect()
 
 # Complex queries
 results = await readonly.query_with_params("""
-    SELECT 
+    SELECT
         user_id,
         COUNT(*) as login_count,
         MAX(login_time) as last_login
-    FROM user_logins 
-    WHERE login_time >= ? 
-    GROUP BY user_id 
+    FROM user_logins
+    WHERE login_time >= ?
+    GROUP BY user_id
     HAVING COUNT(*) > ?
 """, ["2024-01-01", 5])
 

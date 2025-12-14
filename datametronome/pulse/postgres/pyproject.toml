@@ -188,6 +188,3 @@ exclude_lines = [
 min_rounds = 5
 warmup = true
 warmup_iterations = 3
-
-
-

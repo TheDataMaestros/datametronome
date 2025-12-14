@@ -29,7 +29,7 @@ class PostgresPsycopgSQLBuilder:
             raise ValueError("key_columns cannot be empty")
         if num_rows <= 0:
             raise ValueError("num_rows must be > 0")
-            
+
         cols = ", ".join(key_columns)
         tuple_size = len(key_columns)
         value_rows: list[str] = []
@@ -55,5 +55,3 @@ class PostgresPsycopgSQLBuilder:
 
     def set_local_statement_timeout(self, ms: int) -> str:
         return f"SET LOCAL statement_timeout = '{ms}ms';"
-
-

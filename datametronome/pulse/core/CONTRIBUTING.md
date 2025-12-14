@@ -109,12 +109,12 @@ from metronome_pulse_core import Pulse, Readable
 
 class TestPulse:
     """Test the Pulse base interface."""
-    
+
     def test_pulse_is_abstract(self):
         """Test that Pulse cannot be instantiated directly."""
         with pytest.raises(TypeError):
             Pulse()
-    
+
     def test_pulse_has_required_methods(self):
         """Test that Pulse has required abstract methods."""
         assert hasattr(Pulse, 'connect')
@@ -159,14 +159,14 @@ from abc import ABC, abstractmethod
 
 class DataConnector(Pulse, Readable, Writable):
     """Abstract base class for data connectors.
-    
+
     This class provides a common interface for all data connectors
     in the DataPulse ecosystem.
     """
-    
+
     def __init__(self, connection_string: str, **kwargs: Any) -> None:
         """Initialize the data connector.
-        
+
         Args:
             connection_string: Connection string for the data source
             **kwargs: Additional configuration options
@@ -174,7 +174,7 @@ class DataConnector(Pulse, Readable, Writable):
         self.connection_string = connection_string
         self.config = kwargs
         self._connection: Optional[Any] = None
-    
+
     @abstractmethod
     async def connect(self) -> None:
         """Establish connection to the data source."""
@@ -378,4 +378,3 @@ If you need help with contributing:
 ---
 
 **Happy coding! 🚀**
-

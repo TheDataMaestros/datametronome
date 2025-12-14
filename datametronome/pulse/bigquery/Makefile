@@ -28,4 +28,3 @@ build: clean
 
 publish: build
 	python -m twine upload dist/*
-

@@ -27,7 +27,7 @@ async def main():
         "password": "your_password",
         "database": "your_database"
     }
-    
+
     # Optional engine configuration
     engine_config = {
         "pool_size": 10,
@@ -35,13 +35,13 @@ async def main():
         "pool_pre_ping": True,
         "echo": False
     }
-    
+
     # Use as async context manager (recommended)
     async with PostgresSQLAlchemyPulse(credentials, engine_config) as pulse:
         # Query data with SQL string
         results = await pulse.query("SELECT * FROM users WHERE active = true")
         print(f"Found {len(results)} active users")
-        
+
         # Query with structured configuration
         query_config = {
             "sql": "SELECT * FROM users WHERE age > :min_age AND city = :city",
@@ -49,7 +49,7 @@ async def main():
         }
         results = await pulse.query(query_config)
         print(f"Found {len(results)} users in New York over 18")
-        
+
         # Write data
         new_users = [
             {"name": "Alice", "email": "alice@example.com", "age": 25},
@@ -57,7 +57,7 @@ async def main():
         ]
         await pulse.write(new_users, "users")
         print("Added new users")
-        
+
         # Get table information
         table_info = await pulse.get_table_info("users")
         print(f"Table structure: {table_info}")
@@ -71,14 +71,14 @@ asyncio.run(main())
 ```python
 async def manual_example():
     pulse = PostgresSQLAlchemyPulse(credentials)
-    
+
     try:
         await pulse.connect()
-        
+
         # Your operations here
         results = await pulse.query("SELECT COUNT(*) FROM users")
         print(f"Total users: {results[0]['count']}")
-        
+
     finally:
         await pulse.close()
 ```
@@ -139,7 +139,3 @@ While this package is designed for standalone use, it's also a DataPulse connect
 ## 📄 **License**
 
 MIT License - see [LICENSE](LICENSE) file for details.
-
-
-
-

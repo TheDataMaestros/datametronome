@@ -4,12 +4,16 @@ Unit tests for DataPulse SQLite connector.
 These tests focus on isolated component testing without database dependencies.
 """
 
-import pytest
 import asyncio
-from unittest.mock import Mock, patch, AsyncMock
 from pathlib import Path
+from unittest.mock import AsyncMock, Mock, patch
 
-from metronome_pulse_sqlite import SQLitePulse, SQLiteReadonlyPulse, SQLiteWriteonlyPulse
+import pytest
+from metronome_pulse_sqlite import (
+    SQLitePulse,
+    SQLiteReadonlyPulse,
+    SQLiteWriteonlyPulse,
+)
 
 
 class TestSQLitePulse:
@@ -33,18 +37,18 @@ class TestSQLitePulse:
     async def test_connect_success(self):
         """Test successful connection to SQLite database."""
         pulse = SQLitePulse(":memory:")
-        
-        with patch('pathlib.Path.mkdir') as mock_mkdir:
-            with patch('sqlite3.connect') as mock_connect:
+
+        with patch("pathlib.Path.mkdir") as mock_mkdir:
+            with patch("sqlite3.connect") as mock_connect:
                 mock_connection = Mock()
                 mock_connect.return_value = mock_connection
-                
+
                 # Mock the readonly and writeonly connectors
                 pulse._readonly.connect = AsyncMock()
                 pulse._writeonly.connect = AsyncMock()
-                
+
                 await pulse.connect()
-                
+
                 mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
                 mock_connect.assert_called_once_with(":memory:")
                 assert pulse.connection == mock_connection
@@ -56,9 +60,11 @@ class TestSQLitePulse:
     async def test_connect_failure(self):
         """Test connection failure handling."""
         pulse = SQLitePulse("invalid/path/db.db")
-        
-        with patch('sqlite3.connect', side_effect=Exception("Connection failed")):
-            with pytest.raises(ConnectionError, match="Failed to connect to SQLite: Connection failed"):
+
+        with patch("sqlite3.connect", side_effect=Exception("Connection failed")):
+            with pytest.raises(
+                ConnectionError, match="Failed to connect to SQLite: Connection failed"
+            ):
                 await pulse.connect()
 
     @pytest.mark.asyncio
@@ -67,13 +73,13 @@ class TestSQLitePulse:
         pulse = SQLitePulse()
         mock_connection = Mock()
         pulse.connection = mock_connection
-        
+
         # Mock the readonly and writeonly connectors
         pulse._readonly.close = AsyncMock()
         pulse._writeonly.close = AsyncMock()
-        
+
         await pulse.close()
-        
+
         mock_connection.close.assert_called_once()
         assert pulse.connection is None
         pulse._readonly.close.assert_called_once()
@@ -84,13 +90,13 @@ class TestSQLitePulse:
         """Test closing when no connection exists."""
         pulse = SQLitePulse()
         pulse.connection = None
-        
+
         # Mock the readonly and writeonly connectors
         pulse._readonly.close = AsyncMock()
         pulse._writeonly.close = AsyncMock()
-        
+
         await pulse.close()
-        
+
         pulse._readonly.close.assert_called_once()
         pulse._writeonly.close.assert_called_once()
 
@@ -101,9 +107,9 @@ class TestSQLitePulse:
         pulse.connection = Mock()
         pulse._readonly.is_connected = AsyncMock(return_value=True)
         pulse._writeonly.is_connected = AsyncMock(return_value=True)
-        
+
         result = await pulse.is_connected()
-        
+
         assert result is True
         pulse._readonly.is_connected.assert_called_once()
         pulse._writeonly.is_connected.assert_called_once()
@@ -113,9 +119,9 @@ class TestSQLitePulse:
         """Test connection status when not connected."""
         pulse = SQLitePulse()
         pulse.connection = None
-        
+
         result = await pulse.is_connected()
-        
+
         assert result is False
 
     @pytest.mark.asyncio
@@ -126,10 +132,10 @@ class TestSQLitePulse:
         pulse._readonly.is_connected = AsyncMock(return_value=True)
         pulse._writeonly.is_connected = AsyncMock(return_value=True)
         pulse.connection = Mock()
-        
+
         query_config = "SELECT * FROM users"
         result = await pulse.query(query_config)
-        
+
         pulse._readonly.query.assert_called_once_with(query_config)
         assert result == [{"id": 1}]
 
@@ -138,7 +144,7 @@ class TestSQLitePulse:
         """Test query when not connected."""
         pulse = SQLitePulse()
         pulse.connection = None
-        
+
         with pytest.raises(RuntimeError, match="Not connected to SQLite database"):
             await pulse.query("SELECT * FROM users")
 
@@ -150,16 +156,16 @@ class TestSQLitePulse:
         pulse._readonly.is_connected = AsyncMock(return_value=True)
         pulse._writeonly.is_connected = AsyncMock(return_value=True)
         pulse.connection = Mock()
-        
+
         data = [{"name": "Alice"}, {"name": "Bob"}]
         destination = "users"
-        
+
         await pulse.write(data, destination)
-        
+
         # Check that table field was added to each record
         expected_data = [
             {"name": "Alice", "table": "users"},
-            {"name": "Bob", "table": "users"}
+            {"name": "Bob", "table": "users"},
         ]
         pulse._writeonly.write.assert_called_once_with(expected_data, None)
 
@@ -171,12 +177,12 @@ class TestSQLitePulse:
         pulse._readonly.is_connected = AsyncMock(return_value=True)
         pulse._writeonly.is_connected = AsyncMock(return_value=True)
         pulse.connection = Mock()
-        
+
         data = [{"name": "Alice", "table": "custom_table"}]
         destination = "users"
-        
+
         await pulse.write(data, destination)
-        
+
         # Should not override existing table field
         pulse._writeonly.write.assert_called_once_with(data, None)
 
@@ -188,12 +194,12 @@ class TestSQLitePulse:
         pulse._readonly.is_connected = AsyncMock(return_value=True)
         pulse._writeonly.is_connected = AsyncMock(return_value=True)
         pulse.connection = Mock()
-        
+
         sql = "INSERT INTO users (name) VALUES (?)"
         params = ["Alice"]
-        
+
         result = await pulse.execute(sql, params)
-        
+
         pulse._writeonly.execute.assert_called_once_with(sql, params)
         assert result is True
 
@@ -205,12 +211,12 @@ class TestSQLitePulse:
         pulse._readonly.is_connected = AsyncMock(return_value=True)
         pulse._writeonly.is_connected = AsyncMock(return_value=True)
         pulse.connection = Mock()
-        
+
         table_name = "users"
         records = [{"name": "Alice"}, {"name": "Bob"}]
-        
+
         result = await pulse.copy_records(table_name, records)
-        
+
         pulse._writeonly.copy_records.assert_called_once_with(table_name, records)
         assert result is True
 
@@ -228,13 +234,13 @@ class TestSQLiteReadonlyPulse:
     async def test_connect_success(self):
         """Test successful readonly connection."""
         readonly = SQLiteReadonlyPulse(":memory:")
-        
-        with patch('sqlite3.connect') as mock_connect:
+
+        with patch("sqlite3.connect") as mock_connect:
             mock_connection = Mock()
             mock_connect.return_value = mock_connection
-            
+
             await readonly.connect()
-            
+
             mock_connect.assert_called_once_with(":memory:")
             assert readonly.connection == mock_connection
             assert mock_connection.row_factory == sqlite3.Row
@@ -245,9 +251,9 @@ class TestSQLiteReadonlyPulse:
         readonly = SQLiteReadonlyPulse("test.db")
         mock_connection = Mock()
         readonly.connection = mock_connection
-        
+
         await readonly.close()
-        
+
         mock_connection.close.assert_called_once()
         assert readonly.connection is None
 
@@ -256,9 +262,9 @@ class TestSQLiteReadonlyPulse:
         """Test readonly connection status when connected."""
         readonly = SQLiteReadonlyPulse("test.db")
         readonly.connection = Mock()
-        
+
         result = await readonly.is_connected()
-        
+
         assert result is True
 
     @pytest.mark.asyncio
@@ -266,9 +272,9 @@ class TestSQLiteReadonlyPulse:
         """Test readonly connection status when not connected."""
         readonly = SQLiteReadonlyPulse("test.db")
         readonly.connection = None
-        
+
         result = await readonly.is_connected()
-        
+
         assert result is False
 
 
@@ -285,13 +291,13 @@ class TestSQLiteWriteonlyPulse:
     async def test_connect_success(self):
         """Test successful writeonly connection."""
         writeonly = SQLiteWriteonlyPulse(":memory:")
-        
-        with patch('sqlite3.connect') as mock_connect:
+
+        with patch("sqlite3.connect") as mock_connect:
             mock_connection = Mock()
             mock_connect.return_value = mock_connection
-            
+
             await writeonly.connect()
-            
+
             mock_connect.assert_called_once_with(":memory:")
             assert writeonly.connection == mock_connection
             assert mock_connection.row_factory == sqlite3.Row
@@ -302,9 +308,9 @@ class TestSQLiteWriteonlyPulse:
         writeonly = SQLiteWriteonlyPulse("test.db")
         mock_connection = Mock()
         writeonly.connection = mock_connection
-        
+
         await writeonly.close()
-        
+
         mock_connection.close.assert_called_once()
         assert writeonly.connection is None
 
@@ -313,9 +319,9 @@ class TestSQLiteWriteonlyPulse:
         """Test writeonly connection status when connected."""
         writeonly = SQLiteWriteonlyPulse("test.db")
         writeonly.connection = Mock()
-        
+
         result = await writeonly.is_connected()
-        
+
         assert result is True
 
     @pytest.mark.asyncio
@@ -323,9 +329,9 @@ class TestSQLiteWriteonlyPulse:
         """Test writeonly connection status when not connected."""
         writeonly = SQLiteWriteonlyPulse("test.db")
         writeonly.connection = None
-        
+
         result = await writeonly.is_connected()
-        
+
         assert result is False
 
 

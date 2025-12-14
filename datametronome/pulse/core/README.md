@@ -37,23 +37,23 @@ from typing import Any
 
 class MyCustomConnector(Pulse, Readable, Writable):
     """Example custom connector implementation."""
-    
+
     async def connect(self) -> None:
         """Establish connection to data source."""
         pass
-    
+
     async def disconnect(self) -> None:
         """Close connection to data source."""
         pass
-    
+
     async def is_connected(self) -> bool:
         """Check if connection is active."""
         return True
-    
+
     async def query(self, query: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Execute read operation."""
         return []
-    
+
     async def write(self, data: list[dict[str, Any]], config: dict[str, Any] | None = None) -> int:
         """Execute write operation."""
         return len(data)
@@ -67,17 +67,17 @@ The foundation interface that all connectors must implement:
 ```python
 class Pulse(ABC):
     """Base interface for all DataPulse connectors."""
-    
+
     @abstractmethod
     async def connect(self) -> None:
         """Establish connection to the data source."""
         pass
-    
+
     @abstractmethod
     async def disconnect(self) -> None:
         """Close connection to the data source."""
         pass
-    
+
     @abstractmethod
     async def is_connected(self) -> bool:
         """Check if the connection is currently active."""
@@ -90,7 +90,7 @@ Interface for data retrieval operations:
 ```python
 class Readable(ABC):
     """Interface for read operations."""
-    
+
     @abstractmethod
     async def query(self, query: str, params: dict[str, Any] | None = None) -> list[dict[str, Any]]:
         """Execute a query and return results."""
@@ -103,7 +103,7 @@ Interface for data modification operations:
 ```python
 class Writable(ABC):
     """Interface for write operations."""
-    
+
     @abstractmethod
     async def write(self, data: list[dict[str, Any]], config: dict[str, Any] | None = None) -> int:
         """Write data using the specified configuration."""

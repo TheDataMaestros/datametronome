@@ -24,24 +24,24 @@ Complete guide for setting up and using BigQuery with DataMetronome.
    ```
 
 4. **Grant BigQuery Permissions**
-   
+
    For **read-only** access (data quality checks):
    ```bash
    gcloud projects add-iam-policy-binding my-gcp-project \
        --member="serviceAccount:datametronome-sa@my-gcp-project.iam.gserviceaccount.com" \
        --role="roles/bigquery.dataViewer"
-   
+
    gcloud projects add-iam-policy-binding my-gcp-project \
        --member="serviceAccount:datametronome-sa@my-gcp-project.iam.gserviceaccount.com" \
        --role="roles/bigquery.jobUser"
    ```
-   
+
    For **read-write** access (data generation and writes):
    ```bash
    gcloud projects add-iam-policy-binding my-gcp-project \
        --member="serviceAccount:datametronome-sa@my-gcp-project.iam.gserviceaccount.com" \
        --role="roles/bigquery.dataEditor"
-   
+
    gcloud projects add-iam-policy-binding my-gcp-project \
        --member="serviceAccount:datametronome-sa@my-gcp-project.iam.gserviceaccount.com" \
        --role="roles/bigquery.jobUser"
@@ -79,21 +79,21 @@ async def main():
         credentials_path="/path/to/bigquery-credentials.json",
         dataset="analytics"
     )
-    
+
     # Connect
     await pulse.connect()
-    
+
     # Query data
     results = await pulse.query("SELECT * FROM users LIMIT 10")
     print(f"Found {len(results)} users")
-    
+
     # Write data
     data = [
         {"user_id": 1, "name": "Alice", "email": "alice@example.com"},
         {"user_id": 2, "name": "Bob", "email": "bob@example.com"}
     ]
     await pulse.write(data, "users")
-    
+
     # Close connection
     await pulse.close()
 
@@ -325,7 +325,7 @@ Execute custom SQL queries.
 check_type: custom_sql
 config:
   sql: |
-    SELECT 
+    SELECT
       DATE(created_at) as date,
       SUM(amount) as daily_revenue
     FROM orders
@@ -433,7 +433,7 @@ async def test_bigquery_connection():
         credentials_json=test_credentials,
         dataset="test_dataset"
     )
-    
+
     await pulse.connect()
     assert await pulse.is_connected()
     await pulse.close()
@@ -500,4 +500,3 @@ For issues or questions:
 - GitHub Issues: [datametronome/datametronome](https://github.com/datametronome/datametronome/issues)
 - Email: team@datametronome.dev
 - Documentation: [docs/](../../docs/)
-

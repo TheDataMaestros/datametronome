@@ -55,4 +55,3 @@ To add entries to this changelog:
 3. Use the imperative mood ("Move cursor to..." not "Moves cursor to...")
 4. Reference issues and pull requests liberally
 5. When releasing, move `[Unreleased]` to a new version number
-

@@ -27,7 +27,7 @@ async def main():
         "password": "your_password",
         "database": "your_database"
     }
-    
+
     # Optional pool configuration
     pool_config = {
         "min_size": 5,
@@ -35,20 +35,20 @@ async def main():
         "timeout": 30,
         "check": True
     }
-    
+
     # Use as async context manager (recommended)
     async with PostgresPsycopg3Pulse(credentials, pool_config) as pulse:
         # Query data
         results = await pulse.query("SELECT * FROM users WHERE active = true")
         print(f"Found {len(results)} active users")
-        
+
         # Parameterized query
         results = await pulse.query_with_params(
             "SELECT * FROM users WHERE age > %s AND city = %s",
             {"age": 18, "city": "New York"}
         )
         print(f"Found {len(results)} users in New York over 18")
-        
+
         # Write data
         new_users = [
             {"name": "Alice", "email": "alice@example.com", "age": 25},
@@ -56,7 +56,7 @@ async def main():
         ]
         await pulse.write(new_users, "users")
         print("Added new users")
-        
+
         # Get table information
         table_info = await pulse.get_table_info("users")
         print(f"Table structure: {table_info}")
@@ -70,14 +70,14 @@ asyncio.run(main())
 ```python
 async def manual_example():
     pulse = PostgresPsycopg3Pulse(credentials)
-    
+
     try:
         await pulse.connect()
-        
+
         # Your operations here
         results = await pulse.query("SELECT COUNT(*) FROM users")
         print(f"Total users: {results[0]['count']}")
-        
+
     finally:
         await pulse.close()
 ```
@@ -136,7 +136,3 @@ While this package is designed for standalone use, it's also a DataPulse connect
 ## 📄 **License**
 
 MIT License - see [LICENSE](LICENSE) file for details.
-
-
-
-

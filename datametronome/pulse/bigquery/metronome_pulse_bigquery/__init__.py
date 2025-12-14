@@ -10,4 +10,3 @@ from .readonly_connector import BigQueryReadonlyPulse
 
 __all__ = ["BigQueryPulse", "BigQueryReadonlyPulse"]
 __version__ = "0.1.0"
-

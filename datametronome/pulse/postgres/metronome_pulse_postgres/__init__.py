@@ -11,7 +11,7 @@ from .writeonly_connector import PostgresWriteOnlyPulse
 
 __version__ = "0.1.0"
 __all__ = [
-    "PostgresPulse",           # Full-featured (read + write)
-    "PostgresReadOnlyPulse",   # Read-only only
-    "PostgresWriteOnlyPulse"   # Write-only only
+    "PostgresPulse",  # Full-featured (read + write)
+    "PostgresReadOnlyPulse",  # Read-only only
+    "PostgresWriteOnlyPulse",  # Write-only only
 ]

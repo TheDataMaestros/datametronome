@@ -39,7 +39,3 @@ Issues = "https://github.com/datametronome/metronome-pulse-postgres-psycopg3/iss
 
 [tool.hatch.version]
 path = "metronome_pulse_postgres_psycopg3/__init__.py"
-
-
-
-

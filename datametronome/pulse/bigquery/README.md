@@ -40,25 +40,25 @@ async def main():
         credentials_path="/path/to/service-account.json",
         dataset="my_dataset"
     )
-    
+
     # Connect to BigQuery
     await pulse.connect()
-    
+
     # Execute a query
     results = await pulse.query("SELECT * FROM users LIMIT 10")
     print(f"Found {len(results)} users")
-    
+
     # Write data
     data = [
         {"id": 1, "name": "Alice", "email": "alice@example.com"},
         {"id": 2, "name": "Bob", "email": "bob@example.com"}
     ]
     await pulse.write(data, "users")
-    
+
     # Get table information
     schema = await pulse.get_table_info("users")
     print(f"Table schema: {schema}")
-    
+
     # Close connection
     await pulse.close()
 
@@ -79,15 +79,15 @@ async def check_data_quality():
         project_id="my-gcp-project",
         credentials_path="/path/to/service-account.json"
     )
-    
+
     await pulse.connect()
-    
+
     # Safe read operations only
     results = await pulse.query({
         "sql": "SELECT COUNT(*) as count FROM dataset.users WHERE created_at > @date",
         "params": ["2024-01-01"]
     })
-    
+
     await pulse.close()
 ```
 
@@ -199,7 +199,7 @@ await pulse.write(data, "user_events")
 ### Replace Data
 ```python
 await pulse.write(
-    data, 
+    data,
     "user_events",
     config={"mode": "replace"}  # Truncate and insert
 )
@@ -269,4 +269,3 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 For issues, questions, or contributions:
 - GitHub Issues: [datametronome/datametronome](https://github.com/datametronome/datametronome/issues)
 - Email: team@datametronome.dev
-

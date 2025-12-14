@@ -40,4 +40,3 @@ Issues = "https://github.com/datametronome/metronome-pulse-postgres-sqlalchemy/i
 
 [tool.hatch.version]
 path = "metronome_pulse_postgres_sqlalchemy/__init__.py"
-

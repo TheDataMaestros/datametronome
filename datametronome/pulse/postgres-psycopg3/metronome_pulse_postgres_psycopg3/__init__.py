@@ -9,4 +9,3 @@ from .connector import PostgresPsycopg3Pulse
 
 __version__ = "0.1.0"
 __all__ = ["PostgresPsycopg3Pulse"]
-

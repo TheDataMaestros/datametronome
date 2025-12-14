@@ -194,6 +194,3 @@ help-release:
 	@echo "  make release-prep    - Prepare for release (format, lint, test, build)"
 	@echo "  make build           - Build package distribution"
 	@echo "  make publish         - Publish to PyPI (requires PYPI_API_TOKEN)"
-
-
-

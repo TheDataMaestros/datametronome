@@ -65,6 +65,3 @@ help:
 	@echo "  format         - Format code"
 	@echo "  clean          - Clean up generated files"
 	@echo "  help           - Show this help message"
-
-
-

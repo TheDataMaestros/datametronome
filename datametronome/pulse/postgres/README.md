@@ -45,15 +45,15 @@ async def main():
         password="mypassword",
         database="mydb"
     )
-    
+
     # Connect to database
     await pulse.connect()
-    
+
     try:
         # Simple query
         users = await pulse.query("SELECT * FROM users WHERE active = $1", {"active": True})
         print(f"Found {len(users)} active users")
-        
+
         # Bulk insert
         new_users = [
             {"name": "Alice", "email": "alice@example.com", "active": True},
@@ -65,7 +65,7 @@ async def main():
             "batch_size": 1000
         })
         print(f"Inserted {inserted} users")
-        
+
     finally:
         await pulse.disconnect()
 
@@ -91,10 +91,10 @@ await pulse.write(data, {
 await pulse.write(data, {
     "operation": "custom",
     "sql_template": """
-        INSERT INTO {table} ({columns}) 
-        VALUES {values} 
-        ON CONFLICT (id) 
-        DO UPDATE SET 
+        INSERT INTO {table} ({columns})
+        VALUES {values}
+        ON CONFLICT (id)
+        DO UPDATE SET
             name = EXCLUDED.name,
             updated_at = NOW()
     """,
@@ -155,7 +155,7 @@ users = await pulse.query("""
     SELECT u.*, COUNT(o.id) as order_count
     FROM users u
     LEFT JOIN orders o ON u.id = o.user_id
-    WHERE u.created_at >= $1 
+    WHERE u.created_at >= $1
     AND u.status = $2
     GROUP BY u.id
     HAVING COUNT(o.id) > $3
@@ -233,18 +233,18 @@ pulse = PostgresPulse(
     user="myuser",
     password="mypassword",
     database="mydb",
-    
+
     # Advanced options
     ssl_mode="require",
     ssl_cert="path/to/cert.pem",
     ssl_key="path/to/key.pem",
     ssl_ca="path/to/ca.pem",
-    
+
     # Connection pooling
     min_size=5,
     max_size=20,
     command_timeout=60,
-    
+
     # Performance tuning
     server_settings={
         "jit": "off",

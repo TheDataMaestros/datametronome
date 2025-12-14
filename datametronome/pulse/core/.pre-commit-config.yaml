@@ -73,4 +73,3 @@ repos:
         always_run: true
         stages: [commit]
         args: [--tb=short, -q]
-
