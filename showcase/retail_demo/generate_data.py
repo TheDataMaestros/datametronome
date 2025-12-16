@@ -7,11 +7,16 @@ Creates a SQLite database with ~60 days of history and injects anomalies for tod
 import random
 import sqlite3
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import numpy as np
 
 
 def create_retail_db(db_path="retail.db"):
+    db_file = Path(db_path)
+    if db_file.exists():
+        db_file.unlink()
+
     conn = sqlite3.connect(db_path)
     cur = conn.cursor()
 
@@ -43,7 +48,11 @@ def create_retail_db(db_path="retail.db"):
     # 1. Generate History (Last 60 Days)
     # Goal: Predictable pattern for Forecasting (e.g. weekly seasonality + growth)
 
-    start_date = datetime.now() - timedelta(days=60)
+    # Use midnight boundaries so `date(created_at)` groupings are stable.
+    # (If we used `datetime.now()` as-is, adding hours can spill into the next day.)
+    start_date = datetime.now().replace(
+        hour=0, minute=0, second=0, microsecond=0
+    ) - timedelta(days=60)
 
     users = []
     orders = []
@@ -95,18 +104,16 @@ def create_retail_db(db_path="retail.db"):
 
     # 2. Insert Anomalies (Today)
     print("Injecting anomalies for 'Today'...")
-    today = datetime.now()
+    today = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
 
-    # A. Forecast Anomaly: Drop in order volume (e.g. system outage)
-    # Expected: ~80 (base 50 + 30 growth). Actual: 10
-    for _ in range(10):
-        orders.append(
-            (None, random.randint(1, len(users)), 100.0, "completed", today.isoformat())
-        )
-
-    # B. Drift Anomaly: Spike in order values (e.g. pricing bug)
-    # Instead of mean $100, mean $500
-    for _ in range(50):
+    # Combined anomaly scenario:
+    # - Forecast anomaly: volume drops sharply (outage)
+    # - Drift anomaly: order amounts spike (pricing bug)
+    #
+    # Keep today's volume low but >= 20 so drift detection has enough samples.
+    # Expected daily volume at this point in history is typically ~80-120.
+    todays_orders = 20
+    for _ in range(todays_orders):
         amount = max(10.0, np.random.normal(500, 50))  # HUGE drift
         orders.append(
             (

@@ -8,6 +8,7 @@ export interface Check {
   status: string
   message?: string | null
   details?: Record<string, any> | null
+  metadata?: Record<string, any> | null
   timestamp: string
   execution_time?: number | null
   anomalies_count?: number | null

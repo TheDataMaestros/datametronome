@@ -65,8 +65,8 @@ class CheckResult:
     clef_id: str
     stave_id: str
     status: str  # "pass", "warn", or "fail" (per TDD specification)
-    observed_value: Any  # The actual value that was observed/evaluated
     message: str
+    observed_value: Any = None  # The actual value that was observed/evaluated
     metadata: Dict[str, Any] = None  # Additional context and proof of failure
     execution_time: float = 0.0  # seconds
     timestamp: datetime = None
@@ -1970,24 +1970,12 @@ class ClefExecutor:
         value_column = config.get("value_column", "value")
         timestamp_column = config.get("timestamp_column", "timestamp")
 
-        if SarimaForecaster is None or pd is None:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                message="Forecast check requires optional dependencies (statsmodels, pandas). Install them or disable Level 2 checks.",
-                metadata={
-                    "error": "missing_optional_dependency",
-                    "dependencies": ["statsmodels", "pandas"],
-                },
-                timestamp=datetime.now(),
-            )
-
         if not query:
             return CheckResult(
                 clef_id=clef.id,
                 stave_id=stave.id,
                 status="error",
+                observed_value=None,
                 message="Forecast check requires a 'query' configuration",
                 metadata={"error": "missing_query"},
                 timestamp=datetime.now(),
@@ -2002,37 +1990,31 @@ class ClefExecutor:
                     clef_id=clef.id,
                     stave_id=stave.id,
                     status="warn",
+                    observed_value=len(rows) if rows else 0,
                     message=f"Insufficient data for forecasting (got {len(rows)} rows, need 10+)",
                     metadata={"row_count": len(rows)},
                     timestamp=datetime.now(),
                 )
 
-            # 2. Prepare data for SarimaForecaster
-            df = pd.DataFrame(rows)
-
-            # Ensure proper types
-            if timestamp_column in df.columns:
-                df[timestamp_column] = pd.to_datetime(df[timestamp_column])
-                df = df.sort_values(by=timestamp_column)
-
-            if value_column not in df.columns:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="error",
-                    message=f"Value column '{value_column}' not found in query results",
-                    metadata={"columns": list(df.columns)},
-                    timestamp=datetime.now(),
-                )
-
-            # Extract time series
-            ts_values = df[value_column].dropna().tolist()
+            # 2. Extract numeric time series
+            ts_values: list[float] = []
+            for row in rows:
+                if value_column not in row:
+                    continue
+                raw = row.get(value_column)
+                if raw is None:
+                    continue
+                try:
+                    ts_values.append(float(raw))
+                except (TypeError, ValueError):
+                    continue
 
             if len(ts_values) < 10:
                 return CheckResult(
                     clef_id=clef.id,
                     stave_id=stave.id,
                     status="warn",
+                    observed_value=len(ts_values),
                     message="Insufficient non-null values for forecasting",
                     metadata={"valid_count": len(ts_values)},
                     timestamp=datetime.now(),
@@ -2042,26 +2024,92 @@ class ClefExecutor:
             train_data = ts_values[:-1]
             observed_value = ts_values[-1]
 
-            # 3. Train Model
-            forecaster = SarimaForecaster()
+            # 3/4. Detect anomaly
+            #
+            # Prefer the Brain SARIMA implementation when available.
+            # If optional deps aren't installed, fall back to a lightweight
+            # z-score style band using recent history.
+            if SarimaForecaster is not None and pd is not None:
+                df = pd.DataFrame(rows)
+                if timestamp_column in df.columns:
+                    df[timestamp_column] = pd.to_datetime(df[timestamp_column])
+                    df = df.sort_values(by=timestamp_column)
+                if value_column not in df.columns:
+                    return CheckResult(
+                        clef_id=clef.id,
+                        stave_id=stave.id,
+                        status="error",
+                        observed_value=observed_value,
+                        message=f"Value column '{value_column}' not found in query results",
+                        metadata={"columns": list(df.columns)},
+                        timestamp=datetime.now(),
+                    )
+                ts_values_model = df[value_column].dropna().tolist()
+                train_model = ts_values_model[:-1]
+                observed_model = float(ts_values_model[-1])
 
-            # Auto-select order if not provided in config (simplification: always auto for now or defaults)
-            # Using defaults (1,1,1) (1,1,1,12) for speed unless specified
-            # In a real scenario, we might want to cache the trained model.
+                forecaster = SarimaForecaster()
+                forecaster.train(train_model)
+                result = forecaster.detect_anomaly(observed_value=observed_model)
 
-            # Try to train. NOTE: This is compute intensive.
-            forecaster.train(train_data)
+                status = "fail" if result.is_anomaly else "pass"
+                message_prefix = (
+                    "Anomaly Detected: " if result.is_anomaly else "Forecast OK: "
+                )
+                message = (
+                    f"{message_prefix}Value {observed_model:.2f} "
+                    f"(Expected range: [{result.lower_bound:.2f}, {result.upper_bound:.2f}])"
+                )
 
-            # 4. Detect Anomaly
-            result = forecaster.detect_anomaly(observed_value=observed_value)
+                return CheckResult(
+                    clef_id=clef.id,
+                    stave_id=stave.id,
+                    status=status,
+                    observed_value=observed_model,
+                    message=message,
+                    metadata={
+                        "method": "sarima",
+                        "lower_bound": result.lower_bound,
+                        "upper_bound": result.upper_bound,
+                        "confidence_level": result.confidence_level,
+                        "p_value": result.p_value,
+                        "model_info": result.model_info,
+                    },
+                    timestamp=datetime.now(),
+                )
 
-            # 5. Formulate Result
-            status = "fail" if result.is_anomaly else "pass"
+            # Fallback: mean ± 3*std over recent window
+            window = train_data[-30:] if len(train_data) > 30 else train_data
+            n = len(window)
+            if n == 0:
+                return CheckResult(
+                    clef_id=clef.id,
+                    stave_id=stave.id,
+                    status="warn",
+                    observed_value=observed_value,
+                    message="Insufficient history for forecasting baseline window",
+                    metadata={"window_size": 0},
+                    timestamp=datetime.now(),
+                )
 
+            mean = sum(window) / n
+            variance = sum((x - mean) ** 2 for x in window) / n
+            std = variance**0.5
+            k = float(config.get("fallback_sigma", 2.0))
+            lower = mean - (k * std)
+            upper = mean + (k * std)
+            is_anomaly = observed_value <= lower or observed_value >= upper
+
+            status = "fail" if is_anomaly else "pass"
             message_prefix = (
-                "Anomaly Detected: " if result.is_anomaly else "Forecast OK: "
+                "Anomaly Detected (fallback): "
+                if is_anomaly
+                else "Forecast OK (fallback): "
             )
-            message = f"{message_prefix}Value {observed_value:.2f} (Expected range: [{result.lower_bound:.2f}, {result.upper_bound:.2f}])"
+            message = (
+                f"{message_prefix}Value {observed_value:.2f} "
+                f"(Expected range: [{lower:.2f}, {upper:.2f}])"
+            )
 
             return CheckResult(
                 clef_id=clef.id,
@@ -2070,11 +2118,14 @@ class ClefExecutor:
                 observed_value=observed_value,
                 message=message,
                 metadata={
-                    "lower_bound": result.lower_bound,
-                    "upper_bound": result.upper_bound,
-                    "confidence_level": result.confidence_level,
-                    "p_value": result.p_value,
-                    "model_info": result.model_info,
+                    "method": "fallback_band",
+                    "window_size": n,
+                    "mean": mean,
+                    "std": std,
+                    "k": k,
+                    "lower_bound": lower,
+                    "upper_bound": upper,
+                    "note": "Install statsmodels+pandas to enable SARIMA forecasting",
                 },
                 timestamp=datetime.now(),
             )
@@ -2085,6 +2136,7 @@ class ClefExecutor:
                 clef_id=clef.id,
                 stave_id=stave.id,
                 status="fail",
+                observed_value=None,
                 message=f"Forecast analysis failed: {str(e)}",
                 metadata={"error": str(e)},
                 timestamp=datetime.now(),
@@ -2108,6 +2160,7 @@ class ClefExecutor:
                 clef_id=clef.id,
                 stave_id=stave.id,
                 status="fail",
+                observed_value=None,
                 message="Drift check requires optional dependency (scipy). Install it or disable Level 2/3 drift checks.",
                 metadata={
                     "error": "missing_optional_dependency",
@@ -2121,6 +2174,7 @@ class ClefExecutor:
                 clef_id=clef.id,
                 stave_id=stave.id,
                 status="error",
+                observed_value=None,
                 message="Drift check requires 'table' and 'column'",
                 metadata={"error": "missing_config"},
                 timestamp=datetime.now(),
@@ -2143,6 +2197,7 @@ class ClefExecutor:
                     clef_id=clef.id,
                     stave_id=stave.id,
                     status="warn",
+                    observed_value=None,
                     message=f"Insufficient data for drift detection (baseline: {len(baseline_values)}, current: {len(current_values)})",
                     metadata={
                         "baseline_count": len(baseline_values),
@@ -2166,6 +2221,7 @@ class ClefExecutor:
                     clef_id=clef.id,
                     stave_id=stave.id,
                     status="error",
+                    observed_value=None,
                     message="Drift check currently only supports numeric columns for KS test",
                     metadata={"error": "non_numeric_data"},
                     timestamp=datetime.now(),
@@ -2208,6 +2264,7 @@ class ClefExecutor:
                 clef_id=clef.id,
                 stave_id=stave.id,
                 status="fail",
+                observed_value=None,
                 message=f"Drift analysis failed: {str(e)}",
                 metadata={"error": str(e)},
                 timestamp=datetime.now(),

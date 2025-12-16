@@ -68,10 +68,14 @@ prototype: ## Quick prototype setup and start (local)
 	@echo "🔑 Login with: admin / admin"
 
 start-podium: ## Start the Podium backend
-	cd datametronome/podium && python -m datametronome_podium.main
+	./start_podium.sh
 
 start-ui: ## Start the UI
-	cd ui-nuxt && npm install && npm run dev
+	@bash -c 'set -a; [ -f config.env ] && source config.env; set +a; \
+	cd ui-nuxt && npm install && \
+	NUXT_PUBLIC_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8000}/api/v1" \
+	NUXT_PUBLIC_PODIUM_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8000}" \
+	npm run dev -- --port $${UI_PORT:-3000}'
 
 setup-db: ## Initialize the database
 	cd datametronome/podium && DATAMETRONOME_SECRET_KEY="dev-secret-key-change-in-production-32-chars" DATAMETRONOME_DATABASE_URL="sqlite+aiosqlite:///$(PWD)/data/datametronome.db" python -c "import asyncio; from datametronome_podium.core.database import init_db; asyncio.run(init_db())"

@@ -90,6 +90,10 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
         # Store the result in database
         import json
 
+        # Persist metadata in checks.details, and always include observed_value so the UI can chart it.
+        metadata_for_storage = dict(result.metadata or {})
+        metadata_for_storage["observed_value"] = result.observed_value
+
         check_data = {
             "id": f"check-{clef_id}-{datetime.utcnow().isoformat()}",
             "stave_id": stave.id,
@@ -97,7 +101,9 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
             "check_type": clef.check_type,
             "status": result.status,
             "message": result.message,
-            "details": json.dumps(result.metadata) if result.metadata else None,
+            "details": json.dumps(metadata_for_storage)
+            if metadata_for_storage
+            else None,
             "timestamp": datetime.utcnow().isoformat() + "Z",
             "execution_time": result.execution_time,
             "anomalies_count": result.anomalies_count,
@@ -279,8 +285,21 @@ async def get_latest_results(limit: int = Query(20, ge=1, le=100)) -> Dict[str, 
         )
 
         # Format results
+        import json
+
         formatted_results = []
         for result in results:
+            metadata = None
+            if result.get("details"):
+                try:
+                    metadata = (
+                        json.loads(result["details"])
+                        if isinstance(result["details"], str)
+                        else result["details"]
+                    )
+                except (json.JSONDecodeError, TypeError):
+                    metadata = result["details"]
+
             formatted_results.append(
                 {
                     "id": result["id"],
@@ -296,6 +315,7 @@ async def get_latest_results(limit: int = Query(20, ge=1, le=100)) -> Dict[str, 
                     "execution_time": result["execution_time"],
                     "anomalies_count": result["anomalies_count"],
                     "severity": result["severity"],
+                    "metadata": metadata,
                 }
             )
 

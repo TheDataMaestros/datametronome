@@ -56,5 +56,5 @@ clefs:
       column: "amount"
       # Compare Today vs Last 30 Days
       baseline_condition: "created_at BETWEEN date('now', '-30 days') AND date('now', '-1 day')"
-      current_condition: "created_at >= date('now', '-1 day')"
+      current_condition: "created_at >= date('now')"
       critical_p_value: 0.05

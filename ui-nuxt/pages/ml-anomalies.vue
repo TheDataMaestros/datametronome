@@ -1,557 +1,611 @@
 <template>
   <div class="space-y-6">
-    <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">ML Anomaly Detection</h1>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Brain (Forecast + Drift)</h1>
         <p class="mt-2 text-gray-600 dark:text-gray-400">
-          Machine learning powered anomaly detection using advanced algorithms.
+          Live results from Tier-2 clefs: anomaly detection (forecast) and distribution drift.
         </p>
       </div>
       <div class="flex items-center gap-3">
         <UButton
           color="primary"
-          variant="outline"
-          icon="i-heroicons-cog-6-tooth"
-          @click="showMLConfig = !showMLConfig"
+          icon="i-heroicons-arrow-path"
+          :loading="isRefreshing"
+          @click="refresh"
         >
-          ML Config
-        </UButton>
-        <UButton
-          color="primary"
-          icon="i-heroicons-play"
-          @click="runMLDetection"
-          :loading="isRunningML"
-        >
-          Run ML Detection
+          Refresh
         </UButton>
       </div>
     </div>
 
-    <!-- ML Configuration Panel -->
-    <UCard v-if="showMLConfig">
-      <template #header>
-        <h3 class="text-lg font-semibold">Machine Learning Configuration</h3>
-      </template>
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div class="space-y-4">
-          <UFormGroup label="Algorithm">
-            <USelect v-model="mlConfig.algorithm" :options="algorithmOptions" />
-          </UFormGroup>
-          <UFormGroup label="Contamination Factor">
-            <UInput v-model="mlConfig.contamination" type="number" step="0.01" min="0" max="0.5" />
-          </UFormGroup>
-          <UFormGroup label="Random State">
-            <UInput v-model="mlConfig.randomState" type="number" />
-          </UFormGroup>
-        </div>
-        <div class="space-y-4">
-          <UFormGroup label="Number of Estimators">
-            <UInput v-model="mlConfig.nEstimators" type="number" min="10" max="1000" />
-          </UFormGroup>
-          <UFormGroup label="Max Features">
-            <UInput v-model="mlConfig.maxFeatures" type="number" min="1" />
-          </UFormGroup>
-          <UFormGroup label="Bootstrap">
-            <UToggle v-model="mlConfig.bootstrap" />
-          </UFormGroup>
-        </div>
-      </div>
-      <template #footer>
-        <div class="flex justify-end gap-3">
-          <UButton color="gray" variant="outline" @click="resetMLConfig"> Reset </UButton>
-          <UButton color="primary" @click="saveMLConfig"> Save Configuration </UButton>
-        </div>
-      </template>
+    <UCard v-if="error">
+      <div class="text-sm text-red-600 dark:text-red-400">{{ error }}</div>
     </UCard>
 
-    <!-- ML Results Summary -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <UCard class="gradient-primary text-white">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm opacity-90">Records Analyzed</p>
-            <p class="text-3xl font-bold">{{ mlResults.totalRecords }}</p>
-            <p class="text-sm opacity-90">Last run: {{ formatTimeAgo(mlResults.lastRun) }}</p>
-          </div>
-          <Icon name="i-heroicons-chart-bar" class="w-8 h-8 opacity-80" />
-        </div>
-      </UCard>
-
-      <UCard class="gradient-error text-white">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm opacity-90">Anomalies Detected</p>
-            <p class="text-3xl font-bold">{{ mlResults.anomaliesDetected }}</p>
-            <p class="text-sm opacity-90">{{ mlResults.detectionRate }}% detection rate</p>
-          </div>
-          <Icon name="i-heroicons-exclamation-triangle" class="w-8 h-8 opacity-80" />
-        </div>
-      </UCard>
-
-      <UCard class="gradient-success text-white">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm opacity-90">Model Confidence</p>
-            <p class="text-3xl font-bold">{{ mlResults.modelConfidence }}%</p>
-            <p class="text-sm opacity-90">High confidence</p>
-          </div>
-          <Icon name="i-heroicons-cpu-chip" class="w-8 h-8 opacity-80" />
-        </div>
-      </UCard>
-
-      <UCard class="bg-purple-500 text-white">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm opacity-90">Training Accuracy</p>
-            <p class="text-3xl font-bold">{{ mlResults.trainingAccuracy }}%</p>
-            <p class="text-sm opacity-90">Based on {{ mlResults.trainingRecords }} samples</p>
-          </div>
-          <Icon name="i-heroicons-academic-cap" class="w-8 h-8 opacity-80" />
-        </div>
-      </UCard>
-    </div>
-
-    <!-- ML Visualization -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <!-- Anomaly Distribution Chart -->
       <UCard>
         <template #header>
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">Anomaly Distribution</h3>
+            <div>
+              <h3 class="text-lg font-semibold">Forecast (Anomaly Detection)</h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                Detects unexpected deviations based on historical time series.
+              </p>
+            </div>
             <UButton
-              color="gray"
-              variant="ghost"
-              size="sm"
-              icon="i-heroicons-arrow-path"
-              @click="refreshDistributionChart"
-            />
+              v-if="forecastLatest"
+              color="green"
+              icon="i-heroicons-play"
+              :loading="runningClefId === forecastLatest.clef_id"
+              @click="runNow(forecastLatest.clef_id)"
+            >
+              Run
+            </UButton>
           </div>
         </template>
-        <div class="chart-container">
-          <div class="flex items-center justify-center h-full text-gray-500">
-            <div class="text-center">
-              <Icon name="i-heroicons-chart-pie" class="w-12 h-12 mx-auto mb-2" />
-              <p>ML anomaly distribution chart coming soon</p>
+
+        <div v-if="!forecastLatest" class="text-gray-600 dark:text-gray-400">
+          No forecast executions found yet.
+        </div>
+
+        <div v-else class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="space-y-1">
+              <div class="font-medium text-gray-900 dark:text-white">
+                {{ forecastLatest.clef_name || forecastLatest.clef_id }}
+              </div>
+              <div class="text-sm text-gray-600 dark:text-gray-400">
+                {{ forecastLatest.stave_name || forecastLatest.stave_id }} •
+                {{ formatTimeAgo(parseTimestamp(forecastLatest.timestamp)) }}
+              </div>
             </div>
+            <div class="flex items-center gap-2">
+              <UBadge :color="statusColor(String(forecastLatest.status || ''))" variant="subtle">
+                {{ String(forecastLatest.status || '').toLowerCase() }}
+              </UBadge>
+              <UBadge
+                :color="severityColor(normalizeSeverity(forecastLatest.severity))"
+                variant="solid"
+              >
+                {{ normalizeSeverity(forecastLatest.severity) }}
+              </UBadge>
+            </div>
+          </div>
+
+          <div
+            class="rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4"
+          >
+            <div class="text-sm font-medium text-gray-900 dark:text-white mb-1">Message</div>
+            <div class="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">
+              {{ forecastLatest.message || '—' }}
+            </div>
+          </div>
+
+          <div
+            class="rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4"
+          >
+            <div class="text-sm font-medium text-gray-900 dark:text-white mb-1">Metadata</div>
+            <pre class="text-xs overflow-auto whitespace-pre-wrap">{{
+              formatJson(forecastLatest.metadata || forecastLatest.details)
+            }}</pre>
           </div>
         </div>
       </UCard>
 
-      <!-- Model Performance Chart -->
       <UCard>
         <template #header>
           <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">Model Performance Over Time</h3>
+            <div>
+              <h3 class="text-lg font-semibold">Drift (Distribution Shift)</h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                Compares a current window vs baseline (e.g., KS test p-value).
+              </p>
+            </div>
             <UButton
-              color="gray"
-              variant="ghost"
-              size="sm"
-              icon="i-heroicons-arrow-path"
-              @click="refreshPerformanceChart"
-            />
+              v-if="driftLatest"
+              color="green"
+              icon="i-heroicons-play"
+              :loading="runningClefId === driftLatest.clef_id"
+              @click="runNow(driftLatest.clef_id)"
+            >
+              Run
+            </UButton>
           </div>
         </template>
-        <div class="chart-container">
-          <div class="flex items-center justify-center h-full text-gray-500">
-            <div class="text-center">
-              <Icon name="i-heroicons-chart-bar" class="w-12 h-12 mx-auto mb-2" />
-              <p>Model performance chart coming soon</p>
+
+        <div v-if="!driftLatest" class="text-gray-600 dark:text-gray-400">
+          No drift executions found yet.
+        </div>
+
+        <div v-else class="space-y-4">
+          <div class="flex items-center justify-between">
+            <div class="space-y-1">
+              <div class="font-medium text-gray-900 dark:text-white">
+                {{ driftLatest.clef_name || driftLatest.clef_id }}
+              </div>
+              <div class="text-sm text-gray-600 dark:text-gray-400">
+                {{ driftLatest.stave_name || driftLatest.stave_id }} •
+                {{ formatTimeAgo(parseTimestamp(driftLatest.timestamp)) }}
+              </div>
             </div>
+            <div class="flex items-center gap-2">
+              <UBadge :color="statusColor(String(driftLatest.status || ''))" variant="subtle">
+                {{ String(driftLatest.status || '').toLowerCase() }}
+              </UBadge>
+              <UBadge
+                :color="severityColor(normalizeSeverity(driftLatest.severity))"
+                variant="solid"
+              >
+                {{ normalizeSeverity(driftLatest.severity) }}
+              </UBadge>
+            </div>
+          </div>
+
+          <div
+            class="rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4"
+          >
+            <div class="text-sm font-medium text-gray-900 dark:text-white mb-1">Message</div>
+            <div class="text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">
+              {{ driftLatest.message || '—' }}
+            </div>
+          </div>
+
+          <div
+            class="rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4"
+          >
+            <div class="text-sm font-medium text-gray-900 dark:text-white mb-1">Metadata</div>
+            <pre class="text-xs overflow-auto whitespace-pre-wrap">{{
+              formatJson(driftLatest.metadata || driftLatest.details)
+            }}</pre>
           </div>
         </div>
       </UCard>
     </div>
 
-    <!-- ML Anomalies Table -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-semibold">Forecast: observed vs bounds</h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                Latest forecast run (Observed, Lower, Upper).
+              </p>
+            </div>
+          </div>
+        </template>
+
+        <div v-if="!forecastBarData" class="text-gray-600 dark:text-gray-400">
+          Not enough forecast metadata to chart yet. Click “Run”.
+        </div>
+        <div v-else class="h-[260px]">
+          <TrendChart :data="forecastBarData" type="bar" :height="260" :show-legend="true" />
+        </div>
+      </UCard>
+
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-semibold">Drift: baseline vs current mean</h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                Latest drift run (Baseline mean vs Current mean).
+              </p>
+            </div>
+          </div>
+        </template>
+
+        <div v-if="!driftBarData" class="text-gray-600 dark:text-gray-400">
+          Not enough drift metadata to chart yet. Click “Run”.
+        </div>
+        <div v-else class="h-[260px]">
+          <TrendChart :data="driftBarData" type="bar" :height="260" :show-legend="true" />
+        </div>
+      </UCard>
+    </div>
+
     <UCard>
       <template #header>
         <div class="flex items-center justify-between">
-          <h3 class="text-lg font-semibold">ML Detected Anomalies</h3>
-          <div class="flex items-center gap-2">
-            <UButton
-              color="green"
-              variant="outline"
-              size="sm"
-              icon="i-heroicons-check"
-              @click="validateAllAnomalies"
-            >
-              Validate All
-            </UButton>
-            <UButton
-              color="primary"
-              variant="outline"
-              size="sm"
-              icon="i-heroicons-arrow-down-tray"
-              @click="exportMLResults"
-            >
-              Export Results
-            </UButton>
+          <div>
+            <h3 class="text-lg font-semibold">Brain trend</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Forecast observed and drift signal over recent runs.
+            </p>
           </div>
         </div>
       </template>
 
-      <UTable :rows="mlAnomalies" :columns="mlAnomalyColumns" class="w-full">
-        <template #confidence-data="{ row }">
-          <div class="flex items-center gap-2">
-            <div class="w-full bg-gray-200 rounded-full h-2">
-              <div
-                class="bg-blue-600 h-2 rounded-full"
-                :style="{ width: `${row.confidence}%` }"
-              ></div>
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="h-[260px]">
+          <div v-if="!forecastTrendData" class="text-gray-600 dark:text-gray-400">
+            No forecast history yet.
+          </div>
+          <TrendChart
+            v-else
+            :data="forecastTrendData"
+            type="line"
+            :height="260"
+            :show-legend="true"
+            :options="trendLineOptions"
+          />
+        </div>
+
+        <div class="h-[260px]">
+          <div v-if="!driftTrendData" class="text-gray-600 dark:text-gray-400">
+            No drift history yet.
+          </div>
+          <TrendChart
+            v-else
+            :data="driftTrendData"
+            type="line"
+            :height="260"
+            :show-legend="true"
+            :options="trendLineOptions"
+          />
+        </div>
+      </div>
+    </UCard>
+
+    <UCard>
+      <template #header>
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg font-semibold">Latest Brain Runs</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Forecast + Drift from the latest checks feed.
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <UTable :rows="brainRows" :columns="brainColumns" class="w-full">
+        <template #clef-data="{ row }">
+          <div class="space-y-0.5">
+            <div class="font-medium text-gray-900 dark:text-white">
+              {{ row.clef_name || row.clef_id }}
             </div>
-            <span class="text-sm font-medium">{{ row.confidence }}%</span>
+            <div class="text-xs text-gray-500 dark:text-gray-400">{{ row.check_type }}</div>
           </div>
         </template>
 
-        <template #severity-data="{ row }">
-          <UBadge :color="getMLSeverityColor(row.severity)" variant="solid">
-            {{ row.severity }}
+        <template #status-data="{ row }">
+          <UBadge :color="statusColor(String(row.status || ''))" variant="subtle">
+            {{ String(row.status || '').toLowerCase() }}
           </UBadge>
         </template>
 
-        <template #detected-data="{ row }">
-          {{ formatTimeAgo(row.detected) }}
+        <template #severity-data="{ row }">
+          <UBadge :color="severityColor(normalizeSeverity(row.severity))" variant="solid">
+            {{ normalizeSeverity(row.severity) }}
+          </UBadge>
+        </template>
+
+        <template #timestamp-data="{ row }">
+          {{ formatTimeAgo(parseTimestamp(row.timestamp)) }}
         </template>
 
         <template #actions-data="{ row }">
           <div class="flex items-center gap-2">
             <UButton
-              color="blue"
-              variant="ghost"
-              size="sm"
-              icon="i-heroicons-eye"
-              @click="viewMLAnomalyDetails(row)"
-            />
-            <UButton
               color="green"
               variant="ghost"
               size="sm"
-              icon="i-heroicons-check"
-              @click="validateMLAnomaly(row.id)"
-            />
-            <UButton
-              color="red"
-              variant="ghost"
-              size="sm"
-              icon="i-heroicons-x-mark"
-              @click="rejectMLAnomaly(row.id)"
+              icon="i-heroicons-play"
+              :loading="runningClefId === row.clef_id"
+              @click="runNow(row.clef_id)"
             />
           </div>
         </template>
       </UTable>
     </UCard>
-
-    <!-- ML Anomaly Details Modal -->
-    <UModal v-model="showMLAnomalyModal" :ui="{ width: 'w-full sm:max-w-4xl' }">
-      <UCard v-if="selectedMLAnomaly">
-        <template #header>
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">ML Anomaly Analysis</h3>
-            <UButton
-              color="gray"
-              variant="ghost"
-              icon="i-heroicons-x-mark"
-              @click="showMLAnomalyModal = false"
-            />
-          </div>
-        </template>
-
-        <div class="space-y-6">
-          <!-- ML Analysis -->
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <h4 class="font-semibold mb-2">ML Analysis</h4>
-              <div class="space-y-2">
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">Confidence Score:</span>
-                  <span class="font-medium">{{ selectedMLAnomaly.confidence }}%</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">Anomaly Score:</span>
-                  <span class="font-medium">{{ selectedMLAnomaly.anomalyScore }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">Algorithm Used:</span>
-                  <span class="font-medium">{{ selectedMLAnomaly.algorithm }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">Feature Importance:</span>
-                  <span class="font-medium">{{ selectedMLAnomaly.featureImportance }}%</span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h4 class="font-semibold mb-2">Data Context</h4>
-              <div class="space-y-2">
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">Table:</span>
-                  <span class="font-medium">{{ selectedMLAnomaly.table }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">Record ID:</span>
-                  <span class="font-medium">{{ selectedMLAnomaly.recordId }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">Detected:</span>
-                  <span class="font-medium">{{ formatTimeAgo(selectedMLAnomaly.detected) }}</span>
-                </div>
-                <div class="flex justify-between">
-                  <span class="text-gray-600 dark:text-gray-400">Source:</span>
-                  <span class="font-medium">{{ selectedMLAnomaly.source }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Feature Analysis -->
-          <div>
-            <h4 class="font-semibold mb-2">Feature Analysis</h4>
-            <div class="space-y-2">
-              <div
-                v-for="feature in selectedMLAnomaly.features"
-                :key="feature.name"
-                class="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg"
-              >
-                <div>
-                  <span class="font-medium">{{ feature.name }}</span>
-                  <p class="text-sm text-gray-600 dark:text-gray-400">{{ feature.description }}</p>
-                </div>
-                <div class="text-right">
-                  <span class="font-medium">{{ feature.value }}</span>
-                  <p class="text-sm text-gray-600 dark:text-gray-400">
-                    {{ feature.contribution }}% contribution
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Actions -->
-          <div class="flex items-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
-            <UButton
-              color="green"
-              icon="i-heroicons-check"
-              @click="validateMLAnomaly(selectedMLAnomaly.id)"
-            >
-              Validate Anomaly
-            </UButton>
-            <UButton
-              color="blue"
-              variant="outline"
-              icon="i-heroicons-arrow-path"
-              @click="retrainModel(selectedMLAnomaly.id)"
-            >
-              Retrain Model
-            </UButton>
-            <UButton
-              color="red"
-              variant="outline"
-              icon="i-heroicons-x-mark"
-              @click="rejectMLAnomaly(selectedMLAnomaly.id)"
-            >
-              Reject
-            </UButton>
-          </div>
-        </div>
-      </UCard>
-    </UModal>
   </div>
 </template>
 
 <script setup lang="ts">
-// Use middleware for authentication
+import { computed, ref } from 'vue'
+
 definePageMeta({
   middleware: 'auth',
   layout: 'dashboard',
 })
 
-const showMLConfig = ref(false)
-const isRunningML = ref(false)
-const showMLAnomalyModal = ref(false)
-const selectedMLAnomaly = ref(null)
-
-// ML Configuration
-const mlConfig = ref({
-  algorithm: 'isolation_forest',
-  contamination: 0.1,
-  randomState: 42,
-  nEstimators: 100,
-  maxFeatures: 'auto',
-  bootstrap: true,
+useHead({
+  title: 'Brain - DataMetronome',
 })
 
-const algorithmOptions = [
-  { label: 'Isolation Forest', value: 'isolation_forest' },
-  { label: 'One-Class SVM', value: 'one_class_svm' },
-  { label: 'Local Outlier Factor', value: 'lof' },
-  { label: 'Elliptic Envelope', value: 'elliptic_envelope' },
-]
+const isRefreshing = ref(false)
+const runningClefId = ref<string | null>(null)
 
-// ML Results
-const mlResults = ref({
-  totalRecords: 1500,
-  anomaliesDetected: 7,
-  detectionRate: 0.47,
-  modelConfidence: 94.2,
-  trainingAccuracy: 96.8,
-  trainingRecords: 10000,
-  lastRun: new Date(Date.now() - 1 * 60 * 60 * 1000),
+const { fetchLatestResults, checkResults, runCheck, error } = useClefs()
+
+const brainRows = computed(() => {
+  return (checkResults.value || []).filter((r: any) => {
+    const t = String(r?.check_type || '')
+    return t === 'forecast' || t === 'data_profile_drift' || t === 'drift'
+  }) as any[]
 })
 
-// ML Anomalies data
-const mlAnomalies = ref([
-  {
-    id: 1,
-    table: 'users',
-    recordId: 'user_12345',
-    confidence: 94,
-    anomalyScore: 0.87,
-    severity: 'high',
-    detected: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    source: 'Production Database',
-    algorithm: 'Isolation Forest',
-    featureImportance: 85,
-    features: [
-      { name: 'age', value: 150, description: 'Age value', contribution: 45 },
-      { name: 'income', value: 500000, description: 'Annual income', contribution: 30 },
-      { name: 'activity_score', value: 0.02, description: 'User activity score', contribution: 25 },
-    ],
-  },
-  {
-    id: 2,
-    table: 'orders',
-    recordId: 'order_67890',
-    confidence: 89,
-    anomalyScore: 0.82,
-    severity: 'medium',
-    detected: new Date(Date.now() - 1 * 60 * 60 * 1000),
-    source: 'Production Database',
-    algorithm: 'Isolation Forest',
-    featureImportance: 72,
-    features: [
-      { name: 'amount', value: 99999, description: 'Order amount', contribution: 50 },
-      { name: 'quantity', value: 1, description: 'Item quantity', contribution: 22 },
-    ],
-  },
-])
-
-const mlAnomalyColumns = [
-  { key: 'table', label: 'Table' },
-  { key: 'recordId', label: 'Record ID' },
-  { key: 'confidence', label: 'Confidence' },
-  { key: 'severity', label: 'Severity' },
-  { key: 'detected', label: 'Detected' },
-  { key: 'source', label: 'Source' },
-  { key: 'actions', label: 'Actions' },
-]
-
-// Helper functions
-function getMLSeverityColor(severity: string) {
-  const colors: Record<string, string> = {
-    high: 'red',
-    medium: 'yellow',
-    low: 'blue',
+function getMetadata(r: any): Record<string, any> | null {
+  const raw = r?.metadata || r?.details
+  if (!raw) return null
+  if (typeof raw === 'object') return raw
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw)
+    } catch {
+      return null
+    }
   }
-  return colors[severity] || 'gray'
+  return null
+}
+
+function parseObservedFromMessage(msg?: string | null): number | null {
+  if (!msg) return null
+  const m = msg.match(/Value\\s+([0-9]+(?:\\.[0-9]+)?)/i)
+  if (!m) return null
+  const v = Number(m[1])
+  return Number.isFinite(v) ? v : null
+}
+
+const forecastLatest = computed(() => {
+  return brainRows.value.find((r: any) => String(r?.check_type || '') === 'forecast') || null
+})
+
+const driftLatest = computed(() => {
+  return (
+    brainRows.value.find((r: any) => String(r?.check_type || '') === 'data_profile_drift') ||
+    brainRows.value.find((r: any) => String(r?.check_type || '') === 'drift') ||
+    null
+  )
+})
+
+const forecastBarData = computed(() => {
+  const r = forecastLatest.value
+  if (!r) return null
+  const meta = getMetadata(r)
+  const lower = Number(meta?.lower_bound)
+  const upper = Number(meta?.upper_bound)
+  const observed =
+    Number(meta?.observed_value) ||
+    Number(meta?.observed) ||
+    (parseObservedFromMessage(r?.message) ?? NaN)
+
+  if (![lower, upper, observed].every((x) => Number.isFinite(x))) return null
+  return {
+    labels: ['Lower', 'Observed', 'Upper'],
+    datasets: [
+      {
+        label: 'Value',
+        data: [lower, observed, upper],
+        backgroundColor: [
+          'rgba(107,114,128,0.35)',
+          'rgba(239,68,68,0.45)',
+          'rgba(107,114,128,0.35)',
+        ],
+        borderColor: 'rgba(107,114,128,1)',
+      },
+    ],
+  }
+})
+
+const driftBarData = computed(() => {
+  const r = driftLatest.value
+  if (!r) return null
+  const meta = getMetadata(r)
+  const stats = meta?.stats_metadata || meta?.stats || {}
+  const baselineMean = Number(stats?.baseline_mean ?? meta?.baseline_mean)
+  const currentMean = Number(stats?.current_mean ?? meta?.current_mean)
+  if (![baselineMean, currentMean].every((x) => Number.isFinite(x))) return null
+
+  return {
+    labels: ['Baseline mean', 'Current mean'],
+    datasets: [
+      {
+        label: 'Mean',
+        data: [baselineMean, currentMean],
+        backgroundColor: ['rgba(59,130,246,0.45)', 'rgba(168,85,247,0.45)'],
+        borderColor: 'rgba(59,130,246,1)',
+      },
+    ],
+  }
+})
+
+const trendLineOptions = {
+  plugins: {
+    legend: { position: 'top' as const },
+    tooltip: { mode: 'index' as const, intersect: false },
+  },
+  scales: {
+    x: { grid: { display: false } },
+  },
+}
+
+const forecastTrendData = computed(() => {
+  const points = brainRows.value
+    .filter((r: any) => String(r?.check_type || '') === 'forecast')
+    .map((r: any) => {
+      const meta = getMetadata(r) || {}
+      const ts = parseTimestamp(r?.timestamp)
+      const label = ts.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+      const observed =
+        Number(meta?.observed_value) ||
+        Number(meta?.observed) ||
+        (parseObservedFromMessage(r?.message) ?? NaN)
+      const lower = Number(meta?.lower_bound)
+      const upper = Number(meta?.upper_bound)
+      return { label, observed, lower, upper }
+    })
+    .filter((p) => p.label)
+    .reverse()
+
+  if (points.length < 1) return null
+
+  const labels = points.map((p) => p.label)
+  const observed = points.map((p) => (Number.isFinite(p.observed) ? p.observed : null))
+  const lower = points.map((p) => (Number.isFinite(p.lower) ? p.lower : null))
+  const upper = points.map((p) => (Number.isFinite(p.upper) ? p.upper : null))
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Observed',
+        data: observed as any,
+        borderColor: '#EF4444',
+        backgroundColor: 'rgba(239,68,68,0.08)',
+        tension: 0.2,
+        fill: false,
+      },
+      {
+        label: 'Lower bound',
+        data: lower as any,
+        borderColor: 'rgba(107,114,128,0.9)',
+        backgroundColor: 'rgba(107,114,128,0.05)',
+        tension: 0.2,
+        fill: false,
+      },
+      {
+        label: 'Upper bound',
+        data: upper as any,
+        borderColor: 'rgba(107,114,128,0.9)',
+        backgroundColor: 'rgba(107,114,128,0.05)',
+        tension: 0.2,
+        fill: false,
+      },
+    ],
+  }
+})
+
+const driftTrendData = computed(() => {
+  const points = brainRows.value
+    .filter((r: any) => {
+      const t = String(r?.check_type || '')
+      return t === 'data_profile_drift' || t === 'drift'
+    })
+    .map((r: any) => {
+      const meta = getMetadata(r) || {}
+      const ts = parseTimestamp(r?.timestamp)
+      const label = ts.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+      const p = Number(meta?.p_value ?? meta?.pvalue ?? meta?.p)
+      const signal = Number.isFinite(p) && p > 0 ? -Math.log10(p) : null
+      return { label, signal }
+    })
+    .filter((p) => p.label)
+    .reverse()
+
+  if (points.length < 1) return null
+
+  return {
+    labels: points.map((p) => p.label),
+    datasets: [
+      {
+        label: '-log10(p-value)',
+        data: points.map((p) => p.signal) as any,
+        borderColor: '#8B5CF6',
+        backgroundColor: 'rgba(168,85,247,0.08)',
+        tension: 0.2,
+        fill: false,
+      },
+    ],
+  }
+})
+
+const brainColumns = [
+  { key: 'clef', label: 'Clef' },
+  { key: 'message', label: 'Message' },
+  { key: 'status', label: 'Status' },
+  { key: 'severity', label: 'Severity' },
+  { key: 'timestamp', label: 'When' },
+  { key: 'stave_name', label: 'Stave' },
+  { key: 'actions', label: 'Run' },
+]
+
+function parseTimestamp(ts?: string): Date {
+  if (!ts) return new Date()
+  const d = new Date(ts)
+  return Number.isNaN(d.getTime()) ? new Date() : d
+}
+
+function normalizeSeverity(severity?: string | null): string {
+  const s = String(severity || '').toLowerCase()
+  if (s === 'cacophony') return 'critical'
+  if (s === 'dissonance') return 'high'
+  if (s === 'harmony') return 'low'
+  return 'medium'
+}
+
+function severityColor(sev: string) {
+  return (
+    (
+      {
+        critical: 'red',
+        high: 'orange',
+        medium: 'yellow',
+        low: 'blue',
+      } as Record<string, string>
+    )[sev] || 'gray'
+  )
+}
+
+function statusColor(status: string) {
+  const s = String(status || '').toLowerCase()
+  return (
+    (
+      {
+        fail: 'red',
+        failed: 'red',
+        warn: 'yellow',
+        warning: 'yellow',
+        pass: 'green',
+        passed: 'green',
+      } as Record<string, string>
+    )[s] || 'gray'
+  )
 }
 
 function formatTimeAgo(date: Date) {
   const now = new Date()
   const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
 
-  if (diffInMinutes < 60) {
-    return `${diffInMinutes} minutes ago`
-  } else if (diffInMinutes < 1440) {
+  if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`
+  if (diffInMinutes < 1440) {
     const hours = Math.floor(diffInMinutes / 60)
     return `${hours} hour${hours > 1 ? 's' : ''} ago`
-  } else {
-    const days = Math.floor(diffInMinutes / 1440)
-    return `${days} day${days > 1 ? 's' : ''} ago`
   }
+  const days = Math.floor(diffInMinutes / 1440)
+  return `${days} day${days > 1 ? 's' : ''} ago`
 }
 
-// Actions
-async function runMLDetection() {
-  isRunningML.value = true
+function formatJson(value: any) {
+  if (!value) return '—'
   try {
-    // Simulate ML detection
-    await new Promise((resolve) => setTimeout(resolve, 3000))
-    // Refresh ML results
-    await refreshMLResults()
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
+async function runNow(clefId: string) {
+  if (!clefId) return
+  runningClefId.value = clefId
+  try {
+    await runCheck(clefId)
+    await fetchLatestResults(50)
   } finally {
-    isRunningML.value = false
+    runningClefId.value = null
   }
 }
 
-async function refreshMLResults() {
-  // Simulate API call to refresh ML results
-  await new Promise((resolve) => setTimeout(resolve, 500))
-}
-
-async function refreshDistributionChart() {
-  await new Promise((resolve) => setTimeout(resolve, 500))
-}
-
-async function refreshPerformanceChart() {
-  await new Promise((resolve) => setTimeout(resolve, 500))
-}
-
-function resetMLConfig() {
-  mlConfig.value = {
-    algorithm: 'isolation_forest',
-    contamination: 0.1,
-    randomState: 42,
-    nEstimators: 100,
-    maxFeatures: 'auto',
-    bootstrap: true,
+async function refresh() {
+  isRefreshing.value = true
+  try {
+    await fetchLatestResults(50)
+  } finally {
+    isRefreshing.value = false
   }
 }
 
-function saveMLConfig() {
-  console.log('Saving ML configuration:', mlConfig.value)
-  showMLConfig.value = false
-}
-
-function viewMLAnomalyDetails(anomaly: any) {
-  selectedMLAnomaly.value = anomaly
-  showMLAnomalyModal.value = true
-}
-
-function validateMLAnomaly(anomalyId: number) {
-  const anomaly = mlAnomalies.value.find((a) => a.id === anomalyId)
-  if (anomaly) {
-    // Mark as validated
-    console.log(`Validating ML anomaly ${anomalyId}`)
-  }
-  showMLAnomalyModal.value = false
-}
-
-function rejectMLAnomaly(anomalyId: number) {
-  const anomaly = mlAnomalies.value.find((a) => a.id === anomalyId)
-  if (anomaly) {
-    // Remove from list
-    const index = mlAnomalies.value.findIndex((a) => a.id === anomalyId)
-    mlAnomalies.value.splice(index, 1)
-  }
-  showMLAnomalyModal.value = false
-}
-
-function validateAllAnomalies() {
-  console.log('Validating all ML anomalies...')
-}
-
-function exportMLResults() {
-  console.log('Exporting ML results...')
-}
-
-function retrainModel(anomalyId: number) {
-  console.log(`Retraining model based on anomaly ${anomalyId}`)
-}
-
-// Set page meta
-useHead({
-  title: 'ML Anomalies - DataMetronome',
-})
+await refresh()
 </script>

@@ -110,13 +110,16 @@ python3 -c "from showcase.retail_demo.generate_data import create_retail_db; cre
 export DB_PATH="$(pwd)/datametronome/podium/data/retail.db"
 python3 scripts/import_retail_to_db.py
 
-# Start Podium on port 8001 (UI expects http://localhost:8001/api/v1)
-PODIUM_PORT=8001 ./start_podium.sh
+# Start Podium (defaults to http://localhost:8000 via config.env)
+./start_podium.sh
 ```
 
 Then in a new terminal:
 
 ```bash
+# Point the UI to the Podium port you're using (default: 8000)
+NUXT_PUBLIC_API_BASE="http://127.0.0.1:8000/api/v1" \
+NUXT_PUBLIC_PODIUM_API_BASE="http://127.0.0.1:8000" \
 make start-ui
 ```
 
@@ -130,7 +133,7 @@ make start-ui
 
 **Troubleshooting (common gotchas)**:
 - If checks fail with “DB file not found”, re-run the import with `DB_PATH` set to an **absolute path** (see the full-stack steps above).
-- If the UI shows API errors, confirm Podium is running on **port 8001** (`PODIUM_PORT=8001`).
+- If the UI shows API errors, confirm the UI points to the correct Podium port (`NUXT_PUBLIC_API_BASE`) and that Podium is running.
 - To reset the demo state, delete the generated files: `datametronome/podium/data/datametronome.db` and `datametronome/podium/data/retail.db`.
 
 <details>
