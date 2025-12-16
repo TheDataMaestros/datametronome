@@ -7,15 +7,22 @@
     "build": "nuxt build",
     "dev": "nuxt dev",
     "generate": "nuxt generate",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
     "preview": "nuxt preview",
     "postinstall": "nuxt prepare"
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.69",
+    "@nuxt/eslint-config": "^1.0.0",
     "@nuxt/devtools": "latest",
     "@nuxt/ui": "^2.15.0",
     "@nuxtjs/tailwindcss": "^6.8.4",
+    "eslint": "^9.0.0",
     "nuxt": "^3.8.0",
+    "prettier": "^3.0.0",
     "typescript": "^5.2.2"
   },
   "dependencies": {

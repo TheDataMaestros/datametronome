@@ -24,10 +24,7 @@ class ApiService {
     }
   }
 
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
+  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     const url = buildApiUrl(endpoint)
 
     const config: RequestInit = {
@@ -43,7 +40,7 @@ class ApiService {
     if (authStore.token) {
       config.headers = {
         ...config.headers,
-        'Authorization': `Bearer ${authStore.token}`,
+        Authorization: `Bearer ${authStore.token}`,
       }
     }
 
@@ -62,7 +59,10 @@ class ApiService {
 
       if (!response.ok) {
         throw {
-          message: (data && typeof data === 'object' && 'message' in data) ? (data as any).message : `HTTP ${response.status}`,
+          message:
+            data && typeof data === 'object' && 'message' in data
+              ? (data as any).message
+              : `HTTP ${response.status}`,
           status: response.status,
           details: data,
         } as ApiError

@@ -31,7 +31,8 @@
 
 /* Custom animations */
 @keyframes pulse-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 5px rgba(31, 119, 180, 0.3);
   }
   50% {

@@ -3,9 +3,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-          🎵 Clefs
-        </h1>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">🎵 Clefs</h1>
         <p class="mt-2 text-gray-600 dark:text-gray-400">
           Configure and manage your data quality checks and monitoring rules.
         </p>
@@ -27,11 +25,7 @@
         >
           Visual Builder
         </UButton>
-        <UButton
-          color="primary"
-          icon="i-heroicons-plus"
-          @click="showCreateModal = true"
-        >
+        <UButton color="primary" icon="i-heroicons-plus" @click="showCreateModal = true">
           Create Clef
         </UButton>
       </div>
@@ -81,7 +75,9 @@
         <div class="flex items-center justify-between">
           <div>
             <p class="text-sm font-medium text-gray-600 dark:text-gray-400">Total Clefs</p>
-            <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ filteredClefs.length }}</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">
+              {{ filteredClefs.length }}
+            </p>
           </div>
           <Icon name="i-heroicons-musical-note" class="w-8 h-8 text-blue-500" />
         </div>
@@ -135,11 +131,7 @@
               </h3>
             </div>
             <div class="flex items-center gap-1">
-              <UBadge
-                :color="getTierColor(getClefTier(clef.check_type))"
-                variant="soft"
-                size="xs"
-              >
+              <UBadge :color="getTierColor(getClefTier(clef.check_type))" variant="soft" size="xs">
                 T{{ getClefTier(clef.check_type) }}
               </UBadge>
               <UDropdown :items="getClefActions(clef)">
@@ -194,10 +186,7 @@
 
           <div class="flex items-center justify-between text-sm">
             <span class="text-gray-500">Status:</span>
-            <UBadge
-              :color="clef.is_active ? 'green' : 'gray'"
-              variant="soft"
-            >
+            <UBadge :color="clef.is_active ? 'green' : 'gray'" variant="soft">
               {{ clef.is_active ? 'Active' : 'Inactive' }}
             </UBadge>
           </div>
@@ -205,9 +194,7 @@
 
         <template #footer>
           <div class="flex items-center justify-between">
-            <div class="text-xs text-gray-500">
-              Created {{ formatDate(clef.created_at) }}
-            </div>
+            <div class="text-xs text-gray-500">Created {{ formatDate(clef.created_at) }}</div>
             <div class="flex gap-2">
               <UButton
                 size="xs"
@@ -246,11 +233,13 @@
     <!-- Empty State -->
     <UCard v-if="filteredClefs.length === 0" class="text-center py-12">
       <Icon name="i-heroicons-musical-note" class="w-16 h-16 mx-auto text-gray-400 mb-4" />
-        <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-        No Clefs Found
-        </h3>
-        <p class="text-gray-600 dark:text-gray-400 mb-6">
-        {{ clefs.length === 0 ? 'Create your first clef to start monitoring data quality.' : 'Try adjusting your filters to see more results.' }}
+      <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">No Clefs Found</h3>
+      <p class="text-gray-600 dark:text-gray-400 mb-6">
+        {{
+          clefs.length === 0
+            ? 'Create your first clef to start monitoring data quality.'
+            : 'Try adjusting your filters to see more results.'
+        }}
       </p>
       <UButton
         v-if="clefs.length === 0"
@@ -259,7 +248,7 @@
         @click="showCreateModal = true"
       >
         Create Your First Clef
-        </UButton>
+      </UButton>
     </UCard>
 
     <!-- Create/Edit Modal -->
@@ -270,12 +259,7 @@
             <h3 class="text-lg font-semibold">
               {{ editingClef ? 'Edit Clef' : 'Create New Clef' }}
             </h3>
-            <UButton
-              color="gray"
-              variant="ghost"
-              icon="i-heroicons-x-mark"
-              @click="closeModal"
-            />
+            <UButton color="gray" variant="ghost" icon="i-heroicons-x-mark" @click="closeModal" />
           </div>
         </template>
 
@@ -360,29 +344,17 @@
                 <h4 class="text-md font-medium mb-4">Severity Thresholds</h4>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <UFormGroup label="Warning Threshold">
-                    <UInput
-                      v-model="newClef.warn"
-                      placeholder="e.g., > 5%"
-                    />
+                    <UInput v-model="newClef.warn" placeholder="e.g., > 5%" />
                   </UFormGroup>
                   <UFormGroup label="Failure Threshold">
-                    <UInput
-                      v-model="newClef.fail"
-                      placeholder="e.g., > 20%"
-                    />
+                    <UInput v-model="newClef.fail" placeholder="e.g., > 20%" />
                   </UFormGroup>
                 </div>
               </div>
 
               <div class="flex justify-end gap-3 pt-4 border-t">
-                <UButton color="gray" variant="outline" @click="closeModal">
-                  Cancel
-                </UButton>
-                <UButton
-                  type="submit"
-                  color="primary"
-                  :loading="isSaving"
-                >
+                <UButton color="gray" variant="outline" @click="closeModal"> Cancel </UButton>
+                <UButton type="submit" color="primary" :loading="isSaving">
                   {{ editingClef ? 'Update' : 'Create' }} Clef
                 </UButton>
               </div>
@@ -398,12 +370,7 @@
         <template #header>
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold">Visual Clef Builder</h3>
-            <UButton
-              color="gray"
-              variant="ghost"
-              icon="i-heroicons-x-mark"
-              @click="closeModal"
-            />
+            <UButton color="gray" variant="ghost" icon="i-heroicons-x-mark" @click="closeModal" />
           </div>
         </template>
 
@@ -474,9 +441,7 @@
             </template>
           </UTable>
 
-          <p v-else class="py-10 text-center text-gray-500">
-            No check executions recorded yet.
-          </p>
+          <p v-else class="py-10 text-center text-gray-500">No check executions recorded yet.</p>
         </div>
       </UCard>
     </UModal>
@@ -493,10 +458,10 @@ import type { Check } from '~/services/checks'
 // Use middleware for authentication
 definePageMeta({
   middleware: 'auth',
-  layout: 'dashboard'
+  layout: 'dashboard',
 })
 useHead({
-  title: 'Clefs - DataMetronome'
+  title: 'Clefs - DataMetronome',
 })
 
 // Composables
@@ -511,7 +476,7 @@ const {
   deleteClef,
   runCheck: executeCheck,
   fetchLatestResults,
-  fetchCheckResults
+  fetchCheckResults,
 } = useClefs()
 const { staves, fetchStaves } = useStaves()
 
@@ -541,7 +506,7 @@ const filters = ref({
   checkType: '',
   staveId: '',
   status: '',
-  tier: ''
+  tier: '',
 })
 
 // New clef form
@@ -554,7 +519,7 @@ const newClef = ref<CreateClefRequest>({
   schedule: '',
   is_active: true,
   warn: '',
-  fail: ''
+  fail: '',
 })
 
 // Clef templates with tier information
@@ -565,7 +530,7 @@ const clefTemplates = ref([
     description: 'Monitor the number of rows in a table',
     icon: 'i-heroicons-calculator',
     tier: 1,
-    config: { table: '', expected_min: 0, expected_max: 1000000 }
+    config: { table: '', expected_min: 0, expected_max: 1000000 },
   },
   {
     type: 'freshness',
@@ -573,7 +538,7 @@ const clefTemplates = ref([
     description: 'Check how recent your data is',
     icon: 'i-heroicons-clock',
     tier: 1,
-    config: { table: '', column: '', max_age_hours: 24 }
+    config: { table: '', column: '', max_age_hours: 24 },
   },
   {
     type: 'column_values',
@@ -581,7 +546,7 @@ const clefTemplates = ref([
     description: 'Validate values in a specific column',
     icon: 'i-heroicons-check-circle',
     tier: 1,
-    config: { table: '', column: '', validation_type: 'null_check' }
+    config: { table: '', column: '', validation_type: 'null_check' },
   },
   {
     type: 'forecast',
@@ -589,7 +554,7 @@ const clefTemplates = ref([
     description: 'ML-powered anomaly detection',
     icon: 'i-heroicons-chart-bar',
     tier: 2,
-    config: { table: '', metric: 'row_count', time_column: '', model: 'sarima' }
+    config: { table: '', metric: 'row_count', time_column: '', model: 'sarima' },
   },
   {
     type: 'data_profile_drift',
@@ -597,7 +562,7 @@ const clefTemplates = ref([
     description: 'Detect statistical changes in data',
     icon: 'i-heroicons-arrow-trending-up',
     tier: 2,
-    config: { table: '', column: '', reference_period: 'last_30_days' }
+    config: { table: '', column: '', reference_period: 'last_30_days' },
   },
   {
     type: 'lookup_validation',
@@ -605,7 +570,7 @@ const clefTemplates = ref([
     description: 'Validate data across multiple systems',
     icon: 'i-heroicons-link',
     tier: 3,
-    config: { source_table: '', source_column: '', lookup_source: '' }
+    config: { source_table: '', source_column: '', lookup_source: '' },
   },
   {
     type: 'python',
@@ -613,8 +578,8 @@ const clefTemplates = ref([
     description: 'Run custom Python validation scripts',
     icon: 'i-heroicons-code-bracket',
     tier: 4,
-    config: { script_path: '', function_name: '', parameters: {} }
-  }
+    config: { script_path: '', function_name: '', parameters: {} },
+  },
 ])
 
 // Computed properties
@@ -622,37 +587,36 @@ const filteredClefs = computed(() => {
   let result = clefs.value
 
   if (filters.value.checkType) {
-    result = result.filter(clef => clef.check_type === filters.value.checkType)
+    result = result.filter((clef) => clef.check_type === filters.value.checkType)
   }
   if (filters.value.staveId) {
-    result = result.filter(clef => clef.stave_id === filters.value.staveId)
+    result = result.filter((clef) => clef.stave_id === filters.value.staveId)
   }
   if (filters.value.status) {
     if (filters.value.status === 'active') {
-      result = result.filter(clef => clef.is_active)
+      result = result.filter((clef) => clef.is_active)
     } else if (filters.value.status === 'inactive') {
-      result = result.filter(clef => !clef.is_active)
+      result = result.filter((clef) => !clef.is_active)
     }
   }
   if (filters.value.tier) {
-    result = result.filter(clef => getClefTier(clef.check_type) === parseInt(filters.value.tier))
+    result = result.filter((clef) => getClefTier(clef.check_type) === parseInt(filters.value.tier))
   }
 
   return result
 })
 
-const activeClefsCount = computed(() =>
-  clefs.value.filter(clef => clef.is_active).length
-)
+const activeClefsCount = computed(() => clefs.value.filter((clef) => clef.is_active).length)
 
-const failedChecksCount = computed(() =>
-  // This would come from check results in a real implementation
-  0
+const failedChecksCount = computed(
+  () =>
+    // This would come from check results in a real implementation
+    0,
 )
 
 const latestStatusByClef = computed<Record<string, Check | undefined>>(() => {
   const map: Record<string, Check | undefined> = {}
-  checkResults.value.forEach(result => {
+  checkResults.value.forEach((result) => {
     if (!map[result.clef_id]) {
       map[result.clef_id] = result
     }
@@ -663,24 +627,24 @@ const latestStatusByClef = computed<Record<string, Check | undefined>>(() => {
 // Options for selects
 const checkTypeOptions = computed(() => [
   { label: 'All Types', value: '' },
-  ...clefTemplates.value.map(template => ({
+  ...clefTemplates.value.map((template) => ({
     label: template.name,
-    value: template.type
-  }))
+    value: template.type,
+  })),
 ])
 
 const staveOptions = computed(() => [
   { label: 'All Staves', value: '' },
-  ...staves.value.map(stave => ({
+  ...staves.value.map((stave) => ({
     label: stave.name,
-    value: stave.id
-  }))
+    value: stave.id,
+  })),
 ])
 
 const statusOptions = [
   { label: 'All Statuses', value: '' },
   { label: 'Active', value: 'active' },
-  { label: 'Inactive', value: 'inactive' }
+  { label: 'Inactive', value: 'inactive' },
 ]
 
 const tierOptions = [
@@ -688,7 +652,7 @@ const tierOptions = [
   { label: 'Tier 1 (Basic)', value: '1' },
   { label: 'Tier 2 (Advanced)', value: '2' },
   { label: 'Tier 3 (Cross-System)', value: '3' },
-  { label: 'Tier 4 (Custom)', value: '4' }
+  { label: 'Tier 4 (Custom)', value: '4' },
 ]
 
 const scheduleOptions = [
@@ -697,7 +661,7 @@ const scheduleOptions = [
   { label: 'Every 6 Hours', value: '0 */6 * * *' },
   { label: 'Daily', value: '0 0 * * *' },
   { label: 'Weekly', value: '0 0 * * 0' },
-  { label: 'Monthly', value: '0 0 1 * *' }
+  { label: 'Monthly', value: '0 0 1 * *' },
 ]
 
 const historyColumns = [
@@ -705,12 +669,12 @@ const historyColumns = [
   { key: 'status', label: 'Status' },
   { key: 'message', label: 'Message' },
   { key: 'execution_time', label: 'Duration' },
-  { key: 'anomalies_count', label: 'Anomalies' }
+  { key: 'anomalies_count', label: 'Anomalies' },
 ]
 
 // Methods
 const getClefTier = (checkType: string): number => {
-  const template = clefTemplates.value.find(t => t.type === checkType)
+  const template = clefTemplates.value.find((t) => t.type === checkType)
   return template?.tier || 1
 }
 
@@ -720,26 +684,26 @@ const getTierColor = (tier: number): string => {
 }
 
 const getClefIcon = (checkType: string): string => {
-  const template = clefTemplates.value.find(t => t.type === checkType)
+  const template = clefTemplates.value.find((t) => t.type === checkType)
   return template?.icon || 'i-heroicons-musical-note'
 }
 
 const getCheckTypeColor = (checkType: string): string => {
   const colors: Record<string, string> = {
-    'row_count': 'blue',
-    'freshness': 'green',
-    'column_values': 'yellow',
-    'forecast': 'purple',
-    'data_profile_drift': 'orange',
-    'lookup_validation': 'red',
-    'python': 'gray'
+    row_count: 'blue',
+    freshness: 'green',
+    column_values: 'yellow',
+    forecast: 'purple',
+    data_profile_drift: 'orange',
+    lookup_validation: 'red',
+    python: 'gray',
   }
   return colors[checkType] || 'gray'
 }
 
 const formatCheckType = (checkType: string): string => {
-  const template = clefTemplates.value.find(t => t.type === checkType)
-  return template?.name || checkType.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+  const template = clefTemplates.value.find((t) => t.type === checkType)
+  return template?.name || checkType.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())
 }
 
 const getStatusBadgeColor = (status?: string): string => {
@@ -789,7 +753,7 @@ const formatExecutionTime = (seconds?: number | null): string => {
 }
 
 const getStaveName = (staveId: string): string => {
-  const stave = staves.value.find(s => s.id === staveId)
+  const stave = staves.value.find((s) => s.id === staveId)
   return stave?.name || 'Unknown Stave'
 }
 
@@ -799,31 +763,41 @@ const getClefCardClass = (clef: Clef): string => {
 }
 
 const getClefActions = (clef: Clef) => [
-  [{
-    label: 'Run Check',
-    icon: 'i-heroicons-play',
-    click: () => runCheck(clef.id)
-  }],
-  [{
-    label: 'Edit',
-    icon: 'i-heroicons-pencil',
-    click: () => editClef(clef)
-  }],
-  [{
-    label: 'Duplicate',
-    icon: 'i-heroicons-document-duplicate',
-    click: () => duplicateClef(clef)
-  }],
-  [{
-    label: clef.is_active ? 'Deactivate' : 'Activate',
-    icon: clef.is_active ? 'i-heroicons-pause' : 'i-heroicons-play',
-    click: () => toggleClefStatus(clef)
-  }],
-  [{
-    label: 'Delete',
-    icon: 'i-heroicons-trash',
-    click: () => deleteClefAction(clef)
-  }]
+  [
+    {
+      label: 'Run Check',
+      icon: 'i-heroicons-play',
+      click: () => runCheck(clef.id),
+    },
+  ],
+  [
+    {
+      label: 'Edit',
+      icon: 'i-heroicons-pencil',
+      click: () => editClef(clef),
+    },
+  ],
+  [
+    {
+      label: 'Duplicate',
+      icon: 'i-heroicons-document-duplicate',
+      click: () => duplicateClef(clef),
+    },
+  ],
+  [
+    {
+      label: clef.is_active ? 'Deactivate' : 'Activate',
+      icon: clef.is_active ? 'i-heroicons-pause' : 'i-heroicons-play',
+      click: () => toggleClefStatus(clef),
+    },
+  ],
+  [
+    {
+      label: 'Delete',
+      icon: 'i-heroicons-trash',
+      click: () => deleteClefAction(clef),
+    },
+  ],
 ]
 
 const formatDate = (dateString: string): string => {
@@ -836,7 +810,7 @@ const applyFilters = () => {
 
 const selectClefType = (type: string) => {
   newClef.value.check_type = type
-  const template = clefTemplates.value.find(t => t.type === type)
+  const template = clefTemplates.value.find((t) => t.type === type)
   if (template) {
     newClef.value.configuration = { ...template.config }
   }
@@ -853,7 +827,7 @@ const editClef = (clef: Clef) => {
     schedule: clef.schedule || '',
     is_active: clef.is_active,
     warn: '',
-    fail: ''
+    fail: '',
   }
   showCreateModal.value = true
 }
@@ -869,7 +843,7 @@ const duplicateClef = (clef: Clef) => {
     schedule: clef.schedule || '',
     is_active: false,
     warn: '',
-    fail: ''
+    fail: '',
   }
   showCreateModal.value = true
 }
@@ -971,7 +945,7 @@ const closeModal = () => {
     schedule: '',
     is_active: true,
     warn: '',
-    fail: ''
+    fail: '',
   }
 }
 
@@ -985,10 +959,6 @@ const refreshLatestResults = async () => {
 
 // Lifecycle
 onMounted(async () => {
-  await Promise.all([
-    fetchClefs(),
-    fetchStaves(),
-    refreshLatestResults()
-  ])
+  await Promise.all([fetchClefs(), fetchStaves(), refreshLatestResults()])
 })
 </script>

@@ -28,3 +28,17 @@ repos:
           - --select=E9,F63,F7,F82
           - --show-source
           - --statistics
+
+  - repo: local
+    hooks:
+      - id: ui-nuxt-eslint
+        name: ui-nuxt eslint
+        entry: bash -lc "cd ui-nuxt && npm run -s lint:fix"
+        language: system
+        pass_filenames: false
+
+      - id: ui-nuxt-prettier
+        name: ui-nuxt prettier
+        entry: bash -lc "cd ui-nuxt && npm run -s format"
+        language: system
+        pass_filenames: false

@@ -55,7 +55,7 @@ export const useAuthStore = defineStore('auth', () => {
       const userData: User = {
         username: credentials.username,
         email: 'admin@datametronome.dev',
-        name: 'Admin User'
+        name: 'Admin User',
       }
 
       token.value = authToken
@@ -109,7 +109,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       // Simulate API call to refresh user data
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise((resolve) => setTimeout(resolve, 500))
 
       // In a real app, you would call your API here
       // const response = await apiService.get('/auth/me')

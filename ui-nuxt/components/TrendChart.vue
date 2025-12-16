@@ -16,7 +16,7 @@ import {
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 } from 'chart.js'
 
 // Register Chart.js components
@@ -29,7 +29,7 @@ ChartJS.register(
   Title,
   Tooltip,
   Legend,
-  Filler
+  Filler,
 )
 
 interface ChartData {
@@ -64,7 +64,7 @@ const props = withDefaults(defineProps<Props>(), {
   type: 'line',
   options: () => ({}),
   height: undefined,
-  showLegend: true
+  showLegend: true,
 })
 
 const chartCanvas = ref<HTMLCanvasElement>()
@@ -76,7 +76,7 @@ const chartData = computed(() => {
   if (Array.isArray(props.data) && props.data.length > 0 && 'labels' in props.data[0] === false) {
     // It's trend data format - transform it
     const trendData = props.data as TrendDataPoint[]
-    const labels = trendData.map(d => {
+    const labels = trendData.map((d) => {
       const date = new Date(d.date)
       return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     })
@@ -90,36 +90,36 @@ const chartData = computed(() => {
       fill: boolean
     }> = []
 
-    if (trendData.some(d => d.success !== undefined)) {
+    if (trendData.some((d) => d.success !== undefined)) {
       datasets.push({
         label: 'Success',
-        data: trendData.map(d => d.success || 0),
+        data: trendData.map((d) => d.success || 0),
         borderColor: '#10B981',
         backgroundColor: 'rgba(16, 185, 129, 0.1)',
         tension: 0.4,
-        fill: true
+        fill: true,
       })
     }
 
-    if (trendData.some(d => d.failures !== undefined)) {
+    if (trendData.some((d) => d.failures !== undefined)) {
       datasets.push({
         label: 'Failures',
-        data: trendData.map(d => d.failures || 0),
+        data: trendData.map((d) => d.failures || 0),
         borderColor: '#EF4444',
         backgroundColor: 'rgba(239, 68, 68, 0.1)',
         tension: 0.4,
-        fill: true
+        fill: true,
       })
     }
 
-    if (trendData.some(d => d.warnings !== undefined)) {
+    if (trendData.some((d) => d.warnings !== undefined)) {
       datasets.push({
         label: 'Warnings',
-        data: trendData.map(d => d.warnings || 0),
+        data: trendData.map((d) => d.warnings || 0),
         borderColor: '#F59E0B',
         backgroundColor: 'rgba(245, 158, 11, 0.1)',
         tension: 0.4,
-        fill: true
+        fill: true,
       })
     }
 
@@ -176,14 +176,14 @@ const doughnutOptions = {
     },
     tooltip: {
       callbacks: {
-        label: function(context: any) {
+        label: function (context: any) {
           const label = context.label || ''
           const value = context.parsed
           const total = context.dataset.data.reduce((a: number, b: number) => a + b, 0)
           const percentage = ((value / total) * 100).toFixed(1)
           return `${label}: ${value} (${percentage}%)`
-        }
-      }
+        },
+      },
     },
   },
 }
@@ -199,9 +199,10 @@ const createChart = async () => {
   const ctx = chartCanvas.value.getContext('2d')
   if (!ctx) return
 
-  const baseOptions = props.type === 'doughnut'
-    ? { ...doughnutOptions, ...props.options }
-    : { ...defaultOptions, ...props.options }
+  const baseOptions =
+    props.type === 'doughnut'
+      ? { ...doughnutOptions, ...props.options }
+      : { ...defaultOptions, ...props.options }
 
   const options = {
     ...baseOptions,
@@ -209,9 +210,9 @@ const createChart = async () => {
       ...baseOptions.plugins,
       legend: {
         ...baseOptions.plugins?.legend,
-        display: props.showLegend
-      }
-    }
+        display: props.showLegend,
+      },
+    },
   }
 
   chartInstance = new ChartJS(ctx, {
@@ -229,22 +230,29 @@ const updateChart = async () => {
 }
 
 // Watch for data changes
-watch(() => chartData.value, () => {
-  nextTick(() => {
-    if (chartInstance) {
-      updateChart()
-    } else {
-      createChart()
-    }
-  })
-}, { deep: true })
+watch(
+  () => chartData.value,
+  () => {
+    nextTick(() => {
+      if (chartInstance) {
+        updateChart()
+      } else {
+        createChart()
+      }
+    })
+  },
+  { deep: true },
+)
 
 // Watch for type changes
-watch(() => props.type, () => {
-  nextTick(() => {
-    createChart()
-  })
-})
+watch(
+  () => props.type,
+  () => {
+    nextTick(() => {
+      createChart()
+    })
+  },
+)
 
 onMounted(async () => {
   await nextTick()

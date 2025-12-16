@@ -16,7 +16,7 @@ export const getApiBase = (): string => {
 export const config = {
   get apiBase() {
     return getApiBase()
-  }
+  },
 }
 
 export const buildApiUrl = (path: string): string => {

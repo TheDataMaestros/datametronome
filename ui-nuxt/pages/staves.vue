@@ -3,9 +3,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-          Data Sources
-        </h1>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Data Sources</h1>
         <p class="mt-2 text-gray-600 dark:text-gray-400">
           Manage your data source connections and configurations.
         </p>
@@ -27,39 +25,29 @@
             >
               Add Source
             </UButton>
-                <UButton
-                  color="gray"
-                  variant="outline"
-                  size="sm"
-                  icon="i-heroicons-arrow-path"
-                  @click="refreshStaves"
-                  :loading="isLoading"
-                >
-                  Refresh
-                </UButton>
+            <UButton
+              color="gray"
+              variant="outline"
+              size="sm"
+              icon="i-heroicons-arrow-path"
+              @click="refreshStaves"
+              :loading="isLoading"
+            >
+              Refresh
+            </UButton>
           </div>
         </div>
       </template>
 
-      <UTable
-        :rows="staves"
-        :columns="staveColumns"
-        class="w-full"
-      >
+      <UTable :rows="staves" :columns="staveColumns" class="w-full">
         <template #data_source_type-data="{ row }">
-          <UBadge
-            :color="getDataSourceTypeColor(row.data_source_type)"
-            variant="subtle"
-          >
+          <UBadge :color="getDataSourceTypeColor(row.data_source_type)" variant="subtle">
             {{ row.data_source_type.toUpperCase() }}
           </UBadge>
         </template>
 
         <template #is_active-data="{ row }">
-          <UBadge
-            :color="row.is_active ? 'green' : 'gray'"
-            variant="subtle"
-          >
+          <UBadge :color="row.is_active ? 'green' : 'gray'" variant="subtle">
             {{ row.is_active ? 'Active' : 'Inactive' }}
           </UBadge>
         </template>
@@ -130,7 +118,10 @@
                 </div>
                 <div class="flex justify-between">
                   <span class="text-gray-600 dark:text-gray-400">Type:</span>
-                  <UBadge :color="getDataSourceTypeColor(selectedStave.data_source_type)" variant="subtle">
+                  <UBadge
+                    :color="getDataSourceTypeColor(selectedStave.data_source_type)"
+                    variant="subtle"
+                  >
                     {{ selectedStave.data_source_type.toUpperCase() }}
                   </UBadge>
                 </div>
@@ -150,7 +141,9 @@
             <div>
               <h4 class="font-semibold mb-2">Connection Configuration</h4>
               <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                <pre class="text-sm text-gray-700 dark:text-gray-300">{{ JSON.stringify(selectedStave.connection_config, null, 2) }}</pre>
+                <pre class="text-sm text-gray-700 dark:text-gray-300">{{
+                  JSON.stringify(selectedStave.connection_config, null, 2)
+                }}</pre>
               </div>
             </div>
           </div>
@@ -200,7 +193,7 @@ import { useStaves } from '~/composables/useStaves'
 // Use middleware for authentication
 definePageMeta({
   middleware: 'auth',
-  layout: 'dashboard'
+  layout: 'dashboard',
 })
 
 const {
@@ -211,7 +204,7 @@ const {
   createStave,
   updateStave,
   deleteStave: deleteStaveService,
-  testConnection: testConnectionService
+  testConnection: testConnectionService,
 } = useStaves()
 
 const showDetailsModal = ref(false)
@@ -224,7 +217,7 @@ const staveColumns = [
   { key: 'data_source_type', label: 'Type' },
   { key: 'is_active', label: 'Status' },
   { key: 'created_at', label: 'Created' },
-  { key: 'actions', label: 'Actions' }
+  { key: 'actions', label: 'Actions' },
 ]
 
 // Helper functions
@@ -236,7 +229,7 @@ function getDataSourceTypeColor(type: string) {
     sqlite: 'purple',
     redis: 'red',
     snowflake: 'cyan',
-    bigquery: 'yellow'
+    bigquery: 'yellow',
   }
   return colors[type] || 'gray'
 }
@@ -278,6 +271,6 @@ onMounted(() => {
 
 // Set page meta
 useHead({
-  title: 'Data Sources - DataMetronome'
+  title: 'Data Sources - DataMetronome',
 })
 </script>

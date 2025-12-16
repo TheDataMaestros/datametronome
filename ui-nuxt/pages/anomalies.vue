@@ -3,9 +3,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-          Data Quality Anomalies
-        </h1>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Data Quality Anomalies</h1>
         <p class="mt-2 text-gray-600 dark:text-gray-400">
           Monitor and investigate data quality issues across your data sources.
         </p>
@@ -41,25 +39,13 @@
           />
         </UFormGroup>
         <UFormGroup label="Source">
-          <USelect
-            v-model="filters.source"
-            :options="sourceOptions"
-            placeholder="All sources"
-          />
+          <USelect v-model="filters.source" :options="sourceOptions" placeholder="All sources" />
         </UFormGroup>
         <UFormGroup label="Status">
-          <USelect
-            v-model="filters.status"
-            :options="statusOptions"
-            placeholder="All statuses"
-          />
+          <USelect v-model="filters.status" :options="statusOptions" placeholder="All statuses" />
         </UFormGroup>
         <UFormGroup label="Date Range">
-          <USelect
-            v-model="filters.dateRange"
-            :options="dateRangeOptions"
-            placeholder="All time"
-          />
+          <USelect v-model="filters.dateRange" :options="dateRangeOptions" placeholder="All time" />
         </UFormGroup>
       </div>
     </UCard>
@@ -135,25 +121,15 @@
         </div>
       </template>
 
-      <UTable
-        :rows="filteredAnomalies"
-        :columns="anomalyColumns"
-        class="w-full"
-      >
+      <UTable :rows="filteredAnomalies" :columns="anomalyColumns" class="w-full">
         <template #severity-data="{ row }">
-          <UBadge
-            :color="getSeverityColor(row.severity)"
-            variant="solid"
-          >
+          <UBadge :color="getSeverityColor(row.severity)" variant="solid">
             {{ row.severity }}
           </UBadge>
         </template>
 
         <template #status-data="{ row }">
-          <UBadge
-            :color="getStatusColor(row.status)"
-            variant="subtle"
-          >
+          <UBadge :color="getStatusColor(row.status)" variant="subtle">
             {{ row.status }}
           </UBadge>
         </template>
@@ -308,7 +284,7 @@
 // Use middleware for authentication
 definePageMeta({
   middleware: 'auth',
-  layout: 'dashboard'
+  layout: 'dashboard',
 })
 const showFilters = ref(false)
 const isRefreshing = ref(false)
@@ -320,34 +296,34 @@ const filters = ref({
   severity: '',
   source: '',
   status: '',
-  dateRange: ''
+  dateRange: '',
 })
 
 const severityOptions = [
   { label: 'Critical', value: 'critical' },
   { label: 'High', value: 'high' },
   { label: 'Medium', value: 'medium' },
-  { label: 'Low', value: 'low' }
+  { label: 'Low', value: 'low' },
 ]
 
 const sourceOptions = [
   { label: 'Production Database', value: 'production' },
   { label: 'Analytics Database', value: 'analytics' },
-  { label: 'Cache Database', value: 'cache' }
+  { label: 'Cache Database', value: 'cache' },
 ]
 
 const statusOptions = [
   { label: 'Open', value: 'open' },
   { label: 'Investigating', value: 'investigating' },
   { label: 'Resolved', value: 'resolved' },
-  { label: 'Dismissed', value: 'dismissed' }
+  { label: 'Dismissed', value: 'dismissed' },
 ]
 
 const dateRangeOptions = [
   { label: 'Last 24 hours', value: '24h' },
   { label: 'Last 7 days', value: '7d' },
   { label: 'Last 30 days', value: '30d' },
-  { label: 'All time', value: 'all' }
+  { label: 'All time', value: 'all' },
 ]
 
 // Anomaly summary
@@ -355,7 +331,7 @@ const anomalySummary = ref({
   critical: 3,
   high: 7,
   medium: 12,
-  low: 8
+  low: 8,
 })
 
 // Anomalies data
@@ -372,12 +348,13 @@ const anomalies = ref([
     affectedRecords: 15,
     qualityImpact: 2.3,
     businessImpact: 'High',
-    description: 'Detected 15 records with age values outside the expected range (18-100). These outliers may indicate data entry errors or system issues.',
+    description:
+      'Detected 15 records with age values outside the expected range (18-100). These outliers may indicate data entry errors or system issues.',
     recommendedActions: [
       'Review data entry processes for age validation',
       'Check for system bugs in age calculation',
-      'Implement additional validation rules'
-    ]
+      'Implement additional validation rules',
+    ],
   },
   {
     id: 2,
@@ -391,12 +368,13 @@ const anomalies = ref([
     affectedRecords: 8,
     qualityImpact: 1.8,
     businessImpact: 'Medium',
-    description: 'Detected unusual spike in order amounts, with 8 orders exceeding normal thresholds. This could indicate fraudulent activity or pricing errors.',
+    description:
+      'Detected unusual spike in order amounts, with 8 orders exceeding normal thresholds. This could indicate fraudulent activity or pricing errors.',
     recommendedActions: [
       'Investigate recent pricing changes',
       'Review fraud detection systems',
-      'Contact affected customers for verification'
-    ]
+      'Contact affected customers for verification',
+    ],
   },
   {
     id: 3,
@@ -410,13 +388,14 @@ const anomalies = ref([
     affectedRecords: 45,
     qualityImpact: 0.9,
     businessImpact: 'Low',
-    description: 'Found 45 events with timestamps that appear to be in the future or significantly inconsistent with expected patterns.',
+    description:
+      'Found 45 events with timestamps that appear to be in the future or significantly inconsistent with expected patterns.',
     recommendedActions: [
       'Check system clock synchronization',
       'Review event generation logic',
-      'Implement timestamp validation'
-    ]
-  }
+      'Implement timestamp validation',
+    ],
+  },
 ])
 
 const anomalyColumns = [
@@ -427,7 +406,7 @@ const anomalyColumns = [
   { key: 'status', label: 'Status' },
   { key: 'detected', label: 'Detected' },
   { key: 'source', label: 'Source' },
-  { key: 'actions', label: 'Actions' }
+  { key: 'actions', label: 'Actions' },
 ]
 
 // Computed
@@ -435,13 +414,15 @@ const filteredAnomalies = computed(() => {
   let filtered = anomalies.value
 
   if (filters.value.severity) {
-    filtered = filtered.filter(a => a.severity === filters.value.severity)
+    filtered = filtered.filter((a) => a.severity === filters.value.severity)
   }
   if (filters.value.source) {
-    filtered = filtered.filter(a => a.source.toLowerCase().includes(filters.value.source.toLowerCase()))
+    filtered = filtered.filter((a) =>
+      a.source.toLowerCase().includes(filters.value.source.toLowerCase()),
+    )
   }
   if (filters.value.status) {
-    filtered = filtered.filter(a => a.status === filters.value.status)
+    filtered = filtered.filter((a) => a.status === filters.value.status)
   }
 
   return filtered
@@ -453,7 +434,7 @@ function getSeverityColor(severity: string) {
     critical: 'red',
     high: 'orange',
     medium: 'yellow',
-    low: 'blue'
+    low: 'blue',
   }
   return colors[severity] || 'gray'
 }
@@ -463,7 +444,7 @@ function getStatusColor(status: string) {
     open: 'red',
     investigating: 'yellow',
     resolved: 'green',
-    dismissed: 'gray'
+    dismissed: 'gray',
   }
   return colors[status] || 'gray'
 }
@@ -488,7 +469,7 @@ async function refreshAnomalies() {
   isRefreshing.value = true
   try {
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     // Refresh data
   } finally {
     isRefreshing.value = false
@@ -501,7 +482,7 @@ function viewAnomalyDetails(anomaly: any) {
 }
 
 function resolveAnomaly(anomalyId: number) {
-  const anomaly = anomalies.value.find(a => a.id === anomalyId)
+  const anomaly = anomalies.value.find((a) => a.id === anomalyId)
   if (anomaly) {
     anomaly.status = 'resolved'
   }
@@ -509,7 +490,7 @@ function resolveAnomaly(anomalyId: number) {
 }
 
 function dismissAnomaly(anomalyId: number) {
-  const anomaly = anomalies.value.find(a => a.id === anomalyId)
+  const anomaly = anomalies.value.find((a) => a.id === anomalyId)
   if (anomaly) {
     anomaly.status = 'dismissed'
   }
@@ -517,7 +498,7 @@ function dismissAnomaly(anomalyId: number) {
 }
 
 function resolveAllAnomalies() {
-  anomalies.value.forEach(anomaly => {
+  anomalies.value.forEach((anomaly) => {
     if (anomaly.status === 'open') {
       anomaly.status = 'resolved'
     }
@@ -535,6 +516,6 @@ function investigateAnomaly(anomalyId: number) {
 
 // Set page meta
 useHead({
-  title: 'Anomalies - DataMetronome'
+  title: 'Anomalies - DataMetronome',
 })
 </script>

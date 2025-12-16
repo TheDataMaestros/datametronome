@@ -1,14 +1,16 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+  <div
+    class="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8"
+  >
     <div class="max-w-md w-full space-y-8">
       <!-- Logo and Header -->
       <div class="text-center">
-        <div class="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-lg gradient-primary">
+        <div
+          class="flex items-center justify-center w-16 h-16 mx-auto mb-4 rounded-lg gradient-primary"
+        >
           <Icon name="lucide:music" class="w-8 h-8 text-white" />
         </div>
-        <h2 class="text-3xl font-bold text-gray-900 dark:text-white">
-          DataMetronome
-        </h2>
+        <h2 class="text-3xl font-bold text-gray-900 dark:text-white">DataMetronome</h2>
         <p class="mt-2 text-sm text-gray-600 dark:text-gray-400">
           Sign in to your data quality monitoring platform
         </p>
@@ -16,12 +18,7 @@
 
       <!-- Login Form -->
       <UCard>
-        <UForm
-          :state="form"
-          :schema="schema"
-          @submit="handleLogin"
-          class="space-y-6"
-        >
+        <UForm :state="form" :schema="schema" class="space-y-6" @submit="handleLogin">
           <UFormGroup label="Username" name="username">
             <UInput
               v-model="form.username"
@@ -40,27 +37,13 @@
           </UFormGroup>
 
           <div class="flex items-center justify-between">
-            <UCheckbox
-              v-model="form.rememberMe"
-              label="Remember me"
-            />
-            <UButton
-              color="gray"
-              variant="link"
-              size="sm"
-              @click="showForgotPassword = true"
-            >
+            <UCheckbox v-model="form.rememberMe" label="Remember me" />
+            <UButton color="gray" variant="link" size="sm" @click="showForgotPassword = true">
               Forgot password?
             </UButton>
           </div>
 
-          <UButton
-            type="submit"
-            color="primary"
-            size="lg"
-            block
-            :loading="isLoading"
-          >
+          <UButton type="submit" color="primary" size="lg" block :loading="isLoading">
             Sign In
           </UButton>
         </UForm>
@@ -69,9 +52,7 @@
       <!-- Demo Credentials -->
       <UCard>
         <template #header>
-          <h3 class="text-sm font-medium text-gray-900 dark:text-white">
-            Demo Credentials
-          </h3>
+          <h3 class="text-sm font-medium text-gray-900 dark:text-white">Demo Credentials</h3>
         </template>
         <div class="space-y-2 text-sm text-gray-600 dark:text-gray-400">
           <p><strong>Username:</strong> admin</p>
@@ -95,17 +76,12 @@
           </div>
         </template>
         <p class="text-gray-600 dark:text-gray-400">
-          Password reset functionality will be implemented in a future version.
-          For now, please use the demo credentials above.
+          Password reset functionality will be implemented in a future version. For now, please use
+          the demo credentials above.
         </p>
         <template #footer>
           <div class="flex justify-end">
-            <UButton
-              color="primary"
-              @click="showForgotPassword = false"
-            >
-              OK
-            </UButton>
+            <UButton color="primary" @click="showForgotPassword = false"> OK </UButton>
           </div>
         </template>
       </UCard>
@@ -124,12 +100,12 @@ const showForgotPassword = ref(false)
 const form = reactive({
   username: 'admin',
   password: 'admin',
-  rememberMe: false
+  rememberMe: false,
 })
 
 const schema = z.object({
   username: z.string().min(1, 'Username is required'),
-  password: z.string().min(1, 'Password is required')
+  password: z.string().min(1, 'Password is required'),
 })
 
 async function handleLogin() {
@@ -138,7 +114,7 @@ async function handleLogin() {
   try {
     const result = await authStore.login({
       username: form.username,
-      password: form.password
+      password: form.password,
     })
 
     if (result.success) {
@@ -167,6 +143,6 @@ onMounted(() => {
 
 // Set page meta
 useHead({
-  title: 'Login - DataMetronome'
+  title: 'Login - DataMetronome',
 })
 </script>

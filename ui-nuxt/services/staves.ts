@@ -51,7 +51,7 @@ class StavesService {
 
   async testConnection(id: string): Promise<{ success: boolean; message: string }> {
     const response = await apiService.post<{ success: boolean; message: string }>(
-      `${this.endpoint}/${id}/test-connection`
+      `${this.endpoint}/${id}/test-connection`,
     )
     return response.data
   }

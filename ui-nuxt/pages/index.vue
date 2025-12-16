@@ -3,9 +3,7 @@
     <!-- Welcome Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-          Welcome back
-        </h1>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Welcome back</h1>
         <p class="mt-2 text-gray-600 dark:text-gray-400">
           Here's what's happening with your data quality monitoring system.
         </p>
@@ -37,7 +35,10 @@
           <div>
             <p class="text-sm opacity-90">Success Rate</p>
             <p class="text-3xl font-bold">{{ systemMetrics.successRate }}%</p>
-            <p class="text-sm opacity-90">{{ systemMetrics.successRateChange > 0 ? '+' : '' }}{{ systemMetrics.successRateChange }}% from yesterday</p>
+            <p class="text-sm opacity-90">
+              {{ systemMetrics.successRateChange > 0 ? '+' : ''
+              }}{{ systemMetrics.successRateChange }}% from yesterday
+            </p>
           </div>
           <Icon name="i-heroicons-check-circle" class="w-8 h-8 opacity-80" />
         </div>
@@ -146,12 +147,7 @@
         <template #header>
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold">Recent Activity</h3>
-            <UButton
-              color="primary"
-              variant="ghost"
-              size="sm"
-              @click="navigateTo('/anomalies')"
-            >
+            <UButton color="primary" variant="ghost" size="sm" @click="navigateTo('/anomalies')">
               View All
             </UButton>
           </div>
@@ -178,11 +174,7 @@
               </p>
             </div>
             <div class="flex-shrink-0">
-              <UBadge
-                :color="getStatusColor(activity.status)"
-                variant="subtle"
-                size="sm"
-              >
+              <UBadge :color="getStatusColor(activity.status)" variant="subtle" size="sm">
                 {{ activity.statusLabel }}
               </UBadge>
             </div>
@@ -241,26 +233,14 @@
       <template #header>
         <div class="flex items-center justify-between">
           <h3 class="text-lg font-semibold">Data Source Status</h3>
-          <UButton
-            color="primary"
-            variant="ghost"
-            size="sm"
-            @click="navigateTo('/staves')"
-          >
+          <UButton color="primary" variant="ghost" size="sm" @click="navigateTo('/staves')">
             Manage Sources
           </UButton>
         </div>
       </template>
-      <UTable
-        :rows="dataSources"
-        :columns="dataSourceColumns"
-        class="w-full"
-      >
+      <UTable :rows="dataSources" :columns="dataSourceColumns" class="w-full">
         <template #status-data="{ row }">
-          <UBadge
-            :color="getStatusColor(row.status)"
-            variant="subtle"
-          >
+          <UBadge :color="getStatusColor(row.status)" variant="subtle">
             {{ row.status }}
           </UBadge>
         </template>
@@ -294,7 +274,7 @@
 // Use middleware for authentication
 definePageMeta({
   middleware: 'auth',
-  layout: 'dashboard'
+  layout: 'dashboard',
 })
 
 const { staves, isLoading: stavesLoading, fetchStaves } = useStaves()
@@ -310,7 +290,7 @@ const systemMetrics = ref({
   totalSources: 12,
   activeChecks: 24,
   scheduledChecks: 18,
-  anomalies: 7
+  anomalies: 7,
 })
 
 // Recent activity from latest checks
@@ -322,11 +302,13 @@ const recentActivity = computed(() => {
       : `Clef ${check.clef_id}`
     return {
       id: check.id,
-      description: check.message || `${humanizeCheckType(check.check_type)} check ${formatStatusLabel(check.status)}`,
+      description:
+        check.message ||
+        `${humanizeCheckType(check.check_type)} check ${formatStatusLabel(check.status)}`,
       source,
       status: normalizedStatus,
       statusLabel: formatStatusLabel(check.status),
-      timestamp: check.timestamp
+      timestamp: check.timestamp,
     }
   })
 })
@@ -339,7 +321,7 @@ const dataSources = computed(() => {
     type: stave.data_source_type.toUpperCase(),
     status: stave.is_active ? 'healthy' : 'warning',
     lastCheck: new Date(stave.updated_at),
-    checks: Math.floor(Math.random() * 15) + 5 // Random check count for demo
+    checks: Math.floor(Math.random() * 15) + 5, // Random check count for demo
   }))
 })
 
@@ -349,7 +331,7 @@ const dataSourceColumns = [
   { key: 'status', label: 'Status' },
   { key: 'lastCheck', label: 'Last Check' },
   { key: 'checks', label: 'Checks' },
-  { key: 'actions', label: 'Actions' }
+  { key: 'actions', label: 'Actions' },
 ]
 
 // Helper functions
@@ -368,7 +350,7 @@ function getStatusColor(status: string) {
     healthy: 'green',
     warning: 'yellow',
     error: 'red',
-    failed: 'red'
+    failed: 'red',
   }
   return colors[normalized] || 'gray'
 }
@@ -380,7 +362,7 @@ function getStatusIcon(status: string) {
     healthy: 'i-heroicons-check-circle',
     warning: 'i-heroicons-exclamation-triangle',
     error: 'i-heroicons-x-circle',
-    failed: 'i-heroicons-x-circle'
+    failed: 'i-heroicons-x-circle',
   }
   return icons[normalized] || 'i-heroicons-question-mark-circle'
 }
@@ -417,7 +399,7 @@ function humanizeCheckType(checkType?: string) {
   if (!checkType) return 'Data quality'
   return checkType
     .split('_')
-    .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ')
 }
 
@@ -426,7 +408,7 @@ async function runAllChecks() {
   isRunningChecks.value = true
   try {
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    await new Promise((resolve) => setTimeout(resolve, 2000))
     // Refresh data
     await refreshData()
   } finally {
@@ -436,22 +418,17 @@ async function runAllChecks() {
 
 async function refreshData() {
   // Refresh all dashboard data
-  await Promise.all([
-    refreshHealthChart(),
-    refreshAnomalyChart(),
-    fetchStaves(),
-    fetchLatest(20)
-  ])
+  await Promise.all([refreshHealthChart(), refreshAnomalyChart(), fetchStaves(), fetchLatest(20)])
 }
 
 async function refreshHealthChart() {
   // Simulate API call to refresh health chart data
-  await new Promise(resolve => setTimeout(resolve, 500))
+  await new Promise((resolve) => setTimeout(resolve, 500))
 }
 
 async function refreshAnomalyChart() {
   // Simulate API call to refresh anomaly chart data
-  await new Promise(resolve => setTimeout(resolve, 500))
+  await new Promise((resolve) => setTimeout(resolve, 500))
 }
 
 function exportDashboard() {
@@ -469,7 +446,7 @@ function previewData(sourceId: number) {
 
 // Set page meta
 useHead({
-  title: 'Dashboard - DataMetronome'
+  title: 'Dashboard - DataMetronome',
 })
 
 // Load initial data

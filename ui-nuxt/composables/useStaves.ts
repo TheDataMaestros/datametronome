@@ -1,5 +1,10 @@
 import { ref, computed, readonly } from 'vue'
-import { stavesService, type Stave, type CreateStaveRequest, type UpdateStaveRequest } from '~/services/staves'
+import {
+  stavesService,
+  type Stave,
+  type CreateStaveRequest,
+  type UpdateStaveRequest,
+} from '~/services/staves'
 
 export const useStaves = () => {
   const staves = ref<Stave[]>([])
@@ -42,7 +47,7 @@ export const useStaves = () => {
 
     try {
       const updatedStave = await stavesService.update(id, updates)
-      const index = staves.value.findIndex(s => s.id === id)
+      const index = staves.value.findIndex((s) => s.id === id)
       if (index !== -1) {
         staves.value[index] = updatedStave
       }
@@ -61,7 +66,7 @@ export const useStaves = () => {
 
     try {
       await stavesService.delete(id)
-      staves.value = staves.value.filter(s => s.id !== id)
+      staves.value = staves.value.filter((s) => s.id !== id)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to delete stave'
       throw err
@@ -80,15 +85,15 @@ export const useStaves = () => {
   }
 
   const getStaveById = (id: string) => {
-    return staves.value.find(s => s.id === id)
+    return staves.value.find((s) => s.id === id)
   }
 
   const getActiveStaves = computed(() => {
-    return staves.value.filter(s => s.is_active)
+    return staves.value.filter((s) => s.is_active)
   })
 
   const getStavesByType = (type: string) => {
-    return staves.value.filter(s => s.data_source_type === type)
+    return staves.value.filter((s) => s.data_source_type === type)
   }
 
   return {

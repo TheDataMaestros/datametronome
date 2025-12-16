@@ -34,7 +34,9 @@
           <Icon name="i-heroicons-check-circle" class="w-8 h-8 text-green-500" />
         </div>
         <div class="mt-2" v-if="props.checkResults.length > 0">
-          <span class="text-sm text-gray-600 dark:text-gray-400">{{ props.checkResults.length }} total checks</span>
+          <span class="text-sm text-gray-600 dark:text-gray-400"
+            >{{ props.checkResults.length }} total checks</span
+          >
         </div>
       </UCard>
 
@@ -72,16 +74,15 @@
         <template #header>
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold">Performance Over Time</h3>
-            <USelect
-              v-model="selectedTimeRange"
-              :options="timeRangeOptions"
-              size="sm"
-            />
+            <USelect v-model="selectedTimeRange" :options="timeRangeOptions" size="sm" />
           </div>
         </template>
 
         <div class="h-64">
-          <div v-if="performanceData.length === 0" class="flex items-center justify-center h-full text-gray-500">
+          <div
+            v-if="performanceData.length === 0"
+            class="flex items-center justify-center h-full text-gray-500"
+          >
             <div class="text-center">
               <Icon name="i-heroicons-chart-bar" class="w-12 h-12 mx-auto mb-2 text-gray-400" />
               <p>No performance data available</p>
@@ -110,10 +111,7 @@
             class="flex items-center justify-between"
           >
             <div class="flex items-center space-x-3">
-              <div
-                class="w-4 h-4 rounded-full"
-                :style="{ backgroundColor: type.color }"
-              ></div>
+              <div class="w-4 h-4 rounded-full" :style="{ backgroundColor: type.color }"></div>
               <div>
                 <p class="font-medium">{{ type.name }}</p>
                 <p class="text-sm text-gray-600 dark:text-gray-400">Tier {{ type.tier }}</p>
@@ -146,7 +144,9 @@
             class="flex items-center justify-between p-3 bg-green-50 dark:bg-green-900/20 rounded-lg"
           >
             <div class="flex items-center space-x-3">
-              <div class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold">
+              <div
+                class="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center text-sm font-bold"
+              >
                 {{ index + 1 }}
               </div>
               <div>
@@ -184,9 +184,7 @@
                 <p class="text-sm text-gray-600 dark:text-gray-400">{{ clef.issue }}</p>
               </div>
             </div>
-            <UButton size="xs" color="red" variant="outline">
-              Fix
-            </UButton>
+            <UButton size="xs" color="red" variant="outline"> Fix </UButton>
           </div>
         </div>
       </UCard>
@@ -206,10 +204,7 @@
             :key="activity.id"
             class="flex items-center space-x-3 p-2"
           >
-            <div
-              class="w-2 h-2 rounded-full"
-              :class="getActivityColor(activity.type)"
-            ></div>
+            <div class="w-2 h-2 rounded-full" :class="getActivityColor(activity.type)"></div>
             <div class="flex-1 min-w-0">
               <p class="text-sm font-medium truncate">{{ activity.message }}</p>
               <p class="text-xs text-gray-600 dark:text-gray-400">{{ activity.time }}</p>
@@ -286,33 +281,36 @@ const selectedTimeRange = ref('7d')
 // Computed analytics from real data
 const analytics = computed(() => {
   const totalClefs = props.clefs.length
-  const activeClefs = props.clefs.filter(c => c.is_active).length
+  const activeClefs = props.clefs.filter((c) => c.is_active).length
 
   // Calculate new clefs this week
   const oneWeekAgo = new Date()
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
-  const newThisWeek = props.clefs.filter(c => {
+  const newThisWeek = props.clefs.filter((c) => {
     const createdAt = new Date(c.created_at)
     return createdAt >= oneWeekAgo
   }).length
 
   // Calculate success rate from check results
   const totalChecks = props.checkResults.length
-  const successfulChecks = props.checkResults.filter(c => c.status === 'success' || c.status === 'passed').length
+  const successfulChecks = props.checkResults.filter(
+    (c) => c.status === 'success' || c.status === 'passed',
+  ).length
   const successRate = totalChecks > 0 ? (successfulChecks / totalChecks) * 100 : 0
 
   // Calculate average execution time
   const executionTimes = props.checkResults
-    .filter(c => c.execution_time !== null && c.execution_time !== undefined)
-    .map(c => c.execution_time!)
-  const avgExecutionTime = executionTimes.length > 0
-    ? Math.round(executionTimes.reduce((a, b) => a + b, 0) / executionTimes.length)
-    : 0
+    .filter((c) => c.execution_time !== null && c.execution_time !== undefined)
+    .map((c) => c.execution_time!)
+  const avgExecutionTime =
+    executionTimes.length > 0
+      ? Math.round(executionTimes.reduce((a, b) => a + b, 0) / executionTimes.length)
+      : 0
 
   // Count active alerts (failed checks in last 24 hours)
   const oneDayAgo = new Date()
   oneDayAgo.setDate(oneDayAgo.getDate() - 1)
-  const activeAlerts = props.checkResults.filter(c => {
+  const activeAlerts = props.checkResults.filter((c) => {
     const timestamp = new Date(c.timestamp)
     return timestamp >= oneDayAgo && (c.status === 'failed' || c.status === 'failure')
   }).length
@@ -323,14 +321,14 @@ const analytics = computed(() => {
     newThisWeek,
     successRate: Math.round(successRate * 10) / 10,
     avgExecutionTime,
-    activeAlerts
+    activeAlerts,
   }
 })
 
 const timeRangeOptions = [
   { label: 'Last 7 days', value: '7d' },
   { label: 'Last 30 days', value: '30d' },
-  { label: 'Last 90 days', value: '90d' }
+  { label: 'Last 90 days', value: '90d' },
 ]
 
 // Compute performance data from check results
@@ -342,7 +340,7 @@ const performanceData = computed(() => {
   // Group check results by date
   const resultsByDate = new Map<string, { success: number; failures: number; warnings: number }>()
 
-  props.checkResults.forEach(check => {
+  props.checkResults.forEach((check) => {
     const checkDate = new Date(check.timestamp)
     if (checkDate < startDate) return
 
@@ -370,7 +368,7 @@ const performanceData = computed(() => {
     const dayData = resultsByDate.get(dateKey) || { success: 0, failures: 0, warnings: 0 }
     data.push({
       date: dateKey,
-      ...dayData
+      ...dayData,
     })
   }
 
@@ -381,19 +379,19 @@ const performanceData = computed(() => {
 const clefTypeStats = computed(() => {
   const typeCounts = new Map<string, number>()
 
-  props.clefs.forEach(clef => {
+  props.clefs.forEach((clef) => {
     const count = typeCounts.get(clef.check_type) || 0
     typeCounts.set(clef.check_type, count + 1)
   })
 
   const typeInfo: Record<string, { name: string; tier: number; color: string }> = {
-    'row_count': { name: 'Row Count', tier: 1, color: '#3B82F6' },
-    'column_values': { name: 'Column Values', tier: 1, color: '#10B981' },
-    'freshness': { name: 'Freshness', tier: 1, color: '#F59E0B' },
-    'forecast': { name: 'Forecast', tier: 2, color: '#8B5CF6' },
-    'data_profile_drift': { name: 'Data Drift', tier: 2, color: '#EF4444' },
-    'lookup_validation': { name: 'Lookup Validation', tier: 3, color: '#06B6D4' },
-    'python': { name: 'Python Script', tier: 4, color: '#EC4899' }
+    row_count: { name: 'Row Count', tier: 1, color: '#3B82F6' },
+    column_values: { name: 'Column Values', tier: 1, color: '#10B981' },
+    freshness: { name: 'Freshness', tier: 1, color: '#F59E0B' },
+    forecast: { name: 'Forecast', tier: 2, color: '#8B5CF6' },
+    data_profile_drift: { name: 'Data Drift', tier: 2, color: '#EF4444' },
+    lookup_validation: { name: 'Lookup Validation', tier: 3, color: '#06B6D4' },
+    python: { name: 'Python Script', tier: 4, color: '#EC4899' },
   }
 
   const total = props.clefs.length
@@ -405,7 +403,7 @@ const clefTypeStats = computed(() => {
         count,
         percentage: total > 0 ? Math.round((count / total) * 100) : 0,
         tier: info.tier,
-        color: info.color
+        color: info.color,
       }
     })
     .sort((a, b) => b.count - a.count)
@@ -415,18 +413,21 @@ const clefTypeStats = computed(() => {
 
 // Compute top performers from real data
 const topPerformers = computed(() => {
-  const clefPerformance = new Map<string, { success: number; total: number; name: string; type: string }>()
+  const clefPerformance = new Map<
+    string,
+    { success: number; total: number; name: string; type: string }
+  >()
 
-  props.checkResults.forEach(check => {
+  props.checkResults.forEach((check) => {
     if (!check.clef_id) return
 
     if (!clefPerformance.has(check.clef_id)) {
-      const clef = props.clefs.find(c => c.id === check.clef_id)
+      const clef = props.clefs.find((c) => c.id === check.clef_id)
       clefPerformance.set(check.clef_id, {
         success: 0,
         total: 0,
         name: clef?.name || 'Unknown',
-        type: clef?.check_type || 'unknown'
+        type: clef?.check_type || 'unknown',
       })
     }
 
@@ -443,22 +444,22 @@ const topPerformers = computed(() => {
       name: perf.name,
       type: formatCheckType(perf.type),
       successRate: perf.total > 0 ? Math.round((perf.success / perf.total) * 100 * 10) / 10 : 0,
-      runs: perf.total
+      runs: perf.total,
     }))
-    .filter(p => p.runs > 0)
+    .filter((p) => p.runs > 0)
     .sort((a, b) => b.successRate - a.successRate)
     .slice(0, 3)
 })
 
 const formatCheckType = (type: string) => {
   const typeMap: Record<string, string> = {
-    'row_count': 'Row Count',
-    'column_values': 'Column Values',
-    'freshness': 'Freshness',
-    'forecast': 'Forecast',
-    'data_profile_drift': 'Data Drift',
-    'lookup_validation': 'Lookup Validation',
-    'python': 'Python Script'
+    row_count: 'Row Count',
+    column_values: 'Column Values',
+    freshness: 'Freshness',
+    forecast: 'Forecast',
+    data_profile_drift: 'Data Drift',
+    lookup_validation: 'Lookup Validation',
+    python: 'Python Script',
   }
   return typeMap[type] || type
 }
@@ -467,10 +468,10 @@ const formatCheckType = (type: string) => {
 const needsAttention = computed(() => {
   const clefIssues = new Map<string, { name: string; issues: string[] }>()
 
-  props.checkResults.forEach(check => {
+  props.checkResults.forEach((check) => {
     if (!check.clef_id) return
 
-    const clef = props.clefs.find(c => c.id === check.clef_id)
+    const clef = props.clefs.find((c) => c.id === check.clef_id)
     if (!clef) return
 
     if (!clefIssues.has(check.clef_id)) {
@@ -480,16 +481,20 @@ const needsAttention = computed(() => {
     const issue = clefIssues.get(check.clef_id)!
 
     // Check for high failure rate
-    const recentChecks = props.checkResults
-      .filter(c => c.clef_id === check.clef_id)
-      .slice(-20) // Last 20 checks
-    const failureRate = recentChecks.filter(c => c.status === 'failed' || c.status === 'failure').length / recentChecks.length
-    if (failureRate > 0.1 && !issue.issues.some(i => i.includes('failure rate'))) {
+    const recentChecks = props.checkResults.filter((c) => c.clef_id === check.clef_id).slice(-20) // Last 20 checks
+    const failureRate =
+      recentChecks.filter((c) => c.status === 'failed' || c.status === 'failure').length /
+      recentChecks.length
+    if (failureRate > 0.1 && !issue.issues.some((i) => i.includes('failure rate'))) {
       issue.issues.push(`High failure rate (${Math.round(failureRate * 100)}%)`)
     }
 
     // Check for slow execution
-    if (check.execution_time && check.execution_time > 2000 && !issue.issues.some(i => i.includes('Slow execution'))) {
+    if (
+      check.execution_time &&
+      check.execution_time > 2000 &&
+      !issue.issues.some((i) => i.includes('Slow execution'))
+    ) {
       issue.issues.push(`Slow execution (${Math.round(check.execution_time)}ms)`)
     }
   })
@@ -499,7 +504,7 @@ const needsAttention = computed(() => {
     .map(([id, issue]) => ({
       id,
       name: issue.name,
-      issue: issue.issues[0] // Show first issue
+      issue: issue.issues[0], // Show first issue
     }))
     .slice(0, 5)
 })
@@ -513,8 +518,8 @@ const recentActivity = computed(() => {
     .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
     .slice(0, 10)
 
-  recentChecks.forEach(check => {
-    const clef = props.clefs.find(c => c.id === check.clef_id)
+  recentChecks.forEach((check) => {
+    const clef = props.clefs.find((c) => c.id === check.clef_id)
     const clefName = clef?.name || 'Unknown clef'
 
     let type = 'info'
@@ -555,7 +560,7 @@ const recentActivity = computed(() => {
       id: check.id,
       type,
       message,
-      time
+      time,
     })
   })
 
@@ -566,50 +571,56 @@ const recentActivity = computed(() => {
 const healthMetrics = computed(() => {
   // Reliability: based on success rate
   const totalChecks = props.checkResults.length
-  const successfulChecks = props.checkResults.filter(c => c.status === 'success' || c.status === 'passed').length
+  const successfulChecks = props.checkResults.filter(
+    (c) => c.status === 'success' || c.status === 'passed',
+  ).length
   const reliability = totalChecks > 0 ? Math.round((successfulChecks / totalChecks) * 100) : 0
 
   // Performance: based on execution time (inverse - faster is better)
   const executionTimes = props.checkResults
-    .filter(c => c.execution_time !== null && c.execution_time !== undefined)
-    .map(c => c.execution_time!)
-  const avgExecutionTime = executionTimes.length > 0
-    ? executionTimes.reduce((a, b) => a + b, 0) / executionTimes.length
-    : 0
+    .filter((c) => c.execution_time !== null && c.execution_time !== undefined)
+    .map((c) => c.execution_time!)
+  const avgExecutionTime =
+    executionTimes.length > 0
+      ? executionTimes.reduce((a, b) => a + b, 0) / executionTimes.length
+      : 0
   // Score: 100 if < 100ms, decreasing to 0 at 5000ms
-  const performance = avgExecutionTime > 0
-    ? Math.max(0, Math.min(100, Math.round(100 - ((avgExecutionTime - 100) / 4900) * 100)))
-    : 100
+  const performance =
+    avgExecutionTime > 0
+      ? Math.max(0, Math.min(100, Math.round(100 - ((avgExecutionTime - 100) / 4900) * 100)))
+      : 100
 
   // Coverage: percentage of active clefs that have run checks
-  const activeClefs = props.clefs.filter(c => c.is_active)
-  const clefsWithChecks = new Set(props.checkResults.map(c => c.clef_id).filter(Boolean))
-  const coverage = activeClefs.length > 0
-    ? Math.round((clefsWithChecks.size / activeClefs.length) * 100)
-    : 0
+  const activeClefs = props.clefs.filter((c) => c.is_active)
+  const clefsWithChecks = new Set(props.checkResults.map((c) => c.clef_id).filter(Boolean))
+  const coverage =
+    activeClefs.length > 0 ? Math.round((clefsWithChecks.size / activeClefs.length) * 100) : 0
 
   // Maintainability: based on clef age and activity (newer and more active = better)
   const now = new Date()
-  const clefAges = props.clefs.map(c => {
+  const clefAges = props.clefs.map((c) => {
     const age = (now.getTime() - new Date(c.created_at).getTime()) / (1000 * 60 * 60 * 24) // days
     return age
   })
   const avgAge = clefAges.length > 0 ? clefAges.reduce((a, b) => a + b, 0) / clefAges.length : 0
   // Score: 100 if avg age < 30 days, decreasing to 50 at 365 days
-  const maintainability = avgAge < 30 ? 100 : Math.max(50, Math.round(100 - ((avgAge - 30) / 335) * 50))
+  const maintainability =
+    avgAge < 30 ? 100 : Math.max(50, Math.round(100 - ((avgAge - 30) / 335) * 50))
 
   return {
     reliability,
     performance,
     coverage,
-    maintainability
+    maintainability,
   }
 })
 
 // Computed
 const overallHealthScore = computed(() => {
   const metrics = healthMetrics.value
-  return Math.round((metrics.reliability + metrics.performance + metrics.coverage + metrics.maintainability) / 4)
+  return Math.round(
+    (metrics.reliability + metrics.performance + metrics.coverage + metrics.maintainability) / 4,
+  )
 })
 
 // Methods
@@ -618,7 +629,7 @@ const getActivityColor = (type: string) => {
     success: 'bg-green-500',
     warning: 'bg-yellow-500',
     failure: 'bg-red-500',
-    info: 'bg-blue-500'
+    info: 'bg-blue-500',
   }
   return colors[type as keyof typeof colors] || 'bg-gray-500'
 }

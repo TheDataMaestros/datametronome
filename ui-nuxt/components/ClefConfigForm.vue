@@ -3,11 +3,7 @@
     <!-- Row Count Configuration -->
     <div v-if="clefType === 'row_count'" class="space-y-4">
       <UFormGroup label="Table Name" required>
-        <UInput
-          v-model="localConfig.table"
-          placeholder="e.g., users"
-          @input="updateConfig"
-        />
+        <UInput v-model="localConfig.table" placeholder="e.g., users" @input="updateConfig" />
       </UFormGroup>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -34,19 +30,11 @@
     <!-- Freshness Configuration -->
     <div v-else-if="clefType === 'freshness'" class="space-y-4">
       <UFormGroup label="Table Name" required>
-        <UInput
-          v-model="localConfig.table"
-          placeholder="e.g., users"
-          @input="updateConfig"
-        />
+        <UInput v-model="localConfig.table" placeholder="e.g., users" @input="updateConfig" />
       </UFormGroup>
 
       <UFormGroup label="Timestamp Column" required>
-        <UInput
-          v-model="localConfig.column"
-          placeholder="e.g., updated_at"
-          @input="updateConfig"
-        />
+        <UInput v-model="localConfig.column" placeholder="e.g., updated_at" @input="updateConfig" />
       </UFormGroup>
 
       <UFormGroup label="Maximum Age (Hours)">
@@ -62,19 +50,11 @@
     <!-- Column Values Configuration -->
     <div v-else-if="clefType === 'column_values'" class="space-y-4">
       <UFormGroup label="Table Name" required>
-        <UInput
-          v-model="localConfig.table"
-          placeholder="e.g., users"
-          @input="updateConfig"
-        />
+        <UInput v-model="localConfig.table" placeholder="e.g., users" @input="updateConfig" />
       </UFormGroup>
 
       <UFormGroup label="Column Name" required>
-        <UInput
-          v-model="localConfig.column"
-          placeholder="e.g., email"
-          @input="updateConfig"
-        />
+        <UInput v-model="localConfig.column" placeholder="e.g., email" @input="updateConfig" />
       </UFormGroup>
 
       <UFormGroup label="Validation Type">
@@ -134,19 +114,11 @@
     <!-- Forecast Configuration -->
     <div v-else-if="clefType === 'forecast'" class="space-y-4">
       <UFormGroup label="Table Name" required>
-        <UInput
-          v-model="localConfig.table"
-          placeholder="e.g., events"
-          @input="updateConfig"
-        />
+        <UInput v-model="localConfig.table" placeholder="e.g., events" @input="updateConfig" />
       </UFormGroup>
 
       <UFormGroup label="Metric to Monitor">
-        <USelect
-          v-model="localConfig.metric"
-          :options="metricOptions"
-          @change="updateConfig"
-        />
+        <USelect v-model="localConfig.metric" :options="metricOptions" @change="updateConfig" />
       </UFormGroup>
 
       <UFormGroup label="Time Column" required>
@@ -167,11 +139,7 @@
         </UFormGroup>
 
         <UFormGroup label="Model">
-          <USelect
-            v-model="localConfig.model"
-            :options="modelOptions"
-            @change="updateConfig"
-          />
+          <USelect v-model="localConfig.model" :options="modelOptions" @change="updateConfig" />
         </UFormGroup>
       </div>
     </div>
@@ -179,19 +147,11 @@
     <!-- Data Profile Drift Configuration -->
     <div v-else-if="clefType === 'data_profile_drift'" class="space-y-4">
       <UFormGroup label="Table Name" required>
-        <UInput
-          v-model="localConfig.table"
-          placeholder="e.g., users"
-          @input="updateConfig"
-        />
+        <UInput v-model="localConfig.table" placeholder="e.g., users" @input="updateConfig" />
       </UFormGroup>
 
       <UFormGroup label="Column Name" required>
-        <UInput
-          v-model="localConfig.column"
-          placeholder="e.g., age"
-          @input="updateConfig"
-        />
+        <UInput v-model="localConfig.column" placeholder="e.g., age" @input="updateConfig" />
       </UFormGroup>
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -224,11 +184,7 @@
       </UFormGroup>
 
       <UFormGroup label="Source Column" required>
-        <UInput
-          v-model="localConfig.source_column"
-          placeholder="e.g., id"
-          @input="updateConfig"
-        />
+        <UInput v-model="localConfig.source_column" placeholder="e.g., id" @input="updateConfig" />
       </UFormGroup>
 
       <UFormGroup label="Lookup Source">
@@ -280,19 +236,11 @@
     <!-- Default Configuration -->
     <div v-else class="space-y-4">
       <UFormGroup label="Table Name">
-        <UInput
-          v-model="localConfig.table"
-          placeholder="e.g., users"
-          @input="updateConfig"
-        />
+        <UInput v-model="localConfig.table" placeholder="e.g., users" @input="updateConfig" />
       </UFormGroup>
 
       <UFormGroup label="Column Name">
-        <UInput
-          v-model="localConfig.column"
-          placeholder="e.g., email"
-          @input="updateConfig"
-        />
+        <UInput v-model="localConfig.column" placeholder="e.g., email" @input="updateConfig" />
       </UFormGroup>
 
       <UFormGroup label="Custom Configuration (JSON)">
@@ -334,33 +282,33 @@ const validationTypeOptions = [
   { label: 'NULL Check', value: 'null_check' },
   { label: 'Range Check', value: 'range_check' },
   { label: 'Pattern Check', value: 'pattern_check' },
-  { label: 'Uniqueness Check', value: 'uniqueness_check' }
+  { label: 'Uniqueness Check', value: 'uniqueness_check' },
 ]
 
 const metricOptions = [
   { label: 'Row Count', value: 'row_count' },
   { label: 'Sum', value: 'sum' },
   { label: 'Average', value: 'avg' },
-  { label: 'Count Distinct', value: 'count_distinct' }
+  { label: 'Count Distinct', value: 'count_distinct' },
 ]
 
 const aggregationOptions = [
   { label: 'Hourly', value: 'hourly' },
   { label: 'Daily', value: 'daily' },
   { label: 'Weekly', value: 'weekly' },
-  { label: 'Monthly', value: 'monthly' }
+  { label: 'Monthly', value: 'monthly' },
 ]
 
 const modelOptions = [
   { label: 'SARIMA', value: 'sarima' },
   { label: 'Prophet', value: 'prophet' },
-  { label: 'LSTM', value: 'lstm' }
+  { label: 'LSTM', value: 'lstm' },
 ]
 
 const periodOptions = [
   { label: 'Last 7 Days', value: 'last_7_days' },
   { label: 'Last 30 Days', value: 'last_30_days' },
-  { label: 'Last 90 Days', value: 'last_90_days' }
+  { label: 'Last 90 Days', value: 'last_90_days' },
 ]
 
 // Methods
@@ -389,18 +337,22 @@ const updateCustomConfig = () => {
 }
 
 // Watch for prop changes
-watch(() => props.config, (newConfig) => {
-  localConfig.value = { ...newConfig }
+watch(
+  () => props.config,
+  (newConfig) => {
+    localConfig.value = { ...newConfig }
 
-  // Update JSON representations
-  if (newConfig.parameters) {
-    parametersJson.value = JSON.stringify(newConfig.parameters, null, 2)
-  }
+    // Update JSON representations
+    if (newConfig.parameters) {
+      parametersJson.value = JSON.stringify(newConfig.parameters, null, 2)
+    }
 
-  if (Object.keys(newConfig).length > 0) {
-    customConfigJson.value = JSON.stringify(newConfig, null, 2)
-  }
-}, { deep: true })
+    if (Object.keys(newConfig).length > 0) {
+      customConfigJson.value = JSON.stringify(newConfig, null, 2)
+    }
+  },
+  { deep: true },
+)
 
 // Initialize JSON representations
 if (props.config.parameters) {

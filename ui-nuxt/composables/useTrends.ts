@@ -1,5 +1,10 @@
 import { ref, computed, readonly } from 'vue'
-import { trendsService, type StaveTrends, type TrendsOverview, type TrendDataPoint } from '../services/trends'
+import {
+  trendsService,
+  type StaveTrends,
+  type TrendsOverview,
+  type TrendDataPoint,
+} from '../services/trends'
 
 export const useTrends = () => {
   const trendsData = ref<StaveTrends | null>(null)
@@ -10,7 +15,7 @@ export const useTrends = () => {
   const fetchStaveTrends = async (
     staveId: string,
     days: number = 7,
-    granularity: string = 'hour'
+    granularity: string = 'hour',
   ) => {
     isLoading.value = true
     error.value = null
@@ -46,16 +51,18 @@ export const useTrends = () => {
     if (!trendsData.value?.row_count_trends) return null
 
     return {
-      labels: trendsData.value.row_count_trends.map(point =>
-        new Date(point.timestamp).toLocaleString()
+      labels: trendsData.value.row_count_trends.map((point) =>
+        new Date(point.timestamp).toLocaleString(),
       ),
-      datasets: [{
-        label: 'Row Count',
-        data: trendsData.value.row_count_trends.map(point => point.row_count),
-        borderColor: 'rgb(59, 130, 246)',
-        backgroundColor: 'rgba(59, 130, 246, 0.1)',
-        tension: 0.1
-      }]
+      datasets: [
+        {
+          label: 'Row Count',
+          data: trendsData.value.row_count_trends.map((point) => point.row_count),
+          borderColor: 'rgb(59, 130, 246)',
+          backgroundColor: 'rgba(59, 130, 246, 0.1)',
+          tension: 0.1,
+        },
+      ],
     }
   })
 
@@ -65,16 +72,18 @@ export const useTrends = () => {
     const distribution = trendsData.value.distribution_changes.status_distribution
     return {
       labels: Object.keys(distribution),
-      datasets: [{
-        label: 'Check Status',
-        data: Object.values(distribution),
-        backgroundColor: [
-          'rgb(34, 197, 94)', // green for passed
-          'rgb(239, 68, 68)', // red for failed
-          'rgb(245, 158, 11)', // yellow for warning
-          'rgb(107, 114, 128)' // gray for other
-        ]
-      }]
+      datasets: [
+        {
+          label: 'Check Status',
+          data: Object.values(distribution),
+          backgroundColor: [
+            'rgb(34, 197, 94)', // green for passed
+            'rgb(239, 68, 68)', // red for failed
+            'rgb(245, 158, 11)', // yellow for warning
+            'rgb(107, 114, 128)', // gray for other
+          ],
+        },
+      ],
     }
   })
 
@@ -86,15 +95,16 @@ export const useTrends = () => {
       successRate: summary.success_rate,
       rowCountTrend: summary.row_count_trend,
       overallStatus: summary.overall_status,
-      totalDataPoints: summary.total_data_points
+      totalDataPoints: summary.total_data_points,
     }
   })
 
   const hasData = computed(() => {
-    return !!trendsData.value && (
-      (trendsData.value.row_count_trends?.length > 0) ||
-      (trendsData.value.check_results?.length > 0) ||
-      (trendsData.value.recent_anomalies?.length > 0)
+    return (
+      !!trendsData.value &&
+      (trendsData.value.row_count_trends?.length > 0 ||
+        trendsData.value.check_results?.length > 0 ||
+        trendsData.value.recent_anomalies?.length > 0)
     )
   })
 

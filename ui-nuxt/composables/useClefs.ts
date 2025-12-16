@@ -1,5 +1,11 @@
 import { ref, computed, readonly } from 'vue'
-import { clefsService, type Clef, type CreateClefRequest, type UpdateClefRequest, type RunClefResponse } from '~/services/clefs'
+import {
+  clefsService,
+  type Clef,
+  type CreateClefRequest,
+  type UpdateClefRequest,
+  type RunClefResponse,
+} from '~/services/clefs'
 import type { Check } from '~/services/checks'
 
 export const useClefs = () => {
@@ -58,7 +64,7 @@ export const useClefs = () => {
 
     try {
       const updatedClef = await clefsService.update(id, updates)
-      const index = clefs.value.findIndex(c => c.id === id)
+      const index = clefs.value.findIndex((c) => c.id === id)
       if (index !== -1) {
         clefs.value[index] = updatedClef
       }
@@ -77,7 +83,7 @@ export const useClefs = () => {
 
     try {
       await clefsService.delete(id)
-      clefs.value = clefs.value.filter(c => c.id !== id)
+      clefs.value = clefs.value.filter((c) => c.id !== id)
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to delete clef'
       throw err
@@ -119,27 +125,31 @@ export const useClefs = () => {
   }
 
   const getClefById = (id: string) => {
-    return clefs.value.find(c => c.id === id)
+    return clefs.value.find((c) => c.id === id)
   }
 
   const getActiveClefs = computed(() => {
-    return clefs.value.filter(c => c.is_active)
+    return clefs.value.filter((c) => c.is_active)
   })
 
   const getClefsByType = (type: string) => {
-    return clefs.value.filter(c => c.check_type === type)
+    return clefs.value.filter((c) => c.check_type === type)
   }
 
   const getFailedChecks = computed(() => {
-    return checkResults.value.filter(r => r.status?.toLowerCase() === 'fail' || r.status?.toLowerCase() === 'failed')
+    return checkResults.value.filter(
+      (r) => r.status?.toLowerCase() === 'fail' || r.status?.toLowerCase() === 'failed',
+    )
   })
 
   const getPassedChecks = computed(() => {
-    return checkResults.value.filter(r => r.status?.toLowerCase() === 'pass' || r.status?.toLowerCase() === 'passed')
+    return checkResults.value.filter(
+      (r) => r.status?.toLowerCase() === 'pass' || r.status?.toLowerCase() === 'passed',
+    )
   })
 
   const getWarningChecks = computed(() => {
-    return checkResults.value.filter(r => {
+    return checkResults.value.filter((r) => {
       const status = r.status?.toLowerCase()
       return status === 'warn' || status === 'warning'
     })

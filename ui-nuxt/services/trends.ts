@@ -77,14 +77,17 @@ class TrendsService {
   async getStaveTrends(
     staveId: string,
     days: number = 7,
-    granularity: string = 'hour'
+    granularity: string = 'hour',
   ): Promise<StaveTrends> {
-    const response = await fetch(buildApiUrl(`/trends/stave/${staveId}?days=${days}&granularity=${granularity}`), {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
+    const response = await fetch(
+      buildApiUrl(`/trends/stave/${staveId}?days=${days}&granularity=${granularity}`),
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
       },
-    })
+    )
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)

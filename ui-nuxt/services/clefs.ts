@@ -82,12 +82,16 @@ class ClefsService {
   }
 
   async getResults(id: string, limit = 50): Promise<Check[]> {
-    const response = await apiService.get<{ results: Check[] }>(`${this.endpoint}/${id}/results?limit=${limit}`)
+    const response = await apiService.get<{ results: Check[] }>(
+      `${this.endpoint}/${id}/results?limit=${limit}`,
+    )
     return response.data.results
   }
 
   async getLatestResults(limit = 20): Promise<Check[]> {
-    const response = await apiService.get<{ results: Check[] }>(`${this.endpoint}/results/latest?limit=${limit}`)
+    const response = await apiService.get<{ results: Check[] }>(
+      `${this.endpoint}/results/latest?limit=${limit}`,
+    )
     return response.data.results
   }
 }

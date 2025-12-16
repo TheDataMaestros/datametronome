@@ -23,17 +23,12 @@
           :class="[
             $route.path === item.to
               ? 'bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
-              : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700'
+              : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700',
           ]"
         >
           <Icon :name="item.icon" class="w-5 h-5" />
           <span>{{ item.label }}</span>
-          <UBadge
-            v-if="item.badge"
-            :color="item.badgeColor"
-            size="sm"
-            class="ml-auto"
-          >
+          <UBadge v-if="item.badge" :color="item.badgeColor" size="sm" class="ml-auto">
             {{ item.badge }}
           </UBadge>
         </NuxtLink>
@@ -42,11 +37,7 @@
       <!-- Footer -->
       <div class="p-4 border-t border-gray-200 dark:border-gray-700">
         <div class="flex items-center gap-3">
-          <UAvatar
-            :src="user?.avatar || undefined"
-            :alt="user?.name || 'Admin User'"
-            size="sm"
-          />
+          <UAvatar :src="user?.avatar || undefined" :alt="user?.name || 'Admin User'" size="sm" />
           <div class="flex-1 min-w-0">
             <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
               {{ user?.name || 'Admin User' }}
@@ -56,12 +47,7 @@
             </p>
           </div>
           <UDropdown :items="userMenuItems">
-            <UButton
-              color="gray"
-              variant="ghost"
-              icon="i-heroicons-ellipsis-vertical"
-              size="sm"
-            />
+            <UButton color="gray" variant="ghost" icon="i-heroicons-ellipsis-vertical" size="sm" />
           </UDropdown>
         </div>
       </div>
@@ -70,7 +56,9 @@
     <!-- Main Content -->
     <div class="pl-64">
       <!-- Top Navigation -->
-      <header class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <header
+        class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700"
+      >
         <div class="px-6 py-4">
           <div class="flex items-center justify-between">
             <div class="flex items-center gap-4">
@@ -122,15 +110,15 @@ const authStore = useAuthStore()
 const route = useRoute()
 const pageTitle = computed(() => {
   const titles: Record<string, string> = {
-    'index': 'Dashboard',
-    'anomalies': 'Anomalies',
+    index: 'Dashboard',
+    anomalies: 'Anomalies',
     'ml-anomalies': 'ML Anomalies',
-    'trends': 'Trends & Patterns',
-    'investigation': 'Investigation',
-    'reports': 'Reports',
-    'staves': 'Data Sources',
-    'clefs': 'Quality Checks',
-    'settings': 'Settings'
+    trends: 'Trends & Patterns',
+    investigation: 'Investigation',
+    reports: 'Reports',
+    staves: 'Data Sources',
+    clefs: 'Quality Checks',
+    settings: 'Settings',
   }
   return titles[route.name as string] || 'DataMetronome'
 })
@@ -146,69 +134,75 @@ const navigationItems = [
     to: '/',
     icon: 'i-heroicons-home',
     label: 'Dashboard',
-    badge: null
+    badge: null,
   },
   {
     to: '/anomalies',
     icon: 'i-heroicons-exclamation-triangle',
     label: 'Anomalies',
     badge: '2',
-    badgeColor: 'red'
+    badgeColor: 'red',
   },
   {
     to: '/ml-anomalies',
     icon: 'i-heroicons-cpu-chip',
     label: 'ML Anomalies',
-    badge: null
+    badge: null,
   },
   {
     to: '/trends',
     icon: 'i-heroicons-chart-bar',
     label: 'Trends & Patterns',
-    badge: null
+    badge: null,
   },
   {
     to: '/investigation',
     icon: 'i-heroicons-magnifying-glass',
     label: 'Investigation',
-    badge: null
+    badge: null,
   },
   {
     to: '/reports',
     icon: 'i-heroicons-document-text',
     label: 'Reports',
-    badge: null
+    badge: null,
   },
   {
     to: '/staves',
     icon: 'i-heroicons-server',
     label: 'Data Sources',
-    badge: null
+    badge: null,
   },
   {
     to: '/clefs',
     icon: 'i-heroicons-check-circle',
     label: 'Quality Checks',
-    badge: null
-  }
+    badge: null,
+  },
 ]
 
 const userMenuItems = [
-  [{
-    label: 'Profile',
-    icon: 'i-heroicons-user',
-    click: () => navigateTo('/profile')
-  }],
-  [{
-    label: 'Settings',
-    icon: 'i-heroicons-cog-6-tooth',
-    click: () => navigateTo('/settings')
-  }],
-  [{
-    label: 'Sign out',
-    icon: 'i-heroicons-arrow-right-on-rectangle',
-    click: () => authStore.logout()
-  }]
+  [
+    {
+      label: 'Profile',
+      icon: 'i-heroicons-user',
+      click: () => navigateTo('/profile'),
+    },
+  ],
+  [
+    {
+      label: 'Settings',
+      icon: 'i-heroicons-cog-6-tooth',
+      click: () => navigateTo('/settings'),
+    },
+  ],
+  [
+    {
+      label: 'Sign out',
+      icon: 'i-heroicons-arrow-right-on-rectangle',
+      click: () => authStore.logout(),
+    },
+  ],
 ]
 
 async function refreshData() {
@@ -219,7 +213,7 @@ async function refreshData() {
       authStore.refreshUserData(),
       // Add other store refresh calls here
     ])
-    await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate refresh
+    await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate refresh
   } finally {
     isRefreshing.value = false
   }

@@ -34,6 +34,6 @@ export const useChecks = () => {
     error: readonly(error),
     fetchChecks,
     fetchForClef,
-    fetchLatest
+    fetchLatest,
   }
 }

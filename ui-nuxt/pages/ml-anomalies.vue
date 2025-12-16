@@ -3,9 +3,7 @@
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">
-          ML Anomaly Detection
-        </h1>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">ML Anomaly Detection</h1>
         <p class="mt-2 text-gray-600 dark:text-gray-400">
           Machine learning powered anomaly detection using advanced algorithms.
         </p>
@@ -38,42 +36,21 @@
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
         <div class="space-y-4">
           <UFormGroup label="Algorithm">
-            <USelect
-              v-model="mlConfig.algorithm"
-              :options="algorithmOptions"
-            />
+            <USelect v-model="mlConfig.algorithm" :options="algorithmOptions" />
           </UFormGroup>
           <UFormGroup label="Contamination Factor">
-            <UInput
-              v-model="mlConfig.contamination"
-              type="number"
-              step="0.01"
-              min="0"
-              max="0.5"
-            />
+            <UInput v-model="mlConfig.contamination" type="number" step="0.01" min="0" max="0.5" />
           </UFormGroup>
           <UFormGroup label="Random State">
-            <UInput
-              v-model="mlConfig.randomState"
-              type="number"
-            />
+            <UInput v-model="mlConfig.randomState" type="number" />
           </UFormGroup>
         </div>
         <div class="space-y-4">
           <UFormGroup label="Number of Estimators">
-            <UInput
-              v-model="mlConfig.nEstimators"
-              type="number"
-              min="10"
-              max="1000"
-            />
+            <UInput v-model="mlConfig.nEstimators" type="number" min="10" max="1000" />
           </UFormGroup>
           <UFormGroup label="Max Features">
-            <UInput
-              v-model="mlConfig.maxFeatures"
-              type="number"
-              min="1"
-            />
+            <UInput v-model="mlConfig.maxFeatures" type="number" min="1" />
           </UFormGroup>
           <UFormGroup label="Bootstrap">
             <UToggle v-model="mlConfig.bootstrap" />
@@ -82,12 +59,8 @@
       </div>
       <template #footer>
         <div class="flex justify-end gap-3">
-          <UButton color="gray" variant="outline" @click="resetMLConfig">
-            Reset
-          </UButton>
-          <UButton color="primary" @click="saveMLConfig">
-            Save Configuration
-          </UButton>
+          <UButton color="gray" variant="outline" @click="resetMLConfig"> Reset </UButton>
+          <UButton color="primary" @click="saveMLConfig"> Save Configuration </UButton>
         </div>
       </template>
     </UCard>
@@ -218,11 +191,7 @@
         </div>
       </template>
 
-      <UTable
-        :rows="mlAnomalies"
-        :columns="mlAnomalyColumns"
-        class="w-full"
-      >
+      <UTable :rows="mlAnomalies" :columns="mlAnomalyColumns" class="w-full">
         <template #confidence-data="{ row }">
           <div class="flex items-center gap-2">
             <div class="w-full bg-gray-200 rounded-full h-2">
@@ -236,10 +205,7 @@
         </template>
 
         <template #severity-data="{ row }">
-          <UBadge
-            :color="getMLSeverityColor(row.severity)"
-            variant="solid"
-          >
+          <UBadge :color="getMLSeverityColor(row.severity)" variant="solid">
             {{ row.severity }}
           </UBadge>
         </template>
@@ -354,7 +320,9 @@
                 </div>
                 <div class="text-right">
                   <span class="font-medium">{{ feature.value }}</span>
-                  <p class="text-sm text-gray-600 dark:text-gray-400">{{ feature.contribution }}% contribution</p>
+                  <p class="text-sm text-gray-600 dark:text-gray-400">
+                    {{ feature.contribution }}% contribution
+                  </p>
                 </div>
               </div>
             </div>
@@ -396,7 +364,7 @@
 // Use middleware for authentication
 definePageMeta({
   middleware: 'auth',
-  layout: 'dashboard'
+  layout: 'dashboard',
 })
 
 const showMLConfig = ref(false)
@@ -411,14 +379,14 @@ const mlConfig = ref({
   randomState: 42,
   nEstimators: 100,
   maxFeatures: 'auto',
-  bootstrap: true
+  bootstrap: true,
 })
 
 const algorithmOptions = [
   { label: 'Isolation Forest', value: 'isolation_forest' },
   { label: 'One-Class SVM', value: 'one_class_svm' },
   { label: 'Local Outlier Factor', value: 'lof' },
-  { label: 'Elliptic Envelope', value: 'elliptic_envelope' }
+  { label: 'Elliptic Envelope', value: 'elliptic_envelope' },
 ]
 
 // ML Results
@@ -429,7 +397,7 @@ const mlResults = ref({
   modelConfidence: 94.2,
   trainingAccuracy: 96.8,
   trainingRecords: 10000,
-  lastRun: new Date(Date.now() - 1 * 60 * 60 * 1000)
+  lastRun: new Date(Date.now() - 1 * 60 * 60 * 1000),
 })
 
 // ML Anomalies data
@@ -448,8 +416,8 @@ const mlAnomalies = ref([
     features: [
       { name: 'age', value: 150, description: 'Age value', contribution: 45 },
       { name: 'income', value: 500000, description: 'Annual income', contribution: 30 },
-      { name: 'activity_score', value: 0.02, description: 'User activity score', contribution: 25 }
-    ]
+      { name: 'activity_score', value: 0.02, description: 'User activity score', contribution: 25 },
+    ],
   },
   {
     id: 2,
@@ -464,9 +432,9 @@ const mlAnomalies = ref([
     featureImportance: 72,
     features: [
       { name: 'amount', value: 99999, description: 'Order amount', contribution: 50 },
-      { name: 'quantity', value: 1, description: 'Item quantity', contribution: 22 }
-    ]
-  }
+      { name: 'quantity', value: 1, description: 'Item quantity', contribution: 22 },
+    ],
+  },
 ])
 
 const mlAnomalyColumns = [
@@ -476,7 +444,7 @@ const mlAnomalyColumns = [
   { key: 'severity', label: 'Severity' },
   { key: 'detected', label: 'Detected' },
   { key: 'source', label: 'Source' },
-  { key: 'actions', label: 'Actions' }
+  { key: 'actions', label: 'Actions' },
 ]
 
 // Helper functions
@@ -484,7 +452,7 @@ function getMLSeverityColor(severity: string) {
   const colors: Record<string, string> = {
     high: 'red',
     medium: 'yellow',
-    low: 'blue'
+    low: 'blue',
   }
   return colors[severity] || 'gray'
 }
@@ -509,7 +477,7 @@ async function runMLDetection() {
   isRunningML.value = true
   try {
     // Simulate ML detection
-    await new Promise(resolve => setTimeout(resolve, 3000))
+    await new Promise((resolve) => setTimeout(resolve, 3000))
     // Refresh ML results
     await refreshMLResults()
   } finally {
@@ -519,15 +487,15 @@ async function runMLDetection() {
 
 async function refreshMLResults() {
   // Simulate API call to refresh ML results
-  await new Promise(resolve => setTimeout(resolve, 500))
+  await new Promise((resolve) => setTimeout(resolve, 500))
 }
 
 async function refreshDistributionChart() {
-  await new Promise(resolve => setTimeout(resolve, 500))
+  await new Promise((resolve) => setTimeout(resolve, 500))
 }
 
 async function refreshPerformanceChart() {
-  await new Promise(resolve => setTimeout(resolve, 500))
+  await new Promise((resolve) => setTimeout(resolve, 500))
 }
 
 function resetMLConfig() {
@@ -537,7 +505,7 @@ function resetMLConfig() {
     randomState: 42,
     nEstimators: 100,
     maxFeatures: 'auto',
-    bootstrap: true
+    bootstrap: true,
   }
 }
 
@@ -552,7 +520,7 @@ function viewMLAnomalyDetails(anomaly: any) {
 }
 
 function validateMLAnomaly(anomalyId: number) {
-  const anomaly = mlAnomalies.value.find(a => a.id === anomalyId)
+  const anomaly = mlAnomalies.value.find((a) => a.id === anomalyId)
   if (anomaly) {
     // Mark as validated
     console.log(`Validating ML anomaly ${anomalyId}`)
@@ -561,10 +529,10 @@ function validateMLAnomaly(anomalyId: number) {
 }
 
 function rejectMLAnomaly(anomalyId: number) {
-  const anomaly = mlAnomalies.value.find(a => a.id === anomalyId)
+  const anomaly = mlAnomalies.value.find((a) => a.id === anomalyId)
   if (anomaly) {
     // Remove from list
-    const index = mlAnomalies.value.findIndex(a => a.id === anomalyId)
+    const index = mlAnomalies.value.findIndex((a) => a.id === anomalyId)
     mlAnomalies.value.splice(index, 1)
   }
   showMLAnomalyModal.value = false
@@ -584,6 +552,6 @@ function retrainModel(anomalyId: number) {
 
 // Set page meta
 useHead({
-  title: 'ML Anomalies - DataMetronome'
+  title: 'ML Anomalies - DataMetronome',
 })
 </script>
