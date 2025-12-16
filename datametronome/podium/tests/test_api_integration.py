@@ -163,7 +163,7 @@ class TestPodiumAPIIntegration:
         assert clef_data["name"] == test_clef_data["name"]
         assert clef_data["clef_type"] == test_clef_data["clef_type"]
         assert "id" in clef_data
-        assert "created_at" in stave_data
+        assert "created_at" in clef_data
 
         # Verify database was called
         mock_database.execute.assert_called()
@@ -228,7 +228,7 @@ class TestPodiumAPIIntegration:
         assert status_data["checks"][1]["status"] == "failed"
 
     @pytest.mark.asyncio
-    async def test_error_handling(self, async_client, mock_database):
+    async def test_error_handling(self, async_client, mock_database, test_user_data):
         """Test API error handling for various scenarios."""
         # Test invalid JSON
         response = await async_client.post("/api/v1/users/", data="invalid json")

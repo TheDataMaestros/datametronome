@@ -18,7 +18,9 @@ sys.path.append(str(PROJECT_ROOT))
 sys.path.append(str(PROJECT_ROOT / "datametronome" / "podium"))
 
 from datametronome_podium.services.clef_executor import ClefExecutor  # noqa: E402
-from datametronome_podium.services.stave_yaml_loader import load_staves_from_yaml  # noqa: E402
+from datametronome_podium.services.stave_yaml_loader import (  # noqa: E402
+    load_staves_from_yaml,
+)
 
 # Imports for data generation
 try:
@@ -133,6 +135,7 @@ async def run_showcase():
             )
     else:
         print("System Healthy.")
+
 
 if __name__ == "__main__":
     asyncio.run(run_showcase())

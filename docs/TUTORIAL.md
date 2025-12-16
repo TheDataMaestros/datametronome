@@ -72,7 +72,7 @@ clefs:
       threshold: 0.05 # Allow 5% nulls
 
   # --- Level 2: Brain Intelligence 🧠 ---
-  
+
   # 1. Forecasting: Did order volume drop unexpectedly?
   - name: "Order Volume Anomaly"
     stave_id: retail-db-001
@@ -80,7 +80,7 @@ clefs:
     config:
       # SARIMA model requires timestamp and numeric value
       query: |
-        SELECT date(created_at) as day_ts, COUNT(*) as order_count 
+        SELECT date(created_at) as day_ts, COUNT(*) as order_count
         FROM orders GROUP BY date(created_at) ORDER BY day_ts ASC
       timestamp_column: "day_ts"
       value_column: "order_count"

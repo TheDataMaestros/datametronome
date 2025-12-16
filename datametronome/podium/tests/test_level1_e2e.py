@@ -363,5 +363,3 @@ class TestLevel1ChecksE2E:
 
         assert response.status_code == 404
         assert "not found" in response.json()["detail"].lower()
-
-

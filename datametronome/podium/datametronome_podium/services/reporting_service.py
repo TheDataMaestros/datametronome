@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
+import pandas as pd
+
 
 @dataclass
 class CheckResult:

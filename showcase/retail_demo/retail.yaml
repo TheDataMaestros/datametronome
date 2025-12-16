@@ -10,7 +10,7 @@ staves:
 
 clefs:
   # --- Level 1: Declarative Checks ---
-  
+
   - name: "User Email Integrity"
     stave_id: retail-db-001
     check_type: "column_values"  # Replaces legacy null_check
@@ -38,10 +38,10 @@ clefs:
     config:
       # Aggregated daily volume for time-series analysis
       query: |
-        SELECT 
-          date(created_at) as day_ts, 
-          COUNT(*) as order_count 
-        FROM orders 
+        SELECT
+          date(created_at) as day_ts,
+          COUNT(*) as order_count
+        FROM orders
         GROUP BY date(created_at)
         ORDER BY day_ts ASC
       timestamp_column: "day_ts"

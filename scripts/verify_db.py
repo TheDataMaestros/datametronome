@@ -31,7 +31,7 @@ async def verify_db():
 
     await init_db()
     db = await get_db()
-    
+
     staves = await db.query({"sql": "SELECT * FROM staves", "params": []})
     print(f"Found {len(staves)} staves:")
     found_retail = False
@@ -44,6 +44,7 @@ async def verify_db():
         print("✅ Retail Stave FOUND.")
     else:
         print("❌ Retail Stave NOT found.")
+
 
 if __name__ == "__main__":
     asyncio.run(verify_db())

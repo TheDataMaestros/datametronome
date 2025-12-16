@@ -14,7 +14,9 @@ def configure_paths():
 def configure_env():
     db_path = PROJECT_ROOT / "datametronome" / "podium" / "data" / "datametronome.db"
     os.environ["DATAMETRONOME_DATABASE_URL"] = f"sqlite+aiosqlite:///{db_path}"
-    os.environ["DATAMETRONOME_SECRET_KEY"] = "dev-secret-key-change-in-production-32-chars"
+    os.environ[
+        "DATAMETRONOME_SECRET_KEY"
+    ] = "dev-secret-key-change-in-production-32-chars"
     return db_path
 
 
@@ -45,7 +47,9 @@ async def import_demo():
         print(f" - {stave.id}: {stave.name}")
 
     try:
-        count = await db.query({"sql": "SELECT COUNT(*) as count FROM staves", "params": []})
+        count = await db.query(
+            {"sql": "SELECT COUNT(*) as count FROM staves", "params": []}
+        )
         print(f"DEBUG: Staves in DB before import: {count[0]['count']}")
     except Exception as exc:
         print(f"DEBUG: Could not count staves: {exc}")
@@ -58,6 +62,7 @@ async def import_demo():
     )
 
     print(f"✅ Import complete: {result}")
+
 
 if __name__ == "__main__":
     asyncio.run(import_demo())

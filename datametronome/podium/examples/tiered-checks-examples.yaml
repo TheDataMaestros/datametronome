@@ -17,6 +17,21 @@ staves:
       host: "db.example.com"
       database: "users"
       user: "monitor"
+  - id: "stave-api"
+    name: "User API"
+    data_source_type: "api"
+    connection_config:
+      base_url: "https://api.example.com"
+      headers:
+        Authorization: "Bearer ${API_TOKEN}"
+
+  - id: "stave-analytics"
+    name: "Analytics Database"
+    data_source_type: "postgres"
+    connection_config:
+      host: "analytics.example.com"
+      database: "analytics"
+      user: "monitor"
 
 clefs:
   # Simple NULL check with severity thresholds
@@ -94,25 +109,6 @@ clefs:
 # =============================================================================
 # Persona: Power Users, Data Analysts, Engineers
 # Purpose: Complex, multi-source logic without writing Python code
-
-staves:
-  - id: "stave-api"
-    name: "User API"
-    data_source_type: "api"
-    connection_config:
-      base_url: "https://api.example.com"
-      headers:
-        Authorization: "Bearer ${API_TOKEN}"
-
-  - id: "stave-analytics"
-    name: "Analytics Database"
-    data_source_type: "postgres"
-    connection_config:
-      host: "analytics.example.com"
-      database: "analytics"
-      user: "monitor"
-
-clefs:
   # Multi-source reconciliation check
   - id: "clef-user-count-reconciliation"
     stave_id: "stave-users"
@@ -195,8 +191,6 @@ clefs:
 # =============================================================================
 # Persona: The Platform (configured by analysts/engineers)
 # Purpose: Proactive, stateful monitoring that learns from historical data
-
-clefs:
   # ML-driven volume anomaly detection
   - id: "clef-user-registration-forecast"
     stave_id: "stave-users"
@@ -254,8 +248,6 @@ clefs:
 # =============================================================================
 # Persona: Data Engineers
 # Purpose: Implementing any business rule that is too complex for declarative checks
-
-clefs:
   # Custom business logic check
   - id: "clef-custom-business-rule"
     stave_id: "stave-users"

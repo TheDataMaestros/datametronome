@@ -237,6 +237,3 @@ def parse_column_values_condition(condition_str: str) -> dict:
 ---
 
 **🎵 Let's get the core check system rock-solid!**
-
-
-

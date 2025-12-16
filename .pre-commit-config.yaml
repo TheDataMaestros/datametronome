@@ -16,9 +16,15 @@ repos:
     rev: 5.12.0
     hooks:
       - id: isort
+        args: ["--profile", "black"]
 
   - repo: https://github.com/pycqa/flake8
     rev: 6.1.0
     hooks:
       - id: flake8
         additional_dependencies: [flake8-bugbear]
+        args:
+          - --count
+          - --select=E9,F63,F7,F82
+          - --show-source
+          - --statistics

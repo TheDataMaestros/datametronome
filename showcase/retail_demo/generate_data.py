@@ -4,9 +4,9 @@ Retail demo data generator.
 Creates a SQLite database with ~60 days of history and injects anomalies for today.
 """
 
-from datetime import datetime, timedelta
 import random
 import sqlite3
+from datetime import datetime, timedelta
 
 import numpy as np
 
@@ -70,7 +70,7 @@ def create_retail_db(db_path="retail.db"):
 
         # Order Volume: Seasonality
         # Base: 50, Weekend Multiplier: 1.5x, Growth: +0.5 per day
-        base_orders = 50 + (day * 0.5) 
+        base_orders = 50 + (day * 0.5)
         if is_weekend:
             daily_orders_count = int(base_orders * 1.5)
         else:
@@ -100,13 +100,23 @@ def create_retail_db(db_path="retail.db"):
     # A. Forecast Anomaly: Drop in order volume (e.g. system outage)
     # Expected: ~80 (base 50 + 30 growth). Actual: 10
     for _ in range(10):
-        orders.append((None, random.randint(1, len(users)), 100.0, "completed", today.isoformat()))
+        orders.append(
+            (None, random.randint(1, len(users)), 100.0, "completed", today.isoformat())
+        )
 
     # B. Drift Anomaly: Spike in order values (e.g. pricing bug)
     # Instead of mean $100, mean $500
     for _ in range(50):
         amount = max(10.0, np.random.normal(500, 50))  # HUGE drift
-        orders.append((None, random.randint(1, len(users)), amount, "completed", today.isoformat()))
+        orders.append(
+            (
+                None,
+                random.randint(1, len(users)),
+                amount,
+                "completed",
+                today.isoformat(),
+            )
+        )
 
     # Bulk Insert
     print(f"Inserting {len(users)} users and {len(orders)} orders...")
@@ -116,6 +126,7 @@ def create_retail_db(db_path="retail.db"):
     conn.commit()
     conn.close()
     print(f"Database created at {db_path}")
+
 
 if __name__ == "__main__":
     create_retail_db()
