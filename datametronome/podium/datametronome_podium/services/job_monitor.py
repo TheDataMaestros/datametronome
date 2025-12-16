@@ -353,3 +353,5 @@ async def get_failing_jobs(
     except Exception as e:
         logger.error(f"Failed to get failing jobs: {e}")
         return []
+
+

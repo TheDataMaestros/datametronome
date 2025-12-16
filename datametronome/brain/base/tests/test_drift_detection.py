@@ -254,3 +254,5 @@ class TestDriftDetector:
                 "not a list",
                 [1, 2, 3],
             )
+
+
