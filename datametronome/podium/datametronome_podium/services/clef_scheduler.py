@@ -37,7 +37,7 @@ logger = logging.getLogger(__name__)
 
 
 async def execute_scheduled_clef(
-    clef_id: str, retry_attempt: int = 0
+    clef_id: str, retry_attempt: int = 0, priority: str = "medium"
 ) -> Dict[str, Any]:
     """
     Execute a clef on schedule and store the result.
@@ -53,7 +53,9 @@ async def execute_scheduled_clef(
     job_id = f"job_{clef_id}"
     execution_start = datetime.utcnow()
 
-    logger.info(f"🔄 Executing scheduled clef: {clef_id} (attempt {retry_attempt + 1})")
+    logger.info(
+        f"🔄 Executing scheduled clef: {clef_id} (attempt {retry_attempt + 1}, priority={priority})"
+    )
 
     try:
         # Get database connection
