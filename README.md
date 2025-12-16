@@ -86,33 +86,38 @@ The demo showcases a realistic e-commerce scenario with:
    - KS test for distribution changes
    - Catches pricing bugs automatically
 
-### Run the Demo
+### Run the Retail Demo (Full Stack: API + UI)
+
+#### Where does the “dataset” come from?
+
+The Retail demo uses a **synthetic dataset generated locally** (a SQLite file). It is intentionally **not committed to git**.
+
+- **Retail dataset DB (generated)**: `datametronome/podium/data/retail.db` (recommended) or `./retail.db` (CLI-only run)
+- **Podium app DB (generated)**: `datametronome/podium/data/datametronome.db` (stores staves/clefs/results)
+
+#### Full stack (API + UI) — recommended path
+
+From repo root (copy/paste):
 
 ```bash
-# 1. Clone and setup
-git clone https://github.com/datametronome/datametronome.git
-cd datametronome
+# Install Python packages (uses `uv` under the hood; see Makefile: install)
+make install
 
-# 2. Install dependencies
-uv pip install -e ./datametronome/podium
-uv pip install -e ./datametronome/pulse/sqlite
-uv pip install -e ./datametronome/brain/base
+# Generate the retail dataset DB (stable location for the backend)
+python3 -c "from showcase.retail_demo.generate_data import create_retail_db; create_retail_db('datametronome/podium/data/retail.db')"
 
-# 3. Generate demo data
-cd showcase/retail_demo
-python generate_data.py
+# Import the Retail stave/clefs from YAML into Podium (resolve DB_PATH at import time)
+export DB_PATH="$(pwd)/datametronome/podium/data/retail.db"
+python3 scripts/import_retail_to_db.py
 
-# 4. Import configuration
-cd ../..
-python scripts/import_retail_to_db.py
+# Start Podium on port 8001 (UI expects http://localhost:8001/api/v1)
+PODIUM_PORT=8001 ./start_podium.sh
+```
 
-# 5. Start backend
-cd datametronome/podium
-python -m datametronome_podium.main
+Then in a new terminal:
 
-# 6. Start frontend (new terminal)
-cd ui-nuxt
-npm install && npm run dev
+```bash
+make start-ui
 ```
 
 **Access**: http://localhost:3000 (login: `admin` / `admin`)
@@ -123,11 +128,27 @@ npm install && npm run dev
 - View **anomaly detections** with explanations
 - Explore **historical trends** and forecasts
 
+**Troubleshooting (common gotchas)**:
+- If checks fail with “DB file not found”, re-run the import with `DB_PATH` set to an **absolute path** (see the full-stack steps above).
+- If the UI shows API errors, confirm Podium is running on **port 8001** (`PODIUM_PORT=8001`).
+- To reset the demo state, delete the generated files: `datametronome/podium/data/datametronome.db` and `datametronome/podium/data/retail.db`.
+
+<details>
+<summary>Optional: CLI-only quick check</summary>
+
+If you just want a fast smoke run (no API/UI), this runs the generator + checks and prints a report:
+
+```bash
+python3 showcase/retail_demo/run_demo.py
+```
+
+</details>
+
 > 💡 **Tip**: Check out the [complete walkthrough](docs/TUTORIAL.md) for a detailed guide!
 
 ---
 
-## � Visual Showcase
+## 📸 Visual Showcase
 
 ### Dashboard Overview
 <div align="center">
@@ -149,7 +170,7 @@ npm install && npm run dev
 
 ---
 
-## �🚀 Quick Start
+## 🚀 Quick Start
 
 ### Prerequisites
 - Python 3.13+
