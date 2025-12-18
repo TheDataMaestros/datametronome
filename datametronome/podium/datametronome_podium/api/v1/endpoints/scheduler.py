@@ -11,6 +11,7 @@ from datametronome_podium.core.scheduler import (
 from datametronome_podium.services.clef_scheduler import (
     execute_scheduled_clef,
     get_scheduled_clefs,
+    load_and_schedule_all_clefs,
     reschedule_clef,
     unschedule_clef,
 )
@@ -27,6 +28,34 @@ from datametronome_podium.services.scheduler_persistence import (
 from fastapi import APIRouter, HTTPException, Query, status
 
 router = APIRouter()
+
+
+@router.post("/reload")
+async def reload_scheduler_clefs() -> Dict[str, Any]:
+    """
+    Reload and schedule all clefs that have schedules.
+
+    This is useful after importing configuration (staves/clefs) at runtime, since
+    scheduling is normally done on application startup.
+    """
+    try:
+        result = await load_and_schedule_all_clefs()
+        scheduled_clefs = await get_scheduled_clefs()
+        status_info = get_scheduler_status()
+        is_running = await is_scheduler_running()
+
+        return {
+            "success": True,
+            "result": result,
+            "scheduled_clefs": scheduled_clefs,
+            "scheduler": status_info,
+            "is_running": is_running,
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to reload scheduler: {str(e)}",
+        )
 
 
 @router.get("/status")
@@ -128,18 +157,13 @@ async def execute_clef_now_endpoint(clef_id: str) -> Dict[str, Any]:
     """Execute a clef immediately (outside of its schedule)."""
     try:
         result = await execute_scheduled_clef(clef_id)
-
-        if result.get("success"):
-            return {
-                "success": True,
-                "message": f"Clef {clef_id} executed successfully",
-                "execution_result": result,
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to execute clef {clef_id}: {result.get('error', 'Unknown error')}",
-            )
+        # NOTE: A clef can execute successfully but still "fail" its check (status=fail).
+        # That is a valid result and should not be treated as an HTTP error.
+        return {
+            "success": bool(result.get("success", False)),
+            "message": f"Clef {clef_id} executed",
+            "execution_result": result,
+        }
     except HTTPException:
         raise
     except Exception as e:

@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test lint format clean docker-up docker-down docker-build prototype docker-prototype
+.PHONY: help install install-dev install-podium test lint format clean docker-up docker-down docker-build prototype docker-prototype
 
 help: ## Show this help message
 	@echo "DataMetronome - Available commands:"
@@ -7,7 +7,15 @@ help: ## Show this help message
 install: ## Install all packages in development mode
 	uv pip install -e ./datametronome/podium
 	uv pip install -e ./datametronome/pulse/core
+	uv pip install -e ./datametronome/pulse/sqlite
 	uv pip install -e ./datametronome/brain/base
+
+install-podium: ## Install Podium runtime dependencies only
+	@if command -v uv >/dev/null 2>&1; then \
+		uv pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/brain/base -e ./datametronome/podium; \
+	else \
+		python3 -m pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/brain/base -e ./datametronome/podium; \
+	fi
 
 install-dev: ## Install development dependencies
 	uv pip install pytest pytest-asyncio black isort mypy
@@ -67,7 +75,7 @@ prototype: ## Quick prototype setup and start (local)
 	@echo "🎨 Start the UI: make start-ui"
 	@echo "🔑 Login with: admin / admin"
 
-start-podium: ## Start the Podium backend
+start-podium: install-podium ## Start the Podium backend
 	./start_podium.sh
 
 start-ui: ## Start the UI

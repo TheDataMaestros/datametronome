@@ -136,7 +136,7 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
         # Create staves
         for stave_data in config.staves:
             try:
-                stave_id = stave_data.get("id", str(uuid.uuid4()))
+                stave_id = stave_data.get("id") or str(uuid.uuid4())
                 now = datetime.utcnow().isoformat() + "Z"
 
                 await db.write(
@@ -167,7 +167,7 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
         # Create clefs
         for clef_data in config.clefs:
             try:
-                clef_id = clef_data.get("id", str(uuid.uuid4()))
+                clef_id = clef_data.get("id") or str(uuid.uuid4())
                 now = datetime.utcnow().isoformat() + "Z"
 
                 await db.write(
@@ -305,6 +305,7 @@ class YAMLImportRequest(BaseModel):
     file_path: Optional[str] = None
     interpolate_env: bool = True
     strict_validation: bool = True
+    clean: bool = False
 
 
 class ValidationResponse(BaseModel):
@@ -409,7 +410,11 @@ async def import_yaml_advanced(request: YAMLImportRequest) -> ImportResult:
                 }
             )
 
-        import_config = ImportConfig(staves=staves_data, clefs=clefs_data, clean=False)
+        import_config = ImportConfig(
+            staves=staves_data,
+            clefs=clefs_data,
+            clean=request.clean,
+        )
 
         return await import_configuration(import_config)
 

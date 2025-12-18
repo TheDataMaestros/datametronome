@@ -6,7 +6,9 @@ Includes retry logic with exponential backoff for failed executions.
 """
 
 import asyncio
+import json
 import logging
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -34,6 +36,31 @@ from datametronome_podium.services.stave_service import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+# region agent log
+def _agent_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    try:
+        payload = {
+            "sessionId": "debug-session",
+            "runId": "pre-fix",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        }
+        with open(
+            "/Users/totolasso/repos/personal/datametronome/.cursor/debug.log",
+            "a",
+            encoding="utf-8",
+        ) as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+# endregion
 
 
 async def execute_scheduled_clef(
@@ -220,6 +247,24 @@ async def _store_clef_result(clef_id: str, result, clef, db) -> None:
         import uuid
 
         check_id = str(uuid.uuid4())
+        # region agent log
+        _agent_log(
+            "H_STORE_RESULT",
+            "datametronome_podium/services/clef_scheduler.py:_store_clef_result",
+            "storing clef result (pre-write)",
+            {
+                "check_id": check_id,
+                "clef_id": clef_id,
+                "stave_id": getattr(clef, "stave_id", None),
+                "check_type": getattr(clef, "check_type", None),
+                "status": getattr(result, "status", None),
+                "severity": getattr(getattr(result, "severity", None), "value", None),
+                "metadata_len": len(metadata_json)
+                if isinstance(metadata_json, str)
+                else None,
+            },
+        )
+        # endregion
         success = await db.write(
             [
                 {
@@ -244,11 +289,35 @@ async def _store_clef_result(clef_id: str, result, clef, db) -> None:
 
         if success:
             logger.debug(f"Stored result for clef {clef_id}")
+            # region agent log
+            _agent_log(
+                "H_STORE_RESULT",
+                "datametronome_podium/services/clef_scheduler.py:_store_clef_result",
+                "stored clef result (post-write)",
+                {"check_id": check_id, "clef_id": clef_id, "success": True},
+            )
+            # endregion
         else:
             logger.warning(f"Failed to store result for clef {clef_id}")
+            # region agent log
+            _agent_log(
+                "H_STORE_RESULT",
+                "datametronome_podium/services/clef_scheduler.py:_store_clef_result",
+                "db.write returned False",
+                {"check_id": check_id, "clef_id": clef_id, "success": False},
+            )
+            # endregion
 
     except Exception as e:
         logger.error(f"Failed to store result for clef {clef_id}: {e}")
+        # region agent log
+        _agent_log(
+            "H_STORE_EXCEPTION",
+            "datametronome_podium/services/clef_scheduler.py:_store_clef_result",
+            "exception storing clef result",
+            {"clef_id": clef_id, "error_type": type(e).__name__, "error": str(e)},
+        )
+        # endregion
 
 
 async def load_and_schedule_all_clefs() -> Dict[str, int]:

@@ -26,8 +26,13 @@ class SQLiteReadonlyPulse(Pulse, Readable):
             db_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Connect to database (tables should already exist from Podium)
-            self.connection = sqlite3.connect(self.database_path)
+            self.connection = sqlite3.connect(self.database_path, timeout=30)
             self.connection.row_factory = sqlite3.Row  # Enable dict-like access
+            # Improve concurrency behavior (best-effort)
+            cursor = self.connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
 
         except Exception as e:
             raise ConnectionError(f"Failed to connect to SQLite: {e}")
@@ -49,15 +54,40 @@ class SQLiteReadonlyPulse(Pulse, Readable):
 
         try:
             if isinstance(query_config, str):
-                # Simple SQL query
+                sql = query_config
+                sql_op = sql.lstrip().lower()
+                # Guardrail: this connector should only be used for read statements.
+                if not (
+                    sql_op.startswith("select")
+                    or sql_op.startswith("with")
+                    or sql_op.startswith("pragma")
+                    or sql_op.startswith("explain")
+                ):
+                    raise RuntimeError(
+                        "Readonly SQLite connector cannot execute write statements. "
+                        "Use db.execute/db.write instead."
+                    )
+
                 cursor = self.connection.cursor()
-                cursor.execute(query_config)
+                cursor.execute(sql)
                 results = cursor.fetchall()
                 return [dict(row) for row in results]
             else:
                 # Query with parameters
                 sql = query_config.get("sql", "")
                 params = query_config.get("params", [])
+
+                sql_op = sql.lstrip().lower()
+                if not (
+                    sql_op.startswith("select")
+                    or sql_op.startswith("with")
+                    or sql_op.startswith("pragma")
+                    or sql_op.startswith("explain")
+                ):
+                    raise RuntimeError(
+                        "Readonly SQLite connector cannot execute write statements. "
+                        "Use db.execute/db.write instead."
+                    )
 
                 cursor = self.connection.cursor()
                 cursor.execute(sql, params)
@@ -72,6 +102,18 @@ class SQLiteReadonlyPulse(Pulse, Readable):
             raise RuntimeError("Not connected to SQLite database")
 
         try:
+            sql_op = sql.lstrip().lower()
+            if not (
+                sql_op.startswith("select")
+                or sql_op.startswith("with")
+                or sql_op.startswith("pragma")
+                or sql_op.startswith("explain")
+            ):
+                raise RuntimeError(
+                    "Readonly SQLite connector cannot execute write statements. "
+                    "Use db.execute/db.write instead."
+                )
+
             cursor = self.connection.cursor()
             cursor.execute(sql, params)
             results = cursor.fetchall()

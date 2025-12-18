@@ -104,17 +104,9 @@ async def save_scheduler_job(job: SchedulerJob) -> bool:
         db = await get_db()
         job_data = job.to_dict()
 
-        # Check if job exists
-        existing = await db.query(
-            {"sql": "SELECT id FROM scheduler_jobs WHERE id = ?", "params": [job.id]}
-        )
-
-        if existing:
-            # Update existing
-            await db.write([job_data], "scheduler_jobs")
-        else:
-            # Insert new
-            await db.write([job_data], "scheduler_jobs")
+        # Use replace semantics to avoid UNIQUE constraint errors on id and to keep
+        # writes serialized via the write connector lock.
+        await db.write([job_data], "scheduler_jobs", config={"type": "replace"})
 
         logger.debug(f"Saved scheduler job: {job.id}")
         return True
@@ -221,9 +213,9 @@ async def delete_scheduler_job(job_id: str) -> bool:
     """
     try:
         db = await get_db()
-        await db.query(
-            {"sql": "DELETE FROM scheduler_jobs WHERE id = ?", "params": [job_id]}
-        )
+        # Use db.execute (write connector) for DML to avoid leaving transactions open
+        # and to serialize writes via the SQLite write lock.
+        await db.execute("DELETE FROM scheduler_jobs WHERE id = ?", [job_id])
 
         logger.debug(f"Deleted scheduler job: {job_id}")
         return True
@@ -270,7 +262,8 @@ async def update_job_run_time(
         params.append(job_id)
 
         sql = f"UPDATE scheduler_jobs SET {', '.join(updates)} WHERE id = ?"
-        await db.query({"sql": sql, "params": params})
+        # Use db.execute for DML so writes are committed and serialized.
+        await db.execute(sql, params)
 
         return True
 
@@ -298,9 +291,8 @@ async def increment_job_execution_count(job_id: str, success: bool = True) -> bo
         else:
             sql = "UPDATE scheduler_jobs SET failure_count = failure_count + 1, updated_at = ? WHERE id = ?"
 
-        await db.query(
-            {"sql": sql, "params": [datetime.utcnow().isoformat() + "Z", job_id]}
-        )
+        # Use db.execute for DML so writes are committed and serialized.
+        await db.execute(sql, [datetime.utcnow().isoformat() + "Z", job_id])
 
         return True
 

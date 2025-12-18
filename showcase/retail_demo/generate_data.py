@@ -9,8 +9,6 @@ import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import numpy as np
-
 
 def create_retail_db(db_path="retail.db"):
     db_file = Path(db_path)
@@ -91,7 +89,7 @@ def create_retail_db(db_path="retail.db"):
         # Order Amounts: Normal distribution around $100
         # For drift detection later, we keep this stable for now
         for _ in range(daily_orders_count):
-            amount = max(10.0, np.random.normal(100, 20))
+            amount = max(10.0, random.gauss(100, 20))
             orders.append(
                 (
                     None,
@@ -114,7 +112,7 @@ def create_retail_db(db_path="retail.db"):
     # Expected daily volume at this point in history is typically ~80-120.
     todays_orders = 20
     for _ in range(todays_orders):
-        amount = max(10.0, np.random.normal(500, 50))  # HUGE drift
+        amount = max(10.0, random.gauss(500, 50))  # HUGE drift
         orders.append(
             (
                 None,

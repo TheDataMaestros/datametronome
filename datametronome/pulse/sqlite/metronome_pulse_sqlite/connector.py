@@ -33,8 +33,13 @@ class SQLitePulse(Pulse, Readable, Writable):
             db_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Connect to database (tables should already exist from Podium)
-            self.connection = sqlite3.connect(self.database_path)
+            self.connection = sqlite3.connect(self.database_path, timeout=30)
             self.connection.row_factory = sqlite3.Row  # Enable dict-like access
+            # Improve concurrency behavior (best-effort)
+            cursor = self.connection.cursor()
+            cursor.execute("PRAGMA journal_mode=WAL")
+            cursor.execute("PRAGMA synchronous=NORMAL")
+            cursor.execute("PRAGMA busy_timeout=30000")
 
             # Connect both readonly and writeonly connectors
             await self._readonly.connect()
