@@ -1,4 +1,4 @@
-.PHONY: help install install-dev install-podium test lint format clean docker-up docker-down docker-build prototype docker-prototype
+.PHONY: help install install-dev install-podium test lint format clean docker-up docker-down docker-build prototype docker-prototype retail-db
 
 help: ## Show this help message
 	@echo "DataMetronome - Available commands:"
@@ -84,6 +84,9 @@ start-ui: ## Start the UI
 	NUXT_PUBLIC_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8000}/api/v1" \
 	NUXT_PUBLIC_PODIUM_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8000}" \
 	npm run dev -- --port $${UI_PORT:-3000}'
+
+retail-db: ## Generate the Retail demo dataset DB (SQLite)
+	@python3 showcase/retail_demo/generate_db.py --out datametronome/podium/data/retail.db
 
 setup-db: ## Initialize the database
 	cd datametronome/podium && DATAMETRONOME_SECRET_KEY="dev-secret-key-change-in-production-32-chars" DATAMETRONOME_DATABASE_URL="sqlite+aiosqlite:///$(PWD)/data/datametronome.db" python -c "import asyncio; from datametronome_podium.core.database import init_db; asyncio.run(init_db())"

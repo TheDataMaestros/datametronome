@@ -104,15 +104,17 @@ From repo root (copy/paste):
 make install
 
 # Generate the retail dataset DB (stable location for the backend)
-python3 -c "from showcase.retail_demo.generate_data import create_retail_db; create_retail_db('datametronome/podium/data/retail.db')"
+make retail-db
 
 # Import the Retail stave/clefs from YAML into Podium (resolve DB_PATH at import time)
 export DB_PATH="$(pwd)/datametronome/podium/data/retail.db"
-python3 scripts/import_retail_to_db.py
+python3 showcase/retail_demo/import_to_podium.py
 
 # Start Podium (defaults to http://localhost:8000 via config.env)
-./start_podium.sh
+make start-podium
 ```
+
+> Tip: `make retail-db` is a convenience wrapper around `showcase/retail_demo/generate_db.py`.
 
 Then in a new terminal:
 
