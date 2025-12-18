@@ -41,43 +41,6 @@ export LOG_LEVEL="${LOG_LEVEL:-INFO}"
 # Change to the podium directory
 cd datametronome/podium
 
-echo "🔎 Checking Podium runtime dependencies..."
-if ! python3 - <<'PY'
-import sys
-
-missing = []
-for mod in (
-    "fastapi",
-    "uvicorn",
-    "pydantic",
-    "pydantic_settings",
-    "apscheduler",
-    "yaml",
-    "multipart",
-    "metronome_pulse_core",
-    "metronome_pulse_sqlite",
-    "datametronome_brain_base",
-):
-    try:
-        __import__(mod)
-    except Exception:
-        missing.append(mod)
-
-if missing:
-    print("Missing dependencies:", ", ".join(missing))
-    sys.exit(1)
-
-print("✅ Dependencies look good.")
-PY
-then
-    echo "📦 Installing Podium + required local dependencies..."
-    if command -v uv >/dev/null 2>&1; then
-        uv pip install -e ../pulse/core -e ../pulse/sqlite -e ../brain/base -e .
-    else
-        python3 -m pip install -e ../pulse/core -e ../pulse/sqlite -e ../brain/base -e .
-    fi
-fi
-
 echo "🎵 Starting DataMetronome Podium API..."
 echo "📍 Host: ${PODIUM_HOST}"
 echo "🔌 Port: ${PODIUM_PORT}"
