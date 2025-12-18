@@ -3,12 +3,39 @@ Database initialization and management for DataMetronome Podium.
 """
 
 import asyncio
+import json
 import logging
+import time
 from typing import Any, Dict, List
 
 from metronome_pulse_sqlite import SQLitePulse
 
 logger = logging.getLogger(__name__)
+
+
+# region agent log
+def _agent_log(hypothesis_id: str, location: str, message: str, data: dict) -> None:
+    try:
+        payload = {
+            "sessionId": "debug-session",
+            "runId": "pre-fix",
+            "hypothesisId": hypothesis_id,
+            "location": location,
+            "message": message,
+            "data": data,
+            "timestamp": int(time.time() * 1000),
+        }
+        with open(
+            "/Users/totolasso/repos/personal/datametronome/.cursor/debug.log",
+            "a",
+            encoding="utf-8",
+        ) as f:
+            f.write(json.dumps(payload, ensure_ascii=False) + "\n")
+    except Exception:
+        pass
+
+
+# endregion
 
 # Global connector instance
 sqlite_connector: SQLitePulse | None = None
@@ -32,6 +59,21 @@ async def init_db() -> None:
         full_path = os.path.abspath(db_path)
         print(f"DEBUG: init_db using path: {full_path}")
         print(f"DEBUG: File exists? {os.path.exists(full_path)}")
+        # region agent log
+        _agent_log(
+            "H_DB_PATH",
+            "datametronome_podium/core/database.py:init_db",
+            "init_db resolved sqlite path",
+            {
+                "database_url_scheme": "sqlite"
+                if settings.database_url.startswith("sqlite")
+                else "non-sqlite",
+                "db_path": db_path,
+                "full_path": full_path,
+                "exists": bool(os.path.exists(full_path)),
+            },
+        )
+        # endregion
         sqlite_connector = SQLitePulse(db_path)
 
         # Connect to the database
@@ -267,6 +309,14 @@ async def execute_write(operations: List[Dict[str, Any]]) -> bool:
 async def insert_data(table: str, data: Dict[str, Any]) -> bool:
     """Insert data into a table."""
     connector = await get_db()
+    # region agent log
+    _agent_log(
+        "H_INSERT_DATA",
+        "datametronome_podium/core/database.py:insert_data",
+        "insert_data called",
+        {"table": table, "id": data.get("id"), "keys": sorted(list(data.keys()))},
+    )
+    # endregion
     return await connector.write([{"table": table, **data}], table)
 
 

@@ -15,19 +15,20 @@ clefs:
     stave_id: retail-db-001
     check_type: "column_values"  # Replaces legacy null_check
     schedule: "*/10 * * * *"
+    warn: "if_null > 5%"
+    fail: "if_null > 10%"
     config:
       table: "users"
       column: "email"
-      rule: "no_nulls"
-      threshold: 0.05  # Allow up to 5% nulls (we generated ~5%)
 
   - name: "Significant Order Volume"
     stave_id: retail-db-001
     check_type: "row_count"
     schedule: "*/10 * * * *"
+    warn: "< 1200"
+    fail: "< 1000"
     config:
       table: "orders"
-      min_rows: 1000  # We generated ~3000
 
   # --- Level 2: Brain / ML Checks ---
 

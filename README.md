@@ -86,58 +86,59 @@ The demo showcases a realistic e-commerce scenario with:
    - KS test for distribution changes
    - Catches pricing bugs automatically
 
-### Run the Retail Demo (Full Stack: API + UI)
+### Retail Demo (Full Stack: API + UI)
 
-#### Where does the “dataset” come from?
+#### Prerequisites
+- Python 3.13+
+- Node.js 18+
 
-The Retail demo uses a **synthetic dataset generated locally** (a SQLite file). It is intentionally **not committed to git**.
+#### Generated demo artifacts (local)
+The Retail demo uses a **synthetic dataset generated locally** (SQLite). These files are **not committed to git**:
+- **Retail dataset DB**: `datametronome/podium/data/retail.db` (source data the checks query)
+- **Podium app DB**: `datametronome/podium/data/datametronome.db` (stores staves/clefs/results)
 
-- **Retail dataset DB (generated)**: `datametronome/podium/data/retail.db` (recommended) or `./retail.db` (CLI-only run)
-- **Podium app DB (generated)**: `datametronome/podium/data/datametronome.db` (stores staves/clefs/results)
-
-#### Full stack (API + UI) — recommended path
-
-From repo root (copy/paste):
+#### Run (recommended)
+From the repo root:
 
 ```bash
-# Install Python packages (uses `uv` under the hood; see Makefile: install)
+# 1) Install Python packages (uses `uv` under the hood; see Makefile: install)
 make install
 
-# Generate the retail dataset DB (stable location for the backend)
-python3 -c "from showcase.retail_demo.generate_data import create_retail_db; create_retail_db('datametronome/podium/data/retail.db')"
+# 2) Generate the retail dataset DB (SQLite)
+make retail-db
 
-# Import the Retail stave/clefs from YAML into Podium (resolve DB_PATH at import time)
+# 3) Import the Retail stave/clefs from YAML into Podium (DB_PATH must be absolute)
 export DB_PATH="$(pwd)/datametronome/podium/data/retail.db"
-python3 scripts/import_retail_to_db.py
+python3 showcase/retail_demo/import_to_podium.py
 
-# Start Podium (defaults to http://localhost:8000 via config.env)
-./start_podium.sh
+# 4) Start Podium API (default: http://localhost:8000 via config.env)
+make start-podium
 ```
 
-Then in a new terminal:
+In a new terminal (repo root):
 
 ```bash
-# Point the UI to the Podium port you're using (default: 8000)
+# 5) Start the UI (default: http://localhost:3000) and point it at Podium
 NUXT_PUBLIC_API_BASE="http://127.0.0.1:8000/api/v1" \
 NUXT_PUBLIC_PODIUM_API_BASE="http://127.0.0.1:8000" \
 make start-ui
 ```
 
-**Access**: http://localhost:3000 (login: `admin` / `admin`)
+#### Validate
+- **UI**: http://localhost:3000 (login: `admin` / `admin`)
+- **In-app**: go to **Quality Checks** → select **Retail Production DB** → click **Run Check**
 
-**What You'll See**:
-- Navigate to **Quality Checks** → See all 4 checks for "Retail Production DB"
-- Click **Run Check** to execute ML-powered analysis
-- View **anomaly detections** with explanations
-- Explore **historical trends** and forecasts
+#### Reset
+Delete the generated SQLite files:
+- `datametronome/podium/data/datametronome.db`
+- `datametronome/podium/data/retail.db`
 
-**Troubleshooting (common gotchas)**:
-- If checks fail with “DB file not found”, re-run the import with `DB_PATH` set to an **absolute path** (see the full-stack steps above).
-- If the UI shows API errors, confirm the UI points to the correct Podium port (`NUXT_PUBLIC_API_BASE`) and that Podium is running.
-- To reset the demo state, delete the generated files: `datametronome/podium/data/datametronome.db` and `datametronome/podium/data/retail.db`.
+#### Troubleshooting
+- If checks fail with “DB file not found”, re-run the import with `DB_PATH` set to an **absolute** path.
+- If the UI shows API errors, confirm Podium is running and the UI points to the correct Podium port (`NUXT_PUBLIC_API_BASE`).
 
 <details>
-<summary>Optional: CLI-only quick check</summary>
+<summary>Optional: CLI smoke test (no API/UI)</summary>
 
 If you just want a fast smoke run (no API/UI), this runs the generator + checks and prints a report:
 

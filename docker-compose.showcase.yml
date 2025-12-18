@@ -1,0 +1,56 @@
+services:
+  podium:
+    build:
+      context: .
+      dockerfile: datametronome/podium/Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      DATAMETRONOME_SECRET_KEY: "your-super-secret-key-that-is-at-least-32-characters-long"
+      DATAMETRONOME_DEBUG: "false"
+      DATAMETRONOME_HOST: "0.0.0.0"
+      DATAMETRONOME_PORT: "8001"
+      DATAMETRONOME_DATABASE_URL: "sqlite+aiosqlite:////app/data/datametronome.db"
+      DATAMETRONOME_ALLOWED_ORIGINS: "http://localhost:3000"
+      # Scheduler is currently not safe with SQLite concurrency in demo mode
+      DATAMETRONOME_SCHEDULER_ENABLED: "false"
+      # Used by YAML env interpolation for the showcase stave connection_config
+      DB_PATH: "/app/data/retail.db"
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+
+  ui:
+    build:
+      context: .
+      dockerfile: ui-nuxt/Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      # Browser should call the host-exposed Podium port
+      NUXT_PUBLIC_API_BASE: "http://localhost:8001/api/v1"
+      NUXT_PUBLIC_PODIUM_API_BASE: "http://localhost:8001"
+    depends_on:
+      podium:
+        condition: service_healthy
+
+  showcase-init:
+    build:
+      context: .
+      dockerfile: datametronome/podium/Dockerfile
+    depends_on:
+      podium:
+        condition: service_healthy
+    environment:
+      PODIUM_BASE_URL: "http://podium:8001"
+      RETAIL_DB_PATH: "/app/data/retail.db"
+      SHOWCASE_YAML_PATH: "/app/showcase/retail_demo/retail.yaml"
+    volumes:
+      - ./data:/app/data
+    command: ["python", "/app/showcase/retail_demo/docker_bootstrap.py"]
+    restart: "no"

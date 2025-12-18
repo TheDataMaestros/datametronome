@@ -1,4 +1,4 @@
-.PHONY: help install install-dev test lint format clean docker-up docker-down docker-build prototype docker-prototype
+.PHONY: help install install-dev install-podium test lint format clean docker-up docker-down docker-build prototype docker-prototype retail-db
 
 help: ## Show this help message
 	@echo "DataMetronome - Available commands:"
@@ -7,7 +7,15 @@ help: ## Show this help message
 install: ## Install all packages in development mode
 	uv pip install -e ./datametronome/podium
 	uv pip install -e ./datametronome/pulse/core
+	uv pip install -e ./datametronome/pulse/sqlite
 	uv pip install -e ./datametronome/brain/base
+
+install-podium: ## Install Podium runtime dependencies only
+	@if command -v uv >/dev/null 2>&1; then \
+		uv pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/brain/base -e ./datametronome/podium; \
+	else \
+		python3 -m pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/brain/base -e ./datametronome/podium; \
+	fi
 
 install-dev: ## Install development dependencies
 	uv pip install pytest pytest-asyncio black isort mypy
@@ -67,7 +75,7 @@ prototype: ## Quick prototype setup and start (local)
 	@echo "🎨 Start the UI: make start-ui"
 	@echo "🔑 Login with: admin / admin"
 
-start-podium: ## Start the Podium backend
+start-podium: install-podium ## Start the Podium backend
 	./start_podium.sh
 
 start-ui: ## Start the UI
@@ -76,6 +84,9 @@ start-ui: ## Start the UI
 	NUXT_PUBLIC_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8000}/api/v1" \
 	NUXT_PUBLIC_PODIUM_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8000}" \
 	npm run dev -- --port $${UI_PORT:-3000}'
+
+retail-db: ## Generate the Retail demo dataset DB (SQLite)
+	@python3 showcase/retail_demo/generate_db.py --out datametronome/podium/data/retail.db
 
 setup-db: ## Initialize the database
 	cd datametronome/podium && DATAMETRONOME_SECRET_KEY="dev-secret-key-change-in-production-32-chars" DATAMETRONOME_DATABASE_URL="sqlite+aiosqlite:///$(PWD)/data/datametronome.db" python -c "import asyncio; from datametronome_podium.core.database import init_db; asyncio.run(init_db())"
