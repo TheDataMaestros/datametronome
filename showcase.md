@@ -1,6 +1,6 @@
-# DataMetronome — project showcase (one‑pager)
+# DataMetronome — project showcase
 
-## What it is (pitch)
+## What it is
 **DataMetronome is an open-source data quality & anomaly detection platform** that lets teams define checks as code (YAML), run them on a schedule or on-demand, and visualize results in a modern dashboard.
 
 If you’ve ever asked “Is today’s data complete, fresh, and within expected behavior?”, DataMetronome is built to answer that question continuously—before downstream dashboards, ML models, or business logic break.
@@ -136,5 +136,5 @@ Then:
 python3 showcase/retail_demo/run_demo.py
 ```
 
-## Why it’s compelling
+## Strengths
 DataMetronome is designed to be **practical** (YAML checks, clear failures, easy local demo), **extensible** (connector + check architecture), and **production-minded** (API-first, scheduler, Docker-ready) so teams can move from “we noticed an issue” to “we prevent it” quickly.
