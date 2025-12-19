@@ -4,8 +4,8 @@ Scheduler management for DataMetronome Podium.
 
 import asyncio
 import logging
-from typing import Optional
 
+from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
@@ -14,7 +14,7 @@ from .config import settings
 logger = logging.getLogger(__name__)
 
 # Global scheduler instance
-scheduler: Optional[AsyncIOScheduler] = None
+scheduler: AsyncIOScheduler | None = None
 
 
 async def init_scheduler():
@@ -37,11 +37,45 @@ async def init_scheduler():
                 "max_instances": max_instances,
                 "misfire_grace_time": 60,  # Grace period for missed executions
             },
-            executors={"default": {"type": "threadpool", "max_workers": max_workers}},
+            # Important: most scheduled jobs in Podium are async (coroutines).
+            # If we force a threadpool default executor, APScheduler will call the
+            # coroutine function in a worker thread, producing "coroutine was never awaited"
+            # and silently skipping real execution (no new results even though the job
+            # appears "executed successfully").
+            executors={
+                "default": {"type": "asyncio"},
+                "threadpool": {"type": "threadpool", "max_workers": max_workers},
+            },
         )
 
         scheduler.start()
         logger.info("Scheduler started successfully")
+        try:
+            executors = getattr(scheduler, "_executors", {}) or {}
+            executor_info = {
+                name: ex.__class__.__name__ for name, ex in executors.items()
+            }
+            logger.info(f"Scheduler executors: {executor_info}")
+        except Exception as e:
+            logger.debug(f"Could not inspect scheduler executors: {e}")
+
+        def _job_listener(event):
+            # Make scheduler behavior obvious in logs (executed/error/missed).
+            if event.code == EVENT_JOB_EXECUTED:
+                logger.info(f"✅ Job executed: {event.job_id}")
+                return
+            if event.code == EVENT_JOB_MISSED:
+                logger.warning(f"⏰ Job MISSED (misfire): {event.job_id}")
+                return
+            if event.code == EVENT_JOB_ERROR:
+                logger.exception(
+                    f"❌ Job error: {event.job_id}",
+                    exc_info=getattr(event, "exception", None),
+                )
+
+        scheduler.add_listener(
+            _job_listener, EVENT_JOB_EXECUTED | EVENT_JOB_ERROR | EVENT_JOB_MISSED
+        )
 
         # Add the streaming data generator job
         try:
