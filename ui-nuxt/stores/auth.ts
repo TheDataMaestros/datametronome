@@ -26,7 +26,10 @@ export const useAuthStore = defineStore('auth', () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
-  const isAuthenticated = computed(() => !!token.value && !!user.value)
+  // Treat presence of a token as authenticated.
+  // (On refresh, user info may not be available yet / may fail to parse, but we still
+  // want to keep the session and let the app fetch/derive user details later.)
+  const isAuthenticated = computed(() => !!token.value)
 
   async function login(credentials: LoginCredentials): Promise<LoginResult> {
     isLoading.value = true
@@ -127,15 +130,16 @@ export const useAuthStore = defineStore('auth', () => {
       const storedToken = localStorage.getItem('auth_token')
       const storedUser = localStorage.getItem('user_info')
 
-      if (storedToken && storedUser) {
+      if (storedToken) token.value = storedToken
+
+      if (storedUser) {
         try {
-          token.value = storedToken
           user.value = JSON.parse(storedUser)
         } catch (err) {
           console.error('Error parsing stored user data:', err)
-          // Clear invalid data
-          localStorage.removeItem('auth_token')
+          // Clear invalid user data, but keep the token so the session survives.
           localStorage.removeItem('user_info')
+          user.value = null
         }
       }
     }
