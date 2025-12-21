@@ -27,9 +27,10 @@ def to_utc_isoformat(dt: Optional[datetime] = None) -> str:
         # Parse string timestamp
         try:
             if dt.endswith("Z"):
-                dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
+                parsed_dt = datetime.fromisoformat(dt.replace("Z", "+00:00"))
             else:
-                dt = datetime.fromisoformat(dt)
+                parsed_dt = datetime.fromisoformat(dt)
+            dt = parsed_dt
         except ValueError:
             # If parsing fails, return the original string
             return dt

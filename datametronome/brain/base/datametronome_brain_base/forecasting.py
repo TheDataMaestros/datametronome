@@ -96,12 +96,18 @@ class SarimaForecaster:
             raise ValueError(f"Unsupported data type: {type(data)}")
 
         # Validate data
+        if not self.order or not self.seasonal_order:
+            raise ValueError("Order and seasonal_order must be set")
         if len(data) < max(
             self.order[0] + self.order[2],
             self.seasonal_order[0] + self.seasonal_order[2] + self.seasonal_order[3],
         ):
+            order_min = self.order[0] + self.order[2]
+            seasonal_min = (
+                self.seasonal_order[0] + self.seasonal_order[2] + self.seasonal_order[3]
+            )
             raise ValueError(
-                f"Insufficient data: need at least {max(self.order[0] + self.order[2], self.seasonal_order[0] + self.seasonal_order[2] + self.seasonal_order[3])} "
+                f"Insufficient data: need at least {max(order_min, seasonal_min)} "
                 f"points, got {len(data)}"
             )
 
@@ -340,7 +346,7 @@ class SarimaForecaster:
                 # Skip invalid combinations
                 continue
 
-        if best_order is None:
+        if best_order is None or best_seasonal_order is None or best_model is None:
             raise ValueError("Could not find valid SARIMA model")
 
         logger.info(

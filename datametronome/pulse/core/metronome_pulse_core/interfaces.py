@@ -53,7 +53,7 @@ class Readable(ABC):
     """
 
     @abstractmethod
-    async def query(self, query_config) -> list:
+    async def query(self, query_config) -> list | dict:
         """Execute a query and return results.
 
         Args:
@@ -76,16 +76,16 @@ class Readable(ABC):
         pass
 
     # Additional convenience methods for backward compatibility
-    async def execute_query(self, query: str, params: dict = None) -> list:
+    async def execute_query(self, query: str, params: dict | None = None) -> list:
         """Execute a query and return results (alias for query method)."""
         return await self.query(query)
 
-    async def fetch_one(self, query: str, params: dict = None) -> dict | None:
+    async def fetch_one(self, query: str, params: dict | None = None) -> dict | None:
         """Fetch a single result from a query."""
         results = await self.query(query)
         return results[0] if results else None
 
-    async def fetch_all(self, query: str, params: dict = None) -> list:
+    async def fetch_all(self, query: str, params: dict | None = None) -> list:
         """Fetch all results from a query (alias for query method)."""
         return await self.query(query)
 
@@ -102,13 +102,15 @@ class Readable(ABC):
         """Get table schema (default implementation)."""
         return {}
 
-    async def get_table_info(self, table_name: str) -> list:
+    async def get_table_info(self, table_name: str) -> dict | list:
         """Get table information (default implementation)."""
         return []
 
     async def test_connection(self) -> bool:
         """Test if connection is working (default implementation)."""
-        return await self.is_connected()
+        if hasattr(self, "is_connected"):
+            return await self.is_connected()  # type: ignore
+        return True
 
 
 class Writable(ABC):
@@ -118,7 +120,7 @@ class Writable(ABC):
     """
 
     @abstractmethod
-    async def write(self, data, destination: str, config: dict = None) -> None:
+    async def write(self, data, destination: str, config: dict | None = None) -> None:
         """Write data to the destination with optional configuration.
 
         Args:
@@ -138,14 +140,14 @@ class Writable(ABC):
         pass
 
     # Additional convenience methods for backward compatibility
-    async def execute_write(self, query: str, params: dict = None) -> dict:
+    async def execute_write(self, query: str, params: dict | None = None) -> dict:
         """Execute a write query and return result (alias for write method)."""
         # This is a simplified version for backward compatibility
         await self.write([params] if params else [], "temp_table")
         return {"affected_rows": 1}
 
     async def execute_batch(
-        self, queries: list[str], params: list[dict] = None
+        self, queries: list[str], params: list[dict] | None = None
     ) -> dict:
         """Execute multiple write queries in batch (alias for write method)."""
         # This is a simplified version for backward compatibility

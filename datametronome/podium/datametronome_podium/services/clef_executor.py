@@ -15,7 +15,7 @@ Example Usage:
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from datametronome_podium.models.check_run import CheckRun
@@ -30,24 +30,24 @@ from datametronome_podium.models.stave import Stave
 from datametronome_podium.services.connection_tester import ConnectionTester
 
 try:
-    from datametronome_brain_base.forecasting import SarimaForecaster
+    from datametronome_brain_base.forecasting import SarimaForecaster  # type: ignore
 except ModuleNotFoundError:
     SarimaForecaster = None
 
 try:
-    from datametronome_brain_base.drift_detection import DriftDetector
+    from datametronome_brain_base.drift_detection import DriftDetector  # type: ignore
 except ModuleNotFoundError:
     DriftDetector = None
 
 try:
-    import pandas as pd
+    import pandas as pd  # type: ignore
 except ModuleNotFoundError:
-    pd = None
+    pd = None  # type: ignore
 
 try:
-    import numpy as np
+    import numpy as np  # type: ignore
 except ModuleNotFoundError:
-    np = None
+    np = None  # type: ignore
 
 
 logger = logging.getLogger(__name__)
@@ -67,9 +67,9 @@ class CheckResult:
     status: str  # "pass", "warn", or "fail" (per TDD specification)
     message: str
     observed_value: Any = None  # The actual value that was observed/evaluated
-    metadata: Dict[str, Any] = None  # Additional context and proof of failure
+    metadata: Optional[Dict[str, Any]] = None  # Additional context and proof of failure
     execution_time: float = 0.0  # seconds
-    timestamp: datetime = None
+    timestamp: Optional[datetime] = None
     anomalies_count: int = 0
 
     def __post_init__(self):
@@ -96,7 +96,7 @@ class CheckResult:
     @property
     def details(self) -> Dict[str, Any]:
         """Backward compatibility alias for metadata."""
-        return self.metadata
+        return self.metadata or {}
 
     @details.setter
     def details(self, value: Dict[str, Any]):
@@ -1912,7 +1912,7 @@ class ClefExecutor:
                     metadata={"raw_value": latest_raw},
                 )
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             age_hours = max((now - latest_timestamp).total_seconds() / 3600.0, 0.0)
 
             normalized_fail = _normalize_duration_condition(clef.fail)

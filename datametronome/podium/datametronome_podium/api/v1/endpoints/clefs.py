@@ -1,6 +1,6 @@
 """Clef endpoints for DataMetronome Podium using DataPulse connectors."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, List
 
 from datametronome_podium.api.schemas.clef import ClefCreate, ClefResponse, ClefUpdate
@@ -65,7 +65,22 @@ async def get_clefs(skip: int = 0, limit: int = 100) -> List[ClefResponse]:
                     clef_dict["created_at"] = clef_dict["created_at"].isoformat()
                 if isinstance(clef_dict.get("updated_at"), datetime):
                     clef_dict["updated_at"] = clef_dict["updated_at"].isoformat()
-                response_data.append(ClefResponse(**clef_dict))
+                response_data.append(
+                    ClefResponse(
+                        id=clef_dict["id"],
+                        stave_id=clef_dict["stave_id"],
+                        name=clef_dict["name"],
+                        description=clef_dict["description"],
+                        check_type=clef_dict["check_type"],
+                        config=clef_dict["config"],
+                        is_active=clef_dict["is_active"],
+                        schedule=clef_dict["schedule"],
+                        warn=clef_dict["warn"],
+                        fail=clef_dict["fail"],
+                        created_at=clef_dict["created_at"],
+                        updated_at=clef_dict["updated_at"],
+                    )
+                )
             except Exception as e:
                 # Log the error but continue processing other clefs
                 import logging
@@ -117,7 +132,20 @@ async def get_clef(clef_id: str) -> ClefResponse:
             clef_dict["created_at"] = clef_dict["created_at"].isoformat()
         if isinstance(clef_dict.get("updated_at"), datetime):
             clef_dict["updated_at"] = clef_dict["updated_at"].isoformat()
-        return ClefResponse(**clef_dict)
+        return ClefResponse(
+            id=clef_dict["id"],
+            stave_id=clef_dict["stave_id"],
+            name=clef_dict["name"],
+            description=clef_dict["description"],
+            check_type=clef_dict["check_type"],
+            config=clef_dict["config"],
+            is_active=clef_dict["is_active"],
+            schedule=clef_dict["schedule"],
+            warn=clef_dict["warn"],
+            fail=clef_dict["fail"],
+            created_at=clef_dict["created_at"],
+            updated_at=clef_dict["updated_at"],
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -147,7 +175,7 @@ async def create_clef(clef_data: ClefCreate) -> ClefResponse:
         import uuid
 
         clef_id = str(uuid.uuid4())
-        now = datetime.utcnow().isoformat() + "Z"
+        now = datetime.now(timezone.utc).isoformat() + "Z"
 
         # Insert the new clef
         import json
@@ -186,7 +214,20 @@ async def create_clef(clef_data: ClefCreate) -> ClefResponse:
             "created_at": now,
             "updated_at": now,
         }
-        return ClefResponse(**clef_response_data)
+        return ClefResponse(
+            id=clef_id,
+            stave_id=clef_response_data["stave_id"],
+            name=clef_data.name,
+            description=clef_data.description,
+            check_type=clef_data.check_type,
+            config=clef_data.config,
+            is_active=clef_data.is_active,
+            schedule=clef_data.schedule,
+            warn=clef_data.warn,
+            fail=clef_data.fail,
+            created_at=now,
+            updated_at=now,
+        )
 
     except HTTPException:
         raise
@@ -226,7 +267,7 @@ async def update_clef(clef_id: str, clef_data: ClefUpdate) -> ClefResponse:
 
         # Update the clef
         update_data = clef_data.model_dump(exclude_unset=True)
-        update_data["updated_at"] = datetime.utcnow().isoformat() + "Z"
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat() + "Z"
 
         success = await db.write([{"table": "clefs", **update_data}], "clefs")
 
@@ -238,7 +279,20 @@ async def update_clef(clef_id: str, clef_data: ClefUpdate) -> ClefResponse:
 
         # Return the updated clef
         updated_clef = {**clefs[0], **update_data}
-        return ClefResponse(**updated_clef)
+        return ClefResponse(
+            id=updated_clef["id"],
+            stave_id=updated_clef["stave_id"],
+            name=updated_clef["name"],
+            description=updated_clef["description"],
+            check_type=updated_clef["check_type"],
+            config=updated_clef["config"],
+            is_active=updated_clef["is_active"],
+            schedule=updated_clef["schedule"],
+            warn=updated_clef["warn"],
+            fail=updated_clef["fail"],
+            created_at=updated_clef["created_at"],
+            updated_at=updated_clef["updated_at"],
+        )
 
     except HTTPException:
         raise

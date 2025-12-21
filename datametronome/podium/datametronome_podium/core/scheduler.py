@@ -4,6 +4,7 @@ Scheduler management for DataMetronome Podium.
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 
 from apscheduler.events import EVENT_JOB_ERROR, EVENT_JOB_EXECUTED, EVENT_JOB_MISSED
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -221,7 +222,7 @@ def add_scheduled_job(
                 # Update existing
                 existing_job.schedule = schedule
                 existing_job.next_run_time = job.next_run_time
-                existing_job.updated_at = datetime.utcnow()
+                existing_job.updated_at = datetime.now(timezone.utc)
                 await save_scheduler_job(existing_job)
             else:
                 # Create new

@@ -90,6 +90,51 @@
       </UCard>
     </div>
 
+    <!-- Contextual Graphs Based on Check Type -->
+    <div v-if="selectedCheckTypeForChart" class="grid grid-cols-1 gap-6">
+      <UCard>
+        <template #header>
+          <div class="flex items-center justify-between">
+            <div>
+              <h3 class="text-lg font-semibold">{{ selectedCheckTypeForChart }} Trends</h3>
+              <p class="text-sm text-gray-600 dark:text-gray-400">
+                Historical trends and outliers for {{ selectedCheckTypeForChart }} checks
+              </p>
+            </div>
+            <UButton
+              color="gray"
+              variant="ghost"
+              size="sm"
+              icon="i-heroicons-x-mark"
+              @click="selectedCheckTypeForChart = null"
+            >
+              Clear Filter
+            </UButton>
+          </div>
+        </template>
+        <div class="h-[400px]">
+          <CheckTypeChart
+            :check-type="selectedCheckTypeForChart"
+            :data="rows"
+            :height="400"
+            :show-legend="true"
+          />
+        </div>
+      </UCard>
+    </div>
+
+    <!-- Graphs for All Check Types (when no filter) -->
+    <div v-else class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <UCard v-for="checkType in availableCheckTypes" :key="checkType">
+        <template #header>
+          <h3 class="text-lg font-semibold">{{ checkType }} Trends</h3>
+        </template>
+        <div class="h-[300px]">
+          <CheckTypeChart :check-type="checkType" :data="rows" :height="300" :show-legend="true" />
+        </div>
+      </UCard>
+    </div>
+
     <UCard>
       <template #header>
         <div class="flex items-center justify-between">
@@ -273,6 +318,7 @@ const isRefreshing = ref(false)
 const showModal = ref(false)
 const selected = ref<any | null>(null)
 const runningClefId = ref<string | null>(null)
+const selectedCheckTypeForChart = ref<string | null>(null)
 
 const filters = ref({
   severity: '',
@@ -340,6 +386,22 @@ const checkTypeOptions = computed(() => {
     .map((t) => ({ label: t, value: t }))
 })
 
+const availableCheckTypes = computed(() => {
+  const types = new Set<string>()
+  for (const r of rows.value) {
+    if (r?.check_type) {
+      const type = String(r.check_type).toLowerCase()
+      // Normalize drift types
+      if (type === 'data_profile_drift' || type === 'drift') {
+        types.add('drift')
+      } else {
+        types.add(type)
+      }
+    }
+  }
+  return Array.from(types.values()).sort()
+})
+
 const filteredRows = computed(() => {
   return rows.value.filter((r) => {
     if (filters.value.severity && r.severity !== filters.value.severity) return false
@@ -352,6 +414,22 @@ const filteredRows = computed(() => {
     return true
   })
 })
+
+// Watch for check type filter changes to update chart
+watch(
+  () => filters.value.checkType,
+  (newType) => {
+    if (newType) {
+      // Normalize drift types
+      const normalizedType =
+        newType.toLowerCase() === 'data_profile_drift' ? 'drift' : newType.toLowerCase()
+      selectedCheckTypeForChart.value = normalizedType
+    } else {
+      selectedCheckTypeForChart.value = null
+    }
+  },
+  { immediate: true },
+)
 
 const summary = computed(() => {
   const out = { critical: 0, high: 0, medium: 0, low: 0 }

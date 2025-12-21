@@ -29,8 +29,8 @@ class ConfigurationIssue:
         severity: str,
         issue_type: str,
         message: str,
-        affected_items: List[str] = None,
-        suggestion: str = None,
+        affected_items: list[str] | None = None,
+        suggestion: str | None = None,
     ):
         self.severity = severity  # "error", "warning", "info"
         self.issue_type = (

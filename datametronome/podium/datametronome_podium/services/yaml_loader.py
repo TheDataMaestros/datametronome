@@ -6,7 +6,7 @@ staves (data sources) and clefs (data quality checks).
 """
 
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -27,7 +27,10 @@ class ValidationResult:
     """Result of YAML structure validation."""
 
     def __init__(
-        self, is_valid: bool, errors: List[str] = None, warnings: List[str] = None
+        self,
+        is_valid: bool,
+        errors: list[str] | None = None,
+        warnings: list[str] | None = None,
     ):
         self.is_valid = is_valid
         self.errors = errors or []
@@ -192,7 +195,7 @@ def parse_staves(yaml_data: Dict[str, Any]) -> List[Stave]:
                 stave_data["connection_config"] = {}
 
             # Set default timestamps if not present
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             if "created_at" not in stave_data:
                 stave_data["created_at"] = now
             if "updated_at" not in stave_data:
@@ -318,7 +321,7 @@ def _parse_single_clef(
         clef_data["config"] = {}
 
     # Set default timestamps if not present
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     if "created_at" not in clef_data:
         clef_data["created_at"] = now
     if "updated_at" not in clef_data:

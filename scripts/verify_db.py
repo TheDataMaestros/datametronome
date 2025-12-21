@@ -21,7 +21,10 @@ async def verify_db():
     configure_paths()
     db_path = configure_env()
 
-    from datametronome_podium.core.database import get_db, init_db  # noqa: E402
+    from datametronome_podium.core.database import (  # type: ignore # noqa: E402
+        get_db,
+        init_db,
+    )
 
     print("Running DB verification")
     print(f"Checking DB at: {db_path}")

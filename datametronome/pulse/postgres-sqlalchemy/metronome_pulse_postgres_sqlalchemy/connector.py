@@ -69,7 +69,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
         """Check if connected to the database."""
         return self._engine is not None
 
-    async def write(self, data, destination: str, config: dict = None) -> None:
+    async def write(self, data, destination: str, config: dict | None = None) -> None:
         """Write data to destination with optional configuration.
 
         Args:
@@ -106,7 +106,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
                 }
             )
         """
-        if not self._engine:
+        if not self._engine or not self._session_maker:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
         if config is None:
@@ -160,7 +160,10 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
         if not data:
             return
 
-        async with self._session_maker() as session:
+        maker = self._session_maker
+        if not maker:
+            raise RuntimeError("Not connected")
+        async with maker() as session:
             # Build INSERT statement
             columns = list(data[0].keys())
             placeholders = ", ".join([f":{col}" for col in columns])
@@ -170,7 +173,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
             await session.execute(text(insert_sql), data)
             await session.commit()
 
-    async def query(self, query_config) -> list:
+    async def query(self, query_config) -> list | dict:
         """Dynamic query method supporting multiple query types.
 
         Args:
@@ -203,7 +206,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
                 "timeout_ms": 5000
             })
         """
-        if not self._engine:
+        if not self._engine or not self._session_maker:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
         # Handle query configuration dict
@@ -251,13 +254,16 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
 
     async def _simple_query(self, sql: str) -> list:
         """Simple SQL query execution."""
-        async with self._session_maker() as session:
+        maker = self._session_maker
+        if not maker:
+            raise RuntimeError("Not connected")
+        async with maker() as session:
             result = await session.execute(text(sql))
             rows = result.fetchall()
             columns = result.keys()
             return [dict(zip(columns, row)) for row in rows]
 
-    async def query_with_params(self, query: str, params: dict = None) -> list:
+    async def query_with_params(self, query: str, params: dict | None = None) -> list:
         """
         Execute a parameterized SQL query and return results.
 
@@ -268,10 +274,13 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
         Returns:
             List of dictionaries representing the query results
         """
-        if not self._engine:
+        if not self._engine or not self._session_maker:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
-        async with self._session_maker() as session:
+        maker = self._session_maker
+        if not maker:
+            raise RuntimeError("Not connected")
+        async with maker() as session:
             result = await session.execute(text(query), params or {})
             rows = result.fetchall()
             return [dict(row._mapping) for row in rows]
@@ -287,7 +296,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
         statement_timeout_ms: int | None = None,
         synchronous_commit_off: bool = True,
     ) -> None:
-        if not self._engine:
+        if not self._engine or not self._session_maker:
             raise RuntimeError("Not connected to database. Call connect() first.")
         if not data:
             return
@@ -353,7 +362,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
                 synchronous_commit_off=synchronous_commit_off,
             )
 
-    async def execute(self, query: str, params: dict = None):
+    async def execute(self, query: str, params: dict | None = None):
         """
         Execute a SQL command that doesn't return results.
 
@@ -368,10 +377,13 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
             RuntimeError: If not connected to the database
             Exception: If the command fails
         """
-        if not self._engine:
+        if not self._engine or not self._session_maker:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
-        async with self._session_maker() as session:
+        maker = self._session_maker
+        if not maker:
+            raise RuntimeError("Not connected")
+        async with maker() as session:
             result = await session.execute(text(query), params or {})
             await session.commit()
             return result
@@ -388,7 +400,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
             RuntimeError: If not connected to the database
             Exception: If any command fails
         """
-        if not self._engine:
+        if not self._engine or not self._session_maker:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
         async with self._session_maker() as session:
@@ -412,7 +424,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
         - {'type': 'create_table', 'sql': str}
         - {'type': 'partition', 'sql': str}
         """
-        if not self._engine:
+        if not self._engine or not self._session_maker:
             raise RuntimeError("Not connected to database. Call connect() first.")
         for op in operations:
             kind = op.get("type")
@@ -452,7 +464,7 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
         Returns:
             Dictionary containing table metadata
         """
-        if not self._engine:
+        if not self._engine or not self._session_maker:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
         # Query to get table information

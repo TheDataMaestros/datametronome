@@ -7,7 +7,7 @@ their execution results.
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from datametronome_podium.core.database import get_db, insert_data
@@ -95,7 +95,7 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
         metadata_for_storage["observed_value"] = result.observed_value
 
         check_data = {
-            "id": f"check-{clef_id}-{datetime.utcnow().isoformat()}",
+            "id": f"check-{clef_id}-{datetime.now(timezone.utc).isoformat()}",
             "stave_id": stave.id,
             "clef_id": clef.id,
             "check_type": clef.check_type,
@@ -104,7 +104,7 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
             "details": json.dumps(metadata_for_storage)
             if metadata_for_storage
             else None,
-            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
             "execution_time": result.execution_time,
             "anomalies_count": result.anomalies_count,
             "severity": result.severity.value,  # Store the severity value: "harmony", "dissonance", "cacophony"

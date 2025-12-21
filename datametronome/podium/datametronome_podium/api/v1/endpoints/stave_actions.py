@@ -7,7 +7,7 @@ stave-specific actions.
 
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict
 
 from datametronome_podium.core.database import get_db
@@ -94,7 +94,7 @@ async def generate_sample_data(
 
     This is a developer utility to populate tables with realistic sample data.
     """
-    start_time = datetime.utcnow()
+    start_time = datetime.now(timezone.utc)
 
     try:
         # Get the stave from database
@@ -170,7 +170,7 @@ async def generate_sample_data(
         try:
             # Get connector based on stave type
             if stave.data_source_type == "sqlite":
-                from metronome_pulse_sqlite import SQLitePulse
+                from metronome_pulse_sqlite import SQLitePulse  # type: ignore
 
                 db_path = stave.connection_config.get(
                     "database_path", stave.connection_config.get("path")
@@ -189,7 +189,7 @@ async def generate_sample_data(
                     f"✅ Successfully inserted {inserted_count} records into {table_name}"
                 )
             elif stave.data_source_type == "bigquery":
-                from metronome_pulse_bigquery import BigQueryPulse
+                from metronome_pulse_bigquery import BigQueryPulse  # type: ignore
 
                 config = stave.connection_config
                 connector = BigQueryPulse(
@@ -221,7 +221,7 @@ async def generate_sample_data(
             # Don't fail the request if we can't insert - the data generation itself is valuable
 
         # Calculate execution time
-        execution_time = (datetime.utcnow() - start_time).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
 
         logger.info(
             f"🎉 Data generation completed for {table_name}: {len(data)} generated, {inserted_count} inserted, {execution_time:.2f}s"
@@ -250,7 +250,7 @@ async def generate_sample_data(
     except HTTPException:
         raise
     except Exception as e:
-        execution_time = (datetime.utcnow() - start_time).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
         logger.error(
             f"❌ Data generation failed for stave {stave_id}, table {table_name}: {e}"
         )
@@ -307,7 +307,9 @@ async def preview_stave_data(
                 )
                 await connector.close()
             elif stave.data_source_type == "bigquery":
-                from metronome_pulse_bigquery import BigQueryReadonlyPulse
+                from metronome_pulse_bigquery import (
+                    BigQueryReadonlyPulse,  # type: ignore
+                )
 
                 config = stave.connection_config
                 connector = BigQueryReadonlyPulse(

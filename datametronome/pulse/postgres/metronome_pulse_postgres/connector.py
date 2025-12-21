@@ -63,7 +63,7 @@ class PostgresPulse(Pulse, Readable, Writable):
         """Check if connected to the database."""
         return self._pool is not None
 
-    async def write(self, data, destination: str, config: dict = None) -> None:
+    async def write(self, data, destination: str, config: dict | None = None) -> None:
         """Write data to destination with optional configuration.
 
         Args:

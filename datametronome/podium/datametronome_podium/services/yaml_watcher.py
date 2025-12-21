@@ -7,7 +7,7 @@ reloads them without requiring a service restart.
 
 import asyncio
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set
 
@@ -17,9 +17,9 @@ try:
 
     _WATCHDOG_AVAILABLE = True
 except ModuleNotFoundError:
-    Observer = None
-    FileSystemEventHandler = object
-    FileSystemEvent = object
+    Observer = None  # type: ignore
+    FileSystemEventHandler = object  # type: ignore
+    FileSystemEvent = object  # type: ignore
     _WATCHDOG_AVAILABLE = False
 
 from datametronome_podium.services.env_interpolator import (
@@ -41,7 +41,7 @@ class ReloadResult:
         staves_count: int = 0,
         clefs_count: int = 0,
         error: Optional[str] = None,
-        warnings: List[str] = None,
+        warnings: list[str] | None = None,
     ):
         self.success = success
         self.file_path = file_path
@@ -49,7 +49,7 @@ class ReloadResult:
         self.clefs_count = clefs_count
         self.error = error
         self.warnings = warnings or []
-        self.timestamp = datetime.utcnow()
+        self.timestamp = datetime.now(timezone.utc)
 
     def __bool__(self):
         return self.success
@@ -69,12 +69,12 @@ class YAMLFileHandler(FileSystemEventHandler):
         if event.is_directory:
             return
 
-        if not event.src_path.endswith((".yaml", ".yml")):
+        if not str(event.src_path).endswith((".yaml", ".yml")):
             return
 
         # Debounce rapid changes
-        now = datetime.utcnow()
-        file_path = event.src_path
+        now = datetime.now(timezone.utc)
+        file_path = str(event.src_path)
 
         # Check if we should process this event
         if file_path in self._pending_events:

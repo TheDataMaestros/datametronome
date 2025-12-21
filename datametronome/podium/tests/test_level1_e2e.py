@@ -6,7 +6,7 @@ including database operations, connector setup, and result persistence.
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -25,12 +25,12 @@ class TestLevel1ChecksE2E:
     @pytest.fixture
     def client(self):
         """Create a test client."""
-        return TestClient(app)
+        return TestClient(app)  # type: ignore
 
     @pytest.fixture
     def async_client(self):
         """Create an async test client."""
-        return AsyncClient(app=app, base_url="http://test")
+        return AsyncClient(app=app, base_url="http://test")  # type: ignore
 
     @pytest.fixture
     def mock_db(self):
@@ -47,8 +47,8 @@ class TestLevel1ChecksE2E:
             "data_source_type": "sqlite",
             "config": json.dumps({"database": ":memory:"}),
             "is_active": True,
-            "created_at": datetime.utcnow().isoformat() + "Z",
-            "updated_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.now(timezone.utc).isoformat() + "Z",
+            "updated_at": datetime.now(timezone.utc).isoformat() + "Z",
         }
 
     @pytest.fixture
@@ -63,8 +63,8 @@ class TestLevel1ChecksE2E:
             "warn": "> 10000",
             "fail": "< 100",
             "is_active": True,
-            "created_at": datetime.utcnow().isoformat() + "Z",
-            "updated_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.now(timezone.utc).isoformat() + "Z",
+            "updated_at": datetime.now(timezone.utc).isoformat() + "Z",
         }
 
     @pytest.fixture
@@ -78,8 +78,8 @@ class TestLevel1ChecksE2E:
             "config": json.dumps({"table": "users", "column": "email"}),
             "fail": "if_null > 5%",
             "is_active": True,
-            "created_at": datetime.utcnow().isoformat() + "Z",
-            "updated_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.now(timezone.utc).isoformat() + "Z",
+            "updated_at": datetime.now(timezone.utc).isoformat() + "Z",
         }
 
     @pytest.fixture
@@ -96,8 +96,8 @@ class TestLevel1ChecksE2E:
             "warn": "> 12 hours",
             "fail": "> 24 hours",
             "is_active": True,
-            "created_at": datetime.utcnow().isoformat() + "Z",
-            "updated_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.now(timezone.utc).isoformat() + "Z",
+            "updated_at": datetime.now(timezone.utc).isoformat() + "Z",
         }
 
     @pytest.mark.asyncio
@@ -226,8 +226,8 @@ class TestLevel1ChecksE2E:
             "config": json.dumps({"table": "users", "column": "id"}),
             "fail": "if_not_unique > 0",
             "is_active": True,
-            "created_at": datetime.utcnow().isoformat() + "Z",
-            "updated_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.now(timezone.utc).isoformat() + "Z",
+            "updated_at": datetime.now(timezone.utc).isoformat() + "Z",
         }
 
         mock_get_db.return_value = mock_db
@@ -273,8 +273,8 @@ class TestLevel1ChecksE2E:
             "config": json.dumps({"table": "orders", "column": "status"}),
             "fail": "if_not_in: ['pending', 'completed', 'cancelled'] > 0",
             "is_active": True,
-            "created_at": datetime.utcnow().isoformat() + "Z",
-            "updated_at": datetime.utcnow().isoformat() + "Z",
+            "created_at": datetime.now(timezone.utc).isoformat() + "Z",
+            "updated_at": datetime.now(timezone.utc).isoformat() + "Z",
         }
 
         mock_get_db.return_value = mock_db
@@ -327,7 +327,7 @@ class TestLevel1ChecksE2E:
         mock_db.query.side_effect = [[test_clef_freshness], [test_stave_data]]
 
         # Mock recent timestamp (2 hours ago)
-        recent_time = datetime.utcnow() - timedelta(hours=2)
+        recent_time = datetime.now(timezone.utc) - timedelta(hours=2)
         mock_connector = AsyncMock()
         mock_connector.query.return_value = [{"latest_timestamp": recent_time}]
 

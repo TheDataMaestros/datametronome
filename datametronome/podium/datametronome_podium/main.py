@@ -6,6 +6,7 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
+from typing import Any
 
 import uvicorn
 from fastapi import FastAPI, Request
@@ -26,14 +27,14 @@ setup_logging(log_level=settings.log_level, log_format=log_format)
 logger = get_logger(__name__)
 
 
-def create_cors_middleware() -> CORSMiddleware:
+def create_cors_middleware(app: FastAPI | None = None) -> CORSMiddleware:
     """Create CORS middleware with configuration.
 
     Returns:
         Configured CORS middleware.
     """
     return CORSMiddleware(
-        app=None,  # Will be set when added to the app
+        app=app,  # type: ignore
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
@@ -72,7 +73,7 @@ def create_root_endpoints(app: FastAPI) -> None:
         """
         from datetime import datetime, timezone
 
-        health_status = {
+        health_status: dict[str, Any] = {
             "status": "healthy",
             "version": "0.1.0",
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -181,21 +182,21 @@ def create_app() -> FastAPI:
 
     # Add rate limiting
     app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
 
     # Add metrics middleware (first, to track all requests)
     from .core.middleware import MetricsMiddleware
 
-    app.add_middleware(MetricsMiddleware)
+    app.add_middleware(MetricsMiddleware)  # type: ignore
 
     # Add CORS middleware
-    app.add_middleware(
+    app.add_middleware(  # type: ignore
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-    )
+    )  # type: ignore
 
     # Include API router
     app.include_router(api_router, prefix="/api/v1")

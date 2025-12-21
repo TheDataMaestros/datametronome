@@ -9,7 +9,7 @@ import argparse
 import os
 import sqlite3
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -41,6 +41,8 @@ class MigrationRunner:
 
     def ensure_migrations_table(self):
         """Create migrations tracking table if it doesn't exist."""
+        if not self.conn:
+            raise RuntimeError("Not connected to database")
         self.conn.execute(
             """
             CREATE TABLE IF NOT EXISTS schema_migrations (
@@ -50,6 +52,8 @@ class MigrationRunner:
             )
         """
         )
+        if not self.conn:
+            raise RuntimeError("Not connected to database")
         self.conn.commit()
 
     def get_applied_migrations(self) -> set[int]:
@@ -59,6 +63,8 @@ class MigrationRunner:
         Returns:
             Set of applied migration version numbers
         """
+        if not self.conn:
+            raise RuntimeError("Not connected to database")
         cursor = self.conn.execute(
             "SELECT version FROM schema_migrations ORDER BY version"
         )
@@ -109,21 +115,26 @@ class MigrationRunner:
                 sql = f.read()
 
             # Execute migration
+            if not self.conn:
+                raise RuntimeError("Not connected to database")
             self.conn.executescript(sql)
 
             # Record migration
             self.conn.execute(
                 "INSERT INTO schema_migrations (version, name, applied_at) VALUES (?, ?, ?)",
-                (version, name, datetime.utcnow().isoformat()),
+                (version, name, datetime.now(timezone.utc).isoformat()),
             )
 
+            if not self.conn:
+                raise RuntimeError("Not connected to database")
             self.conn.commit()
             print(f"✅ Migration {version:03d} applied successfully")
             return True
 
         except Exception as e:
             print(f"❌ Migration {version:03d} failed: {e}")
-            self.conn.rollback()
+            if self.conn:
+                self.conn.rollback()
             return False
 
     def run_migrations(self, target_version: int | None = None) -> int:
@@ -167,6 +178,8 @@ class MigrationRunner:
 
         if applied:
             print(f"\n✅ Applied migrations: {len(applied)}")
+            if not self.conn:
+                raise RuntimeError("Not connected to database")
             cursor = self.conn.execute(
                 "SELECT version, name, applied_at FROM schema_migrations ORDER BY version"
             )

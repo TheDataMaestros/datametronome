@@ -31,10 +31,10 @@ Example Usage:
     )
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Check types organized by TDD levels
 LEVEL_1_CHECKS = [
@@ -110,7 +110,9 @@ class Clef(BaseModel):
         Custom SQL: {"query": "SELECT ...", "expected_result": 0}
     """
 
-    id: str | None = None
+    id: str = Field(
+        default="", description="Unique identifier (auto-generated if not provided)"
+    )
     stave_id: str = Field(
         ..., description="ID of the Stave (data source) this check belongs to"
     )
@@ -161,10 +163,12 @@ class Clef(BaseModel):
         default=True, description="Whether this check is actively running"
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, description="When this check was created"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When this check was created",
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow, description="When this check was last updated"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When this check was last updated",
     )
 
     model_config = ConfigDict(
@@ -244,6 +248,17 @@ class Clef(BaseModel):
         if not v or not v.strip():
             raise ValueError("name cannot be empty or whitespace")
         return v.strip()
+
+    @model_validator(mode="after")
+    def generate_id_if_missing(self):
+        """Generate ID if not provided."""
+        if not self.id:
+            import uuid
+
+            # Generate ID from check type + name slug + uuid
+            name_slug = self.name.lower().replace(" ", "-")[:30]
+            self.id = f"clef-{self.check_type}-{name_slug}-{str(uuid.uuid4())[:8]}"
+        return self
 
     @field_validator("schedule")
     @classmethod

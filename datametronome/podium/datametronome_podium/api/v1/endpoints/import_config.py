@@ -3,7 +3,7 @@
 import json
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -137,7 +137,7 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
         for stave_data in config.staves:
             try:
                 stave_id = stave_data.get("id") or str(uuid.uuid4())
-                now = datetime.utcnow().isoformat() + "Z"
+                now = datetime.now(timezone.utc).isoformat() + "Z"
 
                 await db.write(
                     [
@@ -168,7 +168,7 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
         for clef_data in config.clefs:
             try:
                 clef_id = clef_data.get("id") or str(uuid.uuid4())
-                now = datetime.utcnow().isoformat() + "Z"
+                now = datetime.now(timezone.utc).isoformat() + "Z"
 
                 await db.write(
                     [

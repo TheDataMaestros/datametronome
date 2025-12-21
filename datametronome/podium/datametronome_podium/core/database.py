@@ -228,6 +228,7 @@ async def _create_tables() -> None:
     ]
 
     for table_sql in tables:
+        assert sqlite_connector is not None
         await sqlite_connector.execute(table_sql)
 
 
@@ -235,6 +236,7 @@ async def _create_default_admin() -> None:
     """Create default admin user for showcase and development."""
     try:
         # Check if admin user already exists
+        assert sqlite_connector is not None
         existing_users = await sqlite_connector.query(
             {"sql": "SELECT * FROM users WHERE username = ?", "params": ["admin"]}
         )
@@ -258,6 +260,7 @@ async def _create_default_admin() -> None:
             "updated_at": "2025-01-01T00:00:00Z",
         }
 
+        assert sqlite_connector is not None
         success = await sqlite_connector.write(
             [{"table": "users", **admin_user}], "users"
         )
@@ -291,7 +294,9 @@ async def close_db():
 
 
 # Helper functions for common database operations
-async def execute_query(sql: str, params: List[Any] = None) -> List[Dict[str, Any]]:
+async def execute_query(
+    sql: str, params: List[Any] | None = None
+) -> List[Dict[str, Any]]:
     """Execute a query and return results."""
     connector = await get_db()
     if params:

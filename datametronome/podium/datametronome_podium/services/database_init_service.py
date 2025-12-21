@@ -146,7 +146,7 @@ class DatabaseInitService:
             "updated_at": now,
         }
 
-        await self.connector.write([admin_user])
+        await self.connector.write([admin_user], "users")
 
         # Insert default stave
         default_stave = {
@@ -159,7 +159,7 @@ class DatabaseInitService:
             "updated_at": now,
         }
 
-        await self.connector.write([default_stave])
+        await self.connector.write([default_stave], "staves")
 
         # Insert default clef
         default_clef = {
@@ -174,7 +174,7 @@ class DatabaseInitService:
             "updated_at": now,
         }
 
-        await self.connector.write([default_clef])
+        await self.connector.write([default_clef], "clefs")
 
         print("✅ Default data inserted successfully")
 

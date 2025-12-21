@@ -12,11 +12,15 @@ import {
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   ArcElement,
   Title,
   Tooltip,
   Legend,
   Filler,
+  LineController,
+  BarController,
+  DoughnutController,
 } from 'chart.js'
 
 // Register Chart.js components
@@ -25,11 +29,15 @@ ChartJS.register(
   LinearScale,
   PointElement,
   LineElement,
+  BarElement,
   ArcElement,
   Title,
   Tooltip,
   Legend,
   Filler,
+  LineController,
+  BarController,
+  DoughnutController,
 )
 
 interface ChartData {

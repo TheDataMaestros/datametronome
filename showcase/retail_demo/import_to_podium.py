@@ -5,7 +5,6 @@ import os
 import sys
 from pathlib import Path
 
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
@@ -15,9 +14,13 @@ def configure_paths():
 
 
 def configure_env():
-    podium_db_path = PROJECT_ROOT / "datametronome" / "podium" / "data" / "datametronome.db"
+    podium_db_path = (
+        PROJECT_ROOT / "datametronome" / "podium" / "data" / "datametronome.db"
+    )
     os.environ["DATAMETRONOME_DATABASE_URL"] = f"sqlite+aiosqlite:///{podium_db_path}"
-    os.environ["DATAMETRONOME_SECRET_KEY"] = "dev-secret-key-change-in-production-32-chars"
+    os.environ[
+        "DATAMETRONOME_SECRET_KEY"
+    ] = "dev-secret-key-change-in-production-32-chars"
     return podium_db_path
 
 
@@ -25,8 +28,11 @@ async def import_demo():
     configure_paths()
     podium_db_path = configure_env()
 
-    from datametronome_podium.core.database import get_db, init_db  # noqa: E402
-    from datametronome_podium.services.stave_yaml_loader import (  # noqa: E402
+    from datametronome_podium.core.database import (  # type: ignore # noqa: E402
+        get_db,
+        init_db,
+    )
+    from datametronome_podium.services.stave_yaml_loader import (  # type: ignore # noqa: E402
         import_staves_from_yaml,
         load_staves_from_yaml,
     )
@@ -52,7 +58,7 @@ async def import_demo():
         print(
             "⚠️  DB_PATH is not set. The Retail demo stave expects DB_PATH to point at the retail dataset SQLite file.\n"
             "    Example:\n"
-            "      export DB_PATH=\"$(pwd)/datametronome/podium/data/retail.db\""
+            '      export DB_PATH="$(pwd)/datametronome/podium/data/retail.db"'
         )
 
     result = await import_staves_from_yaml(
@@ -67,5 +73,3 @@ async def import_demo():
 
 if __name__ == "__main__":
     asyncio.run(import_demo())
-
-

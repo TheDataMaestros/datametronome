@@ -119,10 +119,12 @@ class ConnectionTester:
             elif data_source_type == "bigquery":
                 if read_only:
                     from metronome_pulse_bigquery import (
-                        BigQueryReadonlyPulse as PulseClass,
+                        BigQueryReadonlyPulse as PulseClass,  # type: ignore
                     )
                 else:
-                    from metronome_pulse_bigquery import BigQueryPulse as PulseClass
+                    from metronome_pulse_bigquery import (
+                        BigQueryPulse as PulseClass,  # type: ignore
+                    )
 
                 connector = PulseClass(
                     project_id=config["project_id"],
@@ -214,7 +216,7 @@ class ConnectionTester:
         """Test MySQL connection."""
         try:
             # Import here to avoid dependency issues if mysql-connector is not installed
-            import mysql.connector
+            import mysql.connector  # type: ignore
 
             config = stave.connection_config
 
@@ -345,7 +347,7 @@ class ConnectionTester:
             )
 
             # Test connection
-            info = r.info()
+            info: Any = r.info()
 
             return {
                 "success": True,
@@ -378,7 +380,7 @@ class ConnectionTester:
         """Test MongoDB connection."""
         try:
             # Import here to avoid dependency issues if pymongo is not installed
-            import pymongo
+            import pymongo  # type: ignore
 
             config = stave.connection_config
 
@@ -424,7 +426,7 @@ class ConnectionTester:
         """Test API/HTTP connection."""
         try:
             # Import here to avoid dependency issues if requests is not installed
-            import requests
+            import requests  # type: ignore
 
             config = stave.connection_config
             base_url = config["base_url"]

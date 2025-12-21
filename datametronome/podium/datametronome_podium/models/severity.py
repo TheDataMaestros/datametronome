@@ -81,7 +81,9 @@ class SeverityThreshold:
     dissonance_condition: Optional[str] = None  # warn
     cacophony_condition: Optional[str] = None  # fail
 
-    def evaluate(self, value: float, context: Dict[str, Any] = None) -> SeverityLevel:
+    def evaluate(
+        self, value: float, context: Optional[Dict[str, Any]] = None
+    ) -> SeverityLevel:
         """
         Evaluate a value against the configured thresholds.
 
@@ -250,9 +252,9 @@ class SeverityConfig:
     @classmethod
     def create_custom_threshold(
         cls,
-        dissonance_condition: str = None,
-        cacophony_condition: str = None,
-        harmony_condition: str = None,
+        dissonance_condition: Optional[str] = None,
+        cacophony_condition: Optional[str] = None,
+        harmony_condition: Optional[str] = None,
     ) -> SeverityThreshold:
         """Create a custom severity threshold."""
         return SeverityThreshold(
@@ -283,9 +285,9 @@ class SeverityConfig:
 # Convenience functions
 def evaluate_severity(
     value: float,
-    dissonance_condition: str = None,
-    cacophony_condition: str = None,
-    harmony_condition: str = None,
+    dissonance_condition: Optional[str] = None,
+    cacophony_condition: Optional[str] = None,
+    harmony_condition: Optional[str] = None,
 ) -> SeverityLevel:
     """
     Quick function to evaluate severity without creating a threshold object.

@@ -20,7 +20,7 @@ class InterpolationError(Exception):
 
 
 def interpolate_values(
-    data: Any, env: Dict[str, str] = None, strict: bool = True
+    data: Any, env: dict[str, str] | None = None, strict: bool = True
 ) -> Any:
     """
     Recursively interpolate environment variables in data structures.
@@ -127,7 +127,7 @@ def _extract_vars_recursive(data: Any, env_vars: Set[str]):
 
 
 def validate_required_vars(
-    yaml_data: Dict[str, Any], env: Dict[str, str] = None
+    yaml_data: Dict[str, Any], env: dict[str, str] | None = None
 ) -> List[str]:
     """
     Validate that all required environment variables are set.
@@ -179,7 +179,7 @@ def _extract_required_vars_recursive(data: Any, required_vars: Set[str]):
 
 
 def interpolate_yaml_data(
-    yaml_data: Dict[str, Any], env: Dict[str, str] = None, strict: bool = True
+    yaml_data: Dict[str, Any], env: dict[str, str] | None = None, strict: bool = True
 ) -> Dict[str, Any]:
     """
     Interpolate environment variables in YAML data.

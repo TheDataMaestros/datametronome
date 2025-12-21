@@ -1,6 +1,6 @@
 """Stave endpoints for DataMetronome Podium using DataPulse connectors."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, List
 
 from datametronome_podium.api.schemas.stave import (
@@ -45,7 +45,18 @@ async def get_staves(skip: int = 0, limit: int = 100) -> List[StaveResponse]:
                 stave_dict["created_at"] = stave_dict["created_at"].isoformat()
             if isinstance(stave_dict.get("updated_at"), datetime):
                 stave_dict["updated_at"] = stave_dict["updated_at"].isoformat()
-            response_data.append(StaveResponse(**stave_dict))
+            response_data.append(
+                StaveResponse(
+                    id=stave_dict["id"],
+                    name=stave_dict["name"],
+                    description=stave_dict["description"],
+                    data_source_type=stave_dict["data_source_type"],
+                    connection_config=stave_dict["connection_config"],
+                    is_active=stave_dict["is_active"],
+                    created_at=stave_dict["created_at"],
+                    updated_at=stave_dict["updated_at"],
+                )
+            )
         return response_data
     except Exception as e:
         raise HTTPException(
@@ -87,7 +98,16 @@ async def get_stave(stave_id: str) -> StaveResponse:
             stave_dict["created_at"] = stave_dict["created_at"].isoformat()
         if isinstance(stave_dict.get("updated_at"), datetime):
             stave_dict["updated_at"] = stave_dict["updated_at"].isoformat()
-        return StaveResponse(**stave_dict)
+        return StaveResponse(
+            id=stave_dict["id"],
+            name=stave_dict["name"],
+            description=stave_dict["description"],
+            data_source_type=stave_dict["data_source_type"],
+            connection_config=stave_dict["connection_config"],
+            is_active=stave_dict["is_active"],
+            created_at=stave_dict["created_at"],
+            updated_at=stave_dict["updated_at"],
+        )
     except HTTPException:
         raise
     except Exception as e:
@@ -117,7 +137,7 @@ async def create_stave(stave_data: StaveCreate) -> StaveResponse:
         import uuid
 
         stave_id = str(uuid.uuid4())
-        now = datetime.utcnow().isoformat() + "Z"
+        now = datetime.now(timezone.utc).isoformat() + "Z"
 
         # Insert the new stave
         import json
@@ -156,7 +176,16 @@ async def create_stave(stave_data: StaveCreate) -> StaveResponse:
             "created_at": now,
             "updated_at": now,
         }
-        return StaveResponse(**stave_response_data)
+        return StaveResponse(
+            id=stave_id,
+            name=stave_data.name,
+            description=stave_data.description,
+            data_source_type=stave_data.data_source_type,
+            connection_config=stave_data.connection_config,
+            is_active=stave_data.is_active,
+            created_at=now,
+            updated_at=now,
+        )
 
     except HTTPException:
         raise
@@ -280,7 +309,7 @@ async def update_stave(stave_id: str, stave_data: StaveUpdate) -> StaveResponse:
 
         # Update the stave
         update_data = stave_data.model_dump(exclude_unset=True)
-        update_data["updated_at"] = datetime.utcnow().isoformat() + "Z"
+        update_data["updated_at"] = datetime.now(timezone.utc).isoformat() + "Z"
 
         success = await db.write([{"table": "staves", **update_data}], "staves")
 
@@ -292,7 +321,16 @@ async def update_stave(stave_id: str, stave_data: StaveUpdate) -> StaveResponse:
 
         # Return the updated stave
         updated_stave = {**staves[0], **update_data}
-        return StaveResponse(**updated_stave)
+        return StaveResponse(
+            id=updated_stave["id"],
+            name=updated_stave["name"],
+            description=updated_stave["description"],
+            data_source_type=updated_stave["data_source_type"],
+            connection_config=updated_stave["connection_config"],
+            is_active=updated_stave["is_active"],
+            created_at=updated_stave["created_at"],
+            updated_at=updated_stave["updated_at"],
+        )
 
     except HTTPException:
         raise

@@ -119,8 +119,9 @@
       <UCard
         v-for="clef in filteredClefs"
         :key="clef.id"
-        class="hover:shadow-lg transition-all duration-200 hover:scale-105"
+        class="hover:shadow-lg transition-all duration-200 hover:scale-105 cursor-pointer"
         :class="getClefCardClass(clef)"
+        @click="openClefDetails(clef)"
       >
         <template #header>
           <div class="flex items-center justify-between">
@@ -193,7 +194,7 @@
         </div>
 
         <template #footer>
-          <div class="flex items-center justify-between">
+          <div class="flex items-center justify-between" @click.stop>
             <div class="text-xs text-gray-500">Created {{ formatDate(clef.created_at) }}</div>
             <div class="flex gap-2">
               <UButton
@@ -201,7 +202,7 @@
                 color="blue"
                 variant="ghost"
                 icon="i-heroicons-play"
-                @click="runCheck(clef.id)"
+                @click.stop="runCheck(clef.id)"
                 :loading="runningChecks.has(clef.id)"
               >
                 Run
@@ -211,7 +212,7 @@
                 color="purple"
                 variant="ghost"
                 icon="i-heroicons-clock"
-                @click="viewCheckHistory(clef)"
+                @click.stop="viewCheckHistory(clef)"
               >
                 History
               </UButton>
@@ -220,7 +221,7 @@
                 color="gray"
                 variant="ghost"
                 icon="i-heroicons-pencil"
-                @click="editClef(clef)"
+                @click.stop="editClef(clef)"
               >
                 Edit
               </UButton>
@@ -384,6 +385,134 @@
       </UCard>
     </UModal>
 
+    <!-- Clef Details Modal -->
+    <UModal v-model="showDetailsModal" :ui="{ width: 'w-full sm:max-w-5xl' }">
+      <UCard v-if="selectedClef">
+        <template #header>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <Icon :name="getClefIcon(selectedClef.check_type)" class="w-6 h-6" />
+              <div>
+                <h3 class="text-lg font-semibold">{{ selectedClef.name }}</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400">
+                  {{ formatCheckType(selectedClef.check_type) }} • Tier
+                  {{ getClefTier(selectedClef.check_type) }}
+                </p>
+              </div>
+            </div>
+            <UButton
+              color="gray"
+              variant="ghost"
+              icon="i-heroicons-x-mark"
+              @click="closeDetailsModal"
+            />
+          </div>
+        </template>
+
+        <div class="space-y-6">
+          <!-- Check Details -->
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div class="space-y-4">
+              <div>
+                <h4 class="font-semibold mb-2">Description</h4>
+                <p class="text-gray-700 dark:text-gray-200">
+                  {{ selectedClef.description || 'No description provided' }}
+                </p>
+              </div>
+
+              <div>
+                <h4 class="font-semibold mb-2">Configuration</h4>
+                <div
+                  class="rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4"
+                >
+                  <pre class="text-xs overflow-auto whitespace-pre-wrap">{{
+                    formatJson(selectedClef.configuration || {})
+                  }}</pre>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 class="font-semibold mb-2">Stave</h4>
+                  <p class="text-gray-700 dark:text-gray-200">
+                    {{ getStaveName(selectedClef.stave_id) }}
+                  </p>
+                </div>
+                <div>
+                  <h4 class="font-semibold mb-2">Schedule</h4>
+                  <p class="text-gray-700 dark:text-gray-200">
+                    {{ selectedClef.schedule || 'Manual' }}
+                  </p>
+                </div>
+                <div>
+                  <h4 class="font-semibold mb-2">Status</h4>
+                  <UBadge :color="selectedClef.is_active ? 'green' : 'gray'" variant="soft">
+                    {{ selectedClef.is_active ? 'Active' : 'Inactive' }}
+                  </UBadge>
+                </div>
+                <div>
+                  <h4 class="font-semibold mb-2">Last Run</h4>
+                  <div v-if="latestStatusByClef[selectedClef.id]" class="flex items-center gap-2">
+                    <UBadge
+                      :color="getStatusBadgeColor(latestStatusByClef[selectedClef.id]?.status)"
+                      variant="soft"
+                    >
+                      {{ formatStatusLabel(latestStatusByClef[selectedClef.id]?.status) }}
+                    </UBadge>
+                    <span class="text-xs text-gray-500">
+                      {{ formatRelativeTime(latestStatusByClef[selectedClef.id]?.timestamp) }}
+                    </span>
+                  </div>
+                  <span v-else class="text-gray-400">No runs yet</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Check Graph -->
+            <div>
+              <h4 class="font-semibold mb-2">Trends & Patterns</h4>
+              <div class="h-[400px] rounded-lg border border-gray-200 dark:border-gray-800 p-4">
+                <CheckTypeChart
+                  :check-type="selectedClef.check_type"
+                  :data="checkResultsForClef"
+                  :height="400"
+                  :show-legend="true"
+                />
+              </div>
+            </div>
+          </div>
+
+          <!-- Actions -->
+          <div class="flex items-center gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+            <UButton
+              color="green"
+              icon="i-heroicons-play"
+              :loading="runningChecks.has(selectedClef.id)"
+              @click.stop="runCheck(selectedClef.id)"
+            >
+              Run Check Now
+            </UButton>
+            <UButton
+              color="purple"
+              variant="outline"
+              icon="i-heroicons-clock"
+              @click.stop="viewCheckHistory(selectedClef)"
+            >
+              View History
+            </UButton>
+            <UButton
+              color="blue"
+              variant="outline"
+              icon="i-heroicons-pencil"
+              @click.stop="editClef(selectedClef)"
+            >
+              Edit
+            </UButton>
+          </div>
+        </div>
+      </UCard>
+    </UModal>
+
     <!-- Check History Modal -->
     <UModal v-model="showHistoryModal" :ui="{ width: 'w-full sm:max-w-3xl' }">
       <UCard>
@@ -487,11 +616,15 @@ const showVisualBuilder = ref(false)
 const editingClef = ref<Clef | null>(null)
 const isSaving = ref(false)
 const runningChecks = ref(new Set<string>())
+const showDetailsModal = ref(false)
+const selectedClef = ref<Clef | null>(null)
 const showHistoryModal = ref(false)
 const selectedClefHistory = ref<Clef | null>(null)
 const checkHistory = ref<Check[]>([])
 const isHistoryLoading = ref(false)
 const historyError = ref<string | null>(null)
+// Local state for check results to avoid readonly issues
+const localCheckResults = ref<Check[]>([])
 
 watch(showHistoryModal, (value) => {
   if (!value) {
@@ -622,6 +755,13 @@ const latestStatusByClef = computed<Record<string, Check | undefined>>(() => {
     }
   })
   return map
+})
+
+const checkResultsForClef = computed(() => {
+  if (!selectedClef.value) return []
+  // Combine readonly checkResults with local results
+  const allResults = [...checkResults.value, ...localCheckResults.value]
+  return allResults.filter((result) => result.clef_id === selectedClef.value?.id)
 })
 
 // Options for selects
@@ -804,6 +944,15 @@ const formatDate = (dateString: string): string => {
   return new Date(dateString).toLocaleDateString()
 }
 
+const formatJson = (value: any) => {
+  if (!value) return '—'
+  try {
+    return JSON.stringify(value, null, 2)
+  } catch {
+    return String(value)
+  }
+}
+
 const applyFilters = () => {
   // Filters are applied automatically via computed property
 }
@@ -846,6 +995,41 @@ const duplicateClef = (clef: Clef) => {
     fail: '',
   }
   showCreateModal.value = true
+}
+
+const openClefDetails = async (clef: Clef) => {
+  selectedClef.value = clef
+  showDetailsModal.value = true
+
+  // Fetch check history for this clef to populate the graph
+  try {
+    const response = await fetchCheckResults(clef.id, 50)
+    // Handle both array and object response formats
+    const results = Array.isArray(response) ? response : response?.results || []
+
+    // Ensure results have check_type set from the clef
+    const resultsWithType = results.map((r: any) => ({
+      ...r,
+      check_type: r.check_type || clef.check_type,
+      clef_id: r.clef_id || clef.id,
+    }))
+
+    // Add these results to localCheckResults so the graph can display them
+    // Filter out duplicates and add new ones
+    const existingIds = new Set(
+      [...checkResults.value, ...localCheckResults.value].map((r) => r.id),
+    )
+    const newResults = resultsWithType.filter((r: any) => !existingIds.has(r.id))
+    localCheckResults.value = [...localCheckResults.value, ...newResults]
+  } catch (error) {
+    console.error('Failed to fetch check history for graph:', error)
+    // Don't show error to user, just use existing data
+  }
+}
+
+const closeDetailsModal = () => {
+  showDetailsModal.value = false
+  selectedClef.value = null
 }
 
 const viewCheckHistory = async (clef: Clef) => {

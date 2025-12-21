@@ -2,8 +2,9 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple, cast
 
+from metronome_pulse_core.interfaces import Readable
 from metronome_pulse_postgres import PostgresPulse
 from metronome_pulse_postgres_psycopg3 import PostgresPsycopg3Pulse
 from metronome_pulse_postgres_sqlalchemy import PostgresSQLAlchemyPulse
@@ -21,7 +22,7 @@ class PostgresMonitorService:
             connector_type: Type of connector to use ('asyncpg', 'psycopg3', 'sqlalchemy')
         """
         self.connector_type = connector_type
-        self.connector = None
+        self.connector: Readable | None = None
 
     async def create_connector(self, connection_config: Dict[str, Any]) -> None:
         """Create and configure the appropriate connector."""
@@ -58,7 +59,7 @@ class PostgresMonitorService:
     async def close_connector(self) -> None:
         """Close the connector."""
         if self.connector:
-            await self.connector.close()
+            await cast(Any, self.connector).close()
             self.connector = None
 
     async def check_row_count(
@@ -67,6 +68,7 @@ class PostgresMonitorService:
         """Check if a table has the expected number of rows."""
         try:
             query = f"SELECT COUNT(*) as row_count FROM {table_name}"
+            assert self.connector is not None
             results = await self.connector.query(query)
             actual_count = results[0]["row_count"] if results else 0
 
@@ -99,6 +101,7 @@ class PostgresMonitorService:
                 FROM {table_name}
                 WHERE {timestamp_column} IS NOT NULL
             """
+            assert self.connector is not None
             results = await self.connector.query(query)
 
             if not results or not results[0]["latest_timestamp"]:
@@ -232,7 +235,7 @@ class PostgresMonitorService:
             )
 
         start_time = datetime.now()
-        overall_results = {
+        overall_results: Dict[str, Any] = {
             "check_started_at": start_time.isoformat(),
             "connector_type": self.connector_type,
             "tables_checked": len(table_configs),
@@ -246,9 +249,10 @@ class PostgresMonitorService:
                 table_name = table_config["table_name"]
                 logger.info(f"Checking table: {table_name}")
 
-                table_result = {
+                checks_list: List[Tuple[str, Dict[str, Any]]] = []
+                table_result: Dict[str, Any] = {
                     "table_name": table_name,
-                    "checks": [],
+                    "checks": checks_list,
                     "overall_status": "pass",
                 }
 
@@ -258,7 +262,7 @@ class PostgresMonitorService:
                         table_name,
                         table_config["row_count_check"].get("expected_min", 0),
                     )
-                    table_result["checks"].append(("row_count", row_count_result))
+                    checks_list.append(("row_count", row_count_result))
 
                 # Data freshness check
                 if "freshness_check" in table_config:
@@ -267,25 +271,27 @@ class PostgresMonitorService:
                         table_config["freshness_check"]["timestamp_column"],
                         table_config["freshness_check"]["max_age_hours"],
                     )
-                    table_result["checks"].append(("freshness", freshness_result))
+                    checks_list.append(("freshness", freshness_result))
 
                 # Anomaly detection
                 if "anomaly_checks" in table_config:
+                    assert self.connector is not None
                     anomaly_result = await self.check_anomalies(
                         table_name, table_config["anomaly_checks"]
                     )
-                    table_result["checks"].append(("anomalies", anomaly_result))
+                    checks_list.append(("anomalies", anomaly_result))
 
                 # Schema check
                 if "schema_check" in table_config:
+                    assert self.connector is not None
                     schema_result = await self.check_schema_changes(
                         table_name, table_config["schema_check"]["expected_columns"]
                     )
-                    table_result["checks"].append(("schema", schema_result))
+                    checks_list.append(("schema", schema_result))
 
                 # Determine overall table status
                 table_statuses = [
-                    check[1]["status"] for check in table_result["checks"]
+                    cast(Dict[str, Any], result)["status"] for _, result in checks_list
                 ]
                 if "critical" in table_statuses:
                     table_result["overall_status"] = "critical"

@@ -112,10 +112,7 @@ const pageTitle = computed(() => {
   const titles: Record<string, string> = {
     index: 'Dashboard',
     anomalies: 'Anomalies',
-    'ml-anomalies': 'ML Anomalies',
     trends: 'Trends & Patterns',
-    investigation: 'Investigation',
-    reports: 'Reports',
     staves: 'Data Sources',
     clefs: 'Quality Checks',
     settings: 'Settings',
@@ -144,27 +141,9 @@ const navigationItems = [
     badgeColor: 'red',
   },
   {
-    to: '/ml-anomalies',
-    icon: 'i-heroicons-cpu-chip',
-    label: 'ML Anomalies',
-    badge: null,
-  },
-  {
     to: '/trends',
     icon: 'i-heroicons-chart-bar',
     label: 'Trends & Patterns',
-    badge: null,
-  },
-  {
-    to: '/investigation',
-    icon: 'i-heroicons-magnifying-glass',
-    label: 'Investigation',
-    badge: null,
-  },
-  {
-    to: '/reports',
-    icon: 'i-heroicons-document-text',
-    label: 'Reports',
     badge: null,
   },
   {
