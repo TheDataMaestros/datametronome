@@ -147,24 +147,26 @@ function buildRowCountChart(data: any[]) {
     labels: points.map((p) => p.label),
     datasets: [
       {
-        label: 'Expected Max',
+        label: 'Expected Maximum',
         data: points.map((p) => (Number.isFinite(p.max) ? p.max : null)) as any,
-        borderColor: 'rgba(107,114,128,0.5)',
-        backgroundColor: 'rgba(107,114,128,0.05)',
-        borderWidth: 1,
-        borderDash: [5, 5],
-        fill: '+1',
-        pointRadius: 0,
-      },
-      {
-        label: 'Expected Min',
-        data: points.map((p) => (Number.isFinite(p.min) ? p.min : null)) as any,
-        borderColor: 'rgba(107,114,128,0.5)',
-        backgroundColor: 'transparent',
-        borderWidth: 1,
-        borderDash: [5, 5],
+        borderColor: 'rgba(239, 68, 68, 0.8)', // Red for max threshold
+        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+        borderWidth: 2,
+        borderDash: [8, 4],
         fill: false,
         pointRadius: 0,
+        order: 1, // Render after main data
+      },
+      {
+        label: 'Expected Minimum',
+        data: points.map((p) => (Number.isFinite(p.min) ? p.min : null)) as any,
+        borderColor: 'rgba(34, 197, 94, 0.8)', // Green for min threshold
+        backgroundColor: 'rgba(34, 197, 94, 0.1)',
+        borderWidth: 2,
+        borderDash: [8, 4],
+        fill: '-1',
+        pointRadius: 0,
+        order: 1, // Render after main data
       },
       {
         label: 'Row Count',
@@ -174,7 +176,12 @@ function buildRowCountChart(data: any[]) {
         borderWidth: 2,
         tension: 0.2,
         fill: false,
+        pointRadius: points.map((p) => (p.isOutlier ? 8 : 4)),
+        pointBackgroundColor: points.map((p) => (p.isOutlier ? '#EF4444' : '#3B82F6')),
+        pointBorderColor: points.map((p) => (p.isOutlier ? '#DC2626' : '#3B82F6')),
+        pointBorderWidth: points.map((p) => (p.isOutlier ? 2 : 1)),
         isOutlier: points.map((p) => p.isOutlier),
+        order: 0, // Render first (on top of thresholds)
       },
     ],
   }
