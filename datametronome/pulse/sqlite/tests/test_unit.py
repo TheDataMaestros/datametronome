@@ -22,7 +22,7 @@ class TestSQLitePulse:
     def test_init_default_path(self):
         """Test initialization with default database path."""
         pulse = SQLitePulse()
-        assert pulse.database_path == "datametronome.db"
+        assert pulse.database_path == "data/datametronome.db"
         assert pulse.connection is None
         assert isinstance(pulse._readonly, SQLiteReadonlyPulse)
         assert isinstance(pulse._writeonly, SQLiteWriteonlyPulse)

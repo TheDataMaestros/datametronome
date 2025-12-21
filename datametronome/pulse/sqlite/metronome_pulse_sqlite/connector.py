@@ -19,7 +19,7 @@ class SQLitePulse(Pulse, Readable, Writable):
     Business logic, table creation, and DDL are handled by Podium.
     """
 
-    def __init__(self, database_path="datametronome.db"):
+    def __init__(self, database_path="data/datametronome.db"):
         self.database_path = database_path
         self.connection = None
         self._readonly = SQLiteReadonlyPulse(database_path)

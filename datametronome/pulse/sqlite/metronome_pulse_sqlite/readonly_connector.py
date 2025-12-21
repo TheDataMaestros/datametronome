@@ -28,7 +28,7 @@ class SQLiteReadonlyPulse(Pulse, Readable):
     # Allowed read-only SQL statement prefixes
     _READ_ONLY_PREFIXES = ("select", "with", "pragma", "explain")
 
-    def __init__(self, database_path="datametronome.db"):
+    def __init__(self, database_path="data/datametronome.db"):
         """Initialize the read-only SQLite connector.
 
         Args:

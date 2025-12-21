@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = Field(
-        default="sqlite:///./datametronome.db", env="DATAMETRONOME_DATABASE_URL"
+        default="sqlite:///./data/datametronome.db", env="DATAMETRONOME_DATABASE_URL"
     )
 
     # CORS

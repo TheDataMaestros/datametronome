@@ -14,7 +14,7 @@ class DatabaseInitService:
     DataPulse connectors only provide the connection interface.
     """
 
-    def __init__(self, database_path: str = "datametronome.db"):
+    def __init__(self, database_path: str = "data/datametronome.db"):
         self.database_path = database_path
         self.connector = SQLitePulse(database_path)
 
@@ -154,7 +154,7 @@ class DatabaseInitService:
             "id": str(uuid.uuid4()),
             "name": "Default SQLite Monitor",
             "description": "Default monitoring stave for local development",
-            "connection_config": '{"database_path": "datametronome.db"}',
+            "connection_config": '{"database_path": "data/datametronome.db"}',
             "created_at": now,
             "updated_at": now,
         }

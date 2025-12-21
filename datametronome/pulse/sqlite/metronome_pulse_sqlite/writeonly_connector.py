@@ -16,7 +16,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
     Business logic and table creation are handled by Podium.
     """
 
-    def __init__(self, database_path="datametronome.db"):
+    def __init__(self, database_path="data/datametronome.db"):
         self.database_path = database_path
         self.connection = None
         # Serialize writes to avoid "database is locked" under concurrent access.
