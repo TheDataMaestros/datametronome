@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.11', '3.12']
+        python-version: ['3.11', '3.12', '3.13']
 
     services:
       postgres:
@@ -58,6 +58,7 @@ jobs:
           uv pip install -e ./datametronome/pulse/postgres-psycopg3
           uv pip install -e ./datametronome/pulse/postgres-sqlalchemy
           uv pip install -e ./datametronome/pulse/postgres
+          uv pip install -e ./datametronome/brain/base
           uv pip install -e ./datametronome/podium
           # Install runtime deps not covered by -e
           uv pip install pydantic-settings python-jose[cryptography] passlib bcrypt==4.0.1 apscheduler redis asyncpg

@@ -23,7 +23,9 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
     - service: Service name
     """
 
-    def add_fields(self, log_record, record, message_dict):
+    def add_fields(
+        self, log_record: dict, record: logging.LogRecord, message_dict: dict
+    ) -> None:
         """Add custom fields to log record."""
         super().add_fields(log_record, record, message_dict)
 
