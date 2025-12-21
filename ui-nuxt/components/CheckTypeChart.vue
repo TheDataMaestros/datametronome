@@ -549,6 +549,39 @@ function buildDriftChart(data: any[]) {
     // Also show baseline ± 1 std as a band to show expected range
     const datasets: any[] = []
 
+    // DEBUG: Log the data being processed
+    console.log('[CheckTypeChart] Drift chart data:', {
+      pointsCount: points.length,
+      points: points.map((p) => ({
+        label: p.label,
+        baselineMean: p.baselineMean,
+        baselineStd: p.baselineStd,
+        currentMean: p.currentMean,
+        currentStd: p.currentStd,
+        baselineUpper:
+          Number.isFinite(p.baselineMean) && Number.isFinite(p.baselineStd)
+            ? p.baselineMean + p.baselineStd
+            : null,
+        currentUpper:
+          Number.isFinite(p.currentMean) && Number.isFinite(p.currentStd)
+            ? p.currentMean + p.currentStd
+            : null,
+      })),
+      maxBaselineUpper: Math.max(
+        ...points
+          .filter((p) => Number.isFinite(p.baselineMean) && Number.isFinite(p.baselineStd))
+          .map((p) => p.baselineMean + p.baselineStd),
+      ),
+      maxCurrentUpper: Math.max(
+        ...points
+          .filter((p) => Number.isFinite(p.currentMean) && Number.isFinite(p.currentStd))
+          .map((p) => p.currentMean + p.currentStd),
+      ),
+      maxCurrentMean: Math.max(
+        ...points.filter((p) => Number.isFinite(p.currentMean)).map((p) => p.currentMean),
+      ),
+    })
+
     // Add baseline mean ± std band if we have std
     const hasStd = points.some((p) => Number.isFinite(p.baselineStd))
     if (hasStd) {

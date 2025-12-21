@@ -50,33 +50,33 @@ jobs:
 
       - name: Install dependencies
         run: |
-          uv pip install --system pytest pytest-asyncio pytest-cov pytest-mock
+          uv pip install pytest pytest-asyncio pytest-cov pytest-mock
           # Install core first for dependencies
-          uv pip install --system -e ./datametronome/pulse/core
-          uv pip install --system -e ./datametronome/pulse/sqlite
-          uv pip install --system -e ./datametronome/pulse/postgres-psycopg3
-          uv pip install --system -e ./datametronome/pulse/postgres-sqlalchemy
-          uv pip install --system -e ./datametronome/pulse/postgres
-          uv pip install --system -e ./datametronome/podium
+          uv pip install -e ./datametronome/pulse/core
+          uv pip install -e ./datametronome/pulse/sqlite
+          uv pip install -e ./datametronome/pulse/postgres-psycopg3
+          uv pip install -e ./datametronome/pulse/postgres-sqlalchemy
+          uv pip install -e ./datametronome/pulse/postgres
+          uv pip install -e ./datametronome/podium
           # Install runtime deps not covered by -e
-          uv pip install --system pydantic-settings python-jose[cryptography] passlib bcrypt==4.0.1 apscheduler redis asyncpg
+          uv pip install pydantic-settings python-jose[cryptography] passlib bcrypt==4.0.1 apscheduler redis asyncpg
 
       - name: Type check with ty
-        run: uvx ty check --output-format github
+        run: uv run ty check --output-format github
 
       - name: Run Unit Tests
         run: |
-          pytest datametronome/pulse/core/tests/ -v
-          pytest datametronome/pulse/postgres/tests/ -v
-          pytest datametronome/pulse/postgres-psycopg3/tests/ -v
-          pytest datametronome/pulse/postgres-sqlalchemy/tests/ -v
-          pytest datametronome/podium/tests/test_unit.py -v
+          uv run pytest datametronome/pulse/core/tests/ -v
+          uv run pytest datametronome/pulse/postgres/tests/ -v
+          uv run pytest datametronome/pulse/postgres-psycopg3/tests/ -v
+          uv run pytest datametronome/pulse/postgres-sqlalchemy/tests/ -v
+          uv run pytest datametronome/podium/tests/test_unit.py -v
 
       - name: Run Integration Tests
         run: |
           # Wait for services
           until pg_isready -h localhost -U testuser; do sleep 1; done
-          pytest datametronome/podium/tests/test_integration_database.py -v
+          uv run pytest datametronome/podium/tests/test_integration_database.py -v
 
   release:
     name: Build & Release
