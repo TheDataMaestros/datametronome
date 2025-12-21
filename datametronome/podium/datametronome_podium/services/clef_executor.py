@@ -2078,7 +2078,7 @@ class ClefExecutor:
                     timestamp=datetime.now(),
                 )
 
-            # Fallback: mean ± 3*std over recent window
+            # Fallback: mean ± k*std over recent window, accounting for trend
             window = train_data[-30:] if len(train_data) > 30 else train_data
             n = len(window)
             if n == 0:
@@ -2092,12 +2092,35 @@ class ClefExecutor:
                     timestamp=datetime.now(),
                 )
 
+            # Calculate mean and std
             mean = sum(window) / n
             variance = sum((x - mean) ** 2 for x in window) / n
             std = variance**0.5
-            k = float(config.get("fallback_sigma", 2.0))
-            lower = mean - (k * std)
-            upper = mean + (k * std)
+
+            # Account for trend: if data is growing, adjust expected value upward
+            # Simple linear trend detection: compare first half vs second half
+            trend_adjustment = 0.0
+            if n >= 10:
+                first_half = window[: n // 2]
+                second_half = window[n // 2 :]
+                first_mean = sum(first_half) / len(first_half)
+                second_mean = sum(second_half) / len(second_half)
+                trend = (
+                    (second_mean - first_mean) / len(second_half)
+                    if len(second_half) > 0
+                    else 0
+                )
+                # Project trend forward by 1 step (for the next observation)
+                trend_adjustment = trend
+
+            # Adjust mean for trend
+            adjusted_mean = mean + trend_adjustment
+
+            k = float(
+                config.get("fallback_sigma", 2.5)
+            )  # Slightly wider default (2.5 instead of 2.0)
+            lower = adjusted_mean - (k * std)
+            upper = adjusted_mean + (k * std)
             is_anomaly = observed_value <= lower or observed_value >= upper
 
             status = "fail" if is_anomaly else "pass"

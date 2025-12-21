@@ -107,6 +107,17 @@ def main() -> None:
 
     executed = 0
     failed = 0
+
+    # Find drift and forecast clef IDs for historical checks generation
+    drift_clef_id = None
+    forecast_clef_id = None
+    for clef in retail_clefs:
+        name = clef.get("name", "")
+        if "Drift" in name and "Distribution" in name:
+            drift_clef_id = clef.get("id")
+        elif "Anomaly" in name and "Forecast" in name:
+            forecast_clef_id = clef.get("id")
+
     for clef in retail_clefs:
         clef_id = clef.get("id")
         name = clef.get("name")
@@ -131,6 +142,39 @@ def main() -> None:
         time.sleep(0.5)
 
     print(f"[showcase] executed {executed} clefs (failed={failed})")
+
+    # Generate historical check results for better visualization
+    if drift_clef_id or forecast_clef_id:
+        print("[showcase] generating historical check results...")
+        try:
+            from showcase.retail_demo.generate_historical_checks import (
+                generate_historical_drift_checks,
+                generate_historical_forecast_checks,
+            )
+
+            podium_db_path = Path(os.environ.get("DATAMETRONOME_DATABASE_URL", ""))
+            if podium_db_path and str(podium_db_path).startswith("sqlite"):
+                podium_db_path = Path(str(podium_db_path).split("///")[-1])
+            else:
+                # Default path in Docker
+                podium_db_path = Path("/app/data/datametronome.db")
+
+            if podium_db_path.exists():
+                if drift_clef_id:
+                    print(f"  Generating drift checks for: {drift_clef_id}")
+                    generate_historical_drift_checks(str(podium_db_path), drift_clef_id)
+                if forecast_clef_id:
+                    print(f"  Generating forecast checks for: {forecast_clef_id}")
+                    generate_historical_forecast_checks(
+                        str(podium_db_path), forecast_clef_id
+                    )
+                print("[showcase] ✅ Historical checks generated")
+            else:
+                print(
+                    f"[showcase] ⚠️  Podium DB not found at {podium_db_path}, skipping historical checks"
+                )
+        except Exception as e:
+            print(f"[showcase] ⚠️  Could not generate historical checks: {e}")
 
     print("[showcase] done")
 

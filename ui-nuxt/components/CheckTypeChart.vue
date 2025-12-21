@@ -28,11 +28,17 @@ interface Props {
   data: any[]
   height?: number
   showLegend?: boolean
+  clefConfig?: Record<string, any> // Clef configuration to get thresholds
+  clefWarn?: string | null // Warn condition (e.g., "< 1200")
+  clefFail?: string | null // Fail condition (e.g., "< 1000")
 }
 
 const props = withDefaults(defineProps<Props>(), {
   height: 300,
   showLegend: true,
+  clefConfig: () => ({}),
+  clefWarn: null,
+  clefFail: null,
 })
 
 const hasData = computed(() => {
@@ -130,12 +136,90 @@ function buildRowCountChart(data: any[]) {
         }
       }
 
-      const expectedMin = Number(meta?.expected_min ?? meta?.min_threshold ?? meta?.min_expected)
-      const expectedMax = Number(meta?.expected_max ?? meta?.max_threshold ?? meta?.max_expected)
-      const isOutlier =
-        Number.isFinite(count) && Number.isFinite(expectedMin) && Number.isFinite(expectedMax)
-          ? count < expectedMin || count > expectedMax
-          : false
+      // Get thresholds from multiple sources:
+      // 1. Check result metadata (expected_range, expected_min/max)
+      // 2. Clef config (expected_min/max)
+      // 3. Parse warn/fail conditions (e.g., "< 1200" -> min: 1200)
+
+      // Helper function to extract number from condition string like "< 1200" or "> 5000"
+      const extractThresholdFromCondition = (
+        condition: string | null | undefined,
+      ): number | null => {
+        if (!condition || typeof condition !== 'string') return null
+        const match = condition.match(/[<>]=?\s*(\d+(?:\.\d+)?)/)
+        return match ? Number(match[1]) : null
+      }
+
+      const expectedRange = meta?.expected_range || {}
+
+      // Try to get min threshold from multiple sources
+      let expectedMin = Number(
+        expectedRange?.min ??
+          meta?.expected_min ??
+          meta?.min_threshold ??
+          meta?.min_expected ??
+          props.clefConfig?.expected_min,
+      )
+
+      // If no min found, try parsing from fail condition (prefer fail over warn for min)
+      if (!Number.isFinite(expectedMin)) {
+        const failCondition = meta?.fail_condition || r?.fail_condition || props.clefFail
+        if (failCondition) {
+          const failThreshold = extractThresholdFromCondition(failCondition)
+          if (failThreshold !== null && failCondition.includes('<')) {
+            expectedMin = failThreshold
+          }
+        }
+      }
+
+      // If still no min, try parsing from warn condition
+      if (!Number.isFinite(expectedMin)) {
+        const warnCondition = meta?.warn_condition || r?.warn_condition || props.clefWarn
+        if (warnCondition) {
+          const warnThreshold = extractThresholdFromCondition(warnCondition)
+          if (warnThreshold !== null && warnCondition.includes('<')) {
+            expectedMin = warnThreshold
+          }
+        }
+      }
+
+      // Try to get max threshold from multiple sources
+      let expectedMax = Number(
+        expectedRange?.max ??
+          meta?.expected_max ??
+          meta?.max_threshold ??
+          meta?.max_expected ??
+          props.clefConfig?.expected_max,
+      )
+
+      // If no max found, try parsing from warn/fail conditions (e.g., "> 5000" means max is 5000)
+      if (!Number.isFinite(expectedMax)) {
+        const warnCondition = meta?.warn_condition || r?.warn_condition || props.clefWarn
+        const warnThreshold = extractThresholdFromCondition(warnCondition)
+        if (warnThreshold !== null && warnCondition?.includes('>')) {
+          expectedMax = warnThreshold
+        }
+      }
+
+      if (!Number.isFinite(expectedMax)) {
+        const failCondition = meta?.fail_condition || r?.fail_condition || props.clefFail
+        const failThreshold = extractThresholdFromCondition(failCondition)
+        if (failThreshold !== null && failCondition?.includes('>')) {
+          expectedMax = failThreshold
+        }
+      }
+      // Determine if this point is an outlier
+      let isOutlier = false
+      if (Number.isFinite(count)) {
+        if (Number.isFinite(expectedMin) && Number.isFinite(expectedMax)) {
+          isOutlier = count < expectedMin || count > expectedMax
+        } else if (Number.isFinite(expectedMin)) {
+          isOutlier = count < expectedMin
+        } else if (Number.isFinite(expectedMax)) {
+          isOutlier = count > expectedMax
+        }
+      }
+
       return { label, value: count, min: expectedMin, max: expectedMax, isOutlier }
     })
     .filter((p) => p.label && Number.isFinite(p.value) && p.value > 0)
@@ -143,31 +227,46 @@ function buildRowCountChart(data: any[]) {
 
   if (points.length === 0) return null
 
+  // Check if we have any valid thresholds
+  const hasMin = points.some((p) => Number.isFinite(p.min))
+  const hasMax = points.some((p) => Number.isFinite(p.max))
+
+  const datasets: any[] = []
+
+  // Add maximum threshold line if we have max values
+  if (hasMax) {
+    datasets.push({
+      label: 'Expected Maximum',
+      data: points.map((p) => (Number.isFinite(p.max) ? p.max : null)) as any,
+      borderColor: 'rgba(239, 68, 68, 0.8)', // Red for max threshold
+      backgroundColor: 'rgba(239, 68, 68, 0.1)',
+      borderWidth: 2,
+      borderDash: [8, 4],
+      fill: false,
+      pointRadius: 0,
+      order: 1, // Render after main data
+    })
+  }
+
+  // Add minimum threshold line if we have min values
+  if (hasMin) {
+    datasets.push({
+      label: 'Expected Minimum',
+      data: points.map((p) => (Number.isFinite(p.min) ? p.min : null)) as any,
+      borderColor: 'rgba(34, 197, 94, 0.8)', // Green for min threshold
+      backgroundColor: 'rgba(34, 197, 94, 0.1)',
+      borderWidth: 2,
+      borderDash: [8, 4],
+      fill: hasMax ? '-1' : false,
+      pointRadius: 0,
+      order: 1, // Render after main data
+    })
+  }
+
   return {
     labels: points.map((p) => p.label),
     datasets: [
-      {
-        label: 'Expected Maximum',
-        data: points.map((p) => (Number.isFinite(p.max) ? p.max : null)) as any,
-        borderColor: 'rgba(239, 68, 68, 0.8)', // Red for max threshold
-        backgroundColor: 'rgba(239, 68, 68, 0.1)',
-        borderWidth: 2,
-        borderDash: [8, 4],
-        fill: false,
-        pointRadius: 0,
-        order: 1, // Render after main data
-      },
-      {
-        label: 'Expected Minimum',
-        data: points.map((p) => (Number.isFinite(p.min) ? p.min : null)) as any,
-        borderColor: 'rgba(34, 197, 94, 0.8)', // Green for min threshold
-        backgroundColor: 'rgba(34, 197, 94, 0.1)',
-        borderWidth: 2,
-        borderDash: [8, 4],
-        fill: '-1',
-        pointRadius: 0,
-        order: 1, // Render after main data
-      },
+      ...datasets,
       {
         label: 'Row Count',
         data: points.map((p) => p.value) as any,
@@ -357,7 +456,7 @@ function buildDriftChart(data: any[]) {
   const points = data
     .map((r: any) => {
       const meta = r?.metadata || r?.details || {}
-      const ts = parseTimestamp(r?.timestamp)
+      const ts = parseTimestamp(r?.timestamp || r?.executed_at)
       const label = ts.toLocaleTimeString(undefined, {
         month: 'short',
         day: 'numeric',
@@ -366,7 +465,11 @@ function buildDriftChart(data: any[]) {
 
       // Try multiple ways to extract p-value
       const p = Number(
-        meta?.p_value ?? meta?.pvalue ?? meta?.p ?? r?.observed_value, // Sometimes p-value is in observed_value
+        meta?.p_value ??
+          meta?.pvalue ??
+          meta?.p ??
+          meta?.statistical_test?.p_value ??
+          r?.observed_value, // Sometimes p-value is in observed_value
       )
 
       // Calculate drift signal from p-value
@@ -382,14 +485,56 @@ function buildDriftChart(data: any[]) {
       }
 
       // Also try to get baseline and current means for comparison
-      const baselineMean = Number(meta?.baseline_mean ?? meta?.stats_metadata?.baseline_mean)
-      const currentMean = Number(meta?.current_mean ?? meta?.stats_metadata?.current_mean)
+      // The KS test stores these in stats_metadata, but also check top-level
+      const statsMeta = meta?.stats_metadata || {}
+      const baselineMean = Number(
+        meta?.baseline_mean ??
+          statsMeta?.baseline_mean ??
+          meta?.baseline_stats?.mean ??
+          meta?.reference_mean,
+      )
+      const baselineStd = Number(
+        meta?.baseline_std ?? statsMeta?.baseline_std ?? meta?.baseline_stats?.std,
+      )
+      const currentMean = Number(
+        meta?.current_mean ??
+          statsMeta?.current_mean ??
+          meta?.current_stats?.mean ??
+          meta?.sample_mean,
+      )
+      const currentStd = Number(
+        meta?.current_std ?? statsMeta?.current_std ?? meta?.current_stats?.std,
+      )
+
+      // Try to get drift score or distance metric as fallback
+      const driftScore = Number(
+        meta?.drift_score ?? meta?.distance ?? meta?.statistical_distance ?? meta?.ks_statistic,
+      )
+
+      // Use drift score if available and no signal
+      if (signal === null && Number.isFinite(driftScore) && driftScore > 0) {
+        signal = driftScore
+      }
 
       const isOutlier = signal !== null && signal > 2 // p < 0.01
 
-      return { label, signal, p, baselineMean, currentMean, isOutlier, hasSignal: signal !== null }
+      return {
+        label,
+        signal,
+        p,
+        baselineMean,
+        baselineStd,
+        currentMean,
+        currentStd,
+        driftScore,
+        isOutlier,
+        hasSignal: signal !== null,
+        hasMeans: Number.isFinite(baselineMean) && Number.isFinite(currentMean),
+        hasAnyData:
+          signal !== null || (Number.isFinite(baselineMean) && Number.isFinite(currentMean)),
+      }
     })
-    .filter((p) => p.label && p.hasSignal)
+    .filter((p) => p.label && p.hasAnyData) // Show if we have any data (signal or means)
     .reverse()
 
   if (points.length === 0) return null
@@ -400,32 +545,88 @@ function buildDriftChart(data: any[]) {
   )
 
   if (hasMeans) {
-    // Show comparison chart with baseline vs current
-    return {
-      labels: points.map((p) => p.label),
-      datasets: [
+    // Show comparison chart with baseline vs current means
+    // Also show baseline ± 1 std as a band to show expected range
+    const datasets: any[] = []
+
+    // Add baseline mean ± std band if we have std
+    const hasStd = points.some((p) => Number.isFinite(p.baselineStd))
+    if (hasStd) {
+      datasets.push(
+        {
+          label: 'Baseline Mean + 1σ',
+          data: points.map((p) =>
+            Number.isFinite(p.baselineMean) && Number.isFinite(p.baselineStd)
+              ? p.baselineMean + p.baselineStd
+              : null,
+          ) as any,
+          borderColor: 'rgba(59,130,246,0.3)',
+          backgroundColor: 'rgba(59,130,246,0.05)',
+          borderWidth: 1,
+          borderDash: [3, 3],
+          fill: '+1',
+          pointRadius: 0,
+        },
         {
           label: 'Baseline Mean',
           data: points.map((p) => (Number.isFinite(p.baselineMean) ? p.baselineMean : null)) as any,
-          borderColor: 'rgba(59,130,246,0.6)',
+          borderColor: 'rgba(59,130,246,0.8)',
           backgroundColor: 'rgba(59,130,246,0.1)',
           borderWidth: 2,
           borderDash: [5, 5],
           tension: 0.2,
-          fill: false,
+          fill: hasStd ? '-1' : false,
           pointRadius: 0,
         },
         {
-          label: 'Current Mean',
-          data: points.map((p) => (Number.isFinite(p.currentMean) ? p.currentMean : null)) as any,
-          borderColor: '#8B5CF6',
-          backgroundColor: 'rgba(139,92,246,0.1)',
-          borderWidth: 2,
-          tension: 0.2,
+          label: 'Baseline Mean - 1σ',
+          data: points.map((p) =>
+            Number.isFinite(p.baselineMean) && Number.isFinite(p.baselineStd)
+              ? p.baselineMean - p.baselineStd
+              : null,
+          ) as any,
+          borderColor: 'rgba(59,130,246,0.3)',
+          backgroundColor: 'transparent',
+          borderWidth: 1,
+          borderDash: [3, 3],
           fill: false,
-          isOutlier: points.map((p) => p.isOutlier),
+          pointRadius: 0,
         },
-      ],
+      )
+    } else {
+      // No std, just show baseline mean
+      datasets.push({
+        label: 'Baseline Mean',
+        data: points.map((p) => (Number.isFinite(p.baselineMean) ? p.baselineMean : null)) as any,
+        borderColor: 'rgba(59,130,246,0.8)',
+        backgroundColor: 'rgba(59,130,246,0.1)',
+        borderWidth: 2,
+        borderDash: [5, 5],
+        tension: 0.2,
+        fill: false,
+        pointRadius: 0,
+      })
+    }
+
+    // Add current mean
+    datasets.push({
+      label: 'Current Mean',
+      data: points.map((p) => (Number.isFinite(p.currentMean) ? p.currentMean : null)) as any,
+      borderColor: '#8B5CF6',
+      backgroundColor: 'rgba(139,92,246,0.1)',
+      borderWidth: 3,
+      tension: 0.2,
+      fill: false,
+      pointRadius: points.map((p) => (p.isOutlier ? 8 : 5)),
+      pointBackgroundColor: points.map((p) => (p.isOutlier ? '#EF4444' : '#8B5CF6')),
+      pointBorderColor: points.map((p) => (p.isOutlier ? '#DC2626' : '#8B5CF6')),
+      pointBorderWidth: points.map((p) => (p.isOutlier ? 2 : 1)),
+      isOutlier: points.map((p) => p.isOutlier),
+    })
+
+    return {
+      labels: points.map((p) => p.label),
+      datasets,
     }
   }
 

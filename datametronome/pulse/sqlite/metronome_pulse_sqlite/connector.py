@@ -102,7 +102,8 @@ class SQLitePulse(Pulse, Readable, Writable):
             if "table" not in record:
                 record["table"] = destination
 
-        return await self._writeonly.write(data, config)
+        assert destination is not None
+        return await self._writeonly.write(data, destination, config)
 
     async def execute(self, sql, params=None):
         """Execute raw SQL."""

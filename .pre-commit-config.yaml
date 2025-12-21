@@ -42,3 +42,12 @@ repos:
         entry: bash -lc "cd ui-nuxt && npm run -s format"
         language: system
         pass_filenames: false
+
+  - repo: local
+    hooks:
+      - id: ty-check
+        name: ty type checking
+        entry: uvx ty check
+        language: system
+        pass_filenames: false
+        always_run: true

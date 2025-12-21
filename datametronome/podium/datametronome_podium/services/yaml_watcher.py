@@ -9,7 +9,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Callable, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 try:
     from watchdog.events import FileSystemEvent, FileSystemEventHandler
@@ -97,7 +97,7 @@ class YAMLWatcher:
     """Service for watching YAML files and triggering reloads."""
 
     def __init__(self):
-        self.observer: Optional[Observer] = None
+        self.observer: Any | None = None
         self.watched_paths: Set[str] = set()
         self.reload_callback: Optional[Callable[[str], ReloadResult]] = None
         self.debounce_seconds: float = 1.0

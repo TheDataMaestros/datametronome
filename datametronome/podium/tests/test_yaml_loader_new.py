@@ -5,6 +5,7 @@ Comprehensive tests for the new YAML loader service.
 import os
 import tempfile
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, cast
 
 import pytest
 import yaml
@@ -129,7 +130,7 @@ class TestYAMLValidation:
         """Test validation rejects invalid root structure."""
         yaml_data = "not a dict"
 
-        result = validate_yaml_structure(yaml_data)
+        result = validate_yaml_structure(cast(Any, yaml_data))
         assert not result.is_valid
 
 

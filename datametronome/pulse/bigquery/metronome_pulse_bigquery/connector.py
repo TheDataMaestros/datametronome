@@ -110,12 +110,11 @@ class BigQueryPulse(Pulse, Readable, Writable):
 
             # Run query in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
-            assert self._client is not None
+            client = self._client
+            assert client is not None
             query_job = await loop.run_in_executor(
                 None,
-                lambda: self._client.query(
-                    sql, job_config=self._get_job_config(params)
-                ),
+                lambda: client.query(sql, job_config=self._get_job_config(params)),
             )
 
             # Get results
@@ -173,10 +172,11 @@ class BigQueryPulse(Pulse, Readable, Writable):
 
             # Run insert in thread pool
             loop = asyncio.get_event_loop()
-            assert self._client is not None
+            client = self._client
+            assert client is not None
             load_job = await loop.run_in_executor(
                 None,
-                lambda: self._client.load_table_from_json(
+                lambda: client.load_table_from_json(
                     data, table_ref, job_config=job_config
                 ),
             )
@@ -209,12 +209,11 @@ class BigQueryPulse(Pulse, Readable, Writable):
 
             # Get table
             loop = asyncio.get_event_loop()
-            assert self._client is not None
+            client = self._client
+            assert client is not None
             table = await loop.run_in_executor(
                 None,
-                lambda: self._client.get_table(
-                    f"{self._project_id}.{dataset_id}.{table_id}"
-                ),
+                lambda: client.get_table(f"{self._project_id}.{dataset_id}.{table_id}"),
             )
 
             # Return schema information
@@ -249,9 +248,10 @@ class BigQueryPulse(Pulse, Readable, Writable):
 
         try:
             loop = asyncio.get_event_loop()
-            assert self._client is not None
+            client = self._client
+            assert client is not None
             tables = await loop.run_in_executor(
-                None, lambda: list(self._client.list_tables(dataset_id))
+                None, lambda: list(client.list_tables(dataset_id))
             )
             return [table.table_id for table in tables]
 

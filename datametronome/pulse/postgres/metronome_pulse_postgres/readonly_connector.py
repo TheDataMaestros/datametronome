@@ -64,7 +64,7 @@ class PostgresReadOnlyPulse(Pulse, Readable):
         """Check if connected to the database."""
         return self._pool is not None
 
-    async def query(self, query_config) -> list:
+    async def query(self, query_config) -> list | dict:
         """Dynamic query method supporting multiple query types.
 
         Args:
@@ -145,6 +145,7 @@ class PostgresReadOnlyPulse(Pulse, Readable):
 
     async def _simple_query(self, sql: str) -> list:
         """Simple SQL query execution."""
+        assert self._pool is not None
         async with self._pool.acquire() as conn:
             records = await conn.fetch(sql)
             return [dict(record) for record in records]
@@ -164,11 +165,12 @@ class PostgresReadOnlyPulse(Pulse, Readable):
         if not self._pool:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
+        assert self._pool is not None
         async with self._pool.acquire() as conn:
             records = await conn.fetch(query, *args, **kwargs)
             return [dict(record) for record in records]
 
-    async def get_table_info(self, table_name: str) -> dict:
+    async def get_table_info(self, table_name: str) -> list | dict:
         """
         Get information about a table structure.
 

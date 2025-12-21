@@ -53,3 +53,16 @@ dev-dependencies = [
     "asyncpg>=0.28.0",
     "redis>=4.5.0",
 ]
+[tool.ty.environment]
+extra-paths = [
+    "datametronome/pulse/core",
+    "datametronome/pulse/postgres-sqlalchemy",
+    "datametronome/pulse/bigquery",
+    "datametronome/pulse/sqlite",
+    "datametronome/pulse/postgres",
+    "datametronome/pulse/postgres-psycopg3",
+    "datametronome/podium"
+]
+
+[tool.ty.terminal]
+output-format = "concise"

@@ -4,7 +4,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Tuple, cast
 
-from metronome_pulse_core.interfaces import Readable
+from metronome_pulse_core import Pulse, Readable
 from metronome_pulse_postgres import PostgresPulse
 from metronome_pulse_postgres_psycopg3 import PostgresPsycopg3Pulse
 from metronome_pulse_postgres_sqlalchemy import PostgresSQLAlchemyPulse
@@ -59,7 +59,7 @@ class PostgresMonitorService:
     async def close_connector(self) -> None:
         """Close the connector."""
         if self.connector:
-            await cast(Any, self.connector).close()
+            await cast(Pulse, self.connector).close()
             self.connector = None
 
     async def check_row_count(
@@ -152,6 +152,7 @@ class PostgresMonitorService:
                 sql = check["sql"]
                 expected_max = check.get("expected_max", 0)
 
+                assert self.connector is not None
                 results = await self.connector.query(sql)
                 anomaly_count = results[0]["count"] if results else 0
                 total_anomalies += anomaly_count
@@ -196,6 +197,7 @@ class PostgresMonitorService:
         """Check if table schema matches expected columns."""
         try:
             # Get table info using our connector
+            assert self.connector is not None
             table_info = await self.connector.query(
                 {"type": "table_info", "table_name": table_name}
             )
@@ -290,9 +292,7 @@ class PostgresMonitorService:
                     checks_list.append(("schema", schema_result))
 
                 # Determine overall table status
-                table_statuses = [
-                    cast(Dict[str, Any], result)["status"] for _, result in checks_list
-                ]
+                table_statuses = [result["status"] for _, result in checks_list]
                 if "critical" in table_statuses:
                     table_result["overall_status"] = "critical"
                 elif "warning" in table_statuses:

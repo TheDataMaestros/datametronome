@@ -88,6 +88,10 @@ start-ui: ## Start the UI
 retail-db: ## Generate the Retail demo dataset DB (SQLite)
 	@python3 showcase/retail_demo/generate_db.py --out datametronome/podium/data/retail.db
 
+retail-demo-setup: retail-db ## Generate retail DB and historical checks (requires Podium running)
+	@echo "📊 Generating historical check results..."
+	@python3 showcase/retail_demo/generate_db.py --out datametronome/podium/data/retail.db --generate-historical-checks
+
 setup-db: ## Initialize the database
 	cd datametronome/podium && DATAMETRONOME_SECRET_KEY="dev-secret-key-change-in-production-32-chars" DATAMETRONOME_DATABASE_URL="sqlite+aiosqlite:///$(PWD)/data/datametronome.db" python -c "import asyncio; from datametronome_podium.core.database import init_db; asyncio.run(init_db())"
 

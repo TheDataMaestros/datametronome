@@ -472,6 +472,27 @@ async def api_example():
 asyncio.run(api_example())
 ```
 
+### Retail Demo with Historical Data
+
+The retail demo automatically generates historical check results when you import the configuration. This provides rich visualizations showing:
+
+- **Data Drift**: Gradual distribution shift over multiple days (not just a single outlier)
+- **Forecast Anomalies**: Historical normal behavior vs. today's anomaly
+- **Trend Analysis**: Baseline patterns and threshold visualization
+
+To set up the full demo with historical data:
+
+```bash
+# Generate retail database
+make retail-db
+
+# Import configuration (automatically generates historical checks)
+export DB_PATH="$(pwd)/datametronome/podium/data/retail.db"
+python3 showcase/retail_demo/import_to_podium.py
+
+# Start API and UI, then view graphs in the Quality Checks page
+```
+
 ### Advanced Topics
 
 - 📚 [Full API Reference](api.md)

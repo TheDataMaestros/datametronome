@@ -96,6 +96,7 @@ make retail-db
 
 # 3) Import the Retail stave/clefs from YAML into Podium
 #    IMPORTANT: DB_PATH must be an absolute path to the retail dataset DB
+#    This automatically generates historical check results for better visualization
 export DB_PATH="$(pwd)/datametronome/podium/data/retail.db"
 python3 showcase/retail_demo/import_to_podium.py
 
@@ -115,7 +116,10 @@ make start-ui
 Then:
 - **UI**: http://localhost:3000
 - **Login**: `admin` / `admin`
-- **Run checks**: in the UI, go to **Quality Checks** → select **Retail Production DB** → run a check
+- **View checks**: Go to **Quality Checks** → click on any check card to see:
+  - **Historical trends**: 7 days of past data showing baseline behavior
+  - **Drift visualization**: Gradual distribution shift over time (not just a single outlier)
+  - **Forecast graphs**: Normal behavior in the past + today's anomaly clearly highlighted
 
 ### Option B — Docker Compose (fast full-stack)
 From the repo root:

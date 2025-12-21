@@ -2,7 +2,7 @@
 Setup configuration for metronome-pulse-bigquery
 """
 
-from setuptools import find_packages, setup
+from setuptools import find_packages, setup  # type: ignore
 
 with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()

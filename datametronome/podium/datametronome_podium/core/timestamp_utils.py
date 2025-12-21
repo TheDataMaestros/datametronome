@@ -33,7 +33,7 @@ def to_utc_isoformat(dt: Optional[datetime] = None) -> str:
             dt = parsed_dt
         except ValueError:
             # If parsing fails, return the original string
-            return dt
+            return str(dt)
 
     # Ensure the datetime is timezone-aware
     if dt.tzinfo is None:

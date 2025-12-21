@@ -75,21 +75,27 @@ def create_retail_db(db_path="retail.db"):
                 )
             )
 
-        # Order Volume: Seasonality
-        # Base: 50, Weekend Multiplier: 1.5x, Growth: +0.5 per day
-        base_orders = 50 + (day * 0.5)
+        # Order Volume: Seasonality with minimal growth for stable forecasting
+        # Base: 50, Weekend Multiplier: 1.5x, Very gradual growth: +0.1 per day
+        # Reduced growth to prevent forecast check from flagging everything as outlier
+        base_orders = 50 + (day * 0.1)  # Much slower growth
         if is_weekend:
             daily_orders_count = int(base_orders * 1.5)
         else:
             daily_orders_count = int(base_orders)
 
-        # Add some random noise
-        daily_orders_count += random.randint(-5, 5)
+        # Add some random noise (but less aggressive)
+        daily_orders_count += random.randint(-3, 3)
 
-        # Order Amounts: Normal distribution around $100
-        # For drift detection later, we keep this stable for now
+        # Order Amounts: Very stable baseline for drift detection
+        # Baseline: Consistent ~$100 mean, ~$20 std across all historical days
+        # This creates a clear, predictable pattern that makes drift obvious
         for _ in range(daily_orders_count):
-            amount = max(10.0, random.gauss(100, 20))
+            # Very stable baseline: mean exactly $100, std ~$20
+            # Use truncated normal to prevent extreme outliers (cap at 3σ)
+            amount = random.gauss(100, 20)
+            # Cap at reasonable bounds: mean ± 3σ = $100 ± $60 = $40 to $160
+            amount = max(40.0, min(160.0, amount))
             orders.append(
                 (
                     None,
@@ -100,28 +106,50 @@ def create_retail_db(db_path="retail.db"):
                 )
             )
 
-    # 2. Insert Anomalies (Today)
-    print("Injecting anomalies for 'Today'...")
-    today = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+    # 2. Insert Data Drift (Last 5 Days - showing gradual, realistic distribution shift)
+    print(
+        "Injecting data drift for last 5 days (gradual, realistic distribution shift)..."
+    )
+    now = datetime.now()
 
-    # Combined anomaly scenario:
-    # - Forecast anomaly: volume drops sharply (outage)
-    # - Drift anomaly: order amounts spike (pricing bug)
-    #
-    # Keep today's volume low but >= 20 so drift detection has enough samples.
-    # Expected daily volume at this point in history is typically ~80-120.
-    todays_orders = 20
-    for _ in range(todays_orders):
-        amount = max(10.0, random.gauss(500, 50))  # HUGE drift
-        orders.append(
-            (
-                None,
-                random.randint(1, len(users)),
-                amount,
-                "completed",
-                today.isoformat(),
+    # Data drift scenario: Distribution gradually shifts over 5 days
+    # More realistic: smoother transition, less abrupt changes
+    # This shows TRUE drift (sustained change) vs anomaly (single outlier)
+    drift_days = [
+        (now - timedelta(days=4), 101, 20),  # Day -4: Very slight shift (1.5% increase)
+        (now - timedelta(days=3), 102.5, 20.5),  # Day -3: Slight shift (3% increase)
+        (now - timedelta(days=2), 105, 21),  # Day -2: Moderate shift (5.5% increase)
+        (
+            now - timedelta(days=1),
+            108,
+            21.5,
+        ),  # Day -1: Noticeable shift (8.5% increase)
+        (now, 111, 22),  # Today: Significant shift (11.5% increase) - more realistic
+    ]
+
+    for drift_date, drift_mean, drift_std in drift_days:
+        drift_date = drift_date.replace(hour=12, minute=0, second=0, microsecond=0)
+
+        # Keep volume consistent for drift detection (need enough samples)
+        daily_orders = random.randint(18, 25)
+
+        for _ in range(daily_orders):
+            # Gradual drift: distribution shifts and stays shifted
+            # Use truncated normal to prevent extreme outliers (cap at 3σ)
+            amount = random.gauss(drift_mean, drift_std)
+            # Cap at reasonable bounds: mean ± 3σ to prevent spikes
+            min_bound = max(40.0, drift_mean - (3 * drift_std))
+            max_bound = min(200.0, drift_mean + (3 * drift_std))
+            amount = max(min_bound, min(max_bound, amount))
+            orders.append(
+                (
+                    None,
+                    random.randint(1, len(users)),
+                    amount,
+                    "completed",
+                    drift_date.isoformat(),
+                )
             )
-        )
 
     # Bulk Insert
     print(f"Inserting {len(users)} users and {len(orders)} orders...")

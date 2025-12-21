@@ -3,7 +3,7 @@ Mock CheckRun model for backward compatibility.
 This model has been refactored but tests still expect it.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -19,7 +19,7 @@ class CheckRun(BaseModel):
     started_at: datetime | None = None
     completed_at: datetime | None = None
     parameters: dict = {}
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @field_validator("status")
     @classmethod

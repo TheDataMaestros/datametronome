@@ -11,7 +11,7 @@ import logging
 import sqlite3
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 from datametronome_podium.models.stave import Stave
 
@@ -347,7 +347,7 @@ class ConnectionTester:
             )
 
             # Test connection
-            info: Any = r.info()
+            info = cast(dict, r.info())
 
             return {
                 "success": True,

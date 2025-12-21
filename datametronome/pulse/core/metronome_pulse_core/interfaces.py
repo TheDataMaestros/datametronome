@@ -76,7 +76,9 @@ class Readable(ABC):
         pass
 
     # Additional convenience methods for backward compatibility
-    async def execute_query(self, query: str, params: dict | None = None) -> list:
+    async def execute_query(
+        self, query: str, params: dict | None = None
+    ) -> list | dict:
         """Execute a query and return results (alias for query method)."""
         return await self.query(query)
 
@@ -85,7 +87,7 @@ class Readable(ABC):
         results = await self.query(query)
         return results[0] if results else None
 
-    async def fetch_all(self, query: str, params: dict | None = None) -> list:
+    async def fetch_all(self, query: str, params: dict | None = None) -> list | dict:
         """Fetch all results from a query (alias for query method)."""
         return await self.query(query)
 

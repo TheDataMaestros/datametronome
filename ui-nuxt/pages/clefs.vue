@@ -426,7 +426,7 @@
                   class="rounded-lg bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 p-4"
                 >
                   <pre class="text-xs overflow-auto whitespace-pre-wrap">{{
-                    formatJson(selectedClef.configuration || {})
+                    formatJson(selectedClef.configuration || selectedClef.config || {})
                   }}</pre>
                 </div>
               </div>
@@ -477,6 +477,9 @@
                   :data="checkResultsForClef"
                   :height="400"
                   :show-legend="true"
+                  :clef-config="selectedClef.configuration || selectedClef.config || {}"
+                  :clef-warn="selectedClef.warn"
+                  :clef-fail="selectedClef.fail"
                 />
               </div>
             </div>

@@ -161,6 +161,7 @@ class PostgresWriteOnlyPulse(Pulse, Writable):
         columns = list(data[0].keys())
         records = [tuple(record[col] for col in columns) for record in data]
 
+        assert self._pool is not None
         async with self._pool.acquire() as conn:
             await conn.copy_records_to_table(
                 destination,
@@ -281,6 +282,7 @@ class PostgresWriteOnlyPulse(Pulse, Writable):
                 if columns is None:
                     columns = list(rows[0].keys())
                 # chunked COPY
+                assert self._pool is not None
                 async with self._pool.acquire() as conn:
                     for start in range(0, len(rows), insert_chunk_size):
                         end = min(start + insert_chunk_size, len(rows))

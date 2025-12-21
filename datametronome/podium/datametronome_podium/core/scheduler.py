@@ -128,6 +128,7 @@ async def _load_and_schedule_clefs():
                     execute_scheduled_clef,
                 )
 
+                assert scheduler is not None
                 scheduler.add_job(
                     execute_scheduled_clef,
                     trigger=trigger,

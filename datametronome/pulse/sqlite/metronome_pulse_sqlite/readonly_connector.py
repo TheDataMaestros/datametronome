@@ -196,7 +196,9 @@ class SQLiteReadonlyPulse(Pulse, Readable):
         self._validate_read_only_sql(sql)
 
         try:
-            cursor = self.connection.cursor()
+            conn = self.connection
+            assert conn is not None
+            cursor = conn.cursor()
             if params:
                 cursor.execute(sql, params)
             else:
@@ -257,7 +259,9 @@ class SQLiteReadonlyPulse(Pulse, Readable):
             )
 
         try:
-            cursor = self.connection.cursor()
+            conn = self.connection
+            assert conn is not None
+            cursor = conn.cursor()
             # Use parameterized query for safety (though table names can't be parameterized in PRAGMA)
             # So we validate the table name above instead
             cursor.execute(f"PRAGMA table_info({table_name})")
@@ -279,7 +283,9 @@ class SQLiteReadonlyPulse(Pulse, Readable):
         self._ensure_connected()
 
         try:
-            cursor = self.connection.cursor()
+            conn = self.connection
+            assert conn is not None
+            cursor = conn.cursor()
             cursor.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
             )
@@ -297,7 +303,9 @@ class SQLiteReadonlyPulse(Pulse, Readable):
         try:
             if not await self.is_connected():
                 return False
-            cursor = self.connection.cursor()
+            conn = self.connection
+            assert conn is not None
+            cursor = conn.cursor()
             cursor.execute("SELECT 1")
             cursor.fetchone()
             return True

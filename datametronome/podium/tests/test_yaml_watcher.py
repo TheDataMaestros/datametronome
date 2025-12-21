@@ -156,7 +156,7 @@ class TestYAMLWatcherIntegration:
     """Integration tests for YAML watcher (requires watchdog)."""
 
     @pytest.mark.skipif(
-        not pytest.config.getoption("--run-slow", default=False),
+        not pytest.config.getoption("--run-slow", default=False),  # type: ignore
         reason="Slow integration test - use --run-slow to execute",
     )
     def test_file_change_detection(self, tmp_path):
