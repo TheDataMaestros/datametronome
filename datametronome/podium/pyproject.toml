@@ -7,7 +7,7 @@ name = "datametronome-podium"
 version = "0.1.0"
 description = "Core backend API server for DataMetronome data observability platform"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 authors = [
   { name = "DataMetronome Team", email = "team@datametronome.dev" },
 ]
