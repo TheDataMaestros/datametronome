@@ -124,15 +124,21 @@
             <div class="mt-4 space-y-2">
               <div class="flex items-center justify-between">
                 <span class="text-sm">Passed:</span>
-                <span class="font-medium text-green-600">85%</span>
+                <span class="font-medium text-green-600">
+                  {{ dashboardMetrics?.distribution?.passed ?? 0 }}%
+                </span>
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-sm">Failed:</span>
-                <span class="font-medium text-red-600">10%</span>
+                <span class="font-medium text-red-600">
+                  {{ dashboardMetrics?.distribution?.failed ?? 0 }}%
+                </span>
               </div>
               <div class="flex items-center justify-between">
                 <span class="text-sm">Warning:</span>
-                <span class="font-medium text-yellow-600">5%</span>
+                <span class="font-medium text-yellow-600">
+                  {{ dashboardMetrics?.distribution?.warning ?? 0 }}%
+                </span>
               </div>
             </div>
           </div>
@@ -279,18 +285,32 @@ definePageMeta({
 
 const { staves, isLoading: stavesLoading, fetchStaves } = useStaves()
 const { checks, fetchLatest } = useChecks()
+const { metrics: dashboardMetrics, fetchMetrics } = useDashboard()
 
 const isRunningChecks = ref(false)
 
-// System metrics
-const systemMetrics = ref({
-  successRate: 94.2,
-  successRateChange: 2.1,
-  activeSources: 8,
-  totalSources: 12,
-  activeChecks: 24,
-  scheduledChecks: 18,
-  anomalies: 7,
+// System metrics computed from real data
+const systemMetrics = computed(() => {
+  if (!dashboardMetrics.value) {
+    return {
+      successRate: 0,
+      successRateChange: 0,
+      activeSources: 0,
+      totalSources: 0,
+      activeChecks: 0,
+      scheduledChecks: 0,
+      anomalies: 0,
+    }
+  }
+  return {
+    successRate: dashboardMetrics.value.success_rate,
+    successRateChange: dashboardMetrics.value.success_rate_change,
+    activeSources: dashboardMetrics.value.active_sources,
+    totalSources: dashboardMetrics.value.total_sources,
+    activeChecks: dashboardMetrics.value.active_checks,
+    scheduledChecks: dashboardMetrics.value.scheduled_checks,
+    anomalies: dashboardMetrics.value.anomalies,
+  }
 })
 
 // Recent activity from latest checks
@@ -315,14 +335,18 @@ const recentActivity = computed(() => {
 
 // Transform staves data for display
 const dataSources = computed(() => {
-  return staves.value.map((stave) => ({
-    id: stave.id,
-    name: stave.name,
-    type: stave.data_source_type.toUpperCase(),
-    status: stave.is_active ? 'healthy' : 'warning',
-    lastCheck: new Date(stave.updated_at),
-    checks: Math.floor(Math.random() * 15) + 5, // Random check count for demo
-  }))
+  return staves.value.map((stave) => {
+    // Count checks for this stave from the checks we have
+    const staveChecks = checks.value.filter((check) => check.stave_id === stave.id)
+    return {
+      id: stave.id,
+      name: stave.name,
+      type: stave.data_source_type.toUpperCase(),
+      status: stave.is_active ? 'healthy' : 'warning',
+      lastCheck: new Date(stave.updated_at),
+      checks: staveChecks.length,
+    }
+  })
 })
 
 const dataSourceColumns = [
@@ -418,7 +442,13 @@ async function runAllChecks() {
 
 async function refreshData() {
   // Refresh all dashboard data
-  await Promise.all([refreshHealthChart(), refreshAnomalyChart(), fetchStaves(), fetchLatest(20)])
+  await Promise.all([
+    refreshHealthChart(),
+    refreshAnomalyChart(),
+    fetchStaves(),
+    fetchLatest(20),
+    fetchMetrics(),
+  ])
 }
 
 async function refreshHealthChart() {
@@ -453,5 +483,6 @@ useHead({
 onMounted(() => {
   fetchStaves()
   fetchLatest(20)
+  fetchMetrics()
 })
 </script>

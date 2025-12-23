@@ -1,5 +1,6 @@
 """Metrics endpoints for DataMetronome Podium using DataPulse connectors."""
 
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from datametronome_podium.core.database import get_db
@@ -177,4 +178,200 @@ async def get_anomaly_metrics() -> Dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch anomaly metrics: {str(e)}",
+        )
+
+
+@router.get("/dashboard")
+async def get_dashboard_metrics() -> Dict[str, Any]:
+    """Get comprehensive dashboard metrics for the home page.
+
+    Returns:
+        Dashboard metrics including success rate, sources, checks, anomalies, and distribution.
+    """
+    try:
+        db = await get_db()
+
+        # Calculate time thresholds
+        now = datetime.now(timezone.utc)
+        last_24h = (now - timedelta(hours=24)).isoformat()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+
+        # Get total and active staves
+        total_staves_result = await db.query(
+            {"sql": "SELECT COUNT(*) as count FROM staves", "params": []}
+        )
+        total_staves = total_staves_result[0]["count"] if total_staves_result else 0
+
+        active_staves_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as count FROM staves WHERE is_active = 1",
+                "params": [],
+            }
+        )
+        active_staves = active_staves_result[0]["count"] if active_staves_result else 0
+
+        # Get total and active clefs (quality checks)
+        total_clefs_result = await db.query(
+            {"sql": "SELECT COUNT(*) as count FROM clefs", "params": []}
+        )
+        total_clefs = total_clefs_result[0]["count"] if total_clefs_result else 0
+
+        active_clefs_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as count FROM clefs WHERE is_active = 1",
+                "params": [],
+            }
+        )
+        active_clefs = active_clefs_result[0]["count"] if active_clefs_result else 0
+
+        # Get scheduled clefs count (clefs with schedule)
+        scheduled_clefs_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as count FROM clefs WHERE schedule IS NOT NULL AND schedule != ''",
+                "params": [],
+            }
+        )
+        scheduled_clefs = (
+            scheduled_clefs_result[0]["count"] if scheduled_clefs_result else 0
+        )
+
+        # Get all checks count
+        all_checks_result = await db.query(
+            {"sql": "SELECT COUNT(*) as count FROM checks", "params": []}
+        )
+        all_checks_count = all_checks_result[0]["count"] if all_checks_result else 0
+
+        # Get checks from last 24 hours
+        checks_24h_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as count FROM checks WHERE timestamp >= ?",
+                "params": [last_24h],
+            }
+        )
+        checks_24h = checks_24h_result[0]["count"] if checks_24h_result else 0
+
+        # Calculate success rate (all time)
+        passed_checks_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as count FROM checks WHERE status = 'passed'",
+                "params": [],
+            }
+        )
+        passed_checks = (
+            passed_checks_result[0]["count"] if passed_checks_result else 0
+        )
+        success_rate = (
+            (passed_checks / all_checks_count * 100) if all_checks_count > 0 else 100.0
+        )
+
+        # Calculate success rate for today
+        today_passed_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as count FROM checks WHERE status = 'passed' AND timestamp >= ?",
+                "params": [today_start],
+            }
+        )
+        today_passed = today_passed_result[0]["count"] if today_passed_result else 0
+
+        today_total_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as count FROM checks WHERE timestamp >= ?",
+                "params": [today_start],
+            }
+        )
+        today_total = today_total_result[0]["count"] if today_total_result else 0
+        today_success_rate = (
+            (today_passed / today_total * 100) if today_total > 0 else 100.0
+        )
+
+        # Calculate success rate for yesterday
+        yesterday_start = (now - timedelta(days=1)).replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ).isoformat()
+        yesterday_end = now.replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+
+        yesterday_passed_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as count FROM checks WHERE status = 'passed' AND timestamp >= ? AND timestamp < ?",
+                "params": [yesterday_start, yesterday_end],
+            }
+        )
+        yesterday_passed = (
+            yesterday_passed_result[0]["count"] if yesterday_passed_result else 0
+        )
+
+        yesterday_total_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as count FROM checks WHERE timestamp >= ? AND timestamp < ?",
+                "params": [yesterday_start, yesterday_end],
+            }
+        )
+        yesterday_total = (
+            yesterday_total_result[0]["count"] if yesterday_total_result else 0
+        )
+        yesterday_success_rate = (
+            (yesterday_passed / yesterday_total * 100) if yesterday_total > 0 else 100.0
+        )
+
+        # Calculate success rate change
+        success_rate_change = today_success_rate - yesterday_success_rate
+
+        # Get anomalies from last 24 hours
+        anomalies_24h_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as count FROM anomalies WHERE detected_at >= ?",
+                "params": [last_24h],
+            }
+        )
+        anomalies_24h = (
+            anomalies_24h_result[0]["count"] if anomalies_24h_result else 0
+        )
+
+        # Get check status distribution (all time)
+        status_distribution_result = await db.query(
+            {
+                "sql": "SELECT status, COUNT(*) as count FROM checks GROUP BY status",
+                "params": [],
+            }
+        )
+        status_distribution = {
+            item["status"]: item["count"] for item in status_distribution_result
+        }
+
+        # Calculate percentages for distribution
+        total_for_distribution = sum(status_distribution.values())
+        distribution_percentages = {}
+        if total_for_distribution > 0:
+            distribution_percentages = {
+                "passed": round(
+                    (status_distribution.get("passed", 0) / total_for_distribution) * 100,
+                    1,
+                ),
+                "failed": round(
+                    (status_distribution.get("failed", 0) / total_for_distribution) * 100,
+                    1,
+                ),
+                "warning": round(
+                    (status_distribution.get("warning", 0) / total_for_distribution) * 100,
+                    1,
+                ),
+            }
+
+        return {
+            "success_rate": round(success_rate, 1),
+            "success_rate_change": round(success_rate_change, 1),
+            "active_sources": active_staves,
+            "total_sources": total_staves,
+            "active_checks": active_clefs,
+            "scheduled_checks": scheduled_clefs,
+            "anomalies": anomalies_24h,
+            "distribution": distribution_percentages,
+            "total_checks": all_checks_count,
+            "checks_24h": checks_24h,
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch dashboard metrics: {str(e)}",
         )
