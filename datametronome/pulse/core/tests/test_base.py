@@ -60,7 +60,7 @@ class TestBaseConnector:
         with pytest.raises(TypeError):
             BaseConnector()
 
-    def test_base_connector_inheritance(self):
+    async def test_base_connector_inheritance(self):
         """Test that concrete connectors properly inherit from BaseConnector"""
 
         class TestConnector(BaseConnector):
@@ -99,9 +99,9 @@ class TestBaseConnector:
         config = ConnectionConfig(host="localhost", port=5432, database="test")
         connector = TestConnector(config)
         assert isinstance(connector, BaseConnector)
-        assert connector.connect() == "connected"
-        assert connector.disconnect() == "disconnected"
-        assert connector.is_connected() is True
+        assert await connector.connect() == "connected"
+        assert await connector.disconnect() == "disconnected"
+        assert await connector.is_connected() is True
 
 
 class TestReadable:
@@ -145,7 +145,7 @@ class TestReadable:
         with pytest.raises(TypeError):
             ReadOnlyConnector()
 
-    def test_readonly_connector_methods(self):
+    async def test_readonly_connector_methods(self):
         """Test that ReadOnlyConnector has all required methods"""
 
         class TestReadOnlyConnector(ReadOnlyConnector):
@@ -176,11 +176,11 @@ class TestReadable:
         connector = TestReadOnlyConnector()
 
         # Test all required methods exist and work
-        assert connector.execute_query("SELECT * FROM test") == [{"result": "data"}]
-        assert connector.fetch_one("SELECT * FROM test") == {"result": "single"}
-        assert connector.fetch_all("SELECT * FROM test") == [{"result": "all"}]
+        assert await connector.execute_query("SELECT * FROM test") == [{"result": "data"}]
+        assert await connector.fetch_one("SELECT * FROM test") == {"result": "single"}
+        assert await connector.fetch_all("SELECT * FROM test") == [{"result": "all"}]
 
-    def test_readonly_connector_query_parameters(self):
+    async def test_readonly_connector_query_parameters(self):
         """Test that ReadOnlyConnector handles query parameters correctly"""
 
         class TestReadOnlyConnector(ReadOnlyConnector):
@@ -212,11 +212,11 @@ class TestReadable:
 
         # Test with parameters
         params = {"id": 1, "name": "test"}
-        result = connector.execute_query("SELECT * FROM test WHERE id = :id", params)
+        result = await connector.execute_query("SELECT * FROM test WHERE id = :id", params)
         assert result["params"] == params
 
         # Test without parameters
-        result = connector.execute_query("SELECT * FROM test")
+        result = await connector.execute_query("SELECT * FROM test")
         assert result["params"] is None
 
 
@@ -268,7 +268,7 @@ class TestWriteOnlyConnector:
         with pytest.raises(TypeError):
             WriteOnlyConnector()
 
-    def test_writeonly_connector_methods(self):
+    async def test_writeonly_connector_methods(self):
         """Test that WriteOnlyConnector has all required methods"""
 
         class TestWriteOnlyConnector(WriteOnlyConnector):
@@ -307,17 +307,17 @@ class TestWriteOnlyConnector:
         connector = TestWriteOnlyConnector()
 
         # Test all required methods exist and work
-        assert connector.execute_write("INSERT INTO test VALUES (:id)", {"id": 1}) == {
+        assert await connector.execute_write("INSERT INTO test VALUES (:id)", {"id": 1}) == {
             "affected_rows": 1
         }
-        assert connector.execute_batch(
+        assert await connector.execute_batch(
             ["INSERT INTO test VALUES (1)", "INSERT INTO test VALUES (2)"]
         ) == {"affected_rows": [1, 2, 3]}
-        assert connector.begin_transaction() is True
-        assert connector.commit_transaction() is True
-        assert connector.rollback_transaction() is True
+        assert await connector.begin_transaction() is True
+        assert await connector.commit_transaction() is True
+        assert await connector.rollback_transaction() is True
 
-    def test_writeonly_connector_transaction_flow(self):
+    async def test_writeonly_connector_transaction_flow(self):
         """Test that WriteOnlyConnector handles transaction flow correctly"""
 
         class TestWriteOnlyConnector(WriteOnlyConnector):
@@ -367,14 +367,14 @@ class TestWriteOnlyConnector:
 
         # Test transaction flow
         assert connector.transaction_state == "none"
-        assert connector.begin_transaction() is True
+        assert await connector.begin_transaction() is True
         assert connector.transaction_state == "active"
-        assert connector.commit_transaction() is True
+        assert await connector.commit_transaction() is True
         assert connector.transaction_state == "committed"
 
         # Test rollback
         connector.transaction_state = "active"
-        assert connector.rollback_transaction() is True
+        assert await connector.rollback_transaction() is True
         assert connector.transaction_state == "rolled_back"
 
 
@@ -440,7 +440,7 @@ class TestReadWriteConnector:
         with pytest.raises(TypeError):
             ReadWriteConnector()
 
-    def test_readwrite_connector_full_functionality(self):
+    async def test_readwrite_connector_full_functionality(self):
         """Test that ReadWriteConnector provides full read/write functionality"""
 
         class TestReadWriteConnector(ReadWriteConnector):
@@ -515,28 +515,28 @@ class TestReadWriteConnector:
         connector = TestReadWriteConnector()
 
         # Test read operations
-        assert connector.fetch_all("SELECT * FROM test") == []
-        assert connector.fetch_one("SELECT * FROM test") is None
+        assert await connector.fetch_all("SELECT * FROM test") == []
+        assert await connector.fetch_one("SELECT * FROM test") is None
 
         # Test write operations
-        assert connector.execute_write("INSERT INTO test VALUES (:id)", {"id": 1}) == {
+        assert await connector.execute_write("INSERT INTO test VALUES (:id)", {"id": 1}) == {
             "affected_rows": 1
         }
         assert len(connector.data) == 1
 
         # Test read after write
-        assert connector.fetch_all("SELECT * FROM test") == [{"id": 1}]
-        assert connector.fetch_one("SELECT * FROM test") == {"id": 1}
+        assert await connector.fetch_all("SELECT * FROM test") == [{"id": 1}]
+        assert await connector.fetch_one("SELECT * FROM test") == {"id": 1}
 
         # Test transaction operations
-        assert connector.begin_transaction() is True
+        assert await connector.begin_transaction() is True
         assert connector.transaction_state == "active"
-        assert connector.commit_transaction() is True
+        assert await connector.commit_transaction() is True
         assert connector.transaction_state == "committed"
 
         # Test rollback
         connector.transaction_state = "active"
-        assert connector.rollback_transaction() is True
+        assert await connector.rollback_transaction() is True
         assert connector.transaction_state == "rolled_back"
 
 
