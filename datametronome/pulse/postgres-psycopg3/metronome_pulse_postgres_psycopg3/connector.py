@@ -7,7 +7,12 @@ with full support for the DataPulse ecosystem and psycopg3 features.
 
 import psycopg
 from metronome_pulse_core import Pulse, Readable, Writable
-from psycopg import pool  # type: ignore
+try:
+    from psycopg_pool import AsyncConnectionPool
+except ImportError:
+    # Fallback for older psycopg3 versions that have pool in psycopg
+    from psycopg import pool  # type: ignore
+    AsyncConnectionPool = pool.AsyncConnectionPool
 
 from .sql_builder import PostgresPsycopgSQLBuilder
 
@@ -48,7 +53,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
 
     async def connect(self):
         """Establish connection pool to PostgreSQL using psycopg3."""
-        self._pool = await pool.AsyncConnectionPool.connect(
+        self._pool = await AsyncConnectionPool.connect(
             host=self._host,
             port=self._port,
             dbname=self._database,
