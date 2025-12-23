@@ -584,6 +584,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useClefs } from '~/composables/useClefs'
 import { useStaves } from '~/composables/useStaves'
+import { clefsService } from '~/services/clefs'
 import type { Clef, CreateClefRequest } from '~/services/clefs'
 import type { Check } from '~/services/checks'
 
@@ -658,65 +659,55 @@ const newClef = ref<CreateClefRequest>({
   fail: '',
 })
 
-// Clef templates with tier information
-const clefTemplates = ref([
-  {
-    type: 'row_count',
-    name: 'Row Count',
-    description: 'Monitor the number of rows in a table',
-    icon: 'i-heroicons-calculator',
-    tier: 1,
-    config: { table: '', expected_min: 0, expected_max: 1000000 },
-  },
-  {
-    type: 'freshness',
-    name: 'Data Freshness',
-    description: 'Check how recent your data is',
-    icon: 'i-heroicons-clock',
-    tier: 1,
-    config: { table: '', column: '', max_age_hours: 24 },
-  },
-  {
-    type: 'column_values',
-    name: 'Column Validation',
-    description: 'Validate values in a specific column',
-    icon: 'i-heroicons-check-circle',
-    tier: 1,
-    config: { table: '', column: '', validation_type: 'null_check' },
-  },
-  {
-    type: 'forecast',
-    name: 'Anomaly Detection',
-    description: 'ML-powered anomaly detection',
-    icon: 'i-heroicons-chart-bar',
-    tier: 2,
-    config: { table: '', metric: 'row_count', time_column: '', model: 'sarima' },
-  },
-  {
-    type: 'data_profile_drift',
-    name: 'Data Drift',
-    description: 'Detect statistical changes in data',
-    icon: 'i-heroicons-arrow-trending-up',
-    tier: 2,
-    config: { table: '', column: '', reference_period: 'last_30_days' },
-  },
-  {
-    type: 'lookup_validation',
-    name: 'Cross-System Check',
-    description: 'Validate data across multiple systems',
-    icon: 'i-heroicons-link',
-    tier: 3,
-    config: { source_table: '', source_column: '', lookup_source: '' },
-  },
-  {
-    type: 'python',
-    name: 'Custom Python',
-    description: 'Run custom Python validation scripts',
-    icon: 'i-heroicons-code-bracket',
-    tier: 4,
-    config: { script_path: '', function_name: '', parameters: {} },
-  },
-])
+// Clef templates with tier information - fetched from API
+const clefTemplates = ref<Array<{
+  type: string
+  name: string
+  description: string
+  icon: string
+  tier: number
+  config: Record<string, any>
+}>>([])
+
+// Icon mapping for check types
+const checkTypeIcons: Record<string, string> = {
+  row_count: 'i-heroicons-calculator',
+  freshness: 'i-heroicons-clock',
+  column_values: 'i-heroicons-check-circle',
+  forecast: 'i-heroicons-chart-bar',
+  data_profile_drift: 'i-heroicons-arrow-trending-up',
+  lookup_validation: 'i-heroicons-link',
+  python: 'i-heroicons-code-bracket',
+}
+
+// Default config templates for each check type
+const checkTypeConfigs: Record<string, Record<string, any>> = {
+  row_count: { table: '', expected_min: 0, expected_max: 1000000 },
+  freshness: { table: '', column: '', max_age_hours: 24 },
+  column_values: { table: '', column: '', validation_type: 'null_check' },
+  forecast: { table: '', metric: 'row_count', time_column: '', model: 'sarima' },
+  data_profile_drift: { table: '', column: '', reference_period: 'last_30_days' },
+  lookup_validation: { source_table: '', source_column: '', lookup_source: '' },
+  python: { script_path: '', function_name: '', parameters: {} },
+}
+
+// Fetch check types from API
+const fetchCheckTypes = async () => {
+  try {
+    const response = await clefsService.getAvailableTypes()
+    clefTemplates.value = response.check_types.map((ct) => ({
+      type: ct.type,
+      name: ct.name,
+      description: ct.description,
+      icon: checkTypeIcons[ct.type] || 'i-heroicons-musical-note',
+      tier: ct.tier,
+      config: checkTypeConfigs[ct.type] || {},
+    }))
+  } catch (error) {
+    console.error('Failed to fetch check types:', error)
+    // Fallback to empty array or show error to user
+  }
+}
 
 // Computed properties
 const filteredClefs = computed(() => {
@@ -1146,6 +1137,11 @@ const refreshLatestResults = async () => {
 
 // Lifecycle
 onMounted(async () => {
-  await Promise.all([fetchClefs(), fetchStaves(), refreshLatestResults()])
+  await Promise.all([
+    fetchClefs(),
+    fetchStaves(),
+    refreshLatestResults(),
+    fetchCheckTypes(),
+  ])
 })
 </script>

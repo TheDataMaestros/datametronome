@@ -65,6 +65,24 @@ async def get_staves(skip: int = 0, limit: int = 100) -> List[StaveResponse]:
         )
 
 
+@router.get("/types", response_model=List[str])
+async def get_available_data_source_types() -> List[str]:
+    """Get list of all available data source types.
+
+    Returns:
+        List of supported data source type strings.
+    """
+    from datametronome_podium.services.stave_service import get_supported_data_sources
+
+    try:
+        return get_supported_data_sources()
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch data source types: {str(e)}",
+        )
+
+
 @router.get("/{stave_id}", response_model=StaveResponse)
 async def get_stave(stave_id: str) -> StaveResponse:
     """Get a specific stave by ID using DataPulse connector.

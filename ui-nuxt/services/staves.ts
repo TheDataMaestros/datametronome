@@ -60,6 +60,11 @@ class StavesService {
     const response = await apiService.get<any[]>(`${this.endpoint}/${id}/clefs`)
     return response.data
   }
+
+  async getAvailableTypes(): Promise<string[]> {
+    const response = await apiService.get<string[]>('/staves/types')
+    return response.data
+  }
 }
 
 export const stavesService = new StavesService()

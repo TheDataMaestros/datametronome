@@ -106,6 +106,37 @@ class ClefsService {
     )
     return response.data.results
   }
+
+  async getAvailableTypes(): Promise<{
+    check_types: Array<{
+      type: string
+      name: string
+      description: string
+      tier: number
+    }>
+    by_tier: {
+      '1': Array<{ type: string; name: string; description: string; tier: number }>
+      '2': Array<{ type: string; name: string; description: string; tier: number }>
+      '3': Array<{ type: string; name: string; description: string; tier: number }>
+      '4': Array<{ type: string; name: string; description: string; tier: number }>
+    }
+  }> {
+    const response = await apiService.get<{
+      check_types: Array<{
+        type: string
+        name: string
+        description: string
+        tier: number
+      }>
+      by_tier: {
+        '1': Array<{ type: string; name: string; description: string; tier: number }>
+        '2': Array<{ type: string; name: string; description: string; tier: number }>
+        '3': Array<{ type: string; name: string; description: string; tier: number }>
+        '4': Array<{ type: string; name: string; description: string; tier: number }>
+      }
+    }>('/clefs/types')
+    return response.data
+  }
 }
 
 export const clefsService = new ClefsService()
