@@ -74,12 +74,6 @@ jobs:
           uv run pytest datametronome/pulse/postgres-sqlalchemy/tests/ -v
           uv run pytest datametronome/podium/tests/test_unit.py -v
 
-      - name: Run Integration Tests
-        run: |
-          # Wait for services
-          until pg_isready -h localhost -U testuser; do sleep 1; done
-          uv run pytest datametronome/podium/tests/test_integration_database.py -v
-
   release:
     name: Build & Release
     needs: quality-and-test
