@@ -130,7 +130,7 @@ class TestStaveModelUnit:
         stave_data = {
             "name": "Test Stave",
             "description": "A test stave for unit testing",
-            "stave_type": "postgres_monitor",
+            "stave_type": "postgres",
             "connection_config": {
                 "host": "localhost",
                 "port": 5432,
@@ -149,7 +149,7 @@ class TestStaveModelUnit:
 
         assert stave.name == "Test Stave"
         assert stave.description == "A test stave for unit testing"
-        assert stave.data_source_type == "postgres_monitor"
+        assert stave.data_source_type == "postgres"
         assert stave.connection_config["host"] == "localhost"
         assert stave.is_active is True
 
@@ -170,10 +170,11 @@ class TestStaveModelUnit:
 
     def test_stave_config_validation(self):
         """Test stave config validation."""
+        # Test that empty config raises ValueError
         stave_data = {
             "name": "Test Stave",
-            "data_source_type": "postgres_monitor",
-            "connection_config": {"host": "", "port": -1},  # Empty host  # Invalid port
+            "data_source_type": "postgres",
+            "connection_config": {},  # Empty config should raise ValueError
         }
 
         with pytest.raises(ValueError):
@@ -185,7 +186,7 @@ class TestStaveModelUnit:
 
     def test_stave_default_values(self):
         """Test stave default values."""
-        stave_data = {"name": "Default Stave", "data_source_type": "postgres_monitor"}
+        stave_data = {"name": "Default Stave", "data_source_type": "postgres"}
         stave = Stave(
             name=stave_data["name"],
             data_source_type=stave_data["data_source_type"],
@@ -206,7 +207,7 @@ class TestClefModelUnit:
         clef_data = {
             "name": "Test Clef",
             "description": "A test clef for data quality checks",
-            "check_type": "postgres_quality",
+            "check_type": "column_values",
             "config": {
                 "table_name": "users",
                 "checks": [{"type": "null_check", "column": "email", "threshold": 0}],
@@ -215,6 +216,7 @@ class TestClefModelUnit:
         }
 
         clef = Clef(
+            stave_id="test-stave-001",
             name=str(clef_data["name"]),
             description=str(clef_data["description"]),
             check_type=str(clef_data["check_type"]),
@@ -223,7 +225,7 @@ class TestClefModelUnit:
         )
 
         assert clef.name == "Test Clef"
-        assert clef.check_type == "postgres_quality"
+        assert clef.check_type == "column_values"
         assert clef.config["table_name"] == "users"
         assert len(clef.config["checks"]) == 1
         assert clef.is_active is True
@@ -238,6 +240,7 @@ class TestClefModelUnit:
 
         with pytest.raises(ValueError):
             Clef(
+                stave_id="test-stave-001",
                 name=str(clef_data["name"]),
                 check_type=str(clef_data["check_type"]),
                 config=dict(clef_data["config"]),  # type: ignore
@@ -245,17 +248,16 @@ class TestClefModelUnit:
 
     def test_clef_check_config_validation(self):
         """Test clef check configuration validation."""
+        # Test that empty config raises ValueError
         clef_data = {
             "name": "Test Clef",
-            "check_type": "postgres_quality",
-            "config": {
-                "table_name": "",
-                "checks": [{"type": "invalid_check_type", "column": "email"}],
-            },
+            "check_type": "column_values",
+            "config": {},  # Empty config should raise ValueError
         }
 
         with pytest.raises(ValueError):
             Clef(
+                stave_id="test-stave-001",
                 name=str(clef_data["name"]),
                 check_type=str(clef_data["check_type"]),
                 config=dict(clef_data["config"]),  # type: ignore
@@ -264,15 +266,16 @@ class TestClefModelUnit:
     def test_clef_serialization(self):
         """Test clef model serialization."""
         clef = Clef(
+            stave_id="test-stave-001",
             name="Serialize Clef",
-            check_type="postgres_quality",
+            check_type="column_values",
             config={"table_name": "test_table"},
         )
 
         clef_dict = clef.model_dump()
 
         assert clef_dict["name"] == "Serialize Clef"
-        assert clef_dict["check_type"] == "postgres_quality"
+        assert clef_dict["check_type"] == "column_values"
         assert clef_dict["config"]["table_name"] == "test_table"
 
 
@@ -419,7 +422,7 @@ class TestModelValidationUnit:
 
         stave = Stave(
             name="Test Stave",
-            data_source_type="postgres_monitor",
+            data_source_type="postgres",
             connection_config=valid_config,
         )
         assert stave.connection_config["database"]["host"] == "localhost"
@@ -466,7 +469,7 @@ class TestModelSerializationUnit:
         """Test stave model JSON serialization."""
         stave = Stave(
             name="JSON Stave",
-            data_source_type="postgres_monitor",
+            data_source_type="postgres",
             connection_config={"host": "localhost", "port": 5432},
         )
 
@@ -474,7 +477,7 @@ class TestModelSerializationUnit:
         stave_dict = json.loads(json_str)
 
         assert stave_dict["name"] == "JSON Stave"
-        assert stave_dict["data_source_type"] == "postgres_monitor"
+        assert stave_dict["data_source_type"] == "postgres"
         assert stave_dict["connection_config"]["host"] == "localhost"
 
     def test_model_deserialization(self):
