@@ -23,14 +23,19 @@ class TestUserModelUnit:
 
     def test_user_creation_valid_data(self):
         """Test user creation with valid data."""
-        user_data = {
+        user_data: dict[str, Any] = {
             "username": "testuser",
             "email": "test@example.com",
             "full_name": "Test User",
             "is_active": True,
         }
 
-        user = User(**user_data)
+        user = User(
+            username=str(user_data["username"]),
+            email=str(user_data["email"]),
+            full_name=str(user_data["full_name"]),
+            is_active=bool(user_data["is_active"]),
+        )
 
         assert user.username == "testuser"
         assert user.email == "test@example.com"
@@ -43,7 +48,10 @@ class TestUserModelUnit:
         """Test user creation with minimal required data."""
         user_data = {"username": "minimaluser", "email": "minimal@example.com"}
 
-        user = User(**user_data)
+        user = User(
+            username=str(user_data["username"]),
+            email=str(user_data["email"]),
+        )
 
         assert user.username == "minimaluser"
         assert user.email == "minimal@example.com"
@@ -59,14 +67,20 @@ class TestUserModelUnit:
         }
 
         with pytest.raises(ValueError):
-            User(**user_data)
+            User(
+                username=user_data["username"],
+                email=user_data["email"],
+            )
 
     def test_user_validation_empty_username(self):
         """Test user validation with empty username."""
         user_data = {"username": "", "email": "test@example.com"}  # Empty username
 
         with pytest.raises(ValueError):
-            User(**user_data)
+            User(
+                username=user_data["username"],
+                email=user_data["email"],
+            )
 
     def test_user_validation_username_too_long(self):
         """Test user validation with username too long."""
@@ -76,7 +90,10 @@ class TestUserModelUnit:
         }
 
         with pytest.raises(ValueError):
-            User(**user_data)
+            User(
+                username=user_data["username"],
+                email=user_data["email"],
+            )
 
     def test_user_serialization(self):
         """Test user model serialization to JSON."""
@@ -113,50 +130,72 @@ class TestStaveModelUnit:
         stave_data = {
             "name": "Test Stave",
             "description": "A test stave for unit testing",
-            "stave_type": "postgres_monitor",
-            "config": {"host": "localhost", "port": 5432, "database": "testdb"},
+            "stave_type": "postgres",
+            "connection_config": {
+                "host": "localhost",
+                "port": 5432,
+                "database": "testdb",
+            },
             "is_active": True,
         }
 
-        stave = Stave(**stave_data)
+        stave = Stave(
+            name=str(stave_data["name"]),
+            description=str(stave_data["description"]),
+            data_source_type=str(stave_data["stave_type"]),
+            connection_config=dict(stave_data["connection_config"]),  # type: ignore
+            is_active=bool(stave_data["is_active"]),
+        )
 
         assert stave.name == "Test Stave"
         assert stave.description == "A test stave for unit testing"
-        assert stave.stave_type == "postgres_monitor"
-        assert stave.config["host"] == "localhost"
+        assert stave.data_source_type == "postgres"
+        assert stave.connection_config["host"] == "localhost"
         assert stave.is_active is True
 
     def test_stave_validation_invalid_type(self):
         """Test stave validation with invalid type."""
         stave_data = {
             "name": "Test Stave",
-            "stave_type": "invalid_type",  # Invalid stave type
-            "config": {},
+            "data_source_type": "invalid_type",  # Invalid stave type
+            "connection_config": {},
         }
 
         with pytest.raises(ValueError):
-            Stave(**stave_data)
+            Stave(
+                name=str(stave_data["name"]),
+                data_source_type=str(stave_data["data_source_type"]),
+                connection_config=dict(stave_data["connection_config"]),  # type: ignore
+            )
 
     def test_stave_config_validation(self):
         """Test stave config validation."""
+        # Test that empty config raises ValueError
         stave_data = {
             "name": "Test Stave",
-            "stave_type": "postgres_monitor",
-            "config": {"host": "", "port": -1},  # Empty host  # Invalid port
+            "data_source_type": "postgres",
+            "connection_config": {},  # Empty config should raise ValueError
         }
 
         with pytest.raises(ValueError):
-            Stave(**stave_data)
+            Stave(
+                name=str(stave_data["name"]),
+                data_source_type=str(stave_data["data_source_type"]),
+                connection_config=dict(stave_data["connection_config"]),  # type: ignore
+            )
 
     def test_stave_default_values(self):
         """Test stave default values."""
-        stave_data = {"name": "Default Stave", "stave_type": "postgres_monitor"}
-
-        stave = Stave(**stave_data)
+        stave_data = {"name": "Default Stave", "data_source_type": "postgres"}
+        stave = Stave(
+            name=stave_data["name"],
+            data_source_type=stave_data["data_source_type"],
+            connection_config={"host": "localhost"},
+        )
 
         assert stave.description is None
         assert stave.is_active is True
-        assert stave.config == {}
+        assert stave.connection_config == {"host": "localhost"}
         assert stave.created_at is not None
 
 
@@ -168,7 +207,7 @@ class TestClefModelUnit:
         clef_data = {
             "name": "Test Clef",
             "description": "A test clef for data quality checks",
-            "clef_type": "postgres_quality",
+            "check_type": "column_values",
             "config": {
                 "table_name": "users",
                 "checks": [{"type": "null_check", "column": "email", "threshold": 0}],
@@ -176,10 +215,17 @@ class TestClefModelUnit:
             "is_active": True,
         }
 
-        clef = Clef(**clef_data)
+        clef = Clef(
+            stave_id="test-stave-001",
+            name=str(clef_data["name"]),
+            description=str(clef_data["description"]),
+            check_type=str(clef_data["check_type"]),
+            config=dict(clef_data["config"]),  # type: ignore
+            is_active=bool(clef_data["is_active"]),
+        )
 
         assert clef.name == "Test Clef"
-        assert clef.clef_type == "postgres_quality"
+        assert clef.check_type == "column_values"
         assert clef.config["table_name"] == "users"
         assert len(clef.config["checks"]) == 1
         assert clef.is_active is True
@@ -188,39 +234,48 @@ class TestClefModelUnit:
         """Test clef validation with invalid type."""
         clef_data = {
             "name": "Test Clef",
-            "clef_type": "invalid_type",  # Invalid clef type
+            "check_type": "invalid_type",  # Invalid clef type
             "config": {},
         }
 
         with pytest.raises(ValueError):
-            Clef(**clef_data)
+            Clef(
+                stave_id="test-stave-001",
+                name=str(clef_data["name"]),
+                check_type=str(clef_data["check_type"]),
+                config=dict(clef_data["config"]),  # type: ignore
+            )
 
     def test_clef_check_config_validation(self):
         """Test clef check configuration validation."""
+        # Test that empty config raises ValueError
         clef_data = {
             "name": "Test Clef",
-            "clef_type": "postgres_quality",
-            "config": {
-                "table_name": "",
-                "checks": [{"type": "invalid_check_type", "column": "email"}],
-            },
+            "check_type": "column_values",
+            "config": {},  # Empty config should raise ValueError
         }
 
         with pytest.raises(ValueError):
-            Clef(**clef_data)
+            Clef(
+                stave_id="test-stave-001",
+                name=str(clef_data["name"]),
+                check_type=str(clef_data["check_type"]),
+                config=dict(clef_data["config"]),  # type: ignore
+            )
 
     def test_clef_serialization(self):
         """Test clef model serialization."""
         clef = Clef(
+            stave_id="test-stave-001",
             name="Serialize Clef",
-            clef_type="postgres_quality",
+            check_type="column_values",
             config={"table_name": "test_table"},
         )
 
         clef_dict = clef.model_dump()
 
         assert clef_dict["name"] == "Serialize Clef"
-        assert clef_dict["clef_type"] == "postgres_quality"
+        assert clef_dict["check_type"] == "column_values"
         assert clef_dict["config"]["table_name"] == "test_table"
 
 
@@ -229,7 +284,7 @@ class TestCheckRunModelUnit:
 
     def test_check_run_creation_valid_data(self):
         """Test check run creation with valid data."""
-        check_run_data = {
+        check_run_data: dict[str, Any] = {
             "stave_id": 1,
             "clef_id": 1,
             "status": "running",
@@ -237,7 +292,13 @@ class TestCheckRunModelUnit:
             "parameters": {"table_name": "users"},
         }
 
-        check_run = CheckRun(**check_run_data)
+        check_run = CheckRun(
+            stave_id=int(check_run_data["stave_id"]),
+            clef_id=int(check_run_data["clef_id"]),
+            status=str(check_run_data["status"]),
+            started_at=check_run_data["started_at"],  # type: ignore
+            parameters=dict(check_run_data["parameters"]),  # type: ignore
+        )
 
         assert check_run.stave_id == 1
         assert check_run.clef_id == 1
@@ -246,7 +307,7 @@ class TestCheckRunModelUnit:
 
     def test_check_run_status_validation(self):
         """Test check run status validation."""
-        check_run_data = {
+        check_run_data: dict[str, Any] = {
             "stave_id": 1,
             "clef_id": 1,
             "status": "invalid_status",  # Invalid status
@@ -254,7 +315,12 @@ class TestCheckRunModelUnit:
         }
 
         with pytest.raises(ValueError):
-            CheckRun(**check_run_data)
+            CheckRun(
+                stave_id=int(check_run_data["stave_id"]),
+                clef_id=int(check_run_data["clef_id"]),
+                status=str(check_run_data["status"]),
+                parameters=dict(check_run_data["parameters"]),  # type: ignore
+            )
 
     def test_check_run_status_transitions(self):
         """Test check run status transitions."""
@@ -284,6 +350,8 @@ class TestCheckRunModelUnit:
         )
 
         # Calculate duration
+        assert check_run.completed_at is not None
+        assert check_run.started_at is not None
         duration = check_run.completed_at - check_run.started_at
         assert duration.total_seconds() == 30
 
@@ -353,11 +421,12 @@ class TestModelValidationUnit:
         }
 
         stave = Stave(
-            name="Test Stave", stave_type="postgres_monitor", config=valid_config
+            name="Test Stave",
+            data_source_type="postgres",
+            connection_config=valid_config,
         )
-
-        assert stave.config["database"]["host"] == "localhost"
-        assert stave.config["database"]["credentials"]["username"] == "user"
+        assert stave.connection_config["database"]["host"] == "localhost"
+        assert stave.connection_config["database"]["credentials"]["username"] == "user"
 
     def test_parameter_validation_types(self):
         """Test parameter type validation."""
@@ -400,16 +469,16 @@ class TestModelSerializationUnit:
         """Test stave model JSON serialization."""
         stave = Stave(
             name="JSON Stave",
-            stave_type="postgres_monitor",
-            config={"host": "localhost", "port": 5432},
+            data_source_type="postgres",
+            connection_config={"host": "localhost", "port": 5432},
         )
 
         json_str = stave.model_dump_json()
         stave_dict = json.loads(json_str)
 
         assert stave_dict["name"] == "JSON Stave"
-        assert stave_dict["stave_type"] == "postgres_monitor"
-        assert stave_dict["config"]["host"] == "localhost"
+        assert stave_dict["data_source_type"] == "postgres"
+        assert stave_dict["connection_config"]["host"] == "localhost"
 
     def test_model_deserialization(self):
         """Test model deserialization from dictionaries."""
@@ -420,7 +489,12 @@ class TestModelSerializationUnit:
             "is_active": False,
         }
 
-        user = User(**user_dict)
+        user = User(
+            username=str(user_dict["username"]),
+            email=str(user_dict["email"]),
+            full_name=str(user_dict["full_name"]),
+            is_active=bool(user_dict["is_active"]),
+        )
 
         assert user.username == "deserializeuser"
         assert user.email == "deserialize@example.com"

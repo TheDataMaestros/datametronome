@@ -7,8 +7,8 @@ This connector provides read-only access to BigQuery for data quality checks.
 import asyncio
 from typing import Any, Dict, List, Optional
 
-from google.cloud import bigquery
-from google.oauth2 import service_account
+from google.cloud import bigquery  # type: ignore
+from google.oauth2 import service_account  # type: ignore
 from metronome_pulse_core.interfaces import Pulse, Readable
 
 
@@ -107,11 +107,11 @@ class BigQueryReadonlyPulse(Pulse, Readable):
 
             # Run query in thread pool to avoid blocking
             loop = asyncio.get_event_loop()
+            client = self._client
+            assert client is not None
             query_job = await loop.run_in_executor(
                 None,
-                lambda: self._client.query(
-                    sql, job_config=self._get_job_config(params)
-                ),
+                lambda: client.query(sql, job_config=self._get_job_config(params)),
             )
 
             # Get results
@@ -145,11 +145,11 @@ class BigQueryReadonlyPulse(Pulse, Readable):
 
             # Get table
             loop = asyncio.get_event_loop()
+            client = self._client
+            assert client is not None
             table = await loop.run_in_executor(
                 None,
-                lambda: self._client.get_table(
-                    f"{self._project_id}.{dataset_id}.{table_id}"
-                ),
+                lambda: client.get_table(f"{self._project_id}.{dataset_id}.{table_id}"),
             )
 
             # Return schema information
@@ -184,8 +184,10 @@ class BigQueryReadonlyPulse(Pulse, Readable):
 
         try:
             loop = asyncio.get_event_loop()
+            client = self._client
+            assert client is not None
             tables = await loop.run_in_executor(
-                None, lambda: list(self._client.list_tables(dataset_id))
+                None, lambda: list(client.list_tables(dataset_id))
             )
             return [table.table_id for table in tables]
 

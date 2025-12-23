@@ -40,9 +40,13 @@ We have prepared a showcase script that:
 
 Generate the data:
 ```bash
-python3 showcase/retail_demo/generate_data.py
+# Generate the retail database with synthetic data
+make retail-db
+# Or directly:
+python3 showcase/retail_demo/generate_db.py --out datametronome/podium/data/retail.db
 ```
-*This creates `retail.db` in your current directory.*
+
+> **Note**: The `import_to_podium.py` script (used in step 4) automatically generates historical check results, so you'll see rich graphs with past data when viewing checks in the UI.
 
 ---
 

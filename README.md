@@ -108,6 +108,7 @@ make install
 make retail-db
 
 # 3) Import the Retail stave/clefs from YAML into Podium (DB_PATH must be absolute)
+#    This also automatically generates historical check results for better visualization
 export DB_PATH="$(pwd)/datametronome/podium/data/retail.db"
 python3 showcase/retail_demo/import_to_podium.py
 
@@ -126,7 +127,11 @@ make start-ui
 
 #### Validate
 - **UI**: http://localhost:3000 (login: `admin` / `admin`)
-- **In-app**: go to **Quality Checks** → select **Retail Production DB** → click **Run Check**
+- **In-app**:
+  - Go to **Quality Checks** → click on any check card to see detailed graphs with historical data
+  - Historical check results are automatically generated during import, showing:
+    - **Drift checks**: 7 days of baseline data + gradual drift pattern
+    - **Forecast checks**: 7 days of normal behavior + today's anomaly
 
 #### Reset
 Delete the generated SQLite files:

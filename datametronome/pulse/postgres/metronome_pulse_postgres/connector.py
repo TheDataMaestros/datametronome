@@ -63,7 +63,7 @@ class PostgresPulse(Pulse, Readable, Writable):
         """Check if connected to the database."""
         return self._pool is not None
 
-    async def write(self, data, destination: str, config: dict = None) -> None:
+    async def write(self, data, destination: str, config: dict | None = None) -> None:
         """Write data to destination with optional configuration.
 
         Args:
@@ -157,6 +157,7 @@ class PostgresPulse(Pulse, Readable, Writable):
         columns = list(data[0].keys())
         records = [tuple(record[col] for col in columns) for record in data]
 
+        assert self._pool is not None
         async with self._pool.acquire() as conn:
             await conn.copy_records_to_table(
                 destination,
@@ -164,7 +165,7 @@ class PostgresPulse(Pulse, Readable, Writable):
                 columns=columns,
             )
 
-    async def query(self, query_config) -> list:
+    async def query(self, query_config) -> list | dict:
         """Dynamic query method supporting multiple query types.
 
         Args:
@@ -243,8 +244,47 @@ class PostgresPulse(Pulse, Readable, Writable):
             # Handle simple SQL string (default behavior)
             return await self._simple_query(query_config)
 
+    async def get_table_info(self, table_name: str) -> list[dict]:
+        """Fetch column information for a table."""
+        sql = """
+            SELECT column_name, data_type, is_nullable, column_default
+            FROM information_schema.columns
+            WHERE table_name = $1
+            ORDER BY ordinal_position
+        """
+        return await self.query_with_params(sql, table_name)
+
+    async def apply_operations(
+        self, operations: list[dict], insert_chunk_size: int = 10000
+    ) -> None:
+        """Apply multiple operations in a single transaction."""
+        if not self._pool:
+            raise RuntimeError("Not connected")
+        assert self._pool is not None
+        async with self._pool.acquire() as conn:
+            async with conn.transaction():
+                for op in operations:
+                    op_type = op.get("type")
+                    if op_type == "insert":
+                        table = op.get("table")
+                        rows = op.get("rows", [])
+                        if table and rows:
+                            columns = list(rows[0].keys())
+                            records = [
+                                tuple(row[col] for col in columns) for row in rows
+                            ]
+                            await conn.copy_records_to_table(
+                                table, records=records, columns=columns
+                            )
+                    elif op_type == "delete":
+                        sql = op.get("sql")
+                        params = op.get("params", [])
+                        if sql:
+                            await conn.execute(sql, *params)
+
     async def _simple_query(self, sql: str) -> list:
         """Simple SQL query execution."""
+        assert self._pool is not None
         async with self._pool.acquire() as conn:
             records = await conn.fetch(sql)
             return [dict(record) for record in records]
@@ -264,6 +304,7 @@ class PostgresPulse(Pulse, Readable, Writable):
         if not self._pool:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
+        assert self._pool is not None
         async with self._pool.acquire() as conn:
             records = await conn.fetch(query, *args, **kwargs)
             return [dict(record) for record in records]

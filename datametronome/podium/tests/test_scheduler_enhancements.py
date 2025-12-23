@@ -6,7 +6,7 @@ Comprehensive tests for scheduler enhancements:
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -193,8 +193,8 @@ class TestJobMonitoring:
             clef_id="clef-001",
             status="success",
             execution_time=1.5,
-            started_at=datetime.utcnow(),
-            completed_at=datetime.utcnow(),
+            started_at=datetime.now(timezone.utc),
+            completed_at=datetime.now(timezone.utc),
         )
 
         exec_dict = execution.to_dict()
@@ -265,7 +265,9 @@ class TestJobMonitoring:
             mock_get_db.return_value = mock_db
 
             # Mock execution history with mostly successes
-            cutoff_date = (datetime.utcnow() - timedelta(days=30)).isoformat() + "Z"
+            cutoff_date = (
+                datetime.now(timezone.utc) - timedelta(days=30)
+            ).isoformat() + "Z"
             mock_db.query.return_value = [
                 {
                     "id": f"exec-{i}",
@@ -273,9 +275,13 @@ class TestJobMonitoring:
                     "clef_id": "clef-001",
                     "status": "success" if i < 9 else "failure",
                     "execution_time": 1.0 + (i * 0.1),
-                    "started_at": (datetime.utcnow() - timedelta(hours=i)).isoformat()
+                    "started_at": (
+                        datetime.now(timezone.utc) - timedelta(hours=i)
+                    ).isoformat()
                     + "Z",
-                    "completed_at": (datetime.utcnow() - timedelta(hours=i)).isoformat()
+                    "completed_at": (
+                        datetime.now(timezone.utc) - timedelta(hours=i)
+                    ).isoformat()
                     + "Z",
                 }
                 for i in range(10)
@@ -390,7 +396,7 @@ class TestSchedulerIntegration:
             assert job.schedule == "0 * * * *"
 
             # Update run times
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             result = await update_job_run_time(
                 job.id, last_run=now, next_run=now + timedelta(hours=1)
             )

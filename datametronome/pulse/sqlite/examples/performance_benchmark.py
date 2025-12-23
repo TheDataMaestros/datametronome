@@ -199,7 +199,7 @@ async def main():
         print("=" * 70)
 
         try:
-            import psutil
+            import psutil  # type: ignore
 
             process = psutil.Process()
             memory_info = process.memory_info()

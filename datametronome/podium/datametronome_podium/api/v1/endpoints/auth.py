@@ -3,7 +3,7 @@ Authentication endpoints for DataMetronome Podium.
 """
 
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from datametronome_podium.api.schemas.auth import (
@@ -66,9 +66,9 @@ def create_access_token(
     """
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(
+        expire = datetime.now(timezone.utc) + timedelta(
             minutes=settings.access_token_expire_minutes
         )
 
@@ -166,7 +166,7 @@ async def login(user_credentials: UserLogin) -> dict[str, str]:
 
         user = user_data
 
-    if not verify_password(user_credentials.password, user["hashed_password"]):
+    if not verify_password(user_credentials.password, str(user["hashed_password"])):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",

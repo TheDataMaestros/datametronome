@@ -5,10 +5,13 @@ Provides both human-readable and JSON-structured logging formats
 for development and production environments.
 """
 
+from __future__ import annotations
+
 import logging
 import sys
+from typing import Any
 
-from pythonjsonlogger import jsonlogger
+from pythonjsonlogger import json as jsonlogger
 
 
 class CustomJsonFormatter(jsonlogger.JsonFormatter):
@@ -23,29 +26,29 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
     - service: Service name
     """
 
-    def add_fields(self, log_record, record, message_dict):
+    def add_fields(self, log_data: Any, record: Any, message_dict: Any) -> None:  # type: ignore[override]
         """Add custom fields to log record."""
-        super().add_fields(log_record, record, message_dict)
+        super().add_fields(log_data, record, message_dict)
 
         # Add service identifier
-        log_record["service"] = "datametronome-podium"
+        log_data["service"] = "datametronome-podium"
 
         # Add timestamp in ISO format
-        log_record["timestamp"] = self.formatTime(record, self.datefmt)
+        log_data["timestamp"] = self.formatTime(record, self.datefmt)
 
         # Add level name
-        log_record["level"] = record.levelname
+        log_data["level"] = record.levelname
 
         # Add logger name
-        log_record["logger"] = record.name
+        log_data["logger"] = record.name
 
         # Add filename and line number for debugging
-        log_record["file"] = record.filename
-        log_record["line"] = record.lineno
+        log_data["file"] = record.filename
+        log_data["line"] = record.lineno
 
         # Add function name
         if record.funcName:
-            log_record["function"] = record.funcName
+            log_data["function"] = record.funcName
 
 
 def setup_logging(log_level: str = "INFO", log_format: str = "text") -> None:

@@ -18,34 +18,34 @@ class TestBaseConnector:
 
         # BaseConnector is abstract, so we need to create a concrete implementation
         class ConcreteConnector(BaseConnector):
-            def connect(self):
+            async def connect(self):
                 return True
 
-            def close(self):
+            async def close(self):
                 return True
 
-            def disconnect(self):
+            async def disconnect(self):
                 return True
 
-            def is_connected(self):
+            async def is_connected(self):
                 return True
 
-            def execute_query(self, query: str, params: dict = None):
+            async def execute_query(self, query, params=None):
                 return [{"result": "data"}]
 
-            def get_freshness(self):
+            async def get_freshness(self, table_name, timestamp_column):
                 return "unknown"
 
-            def get_row_count(self):
+            async def get_row_count(self, table_name):
                 return 0
 
-            def get_schema(self):
+            async def get_schema(self, table_name=None):
                 return {}
 
-            def get_table_info(self, table_name: str):
+            async def get_table_info(self, table_name: str):
                 return []
 
-            def test_connection(self):
+            async def test_connection(self):
                 return True
 
         from metronome_pulse_core.base import ConnectionConfig
@@ -60,38 +60,38 @@ class TestBaseConnector:
         with pytest.raises(TypeError):
             BaseConnector()
 
-    def test_base_connector_inheritance(self):
+    async def test_base_connector_inheritance(self):
         """Test that concrete connectors properly inherit from BaseConnector"""
 
         class TestConnector(BaseConnector):
-            def connect(self):
+            async def connect(self):
                 return "connected"
 
-            def close(self):
+            async def close(self):
                 return "closed"
 
-            def disconnect(self):
+            async def disconnect(self):
                 return "disconnected"
 
-            def is_connected(self):
+            async def is_connected(self):
                 return True
 
-            def execute_query(self, query: str, params: dict = None):
+            async def execute_query(self, query, params=None):
                 return [{"result": "data"}]
 
-            def get_freshness(self):
+            async def get_freshness(self, table_name, timestamp_column):
                 return "unknown"
 
-            def get_row_count(self):
+            async def get_row_count(self, table_name):
                 return 0
 
-            def get_schema(self):
+            async def get_schema(self, table_name=None):
                 return {}
 
-            def get_table_info(self, table_name: str):
+            async def get_table_info(self, table_name: str):
                 return []
 
-            def test_connection(self):
+            async def test_connection(self):
                 return True
 
         from metronome_pulse_core.base import ConnectionConfig
@@ -99,9 +99,9 @@ class TestBaseConnector:
         config = ConnectionConfig(host="localhost", port=5432, database="test")
         connector = TestConnector(config)
         assert isinstance(connector, BaseConnector)
-        assert connector.connect() == "connected"
-        assert connector.disconnect() == "disconnected"
-        assert connector.is_connected() is True
+        assert await connector.connect() == "connected"
+        assert await connector.disconnect() == "disconnected"
+        assert await connector.is_connected() is True
 
 
 class TestReadable:
@@ -111,28 +111,28 @@ class TestReadable:
         """Test that Readable can be instantiated"""
 
         class ConcreteReadable(Pulse, Readable):
-            def connect(self):
+            async def connect(self):
                 return True
 
-            def close(self):
+            async def close(self):
                 return True
 
-            def disconnect(self):
+            async def disconnect(self):
                 return True
 
-            def is_connected(self):
+            async def is_connected(self):
                 return True
 
-            def query(self, query_config):
+            async def query(self, query_config):
                 return [{"result": "data"}]
 
-            def execute_query(self, query: str, params: dict = None):
+            async def execute_query(self, query: str, params: dict | None = None):
                 return [{"result": "data"}]
 
-            def fetch_one(self, query: str, params: dict = None):
+            async def fetch_one(self, query: str, params: dict | None = None):
                 return [{"result": "all"}]
 
-            def fetch_all(self, query: str, params: dict = None):
+            async def fetch_all(self, query: str, params: dict | None = None):
                 return [{"result": "all"}]
 
         connector = ConcreteReadable()
@@ -145,78 +145,78 @@ class TestReadable:
         with pytest.raises(TypeError):
             ReadOnlyConnector()
 
-    def test_readonly_connector_methods(self):
+    async def test_readonly_connector_methods(self):
         """Test that ReadOnlyConnector has all required methods"""
 
         class TestReadOnlyConnector(ReadOnlyConnector):
-            def connect(self):
+            async def connect(self):
                 return True
 
-            def close(self):
+            async def close(self):
                 return True
 
-            def disconnect(self):
+            async def disconnect(self):
                 return True
 
-            def is_connected(self):
+            async def is_connected(self):
                 return True
 
-            def query(self, query_config):
+            async def query(self, query_config):
                 return [{"result": "data"}]
 
-            def execute_query(self, query: str, params: dict = None):
+            async def execute_query(self, query: str, params: dict | None = None):
                 return [{"result": "data"}]
 
-            def fetch_one(self, query: str, params: dict = None):
+            async def fetch_one(self, query: str, params: dict | None = None):
                 return {"result": "single"}
 
-            def fetch_all(self, query: str, params: dict = None):
+            async def fetch_all(self, query: str, params: dict | None = None):
                 return [{"result": "all"}]
 
         connector = TestReadOnlyConnector()
 
         # Test all required methods exist and work
-        assert connector.execute_query("SELECT * FROM test") == [{"result": "data"}]
-        assert connector.fetch_one("SELECT * FROM test") == {"result": "single"}
-        assert connector.fetch_all("SELECT * FROM test") == [{"result": "all"}]
+        assert await connector.execute_query("SELECT * FROM test") == [{"result": "data"}]
+        assert await connector.fetch_one("SELECT * FROM test") == {"result": "single"}
+        assert await connector.fetch_all("SELECT * FROM test") == [{"result": "all"}]
 
-    def test_readonly_connector_query_parameters(self):
+    async def test_readonly_connector_query_parameters(self):
         """Test that ReadOnlyConnector handles query parameters correctly"""
 
         class TestReadOnlyConnector(ReadOnlyConnector):
-            def connect(self):
+            async def connect(self):
                 return True
 
-            def close(self):
+            async def close(self):
                 return True
 
-            def disconnect(self):
+            async def disconnect(self):
                 return True
 
-            def is_connected(self):
+            async def is_connected(self):
                 return True
 
-            def query(self, query_config):
+            async def query(self, query_config):
                 return [{"query": str(query_config), "params": None}]
 
-            def execute_query(self, query: str, params: dict = None):
+            async def execute_query(self, query: str, params: dict | None = None):
                 return {"query": query, "params": params}
 
-            def fetch_one(self, query: str, params: dict = None):
+            async def fetch_one(self, query: str, params: dict | None = None):
                 return {"query": query, "params": params}
 
-            def fetch_all(self, query: str, params: dict = None):
+            async def fetch_all(self, query: str, params: dict | None = None):
                 return [{"query": query, "params": params}]
 
         connector = TestReadOnlyConnector()
 
         # Test with parameters
         params = {"id": 1, "name": "test"}
-        result = connector.execute_query("SELECT * FROM test WHERE id = :id", params)
+        result = await connector.execute_query("SELECT * FROM test WHERE id = :id", params)
         assert result["params"] == params
 
         # Test without parameters
-        result = connector.execute_query("SELECT * FROM test")
+        result = await connector.execute_query("SELECT * FROM test")
         assert result["params"] is None
 
 
@@ -227,34 +227,36 @@ class TestWriteOnlyConnector:
         """Test that WriteOnlyConnector can be instantiated"""
 
         class ConcreteWriteOnlyConnector(WriteOnlyConnector):
-            def connect(self):
+            async def connect(self):
                 return True
 
-            def close(self):
+            async def close(self):
                 return True
 
-            def disconnect(self):
+            async def disconnect(self):
                 return True
 
-            def is_connected(self):
+            async def is_connected(self):
                 return True
 
-            def write(self, data, destination: str, config: dict = None):
+            async def write(self, data, destination: str, config: dict | None = None):
                 return None
 
-            def execute_write(self, query: str, params: dict = None):
+            async def execute_write(self, query: str, params: dict | None = None):
                 return {"affected_rows": 1}
 
-            def execute_batch(self, queries: list[str], params: list[dict] = None):
+            async def execute_batch(
+                self, queries: list[str], params: list[dict] | None = None
+            ):
                 return {"affected_rows": [1, 2, 3]}
 
-            def begin_transaction(self):
+            async def begin_transaction(self):
                 return True
 
-            def commit_transaction(self):
+            async def commit_transaction(self):
                 return True
 
-            def rollback_transaction(self):
+            async def rollback_transaction(self):
                 return True
 
         connector = ConcreteWriteOnlyConnector()
@@ -266,92 +268,96 @@ class TestWriteOnlyConnector:
         with pytest.raises(TypeError):
             WriteOnlyConnector()
 
-    def test_writeonly_connector_methods(self):
+    async def test_writeonly_connector_methods(self):
         """Test that WriteOnlyConnector has all required methods"""
 
         class TestWriteOnlyConnector(WriteOnlyConnector):
-            def connect(self):
+            async def connect(self):
                 return True
 
-            def close(self):
+            async def close(self):
                 return True
 
-            def disconnect(self):
+            async def disconnect(self):
                 return True
 
-            def is_connected(self):
+            async def is_connected(self):
                 return True
 
-            def write(self, data, destination: str, config: dict = None):
+            async def write(self, data, destination: str, config: dict | None = None):
                 return None
 
-            def execute_write(self, query: str, params: dict = None):
+            async def execute_write(self, query: str, params: dict | None = None):
                 return {"affected_rows": 1}
 
-            def execute_batch(self, queries: list[str], params: list[dict] = None):
+            async def execute_batch(
+                self, queries: list[str], params: list[dict] | None = None
+            ):
                 return {"affected_rows": [1, 2, 3]}
 
-            def begin_transaction(self):
+            async def begin_transaction(self):
                 return True
 
-            def commit_transaction(self):
+            async def commit_transaction(self):
                 return True
 
-            def rollback_transaction(self):
+            async def rollback_transaction(self):
                 return True
 
         connector = TestWriteOnlyConnector()
 
         # Test all required methods exist and work
-        assert connector.execute_write("INSERT INTO test VALUES (:id)", {"id": 1}) == {
+        assert await connector.execute_write("INSERT INTO test VALUES (:id)", {"id": 1}) == {
             "affected_rows": 1
         }
-        assert connector.execute_batch(
+        assert await connector.execute_batch(
             ["INSERT INTO test VALUES (1)", "INSERT INTO test VALUES (2)"]
         ) == {"affected_rows": [1, 2, 3]}
-        assert connector.begin_transaction() is True
-        assert connector.commit_transaction() is True
-        assert connector.rollback_transaction() is True
+        assert await connector.begin_transaction() is True
+        assert await connector.commit_transaction() is True
+        assert await connector.rollback_transaction() is True
 
-    def test_writeonly_connector_transaction_flow(self):
+    async def test_writeonly_connector_transaction_flow(self):
         """Test that WriteOnlyConnector handles transaction flow correctly"""
 
         class TestWriteOnlyConnector(WriteOnlyConnector):
             def __init__(self):
                 self.transaction_state = "none"
 
-            def connect(self):
+            async def connect(self):
                 return True
 
-            def close(self):
+            async def close(self):
                 return True
 
-            def disconnect(self):
+            async def disconnect(self):
                 return True
 
-            def is_connected(self):
+            async def is_connected(self):
                 return True
 
-            def write(self, data, destination: str, config: dict = None):
+            async def write(self, data, destination: str, config: dict | None = None):
                 return None
 
-            def execute_write(self, query: str, params: dict = None):
+            async def execute_write(self, query: str, params: dict | None = None):
                 return {"affected_rows": 1}
 
-            def execute_batch(self, queries: list[str], params: list[dict] = None):
+            async def execute_batch(
+                self, queries: list[str], params: list[dict] | None = None
+            ):
                 return {"affected_rows": [1, 2, 3]}
 
-            def begin_transaction(self):
+            async def begin_transaction(self):
                 self.transaction_state = "active"
                 return True
 
-            def commit_transaction(self):
+            async def commit_transaction(self):
                 if self.transaction_state == "active":
                     self.transaction_state = "committed"
                     return True
                 return False
 
-            def rollback_transaction(self):
+            async def rollback_transaction(self):
                 if self.transaction_state == "active":
                     self.transaction_state = "rolled_back"
                     return True
@@ -361,14 +367,14 @@ class TestWriteOnlyConnector:
 
         # Test transaction flow
         assert connector.transaction_state == "none"
-        assert connector.begin_transaction() is True
+        assert await connector.begin_transaction() is True
         assert connector.transaction_state == "active"
-        assert connector.commit_transaction() is True
+        assert await connector.commit_transaction() is True
         assert connector.transaction_state == "committed"
 
         # Test rollback
         connector.transaction_state = "active"
-        assert connector.rollback_transaction() is True
+        assert await connector.rollback_transaction() is True
         assert connector.transaction_state == "rolled_back"
 
 
@@ -379,46 +385,48 @@ class TestReadWriteConnector:
         """Test that ReadWriteConnector can be instantiated"""
 
         class ConcreteReadWriteConnector(ReadWriteConnector):
-            def connect(self):
+            async def connect(self):
                 return True
 
-            def close(self):
+            async def close(self):
                 return True
 
-            def disconnect(self):
+            async def disconnect(self):
                 return True
 
-            def is_connected(self):
+            async def is_connected(self):
                 return True
 
-            def query(self, query: str, params: dict = None):
+            async def query(self, query_config):
                 return [{"result": "data"}]
 
-            def write(self, data, destination: str, config: dict = None):
+            async def write(self, data, destination: str, config: dict | None = None):
                 return None
 
-            def execute_query(self, query: str, params: dict = None):
+            async def execute_query(self, query: str, params: dict | None = None):
                 return [{"result": "data"}]
 
-            def fetch_one(self, query: str, params: dict = None):
+            async def fetch_one(self, query: str, params: dict | None = None):
                 return {"result": "single"}
 
-            def fetch_all(self, query: str, params: dict = None):
+            async def fetch_all(self, query: str, params: dict | None = None):
                 return [{"result": "all"}]
 
-            def execute_write(self, query: str, params: dict = None):
+            async def execute_write(self, query: str, params: dict | None = None):
                 return {"affected_rows": 1}
 
-            def execute_batch(self, queries: list[str], params: dict = None):
+            async def execute_batch(
+                self, queries: list[str], params: list[dict] | None = None
+            ):
                 return {"affected_rows": [1, 2, 3]}
 
-            def begin_transaction(self):
+            async def begin_transaction(self):
                 return True
 
-            def commit_transaction(self):
+            async def commit_transaction(self):
                 return True
 
-            def rollback_transaction(self):
+            async def rollback_transaction(self):
                 return True
 
         connector = ConcreteReadWriteConnector()
@@ -432,7 +440,7 @@ class TestReadWriteConnector:
         with pytest.raises(TypeError):
             ReadWriteConnector()
 
-    def test_readwrite_connector_full_functionality(self):
+    async def test_readwrite_connector_full_functionality(self):
         """Test that ReadWriteConnector provides full read/write functionality"""
 
         class TestReadWriteConnector(ReadWriteConnector):
@@ -440,34 +448,34 @@ class TestReadWriteConnector:
                 self.transaction_state = "none"
                 self.data = []
 
-            def connect(self):
+            async def connect(self):
                 return True
 
-            def close(self):
+            async def close(self):
                 return True
 
-            def disconnect(self):
+            async def disconnect(self):
                 return True
 
-            def is_connected(self):
+            async def is_connected(self):
                 return True
 
-            def query(self, query: str, params: dict = None):
+            async def query(self, query_config):
                 return self.data
 
-            def write(self, data, destination: str, config: dict = None):
+            async def write(self, data, destination: str, config: dict | None = None):
                 return None
 
-            def execute_query(self, query: str, params: dict = None):
+            async def execute_query(self, query: str, params: dict | None = None):
                 return self.data
 
-            def fetch_one(self, query: str, params: dict = None):
+            async def fetch_one(self, query: str, params: dict | None = None):
                 return self.data[0] if self.data else None
 
-            def fetch_all(self, query: str, params: dict = None):
+            async def fetch_all(self, query: str, params: dict | None = None):
                 return self.data
 
-            def execute_write(self, query: str, params: dict = None):
+            async def execute_write(self, query: str, params: dict | None = None):
                 if "INSERT" in query.upper():
                     self.data.append(params or {})
                     return {"affected_rows": 1}
@@ -478,25 +486,27 @@ class TestReadWriteConnector:
                     return {"affected_rows": 0}
                 return {"affected_rows": 0}
 
-            def execute_batch(self, queries: list[str], params: dict = None):
+            async def execute_batch(
+                self, queries: list[str], params: list[dict] | None = None
+            ):
                 affected_rows = []
                 for i, query in enumerate(queries):
                     param = params[i] if params and i < len(params) else None
-                    result = self.execute_write(query, param)
+                    result = await self.execute_write(query, param)
                     affected_rows.append(result["affected_rows"])
                 return {"affected_rows": affected_rows}
 
-            def begin_transaction(self):
+            async def begin_transaction(self):
                 self.transaction_state = "active"
                 return True
 
-            def commit_transaction(self):
+            async def commit_transaction(self):
                 if self.transaction_state == "active":
                     self.transaction_state = "committed"
                     return True
                 return False
 
-            def rollback_transaction(self):
+            async def rollback_transaction(self):
                 if self.transaction_state == "active":
                     self.transaction_state = "rolled_back"
                     return True
@@ -505,28 +515,28 @@ class TestReadWriteConnector:
         connector = TestReadWriteConnector()
 
         # Test read operations
-        assert connector.fetch_all("SELECT * FROM test") == []
-        assert connector.fetch_one("SELECT * FROM test") is None
+        assert await connector.fetch_all("SELECT * FROM test") == []
+        assert await connector.fetch_one("SELECT * FROM test") is None
 
         # Test write operations
-        assert connector.execute_write("INSERT INTO test VALUES (:id)", {"id": 1}) == {
+        assert await connector.execute_write("INSERT INTO test VALUES (:id)", {"id": 1}) == {
             "affected_rows": 1
         }
         assert len(connector.data) == 1
 
         # Test read after write
-        assert connector.fetch_all("SELECT * FROM test") == [{"id": 1}]
-        assert connector.fetch_one("SELECT * FROM test") == {"id": 1}
+        assert await connector.fetch_all("SELECT * FROM test") == [{"id": 1}]
+        assert await connector.fetch_one("SELECT * FROM test") == {"id": 1}
 
         # Test transaction operations
-        assert connector.begin_transaction() is True
+        assert await connector.begin_transaction() is True
         assert connector.transaction_state == "active"
-        assert connector.commit_transaction() is True
+        assert await connector.commit_transaction() is True
         assert connector.transaction_state == "committed"
 
         # Test rollback
         connector.transaction_state = "active"
-        assert connector.rollback_transaction() is True
+        assert await connector.rollback_transaction() is True
         assert connector.transaction_state == "rolled_back"
 
 

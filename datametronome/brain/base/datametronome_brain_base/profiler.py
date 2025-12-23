@@ -82,7 +82,7 @@ class DataProfiler:
             ColumnProfile containing comprehensive column statistics.
         """
         profile = ColumnProfile(
-            column_name=data.name or "unnamed",
+            column_name=str(data.name or "unnamed"),
             data_type=str(data.dtype),
             total_count=len(data),
             null_count=data.isnull().sum(),
@@ -92,7 +92,7 @@ class DataProfiler:
         )
 
         # Add type-specific statistics
-        if np.issubdtype(data.dtype, np.number):
+        if np.issubdtype(data.dtype, np.number):  # type: ignore
             self._add_numeric_stats(profile, data)
         elif data.dtype == "object" or data.dtype == "category":
             self._add_categorical_stats(profile, data)
@@ -278,7 +278,9 @@ class DataProfiler:
         clean_data = data.dropna()
 
         if len(clean_data) < 4:
-            return AnomalyResult(anomalies=[], method="iqr", thresholds={})
+            return AnomalyResult(
+                anomalies=[], anomaly_count=0, method="iqr", thresholds={}
+            )
 
         q1 = clean_data.quantile(0.25)
         q3 = clean_data.quantile(0.75)
@@ -317,7 +319,9 @@ class DataProfiler:
         clean_data = data.dropna()
 
         if len(clean_data) < 2:
-            return AnomalyResult(anomalies=[], method="zscore", thresholds={})
+            return AnomalyResult(
+                anomalies=[], anomaly_count=0, method="zscore", thresholds={}
+            )
 
         z_scores = np.abs((clean_data - clean_data.mean()) / clean_data.std())
         anomalies = clean_data[z_scores > threshold]
@@ -344,6 +348,7 @@ class DataProfiler:
         """
         return AnomalyResult(
             anomalies=[],
+            anomaly_count=0,
             method="isolation_forest",
             thresholds={},
             note="Isolation Forest detection not yet implemented",

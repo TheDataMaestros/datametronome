@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pytest
 from metronome_pulse_postgres.sql_builder import PostgresSQLBuilder
 
@@ -156,11 +158,13 @@ class TestPostgresSQLBuilder:
 
         # Test None table name
         with pytest.raises(ValueError):
-            self.builder.delete_using_values_asyncpg(None, ["id"], 1)
+            self.builder.delete_using_values_asyncpg(cast(Any, None), ["id"], 1)
 
         # Test None columns
         with pytest.raises(ValueError):
-            self.builder.delete_using_values_asyncpg("public.events", None, 1)
+            self.builder.delete_using_values_asyncpg(
+                "public.events", cast(Any, None), 1
+            )
 
     def test_sql_injection_prevention(self):
         """Test that SQL injection attempts are properly escaped"""

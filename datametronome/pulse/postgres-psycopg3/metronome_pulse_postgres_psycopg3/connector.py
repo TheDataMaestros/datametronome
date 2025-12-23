@@ -7,6 +7,12 @@ with full support for the DataPulse ecosystem and psycopg3 features.
 
 import psycopg
 from metronome_pulse_core import Pulse, Readable, Writable
+try:
+    from psycopg_pool import AsyncConnectionPool
+except ImportError:
+    # Fallback for older psycopg3 versions that have pool in psycopg
+    from psycopg import pool  # type: ignore
+    AsyncConnectionPool = pool.AsyncConnectionPool
 
 from .sql_builder import PostgresPsycopgSQLBuilder
 
@@ -47,7 +53,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
 
     async def connect(self):
         """Establish connection pool to PostgreSQL using psycopg3."""
-        self._pool = await psycopg.AsyncConnectionPool.connect(
+        self._pool = await AsyncConnectionPool.connect(
             host=self._host,
             port=self._port,
             dbname=self._database,
@@ -67,7 +73,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
         return self._pool is not None
 
     async def write(
-        self, data: list[dict], destination: str, config: dict = None
+        self, data: list[dict], destination: str, config: dict | None = None
     ) -> None:
         """Write data to destination with optional configuration.
 
@@ -166,6 +172,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
         )
         records = [tuple(row[c] for c in columns) for row in data]
 
+        assert self._pool is not None
         async with self._pool.connection() as conn:
             async with conn.cursor() as cur:
                 await cur.executemany(insert_sql, records)
@@ -222,7 +229,8 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
                 table_name = query_config.get("table_name")
                 if not table_name:
                     raise ValueError("Table info query must specify 'table_name'")
-                return await self.get_table_info(table_name)
+                table_info = await self.get_table_info(table_name)
+                return [table_info]  # Convert dict to list to match return type
 
             elif query_type == "custom":
                 sql = query_config.get("sql")
@@ -252,6 +260,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
 
     async def _simple_query(self, sql: str) -> list:
         """Simple SQL query execution."""
+        assert self._pool is not None
         async with self._pool.connection() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(sql)
@@ -273,6 +282,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
         if not self._pool:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
+        assert self._pool is not None
         async with self._pool.connection() as conn:
             async with conn.cursor() as cur:
                 await cur.execute(query, params or [])
@@ -284,7 +294,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
                 # Convert to list of dictionaries
                 return [dict(zip(columns, row)) for row in rows]
 
-    async def execute(self, query: str, params: list = None):
+    async def execute(self, query: str, params: list | None = None):
         """
         Execute a SQL command that doesn't return results.
 
@@ -302,6 +312,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
         if not self._pool:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
+        assert self._pool is not None
         async with self._pool.connection() as conn:
             async with conn.cursor() as cur:
                 result = await cur.execute(query, params or [])
@@ -359,6 +370,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
                 placeholders = ", ".join(["%s" for _ in columns])
                 insert_sql = f"INSERT INTO {table} ({', '.join(columns)}) VALUES ({placeholders})"
                 # chunked executemany
+                assert self._pool is not None
                 async with self._pool.connection() as conn:
                     async with conn.cursor() as cur:
                         for start in range(0, len(rows), insert_chunk_size):
@@ -378,7 +390,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
             else:
                 raise ValueError(f"Unsupported operation type: {kind}")
 
-    async def get_table_info(self, table_name: str) -> dict:
+    async def get_table_info(self, table_name: str) -> dict | list:
         """
         Get information about a table structure.
 
@@ -404,7 +416,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
         ORDER BY ordinal_position
         """
 
-        columns = await self.query_with_params(query, {"table_name": table_name})
+        columns = await self.query_with_params(query, [table_name])
 
         # Get table size
         size_query = """
@@ -414,9 +426,9 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
         """
 
         try:
-            size_info = await self.query_with_params(
-                size_query, {"table_name": table_name}
-            )
+            # Note: This query has issues with parameterization, using f-string for now
+            size_query_formatted = size_query.replace("%s", f"'{table_name}'")
+            size_info = await self._simple_query(size_query_formatted)
         except:
             size_info = [{"size": "Unknown", "row_count": "Unknown"}]
 
@@ -446,3 +458,84 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
         if self._pool:
             return self._pool.get_size()
         return None
+
+    async def replace_using_values(
+        self,
+        destination: str,
+        data: list[dict],
+        key_columns: list[str],
+        *,
+        defer_constraints: bool = False,
+        lock_timeout_ms: int | None = None,
+        statement_timeout_ms: int | None = None,
+        synchronous_commit_off: bool = True,
+    ) -> None:
+        """REPLACE using a VALUES clause instead of a temp table."""
+        if not self._pool:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        if not data:
+            return
+
+        columns = list(data[0].keys())
+        # Build flattened params for DELETE USING (VALUES ...)
+        delete_sql = self._sql.delete_using_values(destination, key_columns, len(data))
+        flat_params: list = []
+        for row in data:
+            for k in key_columns:
+                flat_params.append(row[k])
+
+        records = [tuple(row[c] for c in columns) for row in data]
+
+        async with self._pool.connection() as conn:
+            async with conn.transaction():
+                async with conn.cursor() as cur:
+                    # Session tuning (optional, scoped to transaction)
+                    if synchronous_commit_off:
+                        await cur.execute(self._sql.set_local_synchronous_commit_off())
+                    if defer_constraints:
+                        await cur.execute(self._sql.set_constraints_all_deferred())
+                    if lock_timeout_ms is not None:
+                        await cur.execute(
+                            self._sql.set_local_lock_timeout(lock_timeout_ms)
+                        )
+                    if statement_timeout_ms is not None:
+                        await cur.execute(
+                            self._sql.set_local_statement_timeout(statement_timeout_ms)
+                        )
+
+                    # 1) delete matches
+                    await cur.execute(delete_sql, flat_params)
+                    # 2) insert new rows (bulk)
+                    placeholders = ", ".join(["%s" for _ in columns])
+                    insert_sql = f"INSERT INTO {destination} ({', '.join(columns)}) VALUES ({placeholders})"
+                    await cur.executemany(insert_sql, records)
+
+    async def replace_using_values_chunked(
+        self,
+        destination: str,
+        data: list[dict],
+        key_columns: list[str],
+        *,
+        chunk_size: int = 5000,
+        defer_constraints: bool = False,
+        lock_timeout_ms: int | None = None,
+        statement_timeout_ms: int | None = None,
+        synchronous_commit_off: bool = True,
+    ) -> None:
+        """Chunked REPLACE using VALUES-based delete and bulk insert per chunk."""
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be > 0")
+        total = len(data)
+        if total == 0:
+            return
+        for start in range(0, total, chunk_size):
+            end = min(start + chunk_size, total)
+            await self.replace_using_values(
+                destination,
+                data[start:end],
+                key_columns,
+                defer_constraints=defer_constraints,
+                lock_timeout_ms=lock_timeout_ms,
+                statement_timeout_ms=statement_timeout_ms,
+                synchronous_commit_off=synchronous_commit_off,
+            )

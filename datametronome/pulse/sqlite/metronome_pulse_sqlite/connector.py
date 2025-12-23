@@ -19,7 +19,7 @@ class SQLitePulse(Pulse, Readable, Writable):
     Business logic, table creation, and DDL are handled by Podium.
     """
 
-    def __init__(self, database_path="datametronome.db"):
+    def __init__(self, database_path="data/datametronome.db"):
         self.database_path = database_path
         self.connection = None
         self._readonly = SQLiteReadonlyPulse(database_path)
@@ -102,7 +102,8 @@ class SQLitePulse(Pulse, Readable, Writable):
             if "table" not in record:
                 record["table"] = destination
 
-        return await self._writeonly.write(data, config)
+        assert destination is not None
+        return await self._writeonly.write(data, destination, config)
 
     async def execute(self, sql, params=None):
         """Execute raw SQL."""

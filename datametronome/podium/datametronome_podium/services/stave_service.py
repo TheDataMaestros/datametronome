@@ -197,6 +197,41 @@ def create_mysql_stave(
     )
 
 
+def create_redis_stave(
+    name: str,
+    host: str,
+    port: int = 6379,
+    password: str | None = None,
+    db: int = 0,
+    description: str | None = None,
+    **kwargs,
+) -> Stave:
+    """
+    Create a Redis Stave.
+
+    Example:
+        >>> stave = create_redis_stave(
+        ...     name="Cache",
+        ...     host="redis.example.com"
+        ... )
+    """
+    config = {
+        "host": host,
+        "port": port,
+        "db": db,
+    }
+    if password:
+        config["password"] = password
+    config.update(kwargs)
+
+    return create_stave(
+        name=name,
+        data_source_type="redis",
+        connection_config=config,
+        description=description,
+    )
+
+
 # =============================================================================
 # Clef Creation Helpers
 # =============================================================================

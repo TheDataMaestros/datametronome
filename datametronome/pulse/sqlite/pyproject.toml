@@ -21,9 +21,6 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Database",
@@ -31,11 +28,10 @@ classifiers = [
     "Framework :: AsyncIO",
     "Typing :: Typed",
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 dependencies = [
     "metronome-pulse-core>=0.1.0",
     "pydantic>=2.0.0",
-    "typing-extensions>=4.0.0; python_version < '3.12'",
 ]
 
 [project.optional-dependencies]
@@ -85,7 +81,7 @@ packages = ["metronome_pulse_sqlite"]
 
 [tool.black]
 line-length = 88
-target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
+target-version = ['py312', 'py313']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -110,7 +106,7 @@ line_length = 88
 known_first_party = ["metronome_pulse_sqlite"]
 
 [tool.mypy]
-python_version = "3.9"
+python_version = "3.12"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true

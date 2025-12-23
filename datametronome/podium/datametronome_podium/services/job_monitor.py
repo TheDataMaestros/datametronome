@@ -6,7 +6,7 @@ This service tracks job execution history and calculates health metrics.
 
 import logging
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional
 
 from datametronome_podium.core.database import get_db
@@ -34,7 +34,7 @@ class JobExecution:
         self.status = status
         self.execution_time = execution_time
         self.error_message = error_message
-        self.started_at = started_at or datetime.utcnow()
+        self.started_at = started_at or datetime.now(timezone.utc)
         self.completed_at = completed_at
 
     def to_dict(self) -> Dict[str, Any]:
@@ -147,8 +147,8 @@ async def record_job_execution(
     """
     try:
         execution_id = str(uuid.uuid4())
-        started_at = datetime.utcnow()
-        completed_at = datetime.utcnow()
+        started_at = datetime.now(timezone.utc)
+        completed_at = datetime.now(timezone.utc)
 
         execution = JobExecution(
             id=execution_id,
@@ -225,7 +225,7 @@ async def calculate_job_health_metrics(
 
         # Get executions from the last N days
         cutoff_date = (
-            datetime.utcnow() - timedelta(days=lookback_days)
+            datetime.now(timezone.utc) - timedelta(days=lookback_days)
         ).isoformat() + "Z"
 
         results = await db.query(

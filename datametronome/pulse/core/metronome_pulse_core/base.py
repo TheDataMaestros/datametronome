@@ -44,11 +44,11 @@ class QueryResult(BaseModel):
 class BaseConnector(ABC):
     """Base class for all DataPulse connectors."""
 
-    def __init__(self, config):
+    def __init__(self, config=None):
         """Initialize connector with configuration.
 
         Args:
-            config: Connection configuration.
+            config: Connection configuration (optional for backward compatibility).
         """
         self.config = config
         self._connection_pool = None
@@ -153,6 +153,7 @@ class BaseConnector(ABC):
         Returns:
             Connection information dictionary.
         """
+        assert self.config is not None
         return {
             "connected": self._is_connected,
             "config": self.config.model_dump(),
@@ -174,7 +175,7 @@ class BaseConnector(ABC):
 class ConnectorRegistry:
     """Registry for available connectors."""
 
-    _connectors: object = {}
+    _connectors: dict[str, type["BaseConnector"]] = {}
 
     @classmethod
     def register(cls, name, connector_class):

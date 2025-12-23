@@ -7,7 +7,7 @@ allowing jobs to survive service restarts.
 
 import logging
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from datametronome_podium.core.database import get_db
@@ -39,8 +39,8 @@ class SchedulerJob:
         self.next_run_time = next_run_time
         self.execution_count = execution_count
         self.failure_count = failure_count
-        self.created_at = created_at or datetime.utcnow()
-        self.updated_at = updated_at or datetime.utcnow()
+        self.created_at = created_at or datetime.now(timezone.utc)
+        self.updated_at = updated_at or datetime.now(timezone.utc)
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for database storage."""
@@ -258,7 +258,7 @@ async def update_job_run_time(
             return True
 
         updates.append("updated_at = ?")
-        params.append(datetime.utcnow().isoformat() + "Z")
+        params.append(datetime.now(timezone.utc).isoformat() + "Z")
         params.append(job_id)
 
         sql = f"UPDATE scheduler_jobs SET {', '.join(updates)} WHERE id = ?"
@@ -292,7 +292,7 @@ async def increment_job_execution_count(job_id: str, success: bool = True) -> bo
             sql = "UPDATE scheduler_jobs SET failure_count = failure_count + 1, updated_at = ? WHERE id = ?"
 
         # Use db.execute for DML so writes are committed and serialized.
-        await db.execute(sql, [datetime.utcnow().isoformat() + "Z", job_id])
+        await db.execute(sql, [datetime.now(timezone.utc).isoformat() + "Z", job_id])
 
         return True
 

@@ -28,12 +28,12 @@ class TestPodiumAPIIntegration:
     @pytest.fixture
     def client(self):
         """Create a test client for the FastAPI app."""
-        return TestClient(app)
+        return TestClient(app)  # type: ignore
 
     @pytest.fixture
     def async_client(self):
         """Create an async test client."""
-        return AsyncClient(app=app, base_url="http://test")
+        return AsyncClient(app=app, base_url="http://test")  # type: ignore
 
     @pytest.fixture
     def test_user_data(self):

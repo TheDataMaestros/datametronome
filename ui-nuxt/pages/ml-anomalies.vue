@@ -209,6 +209,36 @@
       <template #header>
         <div class="flex items-center justify-between">
           <div>
+            <h3 class="text-lg font-semibold">Anomaly Detection with Outliers</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400">
+              Line graph showing trends with outliers clearly marked. Values outside expected bounds
+              are highlighted.
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <div
+        v-if="!anomalyTrendData"
+        class="h-[400px] flex items-center justify-center text-gray-600 dark:text-gray-400"
+      >
+        No anomaly data available yet. Run checks to see trends and outliers.
+      </div>
+      <div v-else class="h-[400px]">
+        <TrendChart
+          :data="anomalyTrendData"
+          type="line"
+          :height="400"
+          :show-legend="true"
+          :options="anomalyLineOptions"
+        />
+      </div>
+    </UCard>
+
+    <UCard>
+      <template #header>
+        <div class="flex items-center justify-between">
+          <div>
             <h3 class="text-lg font-semibold">Brain trend</h3>
             <p class="text-sm text-gray-600 dark:text-gray-400">
               Forecast observed and drift signal over recent runs.
@@ -422,6 +452,66 @@ const trendLineOptions = {
   },
 }
 
+const anomalyLineOptions = {
+  plugins: {
+    legend: { position: 'top' as const },
+    tooltip: {
+      mode: 'index' as const,
+      intersect: false,
+      callbacks: {
+        label: function (context: any) {
+          const label = context.dataset.label || ''
+          const value = context.parsed.y
+          if (value === null || value === undefined) return null
+          const isOutlier = context.dataset.isOutlier?.[context.dataIndex]
+          return `${label}: ${value.toFixed(2)}${isOutlier ? ' ⚠️ OUTLIER' : ''}`
+        },
+      },
+    },
+  },
+  scales: {
+    x: { grid: { display: false } },
+    y: {
+      type: 'linear' as const,
+      position: 'left' as const,
+      grid: { color: 'rgba(0, 0, 0, 0.1)' },
+      title: {
+        display: true,
+        text: 'Forecast Value',
+      },
+    },
+    y1: {
+      type: 'linear' as const,
+      position: 'right' as const,
+      grid: { drawOnChartArea: false },
+      title: {
+        display: true,
+        text: 'Drift Signal (-log10 p-value)',
+      },
+    },
+  },
+  elements: {
+    point: {
+      radius: function (context: any) {
+        const isOutlier = context.dataset.isOutlier?.[context.dataIndex]
+        return isOutlier ? 8 : 4
+      },
+      hoverRadius: function (context: any) {
+        const isOutlier = context.dataset.isOutlier?.[context.dataIndex]
+        return isOutlier ? 10 : 6
+      },
+      backgroundColor: function (context: any) {
+        const isOutlier = context.dataset.isOutlier?.[context.dataIndex]
+        return isOutlier ? 'rgba(239, 68, 68, 1)' : context.dataset.borderColor
+      },
+      borderColor: function (context: any) {
+        const isOutlier = context.dataset.isOutlier?.[context.dataIndex]
+        return isOutlier ? 'rgba(239, 68, 68, 1)' : context.dataset.borderColor
+      },
+    },
+  },
+}
+
 const forecastTrendData = computed(() => {
   const points = brainRows.value
     .filter((r: any) => String(r?.check_type || '') === 'forecast')
@@ -507,6 +597,130 @@ const driftTrendData = computed(() => {
         backgroundColor: 'rgba(168,85,247,0.08)',
         tension: 0.2,
         fill: false,
+      },
+    ],
+  }
+})
+
+const anomalyTrendData = computed(() => {
+  // Combine forecast and drift data to show comprehensive anomaly detection
+  const forecastPoints = brainRows.value
+    .filter((r: any) => String(r?.check_type || '') === 'forecast')
+    .map((r: any) => {
+      const meta = getMetadata(r) || {}
+      const ts = parseTimestamp(r?.timestamp)
+      const label = ts.toLocaleTimeString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+      })
+      const observed =
+        Number(meta?.observed_value) ||
+        Number(meta?.observed) ||
+        (parseObservedFromMessage(r?.message) ?? NaN)
+      const lower = Number(meta?.lower_bound)
+      const upper = Number(meta?.upper_bound)
+      const isOutlier =
+        Number.isFinite(observed) && Number.isFinite(lower) && Number.isFinite(upper)
+          ? observed < lower || observed > upper
+          : false
+      return { label, value: observed, lower, upper, isOutlier, type: 'forecast' }
+    })
+    .filter((p) => p.label && Number.isFinite(p.value))
+    .reverse()
+
+  const driftPoints = brainRows.value
+    .filter((r: any) => {
+      const t = String(r?.check_type || '')
+      return t === 'data_profile_drift' || t === 'drift'
+    })
+    .map((r: any) => {
+      const meta = getMetadata(r) || {}
+      const ts = parseTimestamp(r?.timestamp)
+      const label = ts.toLocaleTimeString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+      })
+      const p = Number(meta?.p_value ?? meta?.pvalue ?? meta?.p)
+      const signal = Number.isFinite(p) && p > 0 ? -Math.log10(p) : null
+      // Consider outlier if p-value is very low (high signal)
+      const isOutlier = signal !== null && signal > 2 // p < 0.01
+      return { label, value: signal, isOutlier, type: 'drift' }
+    })
+    .filter((p) => p.label && p.value !== null)
+    .reverse()
+
+  if (forecastPoints.length === 0 && driftPoints.length === 0) return null
+
+  // Merge and sort by timestamp
+  const allPoints = [...forecastPoints, ...driftPoints].sort((a, b) => {
+    const dateA = new Date(a.label).getTime()
+    const dateB = new Date(b.label).getTime()
+    return dateA - dateB
+  })
+
+  const labels = allPoints.map((p) => p.label)
+  const forecastValues = allPoints.map((p) =>
+    p.type === 'forecast' && Number.isFinite(p.value) ? p.value : null,
+  )
+  const driftValues = allPoints.map((p) =>
+    p.type === 'drift' && p.value !== null ? p.value : null,
+  )
+  const lowerBounds = allPoints.map((p) =>
+    p.type === 'forecast' && Number.isFinite(p.lower) ? p.lower : null,
+  )
+  const upperBounds = allPoints.map((p) =>
+    p.type === 'forecast' && Number.isFinite(p.upper) ? p.upper : null,
+  )
+  const forecastOutliers = allPoints.map((p) => p.type === 'forecast' && p.isOutlier)
+  const driftOutliers = allPoints.map((p) => p.type === 'drift' && p.isOutlier)
+
+  return {
+    labels,
+    datasets: [
+      {
+        label: 'Forecast Lower Bound',
+        data: lowerBounds as any,
+        borderColor: 'rgba(107,114,128,0.5)',
+        backgroundColor: 'rgba(107,114,128,0.05)',
+        borderWidth: 1,
+        borderDash: [5, 5],
+        tension: 0.2,
+        fill: false,
+        pointRadius: 0,
+      },
+      {
+        label: 'Forecast Upper Bound',
+        data: upperBounds as any,
+        borderColor: 'rgba(107,114,128,0.5)',
+        backgroundColor: 'rgba(107,114,128,0.05)',
+        borderWidth: 1,
+        borderDash: [5, 5],
+        tension: 0.2,
+        fill: '+1',
+        pointRadius: 0,
+      },
+      {
+        label: 'Forecast Observed',
+        data: forecastValues as any,
+        borderColor: '#EF4444',
+        backgroundColor: 'rgba(239,68,68,0.1)',
+        borderWidth: 2,
+        tension: 0.2,
+        fill: false,
+        isOutlier: forecastOutliers,
+      },
+      {
+        label: 'Drift Signal',
+        data: driftValues as any,
+        borderColor: '#8B5CF6',
+        backgroundColor: 'rgba(139,92,246,0.1)',
+        borderWidth: 2,
+        tension: 0.2,
+        fill: false,
+        isOutlier: driftOutliers,
+        yAxisID: 'y1',
       },
     ],
   }

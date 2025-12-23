@@ -345,7 +345,7 @@ class ReportingService:
             checks = await self.get_check_results(days_back)
             anomalies = await self.get_anomalies(days_back)
 
-            report_data = {
+            report_data: Dict[str, Any] = {
                 "report_metadata": {
                     "generated_at": datetime.now().isoformat(),
                     "period_days": days_back,

@@ -9,7 +9,7 @@ Tests all three Level 1 check types:
 These tests ensure TDD compliance and full functionality.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -235,7 +235,7 @@ class TestFreshnessCheck:
         )
 
         # Mock recent timestamp (2 hours ago)
-        recent_time = datetime.utcnow() - timedelta(hours=2)
+        recent_time = datetime.now(timezone.utc) - timedelta(hours=2)
         mock_connector.query.return_value = [{"latest_timestamp": recent_time}]
 
         result = await executor._execute_freshness_check(
@@ -261,7 +261,7 @@ class TestFreshnessCheck:
         )
 
         # Mock timestamp 15 hours ago
-        old_time = datetime.utcnow() - timedelta(hours=15)
+        old_time = datetime.now(timezone.utc) - timedelta(hours=15)
         mock_connector.query.return_value = [{"latest_timestamp": old_time}]
 
         result = await executor._execute_freshness_check(
@@ -286,7 +286,7 @@ class TestFreshnessCheck:
         )
 
         # Mock very old timestamp (3 days ago)
-        very_old_time = datetime.utcnow() - timedelta(days=3)
+        very_old_time = datetime.now(timezone.utc) - timedelta(days=3)
         mock_connector.query.return_value = [{"latest_timestamp": very_old_time}]
 
         result = await executor._execute_freshness_check(
@@ -312,7 +312,7 @@ class TestFreshnessCheck:
         )
 
         # Mock ISO format string timestamp (2 hours ago)
-        recent_time = datetime.utcnow() - timedelta(hours=2)
+        recent_time = datetime.now(timezone.utc) - timedelta(hours=2)
         # Use datetime object directly (most databases return datetime objects, not strings)
         # But also test string parsing capability
         mock_connector.query.return_value = [{"latest_timestamp": recent_time}]
@@ -957,7 +957,7 @@ class TestLevel1ChecksBoundaryConditions:
         )
 
         # Exactly 12 hours ago
-        exact_time = datetime.utcnow() - timedelta(hours=12)
+        exact_time = datetime.now(timezone.utc) - timedelta(hours=12)
         mock_connector = AsyncMock()
         mock_connector.query.return_value = [{"latest_timestamp": exact_time}]
 
@@ -980,7 +980,7 @@ class TestLevel1ChecksBoundaryConditions:
         )
 
         # Future timestamp (1 hour in future)
-        future_time = datetime.utcnow() + timedelta(hours=1)
+        future_time = datetime.now(timezone.utc) + timedelta(hours=1)
         mock_connector = AsyncMock()
         mock_connector.query.return_value = [{"latest_timestamp": future_time}]
 

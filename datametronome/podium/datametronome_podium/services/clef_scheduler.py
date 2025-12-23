@@ -9,7 +9,7 @@ import asyncio
 import json
 import logging
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from datametronome_podium.api.schemas.clef import ClefResponse
@@ -78,7 +78,7 @@ async def execute_scheduled_clef(
         Dict with execution result information
     """
     job_id = f"job_{clef_id}"
-    execution_start = datetime.utcnow()
+    execution_start = datetime.now(timezone.utc)
 
     logger.info(
         f"🔄 Executing scheduled clef: {clef_id} (attempt {retry_attempt + 1}, priority={priority})"
@@ -124,7 +124,7 @@ async def execute_scheduled_clef(
         executor = ClefExecutor()
         result = await executor.execute_clef(clef, stave)
 
-        execution_time = (datetime.utcnow() - execution_start).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - execution_start).total_seconds()
 
         # Determine if execution was successful
         is_success = result.status in ["pass", "warn"]
@@ -183,7 +183,7 @@ async def execute_scheduled_clef(
         }
 
     except Exception as e:
-        execution_time = (datetime.utcnow() - execution_start).total_seconds()
+        execution_time = (datetime.now(timezone.utc) - execution_start).total_seconds()
         error_msg = str(e)
 
         logger.error(f"❌ Failed to execute scheduled clef {clef_id}: {e}")
@@ -276,7 +276,7 @@ async def _store_clef_result(clef_id: str, result, clef, db) -> None:
                     "status": result.status,  # Store the actual status: "pass", "warn", or "fail"
                     "message": result.message,
                     "details": metadata_json,
-                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
                     "execution_time": result.execution_time,  # Store execution time in seconds
                     "anomalies_count": result.anomalies_count
                     if hasattr(result, "anomalies_count")
@@ -351,6 +351,8 @@ async def load_and_schedule_all_clefs() -> Dict[str, int]:
 
             try:
                 # Parse cron expression (handle shorthand formats)
+                if not clef.schedule:
+                    continue
                 cron_expression = _parse_cron_expression(clef.schedule)
 
                 # Schedule the job
@@ -527,6 +529,10 @@ async def reschedule_clef(clef_id: str) -> bool:
             return False
 
         clef = deserialize_clef(clef_result[0])
+        if not clef.schedule:
+            logger.warning(f"No schedule found for clef {clef_id}")
+            return False
+
         cron_expression = _parse_cron_expression(clef.schedule)
 
         # Schedule again

@@ -159,6 +159,7 @@ class TestTDDCompliantClefs:
         assert result.status == "pass"
         assert result.observed_value == 2500
         assert result.severity == SeverityLevel.HARMONY
+        assert result.metadata is not None
         assert "total_rows" in result.metadata
         assert result.anomalies_count == 0
 

@@ -1,0 +1,94 @@
+name: DataMetronome CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  quality-and-test:
+    name: Quality, Types & Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.12', '3.13']
+
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: testdb
+          POSTGRES_USER: testuser
+          POSTGRES_PASSWORD: testpass
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        run: |
+          uv venv
+          uv pip install pytest pytest-asyncio pytest-cov pytest-mock ty
+          # Install core first for dependencies
+          uv pip install -e ./datametronome/pulse/core
+          uv pip install -e ./datametronome/pulse/sqlite
+          uv pip install -e ./datametronome/pulse/postgres-psycopg3
+          uv pip install -e ./datametronome/pulse/postgres-sqlalchemy
+          uv pip install -e ./datametronome/pulse/postgres
+          uv pip install -e ./datametronome/brain/base
+          uv pip install -e ./datametronome/podium
+          # Install runtime deps not covered by -e
+          uv pip install pydantic-settings python-jose[cryptography] passlib bcrypt==4.0.1 apscheduler redis asyncpg
+
+      - name: Type check with ty
+        run: uv run ty check --output-format github
+
+      - name: Run Unit Tests
+        run: |
+          uv run pytest datametronome/pulse/core/tests/ -v
+          uv run pytest datametronome/pulse/postgres/tests/ -v
+          uv run pytest datametronome/pulse/postgres-psycopg3/tests/ -v
+          uv run pytest datametronome/pulse/postgres-sqlalchemy/tests/ -v
+          uv run pytest datametronome/podium/tests/test_unit.py -v
+
+  release:
+    name: Build & Release
+    needs: quality-and-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+      - name: Build and Publish
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: |
+          # Minimal build logic as per user requirement to start fresh
+          # but keeping the spirit of the old publish workflow
+          echo "Ready to build and publish..."
+          # uv build
+          # uv publish

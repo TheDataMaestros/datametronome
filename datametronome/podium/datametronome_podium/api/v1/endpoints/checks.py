@@ -28,7 +28,8 @@ def _isoformat(value: datetime) -> str:
 async def get_checks(
     skip: int = 0,
     limit: int = 100,
-    status: str | None = Query(default=None, description="Filter by check status"),
+    status_filter: str
+    | None = Query(default=None, alias="status", description="Filter by check status"),
     severity: str | None = Query(default=None, description="Filter by severity level"),
     check_type: str | None = Query(default=None, description="Filter by check type"),
     stave_id: str
@@ -58,9 +59,9 @@ async def get_checks(
         filters: list[str] = []
         params: list[Any] = []
 
-        if status:
+        if status_filter:
             filters.append("status = ?")
-            params.append(status)
+            params.append(status_filter)
         if severity:
             filters.append("severity = ?")
             params.append(severity)

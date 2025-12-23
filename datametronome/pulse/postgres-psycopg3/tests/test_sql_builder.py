@@ -1,3 +1,5 @@
+from typing import Any, cast
+
 import pytest
 from metronome_pulse_postgres_psycopg3.sql_builder import PostgresPsycopgSQLBuilder
 
@@ -113,11 +115,11 @@ class TestPostgresPsycopgSQLBuilder:
 
         # Test None table name
         with pytest.raises(ValueError):
-            self.builder.delete_using_values(None, ["id"], 1)
+            self.builder.delete_using_values(cast(Any, None), ["id"], 1)
 
         # Test None columns
         with pytest.raises(ValueError):
-            self.builder.delete_using_values("public.events", None, 1)
+            self.builder.delete_using_values("public.events", cast(Any, None), 1)
 
     def test_sql_injection_prevention(self):
         """Test that SQL injection attempts are properly handled"""

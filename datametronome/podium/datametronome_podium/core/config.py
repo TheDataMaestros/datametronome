@@ -33,7 +33,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = Field(
-        default="sqlite:///./datametronome.db", env="DATAMETRONOME_DATABASE_URL"
+        default="sqlite:///./data/datametronome.db", env="DATAMETRONOME_DATABASE_URL"
     )
 
     # CORS
@@ -113,7 +113,7 @@ def get_settings() -> Settings:
     return settings
 
 
-def validate_production_config() -> list[str]:
+def validate_production_config() -> tuple[list[str], list[str]]:
     """
     Validate critical configuration for production deployment.
 

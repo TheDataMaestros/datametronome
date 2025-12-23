@@ -6,7 +6,7 @@ authors = [
     {name = "The Data Maestros", email = "team@datamaestros.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
@@ -37,8 +37,8 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["datametronome"]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
     "pytest-cov>=4.1.0",
@@ -53,3 +53,16 @@ dev-dependencies = [
     "asyncpg>=0.28.0",
     "redis>=4.5.0",
 ]
+[tool.ty.environment]
+extra-paths = [
+    "datametronome/pulse/core",
+    "datametronome/pulse/postgres-sqlalchemy",
+    "datametronome/pulse/bigquery",
+    "datametronome/pulse/sqlite",
+    "datametronome/pulse/postgres",
+    "datametronome/pulse/postgres-psycopg3",
+    "datametronome/podium"
+]
+
+[tool.ty.terminal]
+output-format = "concise"

@@ -27,10 +27,10 @@ Example Usage:
     )
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Supported data source types
 SUPPORTED_DATA_SOURCES = [
@@ -73,7 +73,9 @@ class Stave(BaseModel):
         API: {"base_url": "https://api.example.com", "api_key": "..."}
     """
 
-    id: str | None = None
+    id: str = Field(
+        default="", description="Unique identifier (auto-generated if not provided)"
+    )
     name: str = Field(
         ...,
         min_length=1,
@@ -98,10 +100,12 @@ class Stave(BaseModel):
         default=True, description="Whether monitoring is active for this data source"
     )
     created_at: datetime = Field(
-        default_factory=datetime.utcnow, description="When this stave was created"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When this stave was created",
     )
     updated_at: datetime = Field(
-        default_factory=datetime.utcnow, description="When this stave was last updated"
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="When this stave was last updated",
     )
 
     model_config = ConfigDict(
@@ -160,6 +164,17 @@ class Stave(BaseModel):
         if not v or not v.strip():
             raise ValueError("name cannot be empty or whitespace")
         return v.strip()
+
+    @model_validator(mode="after")
+    def generate_id_if_missing(self):
+        """Generate ID if not provided."""
+        if not self.id:
+            import uuid
+
+            # Generate ID from name slug + uuid
+            name_slug = self.name.lower().replace(" ", "-")[:30]
+            self.id = f"stave-{name_slug}-{str(uuid.uuid4())[:8]}"
+        return self
 
     def __repr__(self) -> str:
         """Pretty representation for debugging."""

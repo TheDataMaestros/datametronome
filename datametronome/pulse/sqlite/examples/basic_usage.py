@@ -129,7 +129,7 @@ async def main():
             {"name": "Eve", "email": "eve@example.com", "active": False},
         ]
 
-        await writeonly.write(new_users, {"operation": "insert", "table": "users"})
+        await writeonly.write(new_users, "users", {"operation": "insert"})
         print(f"✅ Added {len(new_users)} new users")
 
         # Bulk copy operation

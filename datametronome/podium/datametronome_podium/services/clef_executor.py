@@ -15,7 +15,7 @@ Example Usage:
 import asyncio
 import logging
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from datametronome_podium.models.check_run import CheckRun
@@ -30,24 +30,24 @@ from datametronome_podium.models.stave import Stave
 from datametronome_podium.services.connection_tester import ConnectionTester
 
 try:
-    from datametronome_brain_base.forecasting import SarimaForecaster
+    from datametronome_brain_base.forecasting import SarimaForecaster  # type: ignore
 except ModuleNotFoundError:
     SarimaForecaster = None
 
 try:
-    from datametronome_brain_base.drift_detection import DriftDetector
+    from datametronome_brain_base.drift_detection import DriftDetector  # type: ignore
 except ModuleNotFoundError:
     DriftDetector = None
 
 try:
-    import pandas as pd
+    import pandas as pd  # type: ignore
 except ModuleNotFoundError:
-    pd = None
+    pd = None  # type: ignore
 
 try:
-    import numpy as np
+    import numpy as np  # type: ignore
 except ModuleNotFoundError:
-    np = None
+    np = None  # type: ignore
 
 
 logger = logging.getLogger(__name__)
@@ -67,9 +67,9 @@ class CheckResult:
     status: str  # "pass", "warn", or "fail" (per TDD specification)
     message: str
     observed_value: Any = None  # The actual value that was observed/evaluated
-    metadata: Dict[str, Any] = None  # Additional context and proof of failure
+    metadata: Optional[Dict[str, Any]] = None  # Additional context and proof of failure
     execution_time: float = 0.0  # seconds
-    timestamp: datetime = None
+    timestamp: Optional[datetime] = None
     anomalies_count: int = 0
 
     def __post_init__(self):
@@ -96,7 +96,7 @@ class CheckResult:
     @property
     def details(self) -> Dict[str, Any]:
         """Backward compatibility alias for metadata."""
-        return self.metadata
+        return self.metadata or {}
 
     @details.setter
     def details(self, value: Dict[str, Any]):
@@ -1912,7 +1912,7 @@ class ClefExecutor:
                     metadata={"raw_value": latest_raw},
                 )
 
-            now = datetime.utcnow()
+            now = datetime.now(timezone.utc)
             age_hours = max((now - latest_timestamp).total_seconds() / 3600.0, 0.0)
 
             normalized_fail = _normalize_duration_condition(clef.fail)
@@ -2078,7 +2078,7 @@ class ClefExecutor:
                     timestamp=datetime.now(),
                 )
 
-            # Fallback: mean ± 3*std over recent window
+            # Fallback: mean ± k*std over recent window, accounting for trend
             window = train_data[-30:] if len(train_data) > 30 else train_data
             n = len(window)
             if n == 0:
@@ -2092,12 +2092,35 @@ class ClefExecutor:
                     timestamp=datetime.now(),
                 )
 
+            # Calculate mean and std
             mean = sum(window) / n
             variance = sum((x - mean) ** 2 for x in window) / n
             std = variance**0.5
-            k = float(config.get("fallback_sigma", 2.0))
-            lower = mean - (k * std)
-            upper = mean + (k * std)
+
+            # Account for trend: if data is growing, adjust expected value upward
+            # Simple linear trend detection: compare first half vs second half
+            trend_adjustment = 0.0
+            if n >= 10:
+                first_half = window[: n // 2]
+                second_half = window[n // 2 :]
+                first_mean = sum(first_half) / len(first_half)
+                second_mean = sum(second_half) / len(second_half)
+                trend = (
+                    (second_mean - first_mean) / len(second_half)
+                    if len(second_half) > 0
+                    else 0
+                )
+                # Project trend forward by 1 step (for the next observation)
+                trend_adjustment = trend
+
+            # Adjust mean for trend
+            adjusted_mean = mean + trend_adjustment
+
+            k = float(
+                config.get("fallback_sigma", 2.5)
+            )  # Slightly wider default (2.5 instead of 2.0)
+            lower = adjusted_mean - (k * std)
+            upper = adjusted_mean + (k * std)
             is_anomaly = observed_value <= lower or observed_value >= upper
 
             status = "fail" if is_anomaly else "pass"

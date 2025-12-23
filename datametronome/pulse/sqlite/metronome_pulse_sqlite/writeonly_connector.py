@@ -16,7 +16,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
     Business logic and table creation are handled by Podium.
     """
 
-    def __init__(self, database_path="datametronome.db"):
+    def __init__(self, database_path="data/datametronome.db"):
         self.database_path = database_path
         self.connection = None
         # Serialize writes to avoid "database is locked" under concurrent access.
@@ -58,6 +58,8 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
             self.connection = sqlite3.connect(self.database_path, timeout=30)
             self.connection.row_factory = sqlite3.Row  # Enable dict-like access
             # Improve concurrency behavior (best-effort)
+            if not self.connection:
+                raise ConnectionError("Failed to establish connection")
             cursor = self.connection.cursor()
             cursor.execute("PRAGMA journal_mode=WAL")
             cursor.execute("PRAGMA synchronous=NORMAL")
@@ -76,7 +78,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
         """Check if connected to SQLite."""
         return self.connection is not None
 
-    async def write(self, data, config=None):
+    async def write(self, data, destination: str, config: dict | None = None):
         """Write data to SQLite."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
@@ -93,7 +95,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
                 try:
                     tables = sorted(
                         {
-                            (r or {}).get("table")
+                            str((r or {}).get("table"))
                             for r in (data or [])
                             if (r or {}).get("table")
                         }
@@ -150,7 +152,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
             try:
                 tables = sorted(
                     {
-                        (r or {}).get("table")
+                        str((r or {}).get("table"))
                         for r in (data or [])
                         if (r or {}).get("table")
                     }
@@ -185,13 +187,18 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
 
                 sql = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({placeholders})"
 
+                if not self.connection:
+                    raise RuntimeError("Not connected")
                 cursor = self.connection.cursor()
                 cursor.execute(sql, values)
 
+            if not self.connection:
+                raise RuntimeError("Not connected to database")
             self.connection.commit()
             return True
         except Exception as e:
-            self.connection.rollback()
+            if self.connection:
+                self.connection.rollback()
             # region agent log
             self._agent_log(
                 "H_SQLITE_INSERT_EXCEPTION",
@@ -218,6 +225,8 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
                 primary_key = record.get("id")
                 if primary_key:
                     # Delete existing record
+                    if not self.connection:
+                        raise RuntimeError("Not connected")
                     cursor = self.connection.cursor()
                     cursor.execute(
                         f"DELETE FROM {table_name} WHERE id = ?", (primary_key,)
@@ -226,7 +235,8 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
             # Insert new data
             return await self._insert_data(data)
         except Exception as e:
-            self.connection.rollback()
+            if self.connection:
+                self.connection.rollback()
             raise RuntimeError(f"Replace failed: {e}")
 
     async def _execute_operations(self, operations):
@@ -237,6 +247,8 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
                 sql = operation.get("sql", "")
                 params = operation.get("params", [])
 
+                if not self.connection:
+                    raise RuntimeError("Not connected")
                 cursor = self.connection.cursor()
 
                 if op_type == "insert":
@@ -252,10 +264,13 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
                 else:
                     raise ValueError(f"Unknown operation type: {op_type}")
 
+            if not self.connection:
+                raise RuntimeError("Not connected to database")
             self.connection.commit()
             return True
         except Exception as e:
-            self.connection.rollback()
+            if self.connection:
+                self.connection.rollback()
             raise RuntimeError(f"Operations failed: {e}")
 
     async def execute(self, sql, params=None):
@@ -265,16 +280,21 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
 
         async with self._write_lock:
             try:
+                if not self.connection:
+                    raise RuntimeError("Not connected")
                 cursor = self.connection.cursor()
                 if params:
                     cursor.execute(sql, params)
                 else:
                     cursor.execute(sql)
 
+                if not self.connection:
+                    raise RuntimeError("Not connected to database")
                 self.connection.commit()
                 return True
             except Exception as e:
-                self.connection.rollback()
+                if self.connection:
+                    self.connection.rollback()
                 raise RuntimeError(f"Execute failed: {e}")
 
     async def copy_records(self, table_name, records):
@@ -293,6 +313,8 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
 
                 sql = f"INSERT INTO {table_name} ({', '.join(columns)}) VALUES ({placeholders})"
 
+                if not self.connection:
+                    raise RuntimeError("Not connected")
                 cursor = self.connection.cursor()
 
                 # Prepare all values
@@ -301,8 +323,11 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
                 # Execute batch insert
                 cursor.executemany(sql, values)
 
+                if not self.connection:
+                    raise RuntimeError("Not connected to database")
                 self.connection.commit()
                 return True
             except Exception as e:
-                self.connection.rollback()
+                if self.connection:
+                    self.connection.rollback()
                 raise RuntimeError(f"Copy records failed: {e}")

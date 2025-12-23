@@ -14,7 +14,7 @@ class DatabaseInitService:
     DataPulse connectors only provide the connection interface.
     """
 
-    def __init__(self, database_path: str = "datametronome.db"):
+    def __init__(self, database_path: str = "data/datametronome.db"):
         self.database_path = database_path
         self.connector = SQLitePulse(database_path)
 
@@ -146,7 +146,7 @@ class DatabaseInitService:
             "updated_at": now,
         }
 
-        await self.connector.write([admin_user])
+        await self.connector.write([admin_user], "users")
 
         # Insert default stave
         default_stave = {
@@ -154,12 +154,12 @@ class DatabaseInitService:
             "id": str(uuid.uuid4()),
             "name": "Default SQLite Monitor",
             "description": "Default monitoring stave for local development",
-            "connection_config": '{"database_path": "datametronome.db"}',
+            "connection_config": '{"database_path": "data/datametronome.db"}',
             "created_at": now,
             "updated_at": now,
         }
 
-        await self.connector.write([default_stave])
+        await self.connector.write([default_stave], "staves")
 
         # Insert default clef
         default_clef = {
@@ -174,7 +174,7 @@ class DatabaseInitService:
             "updated_at": now,
         }
 
-        await self.connector.write([default_clef])
+        await self.connector.write([default_clef], "clefs")
 
         print("✅ Default data inserted successfully")
 

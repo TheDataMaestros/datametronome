@@ -48,18 +48,30 @@ class ClefsService {
   private readonly endpoint = '/clefs'
 
   async getAll(): Promise<Clef[]> {
-    const response = await apiService.get<Clef[]>(this.endpoint)
-    return response.data
+    const response = await apiService.get<any[]>(this.endpoint)
+    // Map API response (config) to frontend format (configuration)
+    return response.data.map((clef) => ({
+      ...clef,
+      configuration: clef.config || clef.configuration || {},
+    }))
   }
 
   async getById(id: string): Promise<Clef> {
-    const response = await apiService.get<Clef>(`${this.endpoint}/${id}`)
-    return response.data
+    const response = await apiService.get<any>(`${this.endpoint}/${id}`)
+    // Map API response (config) to frontend format (configuration)
+    return {
+      ...response.data,
+      configuration: response.data.config || response.data.configuration || {},
+    }
   }
 
   async getByStaveId(staveId: string): Promise<Clef[]> {
-    const response = await apiService.get<Clef[]>(`${this.endpoint}?stave_id=${staveId}`)
-    return response.data
+    const response = await apiService.get<any[]>(`${this.endpoint}?stave_id=${staveId}`)
+    // Map API response (config) to frontend format (configuration)
+    return response.data.map((clef) => ({
+      ...clef,
+      configuration: clef.config || clef.configuration || {},
+    }))
   }
 
   async create(clef: CreateClefRequest): Promise<Clef> {

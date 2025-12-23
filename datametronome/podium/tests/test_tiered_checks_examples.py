@@ -10,11 +10,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 from datametronome_podium.models.clef import (
-    CHECK_TIER_MAPPING,
-    TIER_1_CHECKS,
-    TIER_2_CHECKS,
-    TIER_3_CHECKS,
-    TIER_4_CHECKS,
+    CHECK_LEVEL_MAPPING,
+    LEVEL_1_CHECKS,
+    LEVEL_2_CHECKS,
+    LEVEL_3_CHECKS,
+    LEVEL_4_CHECKS,
     Clef,
 )
 from datametronome_podium.models.severity import (
@@ -99,7 +99,7 @@ class TestTieredChecksExamples:
         for clef in tier_1_clefs:
             assert clef.tier == 1
             assert clef.tier_description == "Simple Declarative"
-            assert clef.check_type in TIER_1_CHECKS
+            assert clef.check_type in LEVEL_1_CHECKS
             print(f"   ✅ {clef.name}: {clef.check_type} (Tier {clef.tier})")
 
         print(f"   📊 Total Tier 1 checks: {len(tier_1_clefs)}")
@@ -201,7 +201,7 @@ class TestTieredChecksExamples:
         for clef in tier_2_clefs:
             assert clef.tier == 2
             assert clef.tier_description == "Advanced Declarative"
-            assert clef.check_type in TIER_2_CHECKS
+            assert clef.check_type in LEVEL_2_CHECKS
             print(f"   ✅ {clef.name}: {clef.check_type} (Tier {clef.tier})")
 
         print(f"   📊 Total Tier 2 checks: {len(tier_2_clefs)}")
@@ -268,7 +268,7 @@ class TestTieredChecksExamples:
         for clef in tier_3_clefs:
             assert clef.tier == 3
             assert clef.tier_description == "Intelligent (ML-Driven)"
-            assert clef.check_type in TIER_3_CHECKS
+            assert clef.check_type in LEVEL_3_CHECKS
             print(f"   ✅ {clef.name}: {clef.check_type} (Tier {clef.tier})")
 
         print(f"   📊 Total Tier 3 checks: {len(tier_3_clefs)}")
@@ -324,7 +324,7 @@ class TestTieredChecksExamples:
         for clef in tier_4_clefs:
             assert clef.tier == 4
             assert clef.tier_description == "Custom Python"
-            assert clef.check_type in TIER_4_CHECKS
+            assert clef.check_type in LEVEL_4_CHECKS
             print(f"   ✅ {clef.name}: {clef.check_type} (Tier {clef.tier})")
 
         print(f"   📊 Total Tier 4 checks: {len(tier_4_clefs)}")
@@ -446,33 +446,40 @@ class TestSeveritySystemExamples:
             CheckResult(
                 clef_id="clef-001",
                 stave_id="stave-001",
-                severity=SeverityLevel.HARMONY,
+                status="pass",
                 message="NULL check passed: 0.5% NULLs (threshold: 1%)",
-                details={"null_percentage": 0.005, "total_rows": 1000, "null_rows": 5},
+                metadata={
+                    "severity": SeverityLevel.HARMONY.value,
+                    "null_percentage": 0.005,
+                    "total_rows": 1000,
+                    "null_rows": 5,
+                },
                 execution_time=0.123,
                 timestamp=datetime.now(),
-                check_value=0.005,
+                observed_value=0.005,
             ),
             CheckResult(
                 clef_id="clef-002",
                 stave_id="stave-001",
-                severity=SeverityLevel.DISSONANCE,
+                status="warn",
                 message="Volume check warning: 5100 users exceeds warning threshold",
-                details={
+                metadata={
+                    "severity": SeverityLevel.DISSONANCE.value,
                     "actual_count": 5100,
                     "expected_range": {"min": 100, "max": 5000},
                 },
                 execution_time=0.456,
                 timestamp=datetime.now(),
                 anomalies_count=1,
-                check_value=5100,
+                observed_value=5100,
             ),
             CheckResult(
                 clef_id="clef-003",
                 stave_id="stave-001",
-                severity=SeverityLevel.CACOPHONY,
+                status="fail",
                 message="Range check failed: 25 values outside range [0, 1000]",
-                details={
+                metadata={
+                    "severity": SeverityLevel.CACOPHONY.value,
                     "out_of_range_rows": 25,
                     "total_rows": 100,
                     "violation_percentage": 0.25,
@@ -480,16 +487,16 @@ class TestSeveritySystemExamples:
                 execution_time=0.789,
                 timestamp=datetime.now(),
                 anomalies_count=25,
-                check_value=0.25,
+                observed_value=0.25,
             ),
         ]
 
         print(f"   📊 Check Results with Severity Classification:")
         for result in results:
             print(f"   {result}")
-            print(f"      Details: {result.details}")
+            print(f"      Details: {result.metadata}")
             print(f"      Anomalies: {result.anomalies_count}")
-            print(f"      Check Value: {result.check_value}")
+            print(f"      Check Value: {result.observed_value}")
             print()
 
     def test_executor_stats_with_severity(self):
@@ -504,47 +511,47 @@ class TestSeveritySystemExamples:
             CheckResult(
                 "clef-1",
                 "stave-1",
-                SeverityLevel.HARMONY,
+                "pass",
                 "Pass",
-                {},
-                0.1,
-                datetime.now(),
+                observed_value={},
+                execution_time=0.1,
+                timestamp=datetime.now(),
             ),
             CheckResult(
                 "clef-2",
                 "stave-1",
-                SeverityLevel.HARMONY,
+                "pass",
                 "Pass",
-                {},
-                0.2,
-                datetime.now(),
+                observed_value={},
+                execution_time=0.2,
+                timestamp=datetime.now(),
             ),
             CheckResult(
                 "clef-3",
                 "stave-1",
-                SeverityLevel.DISSONANCE,
+                "warn",
                 "Warning",
-                {},
-                0.3,
-                datetime.now(),
+                observed_value={},
+                execution_time=0.3,
+                timestamp=datetime.now(),
             ),
             CheckResult(
                 "clef-4",
                 "stave-1",
-                SeverityLevel.CACOPHONY,
+                "fail",
                 "Critical",
-                {},
-                0.4,
-                datetime.now(),
+                observed_value={},
+                execution_time=0.4,
+                timestamp=datetime.now(),
             ),
             CheckResult(
                 "clef-5",
                 "stave-1",
-                SeverityLevel.HARMONY,
+                "pass",
                 "Pass",
-                {},
-                0.5,
-                datetime.now(),
+                observed_value={},
+                execution_time=0.5,
+                timestamp=datetime.now(),
             ),
         ]
 
