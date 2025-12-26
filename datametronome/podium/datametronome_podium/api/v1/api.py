@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from .endpoints import (
     auth,
+    chat,
     checks,
     clef_actions,
     clefs,
@@ -36,3 +37,4 @@ api_router.include_router(
     import_config.router, prefix="/config", tags=["configuration"]
 )
 api_router.include_router(trends.router, prefix="/trends", tags=["trends"])
+api_router.include_router(chat.router, prefix="/chat", tags=["chat"])

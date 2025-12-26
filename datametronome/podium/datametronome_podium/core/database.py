@@ -225,11 +225,38 @@ async def _create_tables() -> None:
             FOREIGN KEY (check_id) REFERENCES checks (id)
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS chat_messages (
+            id TEXT PRIMARY KEY,
+            conversation_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            role TEXT NOT NULL CHECK(role IN ('user', 'assistant', 'system')),
+            content TEXT NOT NULL,
+            tool_calls TEXT,
+            tool_results TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+        )
+        """,
     ]
 
     for table_sql in tables:
         assert sqlite_connector is not None
         await sqlite_connector.execute(table_sql)
+
+    # Create indexes for chat_messages
+    indexes = [
+        "CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation_id ON chat_messages(conversation_id)",
+        "CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at)",
+    ]
+    for index_sql in indexes:
+        assert sqlite_connector is not None
+        try:
+            await sqlite_connector.execute(index_sql)
+        except Exception as e:
+            # Index might already exist, ignore
+            logger.debug(f"Index creation (may already exist): {e}")
 
 
 async def _create_default_admin() -> None:

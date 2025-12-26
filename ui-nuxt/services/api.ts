@@ -33,6 +33,7 @@ class ApiService {
         ...this.defaultHeaders,
         ...options.headers,
       },
+      signal: options.signal, // Preserve abort signal
     }
 
     // Add auth token if available
@@ -46,6 +47,11 @@ class ApiService {
 
     try {
       const response = await fetch(url, config)
+      
+      // Check if request was aborted
+      if (config.signal?.aborted) {
+        throw new Error('Request aborted')
+      }
       console.log(`API Response [${endpoint}]:`, response.status, response.statusText)
 
       const raw = await response.text()
@@ -58,11 +64,23 @@ class ApiService {
       console.log(`API Data [${endpoint}]:`, data)
 
       if (!response.ok) {
+        // Handle 401 Unauthorized (expired token)
+        if (response.status === 401) {
+          const authStore = useAuthStore()
+          authStore.logout()
+          // Redirect to login if not already there
+          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+            window.location.href = '/login'
+          }
+        }
+        
         throw {
           message:
-            data && typeof data === 'object' && 'message' in data
-              ? (data as any).message
-              : `HTTP ${response.status}`,
+            data && typeof data === 'object' && 'detail' in data
+              ? (data as any).detail
+              : data && typeof data === 'object' && 'message' in data
+                ? (data as any).message
+                : `HTTP ${response.status}`,
           status: response.status,
           details: data,
         } as ApiError
@@ -73,6 +91,11 @@ class ApiService {
         status: response.status,
       }
     } catch (error) {
+      // Check if error is due to abort
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw error
+      }
+      
       console.error(`API Error [${endpoint}]:`, error)
       if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
         throw error as ApiError
@@ -89,10 +112,11 @@ class ApiService {
     return this.request<T>(endpoint, { method: 'GET' })
   }
 
-  async post<T>(endpoint: string, data?: any): Promise<ApiResponse<T>> {
+  async post<T>(endpoint: string, data?: any, signal?: AbortSignal): Promise<ApiResponse<T>> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
+      signal,
     })
   }
 

@@ -99,6 +99,9 @@
         <slot />
       </main>
     </div>
+
+    <!-- Chat Widget -->
+    <ChatWidget />
   </div>
 </template>
 
@@ -115,6 +118,7 @@ const pageTitle = computed(() => {
     trends: 'Trends & Patterns',
     staves: 'Data Sources',
     clefs: 'Quality Checks',
+    chat: 'Chat History',
     settings: 'Settings',
   }
   return titles[route.name as string] || 'DataMetronome'
@@ -156,6 +160,12 @@ const navigationItems = [
     to: '/clefs',
     icon: 'i-heroicons-check-circle',
     label: 'Quality Checks',
+    badge: null,
+  },
+  {
+    to: '/chat',
+    icon: 'i-heroicons-chat-bubble-left-right',
+    label: 'Chat History',
     badge: null,
   },
 ]
