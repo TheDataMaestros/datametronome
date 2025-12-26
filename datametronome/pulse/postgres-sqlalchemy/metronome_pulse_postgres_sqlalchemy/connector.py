@@ -502,6 +502,32 @@ class PostgresSQLAlchemyPulse(Pulse, Readable, Writable):
             "size_info": size_info[0] if size_info else {},
         }
 
+    async def list_tables(self, schema: str = "public") -> list[str]:
+        """
+        List all tables in the database.
+
+        Args:
+            schema: Schema name to list tables from (default: 'public')
+
+        Returns:
+            List of table names
+
+        Raises:
+            RuntimeError: If not connected to database
+        """
+        if not self._engine or not self._session_maker:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+
+        query = """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = :schema
+        AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+        """
+        results = await self.query_with_params(query, {"schema": schema})
+        return [row["table_name"] for row in results]
+
     async def __aenter__(self):
         """Async context manager entry."""
         await self.connect()

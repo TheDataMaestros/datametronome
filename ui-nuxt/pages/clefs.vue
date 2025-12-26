@@ -660,14 +660,16 @@ const newClef = ref<CreateClefRequest>({
 })
 
 // Clef templates with tier information - fetched from API
-const clefTemplates = ref<Array<{
-  type: string
-  name: string
-  description: string
-  icon: string
-  tier: number
-  config: Record<string, any>
-}>>([])
+const clefTemplates = ref<
+  Array<{
+    type: string
+    name: string
+    description: string
+    icon: string
+    tier: number
+    config: Record<string, any>
+  }>
+>([])
 
 // Icon mapping for check types
 const checkTypeIcons: Record<string, string> = {
@@ -1137,11 +1139,6 @@ const refreshLatestResults = async () => {
 
 // Lifecycle
 onMounted(async () => {
-  await Promise.all([
-    fetchClefs(),
-    fetchStaves(),
-    refreshLatestResults(),
-    fetchCheckTypes(),
-  ])
+  await Promise.all([fetchClefs(), fetchStaves(), refreshLatestResults(), fetchCheckTypes()])
 })
 </script>

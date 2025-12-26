@@ -47,7 +47,7 @@ class ApiService {
 
     try {
       const response = await fetch(url, config)
-      
+
       // Check if request was aborted
       if (config.signal?.aborted) {
         throw new Error('Request aborted')
@@ -73,7 +73,7 @@ class ApiService {
             window.location.href = '/login'
           }
         }
-        
+
         throw {
           message:
             data && typeof data === 'object' && 'detail' in data
@@ -95,7 +95,7 @@ class ApiService {
       if (error instanceof Error && error.name === 'AbortError') {
         throw error
       }
-      
+
       console.error(`API Error [${endpoint}]:`, error)
       if (error && typeof error === 'object' && 'status' in error && 'message' in error) {
         throw error as ApiError

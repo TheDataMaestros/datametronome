@@ -7,8 +7,8 @@ export interface ChatMessage {
   timestamp: Date
   toolCalls?: ToolCall[]
   toolResults?: ToolResult[]
-  model?: string  // Model name that generated the response
-  finishReason?: string  // Finish reason from the model
+  model?: string // Model name that generated the response
+  finishReason?: string // Finish reason from the model
 }
 
 export interface ToolCall {
@@ -34,7 +34,7 @@ export interface ChatResponse {
   conversationId: string
   toolCalls?: ToolCall[]
   finishReason?: string
-  model?: string  // Model name that generated the response
+  model?: string // Model name that generated the response
 }
 
 class ChatService {
@@ -47,7 +47,7 @@ class ChatService {
       this.abortController = new AbortController()
       signal = this.abortController.signal
     }
-    
+
     const response = await apiService.post<ChatResponse>(this.endpoint, request, signal)
     return response.data
   }
@@ -70,15 +70,15 @@ class ChatService {
   }
 
   async getConversationHistory(conversationId: string): Promise<ChatMessage[]> {
-    const response = await apiService.get<Array<{
-      id: string
-      role: 'user' | 'assistant' | 'system'
-      content: string
-      timestamp: string
-      toolCalls?: ToolCall[]
-    }>>(
-      `${this.endpoint}/conversations/${conversationId}`,
-    )
+    const response = await apiService.get<
+      Array<{
+        id: string
+        role: 'user' | 'assistant' | 'system'
+        content: string
+        timestamp: string
+        toolCalls?: ToolCall[]
+      }>
+    >(`${this.endpoint}/conversations/${conversationId}`)
     // Convert timestamp strings to Date objects
     return response.data.map((msg) => {
       let timestamp: Date
@@ -109,9 +109,9 @@ class ChatService {
   }
 
   async listConversations(): Promise<Array<{ id: string; title: string; updatedAt: Date }>> {
-    const response = await apiService.get<Array<{ id: string; title: string; updatedAt: string | null }>>(
-      `${this.endpoint}/conversations`,
-    )
+    const response = await apiService.get<
+      Array<{ id: string; title: string; updatedAt: string | null }>
+    >(`${this.endpoint}/conversations`)
     return response.data.map((conv) => {
       // Handle null or invalid dates - use epoch instead of current time
       let updatedAt: Date
@@ -135,4 +135,3 @@ class ChatService {
 }
 
 export const chatService = new ChatService()
-

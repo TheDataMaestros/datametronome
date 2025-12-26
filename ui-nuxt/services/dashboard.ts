@@ -27,4 +27,3 @@ class DashboardService {
 }
 
 export const dashboardService = new DashboardService()
-

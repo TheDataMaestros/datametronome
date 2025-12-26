@@ -18,7 +18,8 @@ install-podium: ## Install Podium runtime dependencies only
 	fi
 
 install-dev: ## Install development dependencies
-	uv pip install pytest pytest-asyncio black isort mypy
+	uv pip install pytest pytest-asyncio black isort mypy pre-commit
+	pre-commit install
 
 test: ## Run tests
 	pytest tests/ -v

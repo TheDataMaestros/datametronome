@@ -125,7 +125,9 @@
         </div>
 
         <!-- Input Area -->
-        <div class="px-3 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+        <div
+          class="px-3 py-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+        >
           <form @submit.prevent="handleSubmit" class="flex gap-2">
             <UInput
               v-model="inputMessage"
@@ -166,13 +168,16 @@
       :class="isOpen ? 'rounded-full' : 'rounded-full shadow-lg'"
       class="!w-14 !h-14"
     >
-      <span v-if="!isOpen" class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+      <span
+        v-if="!isOpen"
+        class="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-white dark:border-gray-800"
+      ></span>
     </UButton>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, nextTick, watch, onMounted } from 'vue'
+import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue'
 import { useChat } from '~/composables/useChat'
 
 const chat = useChat()
@@ -243,11 +248,36 @@ const handleClear = () => {
   }
 }
 
+const handleLoadConversation = async (event: CustomEvent) => {
+  const { conversationId } = event.detail
+  if (conversationId) {
+    // Open chat widget if not already open
+    if (!isOpen.value) {
+      isOpen.value = true
+    }
+    // Load the conversation
+    try {
+      await chat.loadConversation(conversationId)
+      scrollToBottom()
+    } catch (error) {
+      console.error('Failed to load conversation in widget:', error)
+    }
+  }
+}
+
 onMounted(() => {
   // Auto-scroll on mount if chat is open
   if (isOpen.value) {
     scrollToBottom()
   }
+
+  // Listen for custom event to load conversation from chat history page
+  window.addEventListener('chat:load-conversation', handleLoadConversation as EventListener)
+})
+
+onUnmounted(() => {
+  // Cleanup event listener
+  window.removeEventListener('chat:load-conversation', handleLoadConversation as EventListener)
 })
 </script>
 
@@ -267,4 +297,3 @@ onMounted(() => {
   transform: translateY(20px);
 }
 </style>
-

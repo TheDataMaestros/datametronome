@@ -7,11 +7,13 @@ with full support for the DataPulse ecosystem and psycopg3 features.
 
 import psycopg
 from metronome_pulse_core import Pulse, Readable, Writable
+
 try:
     from psycopg_pool import AsyncConnectionPool
 except ImportError:
     # Fallback for older psycopg3 versions that have pool in psycopg
     from psycopg import pool  # type: ignore
+
     AsyncConnectionPool = pool.AsyncConnectionPool
 
 from .sql_builder import PostgresPsycopgSQLBuilder
@@ -53,7 +55,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
 
     async def connect(self):
         """Establish connection pool to PostgreSQL using psycopg3."""
-        self._pool = await AsyncConnectionPool.connect(
+        self._pool = await AsyncConnectionPool.connect(  # type: ignore[attr-defined]
             host=self._host,
             port=self._port,
             dbname=self._database,
@@ -437,6 +439,32 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
             "columns": columns,
             "size_info": size_info[0] if size_info else {},
         }
+
+    async def list_tables(self, schema: str = "public") -> list[str]:
+        """
+        List all tables in the database.
+
+        Args:
+            schema: Schema name to list tables from (default: 'public')
+
+        Returns:
+            List of table names
+
+        Raises:
+            RuntimeError: If not connected to database
+        """
+        if not self._pool:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+
+        query = """
+        SELECT table_name
+        FROM information_schema.tables
+        WHERE table_schema = %s
+        AND table_type = 'BASE TABLE'
+        ORDER BY table_name
+        """
+        results = await self.query_with_params(query, [schema])
+        return [row["table_name"] for row in results]
 
     async def __aenter__(self):
         """Async context manager entry."""
