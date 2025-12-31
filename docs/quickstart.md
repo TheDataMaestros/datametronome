@@ -118,8 +118,8 @@ Welcome to DataMetronome! This guide will help you get started based on your rol
 
 2. **Start with Docker Compose:**
    ```bash
-   # Copy environment example
-   cp env.example .env
+   # Create .env from example (or use: cp env.example .env)
+   make setup-env
 
    # Edit .env with your settings
    nano .env
@@ -329,6 +329,10 @@ pip install metronome-pulse-sqlite  # SQLite
 # Or install from source
 git clone https://github.com/datametronome/datametronome.git
 cd datametronome
+
+# Create .env file from env.example (for API/UI setup)
+make setup-env
+
 pip install -e ./datametronome/pulse/core
 pip install -e ./datametronome/pulse/postgres
 ```
@@ -483,6 +487,9 @@ The retail demo automatically generates historical check results when you import
 To set up the full demo with historical data:
 
 ```bash
+# Create .env file from env.example (if not already exists)
+make setup-env
+
 # Generate retail database
 make retail-db
 
@@ -512,6 +519,9 @@ For all users, the UI dashboard provides a beautiful visual interface:
 git clone https://github.com/datametronome/datametronome.git
 cd datametronome
 
+# Create .env file from env.example
+make setup-env
+
 # Install UI dependencies
 cd ui-nuxt
 npm install
@@ -520,7 +530,10 @@ npm install
 ### Launch
 
 ```bash
-# Start the UI in dev mode (defaults to http://localhost:3000)
+# Start the backend API (from repo root)
+make start-podium
+
+# In a new terminal, start the UI in dev mode (defaults to http://localhost:3000)
 npm run dev
 ```
 

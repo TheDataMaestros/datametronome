@@ -52,6 +52,9 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Upgrade pip
 pip install --upgrade pip
 
+# Create .env file from env.example
+make setup-env
+
 # Install all pulse packages in development mode
 pip install -e ./datametronome/pulse/core
 pip install -e ./datametronome/pulse/postgres
@@ -76,6 +79,9 @@ pip install pre-commit
 ```bash
 # Install uv if you haven't
 curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Create .env file from env.example
+make setup-env
 
 # Install packages
 uv pip install -e ./datametronome/pulse/core

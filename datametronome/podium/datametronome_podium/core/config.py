@@ -28,12 +28,15 @@ class Settings(BaseSettings):
     )
     algorithm: str = "HS256"
     access_token_expire_minutes: int = Field(
-        default=30, env="DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES", ge=1,
+        default=30,
+        env="DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES",
+        ge=1,
     )
 
     # Database
     database_url: str = Field(
-        default="sqlite:///./data/datametronome.db", env="DATAMETRONOME_DATABASE_URL",
+        default="sqlite:///./data/datametronome.db",
+        env="DATAMETRONOME_DATABASE_URL",
     )
 
     # CORS
@@ -45,13 +48,18 @@ class Settings(BaseSettings):
     # Scheduler
     scheduler_enabled: bool = Field(default=True, env="DATAMETRONOME_SCHEDULER_ENABLED")
     scheduler_timezone: str = Field(
-        default="UTC", env="DATAMETRONOME_SCHEDULER_TIMEZONE",
+        default="UTC",
+        env="DATAMETRONOME_SCHEDULER_TIMEZONE",
     )
     scheduler_max_instances: int = Field(
-        default=3, env="DATAMETRONOME_SCHEDULER_MAX_INSTANCES", ge=1,
+        default=3,
+        env="DATAMETRONOME_SCHEDULER_MAX_INSTANCES",
+        ge=1,
     )
     scheduler_max_workers: int = Field(
-        default=10, env="DATAMETRONOME_SCHEDULER_MAX_WORKERS", ge=1,
+        default=10,
+        env="DATAMETRONOME_SCHEDULER_MAX_WORKERS",
+        ge=1,
     )
 
     # Job Queue
@@ -61,12 +69,16 @@ class Settings(BaseSettings):
     # Metrics
     metrics_enabled: bool = Field(default=True, env="DATAMETRONOME_METRICS_ENABLED")
     metrics_retention_days: int = Field(
-        default=90, env="DATAMETRONOME_METRICS_RETENTION_DAYS", ge=1,
+        default=90,
+        env="DATAMETRONOME_METRICS_RETENTION_DAYS",
+        ge=1,
     )
 
     # AI Agent / ADK Configuration
     adk_api_key: str = Field(
-        default="", env="DATAMETRONOME_ADK_API_KEY", description="API key for ADK agent (not needed for Ollama)",
+        default="",
+        env="DATAMETRONOME_ADK_API_KEY",
+        description="API key for ADK agent (not needed for Ollama)",
     )
     adk_model: str = Field(
         default="ollama_chat/qwen2.5",
@@ -77,6 +89,11 @@ class Settings(BaseSettings):
         default="https://generativelanguage.googleapis.com/v1beta",
         env="DATAMETRONOME_ADK_API_URL",
         description="ADK API endpoint URL (not used for Ollama)",
+    )
+    ollama_api_base: str = Field(
+        default="http://localhost:11434",
+        env="OLLAMA_API_BASE",
+        description="Ollama API base URL (e.g., 'http://192.168.0.35:11434' for remote instance)",
     )
 
     @field_validator("log_level")
@@ -161,8 +178,8 @@ def validate_production_config() -> tuple[list[str], list[str]]:
 
     # Check CORS origins
     if (
-            "*" in settings.allowed_origins
-            or "http://localhost" in str(settings.allowed_origins).lower()
+        "*" in settings.allowed_origins
+        or "http://localhost" in str(settings.allowed_origins).lower()
     ):
         if not settings.debug:
             warnings.append(

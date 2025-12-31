@@ -31,6 +31,11 @@ First, ensure you have the project installed.
 # Clone and install dependencies
 git clone https://github.com/datametronome/datametronome.git
 cd datametronome
+
+# Create .env file from env.example
+make setup-env
+
+# Install dependencies
 make install
 ```
 

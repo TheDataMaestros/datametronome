@@ -101,6 +101,9 @@ The Retail demo uses a **synthetic dataset generated locally** (SQLite). These f
 From the repo root:
 
 ```bash
+# 0) Create .env file from env.example (if not already exists)
+make setup-env
+
 # 1) Install Python packages (uses `uv` under the hood; see Makefile: install)
 make install
 
@@ -112,7 +115,7 @@ make retail-db
 export DB_PATH="$(pwd)/datametronome/podium/data/retail.db"
 python3 showcase/retail_demo/import_to_podium.py
 
-# 4) Start Podium API (default: http://localhost:8000 via config.env)
+# 4) Start Podium API (default: http://localhost:8000 via .env)
 make start-podium
 ```
 

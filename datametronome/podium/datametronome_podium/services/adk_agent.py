@@ -83,12 +83,11 @@ class ADKAgent:
         self.agent = None
         if ADK_AVAILABLE:
             try:
-                # Create LiteLLM model for Ollama
-                if self.model_name.startswith("ollama_chat/"):
-                    model_obj = LiteLlm(model=self.model_name)
-                else:
-                    # For Gemini, use the model string directly
-                    model_obj = LiteLlm(model=self.model_name)
+                # Configure LiteLLM environment variables (LiteLLM requires env vars, not constructor params)
+                self._configure_litellm_environment()
+
+                # Create LiteLLM model - it will read from environment variables we just set
+                model_obj = LiteLlm(model=self.model_name)
 
                 # Create the root agent with tools
                 # ADK Agent accepts 'instruction' (singular) for system instructions
@@ -112,6 +111,46 @@ class ADKAgent:
             except Exception as e:
                 logger.error(f"Failed to initialize ADK agent: {e}", exc_info=True)
                 self.agent = None
+
+    def _configure_litellm_environment(self) -> None:
+        """Configure LiteLLM by setting required environment variables.
+
+        Note: LiteLLM reads configuration from environment variables (OLLAMA_API_BASE,
+        GEMINI_API_KEY, etc.) rather than accepting them as constructor parameters.
+        This method ensures the necessary environment variables are set from our
+        configuration system before LiteLLM is initialized.
+
+        This is a limitation of the LiteLLM library - we would prefer to pass these
+        values directly, but must use environment variables as a workaround.
+
+        We only set the environment variable if it's not already present, to avoid
+        overwriting explicit user configuration via environment variables.
+        """
+        import os
+
+        if self.model_name.startswith("ollama_chat/"):
+            # Set OLLAMA_API_BASE if not already set (to avoid overwriting explicit user config)
+            if "OLLAMA_API_BASE" not in os.environ:
+                os.environ["OLLAMA_API_BASE"] = settings.ollama_api_base
+                logger.info(
+                    f"🔗 Configured Ollama API base URL: {settings.ollama_api_base}"
+                )
+            else:
+                logger.debug("🔗 Using existing OLLAMA_API_BASE from environment")
+        else:
+            # For Gemini, set GEMINI_API_KEY if we have one configured
+            if self.api_key:
+                # Only set if not already present (preserve explicit env var if set)
+                if "GEMINI_API_KEY" not in os.environ:
+                    os.environ["GEMINI_API_KEY"] = self.api_key
+                    logger.info("🔑 Configured Gemini API key from settings")
+                else:
+                    logger.debug("🔑 Using existing GEMINI_API_KEY from environment")
+            else:
+                logger.warning(
+                    "⚠️  No Gemini API key configured. "
+                    "Set DATAMETRONOME_ADK_API_KEY environment variable."
+                )
 
     def _get_system_instructions(self) -> str:
         """Get system instructions for the agent."""
@@ -552,11 +591,13 @@ Be concise but informative. If a user asks about their data sources, tables, che
 
         import httpx
 
-        # For Ollama, use local endpoint
+        # For Ollama, use configured endpoint
         if self.model_name.startswith("ollama_chat/"):
             # Extract model name (e.g., "qwen2.5" from "ollama_chat/qwen2.5")
             model_name = self.model_name.replace("ollama_chat/", "")
-            base_url = "http://localhost:11434/api/chat"
+            # Get Ollama base URL from settings (which reads from OLLAMA_API_BASE env var)
+            ollama_base = settings.ollama_api_base
+            base_url = f"{ollama_base}/api/chat"
 
             # Build conversation history
             # Start with system instructions so the model knows about DataMetronome
