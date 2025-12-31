@@ -453,3 +453,140 @@ async def _ensure_table_exists(connector, table_name: str):
     except Exception as e:
         logger.warning(f"Could not ensure table {table_name} exists: {e}")
         # Don't raise - this is not critical for data generation
+
+
+@router.get("/{stave_id}/tables")
+async def list_stave_tables(
+    stave_id: str,
+    include_structure: bool = Query(True, description="Include table structure/schema"),
+) -> Dict[str, Any]:
+    """
+    List all tables available in a stave's data source.
+
+    This endpoint connects to the data source specified in the stave configuration
+    and returns a list of all available tables, optionally including their structure.
+
+    Args:
+        stave_id: ID of the stave to query
+        include_structure: Whether to include table structure/schema information
+
+    Returns:
+        Dictionary containing:
+        - tables: List of table objects with name and optional structure
+        - count: Number of tables found
+        - stave_id: The stave ID queried
+        - data_source_type: Type of data source
+
+    Example Response:
+        {
+            "success": true,
+            "stave_id": "stave-123",
+            "stave_name": "Production Database",
+            "data_source_type": "postgres",
+            "count": 3,
+            "tables": [
+                {
+                    "name": "users",
+                    "structure": {
+                        "columns": [
+                            {"column_name": "id", "data_type": "integer", ...},
+                            ...
+                        ]
+                    }
+                },
+                ...
+            ]
+        }
+    """
+    connector = None
+    try:
+        # Get the stave from database
+        db = await get_db()
+        staves = await db.query(
+            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [stave_id]}
+        )
+
+        if not staves:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Stave not found"
+            )
+
+        stave = deserialize_stave(staves[0])
+
+        logger.info(f"🔍 Listing tables for stave {stave_id} ({stave.data_source_type})")
+
+        # Get connector based on stave type
+        tester = ConnectionTester()
+        connector = await tester.get_connector(stave, read_only=True)
+
+        # List tables using the connector's list_tables method
+        tables = []
+        if not hasattr(connector, "list_tables"):
+            raise HTTPException(
+                status_code=status.HTTP_501_NOT_IMPLEMENTED,
+                detail=f"list_tables not available for {stave.data_source_type} connector",
+            )
+
+        # Call list_tables with appropriate parameters based on data source type
+        if stave.data_source_type == "bigquery":
+            # BigQuery requires dataset parameter
+            config = stave.connection_config
+            dataset = config.get("dataset")
+            table_names = await connector.list_tables(dataset)
+        elif stave.data_source_type in ["postgres", "postgresql"]:
+            # Postgres can optionally take schema parameter (defaults to 'public')
+            schema = stave.connection_config.get("schema", "public")
+            table_names = await connector.list_tables(schema)
+        else:
+            # SQLite and others use default list_tables()
+            table_names = await connector.list_tables()
+
+        # Get structure for each table if requested
+        for table_name in table_names:
+            table_info = {"name": table_name}
+
+            if include_structure:
+                try:
+                    if hasattr(connector, "get_table_info"):
+                        structure = await connector.get_table_info(table_name)
+                        table_info["structure"] = structure
+                    else:
+                        logger.warning(
+                            f"get_table_info not available for {stave.data_source_type}"
+                        )
+                        table_info["structure"] = None
+                except Exception as e:
+                    logger.warning(
+                        f"Failed to get structure for table {table_name}: {e}"
+                    )
+                    table_info["structure"] = None
+                    table_info["structure_error"] = str(e)
+
+            tables.append(table_info)
+
+        logger.info(f"📊 Found {len(tables)} tables in stave {stave_id}")
+
+        return {
+            "success": True,
+            "stave_id": stave_id,
+            "stave_name": stave.name,
+            "data_source_type": stave.data_source_type,
+            "count": len(tables),
+            "tables": tables,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"❌ Failed to list tables for stave {stave_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to list tables: {str(e)}",
+        )
+    finally:
+        # Always close the connector
+        if connector:
+            try:
+                await connector.close()
+            except Exception as e:
+                logger.warning(f"Failed to close connector: {e}")

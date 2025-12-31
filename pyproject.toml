@@ -21,6 +21,7 @@ dependencies = [
     "psycopg[binary]>=3.0.0",
     "asyncpg>=0.28.0",
     "redis>=4.5.0",
+    "litellm>=1.80.11",
 ]
 
 [project.optional-dependencies]

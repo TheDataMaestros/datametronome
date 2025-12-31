@@ -6,9 +6,9 @@
 set -euo pipefail
 
 # Source configuration file if it exists
-if [ -f "config.env" ]; then
-    echo "📋 Loading configuration from config.env..."
-    export $(grep -v '^#' config.env | xargs)
+if [ -f ".env" ]; then
+    echo "📋 Loading configuration from .env..."
+    export $(grep -v '^#' .env | xargs)
 fi
 
 # Normalize comma-separated CORS origins into JSON array for Pydantic

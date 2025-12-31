@@ -1,8 +1,17 @@
-.PHONY: help install install-dev install-podium test lint format clean docker-up docker-down docker-build prototype docker-prototype retail-db
+.PHONY: help setup-env install install-dev install-podium test lint format clean docker-up docker-down docker-build prototype docker-prototype retail-db
 
 help: ## Show this help message
 	@echo "DataMetronome - Available commands:"
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+setup-env: ## Create .env file from env.example
+	@if [ -f .env ]; then \
+		echo "⚠️  .env already exists. Skipping..."; \
+	else \
+		cp env.example .env; \
+		echo "✅ Created .env from env.example"; \
+		echo "📝 Please edit .env with your configuration"; \
+	fi
 
 install: ## Install all packages in development mode
 	uv pip install -e ./datametronome/podium
@@ -18,7 +27,8 @@ install-podium: ## Install Podium runtime dependencies only
 	fi
 
 install-dev: ## Install development dependencies
-	uv pip install pytest pytest-asyncio black isort mypy
+	uv pip install pytest pytest-asyncio black isort mypy pre-commit
+	pre-commit install
 
 test: ## Run tests
 	pytest tests/ -v
@@ -79,7 +89,7 @@ start-podium: install-podium ## Start the Podium backend
 	./start_podium.sh
 
 start-ui: ## Start the UI
-	@bash -c 'set -a; [ -f config.env ] && source config.env; set +a; \
+	@bash -c 'set -a; [ -f .env ] && source .env; set +a; \
 	cd ui-nuxt && npm install && \
 	NUXT_PUBLIC_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8000}/api/v1" \
 	NUXT_PUBLIC_PODIUM_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8000}" \

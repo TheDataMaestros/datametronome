@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     app_name: str = "DataMetronome Podium"
     version: str = "0.1.0"
     # Logging
-    log_level: str = Field(default="INFO", env="DATAMETRONOME_LOG_LEVEL")
+    log_level: str = Field(default="INFO")
     debug: bool = Field(default=False, env="DATAMETRONOME_DEBUG")
 
     # Server
@@ -28,12 +28,15 @@ class Settings(BaseSettings):
     )
     algorithm: str = "HS256"
     access_token_expire_minutes: int = Field(
-        default=30, env="DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES", ge=1
+        default=30,
+        env="DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES",
+        ge=1,
     )
 
     # Database
     database_url: str = Field(
-        default="sqlite:///./data/datametronome.db", env="DATAMETRONOME_DATABASE_URL"
+        default="sqlite:///./data/datametronome.db",
+        env="DATAMETRONOME_DATABASE_URL",
     )
 
     # CORS
@@ -45,13 +48,18 @@ class Settings(BaseSettings):
     # Scheduler
     scheduler_enabled: bool = Field(default=True, env="DATAMETRONOME_SCHEDULER_ENABLED")
     scheduler_timezone: str = Field(
-        default="UTC", env="DATAMETRONOME_SCHEDULER_TIMEZONE"
+        default="UTC",
+        env="DATAMETRONOME_SCHEDULER_TIMEZONE",
     )
     scheduler_max_instances: int = Field(
-        default=3, env="DATAMETRONOME_SCHEDULER_MAX_INSTANCES", ge=1
+        default=3,
+        env="DATAMETRONOME_SCHEDULER_MAX_INSTANCES",
+        ge=1,
     )
     scheduler_max_workers: int = Field(
-        default=10, env="DATAMETRONOME_SCHEDULER_MAX_WORKERS", ge=1
+        default=10,
+        env="DATAMETRONOME_SCHEDULER_MAX_WORKERS",
+        ge=1,
     )
 
     # Job Queue
@@ -61,7 +69,31 @@ class Settings(BaseSettings):
     # Metrics
     metrics_enabled: bool = Field(default=True, env="DATAMETRONOME_METRICS_ENABLED")
     metrics_retention_days: int = Field(
-        default=90, env="DATAMETRONOME_METRICS_RETENTION_DAYS", ge=1
+        default=90,
+        env="DATAMETRONOME_METRICS_RETENTION_DAYS",
+        ge=1,
+    )
+
+    # AI Agent / ADK Configuration
+    adk_api_key: str = Field(
+        default="",
+        env="DATAMETRONOME_ADK_API_KEY",
+        description="API key for ADK agent (not needed for Ollama)",
+    )
+    adk_model: str = Field(
+        default="ollama_chat/qwen2.5",
+        env="DATAMETRONOME_ADK_MODEL",
+        description="ADK model identifier (e.g., 'ollama_chat/qwen2.5' for Ollama or 'gemini-2.0-flash-exp' for Gemini)",
+    )
+    adk_api_url: str = Field(
+        default="https://generativelanguage.googleapis.com/v1beta",
+        env="DATAMETRONOME_ADK_API_URL",
+        description="ADK API endpoint URL (not used for Ollama)",
+    )
+    ollama_api_base: str = Field(
+        default="http://localhost:11434",
+        env="OLLAMA_API_BASE",
+        description="Ollama API base URL (e.g., 'http://192.168.0.35:11434' for remote instance)",
     )
 
     @field_validator("log_level")
@@ -129,19 +161,19 @@ def validate_production_config() -> tuple[list[str], list[str]]:
             errors.append(
                 "⚠️  CRITICAL: Using default SECRET_KEY in production! "
                 "Set DATAMETRONOME_SECRET_KEY to a secure random value. "
-                "Generate one with: openssl rand -hex 32"
+                "Generate one with: openssl rand -hex 32",
             )
         else:
             warnings.append(
                 "ℹ️  Using default SECRET_KEY (OK for development, "
-                "but change for production)"
+                "but change for production)",
             )
 
     # Check debug mode in production
     if settings.debug:
         warnings.append(
             "⚠️  Debug mode is enabled. Disable in production by setting "
-            "DATAMETRONOME_DEBUG=false"
+            "DATAMETRONOME_DEBUG=false",
         )
 
     # Check CORS origins
@@ -152,7 +184,7 @@ def validate_production_config() -> tuple[list[str], list[str]]:
         if not settings.debug:
             warnings.append(
                 "⚠️  CORS allows localhost or all origins (*). "
-                "Restrict DATAMETRONOME_ALLOWED_ORIGINS in production"
+                "Restrict DATAMETRONOME_ALLOWED_ORIGINS in production",
             )
 
     # Check database URL
@@ -160,21 +192,21 @@ def validate_production_config() -> tuple[list[str], list[str]]:
         if not settings.debug:
             warnings.append(
                 "ℹ️  Using SQLite database. Consider PostgreSQL for production "
-                "for better performance and scalability"
+                "for better performance and scalability",
             )
 
     # Check log level
     if settings.log_level == "DEBUG" and not settings.debug:
         warnings.append(
             "⚠️  Log level is DEBUG in non-debug mode. "
-            "This may impact performance and expose sensitive information"
+            "This may impact performance and expose sensitive information",
         )
 
     # Check access token expiry
     if settings.access_token_expire_minutes > 1440:  # 24 hours
         warnings.append(
             f"⚠️  Access token expires in {settings.access_token_expire_minutes} minutes (>24h). "
-            "Consider shorter expiration for security"
+            "Consider shorter expiration for security",
         )
 
     return errors, warnings

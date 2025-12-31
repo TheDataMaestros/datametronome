@@ -17,7 +17,7 @@ from datametronome_podium.core.database import execute_query, get_db, insert_dat
 from datametronome_podium.core.exceptions import AuthenticationError
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
+from jose import ExpiredSignatureError, JWTError, jwt
 from passlib.context import CryptContext
 
 router = APIRouter()
@@ -102,8 +102,18 @@ async def get_current_user(
         if username is None:
             raise AuthenticationError("Invalid token")
         token_data = TokenData(username=username)
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired. Please log in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     except JWTError:
-        raise AuthenticationError("Invalid token")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token. Please log in again.",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
 
     # Query user from database using DataPulse
     db = await get_db()
