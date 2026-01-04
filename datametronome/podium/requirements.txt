@@ -36,3 +36,4 @@ httpx>=0.25.0
 
 # Google ADK for agent functionality (required for Ollama/Gemini agent)
 google-adk>=0.1.0
+litellm>=1.0.0  # Required by google-adk.models.lite_llm

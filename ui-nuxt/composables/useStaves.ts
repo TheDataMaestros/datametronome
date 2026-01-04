@@ -16,9 +16,24 @@ export const useStaves = () => {
     error.value = null
 
     try {
-      staves.value = await stavesService.getAll()
-    } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to fetch staves'
+      const result = await stavesService.getAll()
+      staves.value = result || []
+      // Clear error if fetch succeeds
+      if (error.value) {
+        error.value = null
+      }
+    } catch (err: any) {
+      // Extract detailed error message
+      let errorMessage = 'Failed to fetch staves'
+      if (err instanceof Error) {
+        errorMessage = err.message
+      } else if (err && typeof err === 'object' && 'message' in err) {
+        errorMessage = String(err.message)
+      } else if (typeof err === 'string') {
+        errorMessage = err
+      }
+      error.value = errorMessage
+      staves.value = [] // Clear staves on error
       console.error('Error fetching staves:', err)
     } finally {
       isLoading.value = false

@@ -18,6 +18,7 @@ COPY . .
 # Install dependencies using uv (monorepo editable installs)
 RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/core
 RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/sqlite
+RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/bigquery
 RUN uv pip install --system --no-cache-dir -e ./datametronome/brain/base
 RUN uv pip install --system --no-cache-dir -e ./datametronome/podium
 

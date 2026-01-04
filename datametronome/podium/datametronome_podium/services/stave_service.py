@@ -451,6 +451,7 @@ def deserialize_stave(data: dict[str, Any]) -> Stave:
     Deserialize a Stave from database storage.
 
     Converts connection_config JSON string back to dict.
+    Fixes malformed datetime strings (e.g., with both +00:00 and Z).
 
     Args:
         data: Database row dict
@@ -469,8 +470,23 @@ def deserialize_stave(data: dict[str, Any]) -> Stave:
     if isinstance(data.get("connection_config"), str):
         data["connection_config"] = json.loads(data["connection_config"])
 
-    # Keep datetime fields as strings for API compatibility
-    # (The API schemas expect strings, not datetime objects)
+    # Fix malformed datetime strings (remove trailing Z if timezone offset is present)
+    for field in ["created_at", "updated_at"]:
+        if isinstance(data.get(field), str):
+            dt_str = data[field]
+            # Fix format like "2026-01-02T22:13:04.019649+00:00Z" -> "2026-01-02T22:13:04.019649+00:00"
+            if dt_str.endswith("Z") and ("+" in dt_str or dt_str.count("-") > 2):
+                # Has timezone offset, remove trailing Z
+                data[field] = dt_str.rstrip("Z")
+            # Parse to datetime then back to string to normalize format
+            try:
+                from datetime import datetime
+
+                dt = datetime.fromisoformat(data[field].replace("Z", "+00:00"))
+                data[field] = dt.isoformat()
+            except (ValueError, AttributeError):
+                # If parsing fails, keep original string
+                pass
 
     return Stave(**data)
 

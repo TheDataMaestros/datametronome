@@ -7,6 +7,10 @@ install:
 test:
 	pytest tests/ -v
 
+test-integration:
+	@echo "Running integration tests (requires BIGQUERY_TEST_PROJECT_ID and credentials)"
+	pytest tests/ -v -m integration
+
 lint:
 	black --check metronome_pulse_bigquery/
 	isort --check-only metronome_pulse_bigquery/

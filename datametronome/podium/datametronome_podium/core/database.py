@@ -56,7 +56,16 @@ async def init_db() -> None:
             .replace("sqlite:///", "")
             .replace("./", "")
         )
-        full_path = os.path.abspath(db_path)
+        # If path is relative, resolve it relative to the podium directory, not CWD
+        if not os.path.isabs(db_path):
+            # Get the directory where this file is located (podium/core/)
+            current_file_dir = os.path.dirname(os.path.abspath(__file__))
+            # Go up to podium directory
+            podium_dir = os.path.dirname(os.path.dirname(current_file_dir))
+            # Resolve path relative to podium directory
+            full_path = os.path.abspath(os.path.join(podium_dir, db_path))
+        else:
+            full_path = os.path.abspath(db_path)
         print(f"DEBUG: init_db using path: {full_path}")
         print(f"DEBUG: File exists? {os.path.exists(full_path)}")
         # region agent log
@@ -74,7 +83,8 @@ async def init_db() -> None:
             },
         )
         # endregion
-        sqlite_connector = SQLitePulse(db_path)
+        # Use full_path for SQLitePulse to ensure consistent path resolution
+        sqlite_connector = SQLitePulse(full_path)
 
         # Connect to the database
         await sqlite_connector.connect()
