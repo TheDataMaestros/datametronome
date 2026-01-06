@@ -209,8 +209,7 @@ class BigQueryReadonlyPulse(Pulse, Readable):
             # Return schema information
             if not table.schema:
                 logger.warning(
-                    f"Table '{table_name}' exists but has no schema. "
-                    f"This is unusual and might indicate a problem with the query or permissions."
+                    f"Table '{table_name}' exists but has no schema. This is unusual and might indicate a problem with the query or permissions."
                 )
                 return []
 
