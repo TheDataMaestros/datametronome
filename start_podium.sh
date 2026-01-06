@@ -30,11 +30,37 @@ fi
 
 # Set default environment variables
 export DATAMETRONOME_SECRET_KEY="${DATAMETRONOME_SECRET_KEY:-demo-secret-key-for-development-only}"
-export PODIUM_PORT="${PODIUM_PORT:-8000}"
+
+# Track if PODIUM_PORT was explicitly set (before we assign defaults)
+# We check this by seeing if it exists in the environment before we touch it
+_PODIUM_PORT_WAS_SET="${PODIUM_PORT+yes}"
+
+# Set PODIUM_PORT: use explicit value, or DATAMETRONOME_PORT if set, or default
+if [ -n "${PODIUM_PORT:-}" ]; then
+    # PODIUM_PORT was explicitly set, use it
+    export PODIUM_PORT="${PODIUM_PORT}"
+elif [ -n "${DATAMETRONOME_PORT:-}" ]; then
+    # PODIUM_PORT not set, but DATAMETRONOME_PORT is - use it for PODIUM_PORT
+    export PODIUM_PORT="${DATAMETRONOME_PORT}"
+else
+    # Neither set, use default
+    export PODIUM_PORT="8000"
+fi
+
 export PODIUM_HOST="${PODIUM_HOST:-0.0.0.0}"
 export PODIUM_API_BASE="http://localhost:${PODIUM_PORT}"
-# Ensure DATAMETRONOME_PORT matches PODIUM_PORT (PODIUM_PORT takes precedence)
-export DATAMETRONOME_PORT="${PODIUM_PORT}"
+
+# Set DATAMETRONOME_PORT: PODIUM_PORT takes precedence only if it was explicitly set
+# Otherwise, preserve DATAMETRONOME_PORT if it was explicitly set
+if [ -n "${_PODIUM_PORT_WAS_SET}" ]; then
+    # PODIUM_PORT was explicitly set, it takes precedence
+    export DATAMETRONOME_PORT="${PODIUM_PORT}"
+elif [ -z "${DATAMETRONOME_PORT:-}" ]; then
+    # Neither was explicitly set, use PODIUM_PORT value (which may have come from DATAMETRONOME_PORT)
+    export DATAMETRONOME_PORT="${PODIUM_PORT}"
+fi
+# If DATAMETRONOME_PORT was explicitly set and PODIUM_PORT was not, DATAMETRONOME_PORT is preserved
+
 export DATAMETRONOME_HOST="${DATAMETRONOME_HOST:-${PODIUM_HOST}}"
 export ENVIRONMENT="${ENVIRONMENT:-development}"
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
