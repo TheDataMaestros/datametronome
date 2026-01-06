@@ -5,11 +5,14 @@ This connector provides read-only access to BigQuery for data quality checks.
 """
 
 import asyncio
+import logging
 from typing import Any, Dict, List, Optional
 
 from google.cloud import bigquery  # type: ignore
 from google.oauth2 import service_account  # type: ignore
 from metronome_pulse_core.interfaces import Pulse, Readable
+
+logger = logging.getLogger(__name__)
 
 
 class BigQueryReadonlyPulse(Pulse, Readable):
@@ -205,6 +208,10 @@ class BigQueryReadonlyPulse(Pulse, Readable):
 
             # Return schema information
             if not table.schema:
+                logger.warning(
+                    f"Table '{table_name}' exists but has no schema. "
+                    f"This is unusual and might indicate a problem with the query or permissions."
+                )
                 return []
 
             return [
@@ -240,17 +247,13 @@ class BigQueryReadonlyPulse(Pulse, Readable):
             loop = asyncio.get_event_loop()
             client = self._client
             assert client is not None
-            tables = await loop.run_in_executor(
-                None, lambda: list(client.list_tables(dataset_id))
-            )
+            tables = await loop.run_in_executor(None, lambda: list(client.list_tables(dataset_id)))
             return [table.table_id for table in tables]
 
         except Exception as e:
             raise Exception(f"Failed to list tables: {e}")
 
-    def _get_job_config(
-        self, params: Optional[List] = None
-    ) -> Optional[bigquery.QueryJobConfig]:
+    def _get_job_config(self, params: Optional[List] = None) -> Optional[bigquery.QueryJobConfig]:
         """Get job config for parameterized queries.
 
         Args:
@@ -266,30 +269,18 @@ class BigQueryReadonlyPulse(Pulse, Readable):
         query_parameters = []
         for param in params:
             if isinstance(param, bool):
-                query_parameters.append(
-                    bigquery.ScalarQueryParameter(None, "BOOL", param)
-                )
+                query_parameters.append(bigquery.ScalarQueryParameter(None, "BOOL", param))
             elif isinstance(param, int):
-                query_parameters.append(
-                    bigquery.ScalarQueryParameter(None, "INT64", param)
-                )
+                query_parameters.append(bigquery.ScalarQueryParameter(None, "INT64", param))
             elif isinstance(param, float):
-                query_parameters.append(
-                    bigquery.ScalarQueryParameter(None, "FLOAT64", param)
-                )
+                query_parameters.append(bigquery.ScalarQueryParameter(None, "FLOAT64", param))
             elif isinstance(param, str):
-                query_parameters.append(
-                    bigquery.ScalarQueryParameter(None, "STRING", param)
-                )
+                query_parameters.append(bigquery.ScalarQueryParameter(None, "STRING", param))
             elif param is None:
-                query_parameters.append(
-                    bigquery.ScalarQueryParameter(None, "STRING", None)
-                )
+                query_parameters.append(bigquery.ScalarQueryParameter(None, "STRING", None))
             else:
                 # Fallback to string for other types
-                query_parameters.append(
-                    bigquery.ScalarQueryParameter(None, "STRING", str(param))
-                )
+                query_parameters.append(bigquery.ScalarQueryParameter(None, "STRING", str(param)))
 
         return bigquery.QueryJobConfig(query_parameters=query_parameters)
 
