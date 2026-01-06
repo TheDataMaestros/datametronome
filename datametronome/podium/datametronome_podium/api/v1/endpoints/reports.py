@@ -10,8 +10,11 @@ router = APIRouter()
 
 
 @router.get("/summary")
-async def get_summary_report() -> Dict[str, Any]:
+async def get_summary_report(days: int = 7) -> Dict[str, Any]:
     """Get summary report using DataPulse connector.
+
+    Args:
+        days: Number of days to look back for recent activity. Defaults to 7.
 
     Returns:
         Summary report data.
@@ -41,16 +44,18 @@ async def get_summary_report() -> Dict[str, Any]:
         )
         total_checks = checks_count[0]["count"] if checks_count else 0
 
-        # Get recent activity
+        # Get recent activity within the specified time period
+        threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
         recent_checks = await db.query(
             {
-                "sql": "SELECT * FROM checks ORDER BY timestamp DESC LIMIT 5",
-                "params": [],
+                "sql": "SELECT * FROM checks WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 5",
+                "params": [threshold_date],
             }
         )
 
         return {
             "generated_at": datetime.now().isoformat(),
+            "period_days": days,
             "summary": {
                 "total_staves": total_staves,
                 "total_clefs": total_clefs,

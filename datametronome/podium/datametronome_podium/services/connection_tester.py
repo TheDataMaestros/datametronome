@@ -52,6 +52,8 @@ class ConnectionTester:
                 result = await self._test_redis_connection(stave)
             elif stave.data_source_type == "mongodb":
                 result = await self._test_mongodb_connection(stave)
+            elif stave.data_source_type == "bigquery":
+                result = await self._test_bigquery_connection(stave)
             elif stave.data_source_type in ["api", "http"]:
                 result = await self._test_api_connection(stave)
             else:
@@ -419,6 +421,129 @@ class ConnectionTester:
             return {
                 "success": False,
                 "message": f"MongoDB connection failed: {str(e)}",
+                "metadata": {},
+            }
+
+    async def _test_bigquery_connection(self, stave: Stave) -> Dict[str, Any]:
+        """Test BigQuery connection using DataPulse."""
+        try:
+            # Import DataPulse BigQuery read-only connector
+            from metronome_pulse_bigquery import BigQueryReadonlyPulse
+
+            config = stave.connection_config
+
+            # Create DataPulse read-only connector
+            connector = BigQueryReadonlyPulse(
+                project_id=config["project_id"],
+                credentials_path=config.get("credentials_path"),
+                credentials_json=config.get("credentials_json"),
+                dataset=config.get("dataset"),
+                location=config.get("location", "US"),
+            )
+
+            # Connect to BigQuery
+            await connector.connect()
+
+            # Test connection by checking if it's connected
+            is_connected = await connector.is_connected()
+            if not is_connected:
+                await connector.close()
+                return {
+                    "success": False,
+                    "message": "BigQuery connection established but health check failed",
+                    "metadata": {},
+                }
+
+            # Get project info
+            project_id = config["project_id"]
+            dataset = config.get("dataset", "default")
+
+            # Try to list datasets or tables if dataset is specified
+            metadata = {
+                "project_id": project_id,
+                "location": config.get("location", "US"),
+            }
+
+            if dataset:
+                metadata["dataset"] = dataset
+                try:
+                    # Handle public datasets (e.g., bigquery-public-data.samples)
+                    # If dataset contains a dot, it's likely project.dataset format
+                    dataset_for_listing = dataset
+
+                    # If dataset is just "bigquery-public-data", it's a project, not a dataset
+                    # Try a common public dataset instead
+                    if dataset == "bigquery-public-data":
+                        dataset_for_listing = "bigquery-public-data.samples"
+                        metadata["note"] = (
+                            f"Note: 'bigquery-public-data' is a project, not a dataset. "
+                            f"Trying common public dataset 'bigquery-public-data.samples'. "
+                            f"For other public datasets, use format 'bigquery-public-data.DATASET_NAME'"
+                        )
+
+                    # Try to list tables in the dataset
+                    tables = await connector.list_tables(dataset_for_listing)
+                    metadata["table_count"] = len(tables) if tables else 0
+
+                    # If we used a different dataset for listing, add info
+                    if dataset_for_listing != dataset and "table_count" in metadata:
+                        if metadata.get("note"):
+                            metadata[
+                                "note"
+                            ] += f" Found {metadata['table_count']} tables."
+                        else:
+                            metadata[
+                                "note"
+                            ] = f"Found {metadata['table_count']} tables."
+
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.warning(f"Could not list tables for dataset {dataset}: {e}")
+
+                    # Provide helpful guidance for common errors
+                    if "404" in error_msg or "Not found" in error_msg:
+                        if dataset == "bigquery-public-data":
+                            metadata["note"] = (
+                                f"'bigquery-public-data' is a project, not a dataset. "
+                                f"Use format 'bigquery-public-data.DATASET_NAME' (e.g., 'bigquery-public-data.samples'). "
+                                f"Connection successful, but cannot list tables without a specific dataset."
+                            )
+                        elif "." not in dataset:
+                            metadata["note"] = (
+                                f"Dataset '{dataset}' not found in project '{project_id}'. "
+                                f"If this is a public dataset, use format 'PROJECT.DATASET' (e.g., 'bigquery-public-data.samples'). "
+                                f"Connection successful, but cannot list tables."
+                            )
+                        else:
+                            metadata["note"] = f"Could not list tables: {error_msg}"
+                    else:
+                        metadata["note"] = f"Could not list tables: {error_msg}"
+
+            # Close connection
+            await connector.close()
+
+            return {
+                "success": True,
+                "message": "BigQuery connection successful",
+                "metadata": metadata,
+            }
+
+        except ImportError:
+            return {
+                "success": False,
+                "message": "metronome_pulse_bigquery not installed. Install with: pip install metronome-pulse-bigquery",
+                "metadata": {},
+            }
+        except KeyError as e:
+            return {
+                "success": False,
+                "message": f"Missing required BigQuery configuration: {str(e)}",
+                "metadata": {},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"BigQuery connection failed: {str(e)}",
                 "metadata": {},
             }
 

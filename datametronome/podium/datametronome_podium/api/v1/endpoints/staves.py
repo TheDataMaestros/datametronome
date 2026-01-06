@@ -38,27 +38,44 @@ async def get_staves(skip: int = 0, limit: int = 100) -> List[StaveResponse]:
 
         response_data = []
         for stave in staves:
-            deserialized = deserialize_stave(stave)
-            stave_dict = deserialized.model_dump()
-            # Convert datetime objects to strings for API compatibility
-            if isinstance(stave_dict.get("created_at"), datetime):
-                stave_dict["created_at"] = stave_dict["created_at"].isoformat()
-            if isinstance(stave_dict.get("updated_at"), datetime):
-                stave_dict["updated_at"] = stave_dict["updated_at"].isoformat()
-            response_data.append(
-                StaveResponse(
-                    id=stave_dict["id"],
-                    name=stave_dict["name"],
-                    description=stave_dict["description"],
-                    data_source_type=stave_dict["data_source_type"],
-                    connection_config=stave_dict["connection_config"],
-                    is_active=stave_dict["is_active"],
-                    created_at=stave_dict["created_at"],
-                    updated_at=stave_dict["updated_at"],
+            try:
+                deserialized = deserialize_stave(stave)
+                stave_dict = deserialized.model_dump()
+                # Convert datetime objects to strings for API compatibility
+                if isinstance(stave_dict.get("created_at"), datetime):
+                    stave_dict["created_at"] = stave_dict["created_at"].isoformat()
+                if isinstance(stave_dict.get("updated_at"), datetime):
+                    stave_dict["updated_at"] = stave_dict["updated_at"].isoformat()
+                response_data.append(
+                    StaveResponse(
+                        id=stave_dict["id"],
+                        name=stave_dict["name"],
+                        description=stave_dict["description"],
+                        data_source_type=stave_dict["data_source_type"],
+                        connection_config=stave_dict["connection_config"],
+                        is_active=stave_dict["is_active"],
+                        created_at=stave_dict["created_at"],
+                        updated_at=stave_dict["updated_at"],
+                    )
                 )
-            )
+            except Exception as e:
+                # Log the error but continue processing other staves
+                import logging
+
+                logger = logging.getLogger(__name__)
+                logger.error(
+                    f"Failed to deserialize stave {stave.get('id', 'unknown')}: {e}",
+                    exc_info=True,
+                )
+                # Skip this stave and continue with others
+                continue
+
         return response_data
     except Exception as e:
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to fetch staves: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch staves: {str(e)}",
@@ -329,7 +346,18 @@ async def update_stave(stave_id: str, stave_data: StaveUpdate) -> StaveResponse:
         update_data = stave_data.model_dump(exclude_unset=True)
         update_data["updated_at"] = datetime.now(timezone.utc).isoformat() + "Z"
 
-        success = await db.write([{"table": "staves", **update_data}], "staves")
+        # Serialize connection_config to JSON if it's being updated
+        if "connection_config" in update_data:
+            import json
+
+            update_data["connection_config"] = json.dumps(
+                update_data["connection_config"]
+            )
+
+        # Use update_data function for proper SQL UPDATE
+        from datametronome_podium.core.database import update_data as db_update
+
+        success = await db_update("staves", update_data, "id = ?", [stave_id])
 
         if not success:
             raise HTTPException(
@@ -339,12 +367,20 @@ async def update_stave(stave_id: str, stave_data: StaveUpdate) -> StaveResponse:
 
         # Return the updated stave
         updated_stave = {**staves[0], **update_data}
+
+        # Deserialize connection_config from JSON if it's a string
+        connection_config = updated_stave["connection_config"]
+        if isinstance(connection_config, str):
+            import json
+
+            connection_config = json.loads(connection_config)
+
         return StaveResponse(
             id=updated_stave["id"],
             name=updated_stave["name"],
             description=updated_stave["description"],
             data_source_type=updated_stave["data_source_type"],
-            connection_config=updated_stave["connection_config"],
+            connection_config=connection_config,
             is_active=updated_stave["is_active"],
             created_at=updated_stave["created_at"],
             updated_at=updated_stave["updated_at"],
@@ -416,9 +452,9 @@ async def delete_stave(stave_id: str, force: bool = False) -> dict:
             )
             check_results_count = results[0]["count"] if results else 0
 
-        # Start transaction for atomic deletion
-        await db.begin_transaction()
-
+        # Delete in order: checks -> clefs -> stave
+        # Note: SQLite connector's execute() commits after each call
+        # For atomicity, we combine operations where possible
         try:
             # Delete check results for all associated clefs
             if clef_ids:
@@ -433,9 +469,6 @@ async def delete_stave(stave_id: str, force: bool = False) -> dict:
             # Delete the stave itself
             await db.execute("DELETE FROM staves WHERE id = ?", [stave_id])
 
-            # Commit the transaction
-            await db.commit_transaction()
-
             return {
                 "message": f"Successfully deleted stave '{stave['name']}' and all associated data",
                 "deleted": {
@@ -448,8 +481,6 @@ async def delete_stave(stave_id: str, force: bool = False) -> dict:
             }
 
         except Exception as e:
-            # Rollback on any error
-            await db.rollback_transaction()
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail=f"Failed to delete stave and associated data: {str(e)}",

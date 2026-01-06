@@ -134,6 +134,7 @@ class Settings(BaseSettings):
         env_file = ".env"
         case_sensitive = False
         env_prefix = "DATAMETRONOME_"
+        extra = "ignore"
 
 
 # Global settings instance

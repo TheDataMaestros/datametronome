@@ -14,16 +14,27 @@ setup-env: ## Create .env file from env.example
 	fi
 
 install: ## Install all packages in development mode
-	uv pip install -e ./datametronome/podium
-	uv pip install -e ./datametronome/pulse/core
-	uv pip install -e ./datametronome/pulse/sqlite
-	uv pip install -e ./datametronome/brain/base
+	@if [ -d ".venv" ]; then \
+		echo "🐍 Installing in root .venv..."; \
+		.venv/bin/pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/pulse/bigquery -e ./datametronome/brain/base; \
+		.venv/bin/pip install -e ./datametronome/podium; \
+	else \
+		uv pip install -e ./datametronome/pulse/core; \
+		uv pip install -e ./datametronome/pulse/sqlite; \
+		uv pip install -e ./datametronome/pulse/bigquery; \
+		uv pip install -e ./datametronome/brain/base; \
+		python3 -m pip install -e ./datametronome/podium; \
+	fi
 
 install-podium: ## Install Podium runtime dependencies only
-	@if command -v uv >/dev/null 2>&1; then \
-		uv pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/brain/base -e ./datametronome/podium; \
+	@if [ -d ".venv" ]; then \
+		echo "🐍 Installing in root .venv..."; \
+		.venv/bin/pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/pulse/bigquery -e ./datametronome/brain/base -e ./datametronome/podium; \
+	elif command -v uv >/dev/null 2>&1; then \
+		uv pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/pulse/bigquery -e ./datametronome/brain/base; \
+		python3 -m pip install -e ./datametronome/podium; \
 	else \
-		python3 -m pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/brain/base -e ./datametronome/podium; \
+		python3 -m pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/pulse/bigquery -e ./datametronome/brain/base -e ./datametronome/podium; \
 	fi
 
 install-dev: ## Install development dependencies

@@ -114,8 +114,10 @@ async def send_chat_message(
         # Generate or use existing conversation ID
         conversation_id = request.conversationId or f"conv-{uuid.uuid4().hex[:12]}"
 
-        # Check if ADK API key is configured
-        if not settings.adk_api_key:
+        # Check if ADK API key is configured (only required for Gemini, not Ollama)
+        model_name = settings.adk_model.lower()
+        is_ollama = model_name.startswith("ollama_chat/")
+        if not is_ollama and not settings.adk_api_key:
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="ADK API key not configured. Please set DATAMETRONOME_ADK_API_KEY environment variable.",
@@ -132,27 +134,49 @@ async def send_chat_message(
         history_messages = []
         if conversation_id:
             try:
+                logger.info(
+                    f"📚 Loading conversation history for conversation_id={conversation_id}, user_id={user_id}"
+                )
                 history = await db.query(
                     {
                         "sql": """
-                            SELECT role, content, created_at
+                            SELECT role, content, tool_calls, created_at
                             FROM chat_messages
                             WHERE conversation_id = ? AND user_id = ?
                             ORDER BY created_at ASC
-                            LIMIT 10
+                            LIMIT 20
                         """,
                         "params": [conversation_id, user_id],
                     }
                 )
-                history_messages = [
-                    {
+                logger.info(
+                    f"📚 Found {len(history)} messages in database for conversation {conversation_id}"
+                )
+                history_messages = []
+                for msg in history:
+                    msg_dict = {
                         "role": msg["role"],
                         "content": msg["content"],
                     }
-                    for msg in history
-                ]
+                    # Include tool_calls if available to provide full context
+                    if msg.get("tool_calls"):
+                        try:
+                            tool_calls = json.loads(msg["tool_calls"])
+                            if tool_calls:
+                                msg_dict["tool_calls"] = tool_calls
+                        except:
+                            pass
+                    history_messages.append(msg_dict)
+                    logger.debug(
+                        f"📚 Added message to history: role={msg_dict['role']}, content_preview={msg_dict['content'][:50]}..."
+                    )
+                logger.info(
+                    f"✅ Loaded {len(history_messages)} messages into conversation history"
+                )
             except Exception as e:
-                logger.warning(f"Could not load conversation history: {e}")
+                logger.error(
+                    f"❌ Could not load conversation history: {e}", exc_info=True
+                )
 
         # Initialize and use ADK agent
         agent = ADKAgent(
@@ -201,7 +225,7 @@ async def send_chat_message(
         )
 
         message_id = f"msg-{uuid.uuid4().hex[:12]}"
-        now = datetime.now(timezone.utc).isoformat() + "Z"
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
         try:
             await db.write(
@@ -227,7 +251,7 @@ async def send_chat_message(
         assistant_message_id = f"msg-{uuid.uuid4().hex[:12]}"
         tool_calls_json = json.dumps(tool_calls) if tool_calls else None
         # Use current time for assistant message (after processing)
-        assistant_now = datetime.now(timezone.utc).isoformat() + "Z"
+        assistant_now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
         try:
             await db.write(
@@ -520,26 +544,46 @@ async def list_conversations(
                 try:
                     # Handle datetime objects
                     if isinstance(updated_at_raw, datetime):
-                        updated_at = updated_at_raw.isoformat() + "Z"
+                        # Convert to UTC if timezone-aware, otherwise assume UTC
+                        if updated_at_raw.tzinfo is not None:
+                            dt_utc = updated_at_raw.astimezone(timezone.utc)
+                        else:
+                            dt_utc = updated_at_raw.replace(tzinfo=timezone.utc)
+                        # Format as ISO with Z suffix (no +00:00)
+                        updated_at = dt_utc.isoformat().replace("+00:00", "Z")
                     # Handle string timestamps from SQLite
                     elif isinstance(updated_at_raw, str):
                         # Try to parse and reformat to ensure ISO format
                         try:
-                            # SQLite might return timestamps in various formats
-                            if updated_at_raw.endswith("Z"):
-                                # Already in ISO format with Z
-                                updated_at = updated_at_raw
-                            elif (
-                                "+" in updated_at_raw or updated_at_raw.count("-") >= 3
+                            # Clean up the timestamp string first
+                            updated_at_clean = updated_at_raw.strip()
+
+                            # Check if it has both +00:00 and Z (invalid format)
+                            if (
+                                "+00:00Z" in updated_at_clean
+                                or updated_at_clean.endswith("+00:00Z")
                             ):
+                                # Remove the Z, keep +00:00, then we'll convert to Z format
+                                updated_at_clean = updated_at_clean.replace(
+                                    "+00:00Z", "+00:00"
+                                ).replace("Z", "")
+
+                            # SQLite might return timestamps in various formats
+                            if (
+                                updated_at_clean.endswith("Z")
+                                and "+" not in updated_at_clean
+                            ):
+                                # Already in ISO format with Z (and no +00:00)
+                                updated_at = updated_at_clean
+                            elif "+" in updated_at_clean:
                                 # Has timezone info, parse and reformat
                                 dt = datetime.fromisoformat(
-                                    updated_at_raw.replace("Z", "+00:00")
+                                    updated_at_clean.replace("Z", "+00:00")
                                 )
                                 updated_at = dt.isoformat().replace("+00:00", "Z")
                             else:
                                 # No timezone, assume UTC and parse
-                                dt = datetime.fromisoformat(updated_at_raw + "+00:00")
+                                dt = datetime.fromisoformat(updated_at_clean + "+00:00")
                                 updated_at = dt.isoformat().replace("+00:00", "Z")
                         except (ValueError, AttributeError) as e:
                             logger.warning(
@@ -564,14 +608,107 @@ async def list_conversations(
                     )
                     updated_at = None
 
-            # Only use current time if we absolutely cannot parse the timestamp
-            # This should rarely happen if the database has proper timestamps
+            # If no valid updated_at, try to get the first message's timestamp
+            if not updated_at:
+                conversation_id = conv.get("id") or conv.get("conversation_id", "")
+                logger.warning(
+                    f"Conversation {conversation_id} has no valid updated_at - fetching first message timestamp"
+                )
+                try:
+                    # Query the first message's timestamp for this conversation
+                    first_message = await db.query(
+                        {
+                            "sql": """
+                                SELECT created_at
+                                FROM chat_messages
+                                WHERE conversation_id = ? AND user_id = ?
+                                ORDER BY created_at ASC
+                                LIMIT 1
+                            """,
+                            "params": [conversation_id, user_id],
+                        }
+                    )
+                    if first_message and len(first_message) > 0:
+                        first_msg_created_at = first_message[0].get("created_at")
+                        if first_msg_created_at:
+                            try:
+                                # Parse the first message timestamp
+                                if isinstance(first_msg_created_at, datetime):
+                                    if first_msg_created_at.tzinfo is not None:
+                                        dt_utc = first_msg_created_at.astimezone(
+                                            timezone.utc
+                                        )
+                                    else:
+                                        dt_utc = first_msg_created_at.replace(
+                                            tzinfo=timezone.utc
+                                        )
+                                    updated_at = dt_utc.isoformat().replace(
+                                        "+00:00", "Z"
+                                    )
+                                elif isinstance(first_msg_created_at, str):
+                                    # Parse string timestamp
+                                    first_msg_clean = first_msg_created_at.strip()
+
+                                    # Check if it has both +00:00 and Z (invalid format)
+                                    if (
+                                        "+00:00Z" in first_msg_clean
+                                        or first_msg_clean.endswith("+00:00Z")
+                                    ):
+                                        # Remove the Z, keep +00:00, then we'll convert to Z format
+                                        first_msg_clean = first_msg_clean.replace(
+                                            "+00:00Z", "+00:00"
+                                        ).replace("Z", "")
+
+                                    if (
+                                        first_msg_clean.endswith("Z")
+                                        and "+" not in first_msg_clean
+                                    ):
+                                        # Already in ISO format with Z (and no +00:00)
+                                        updated_at = first_msg_clean
+                                    elif "+" in first_msg_clean:
+                                        dt = datetime.fromisoformat(
+                                            first_msg_clean.replace("Z", "+00:00")
+                                        )
+                                        updated_at = dt.isoformat().replace(
+                                            "+00:00", "Z"
+                                        )
+                                    else:
+                                        dt = datetime.fromisoformat(
+                                            first_msg_clean + "+00:00"
+                                        )
+                                        updated_at = dt.isoformat().replace(
+                                            "+00:00", "Z"
+                                        )
+                                else:
+                                    # Try to convert to string and parse
+                                    dt = datetime.fromisoformat(
+                                        str(first_msg_created_at).replace("Z", "+00:00")
+                                    )
+                                    updated_at = dt.isoformat().replace("+00:00", "Z")
+                                logger.info(
+                                    f"✅ Using first message timestamp for conversation {conversation_id}: {updated_at}"
+                                )
+                            except Exception as e:
+                                logger.warning(
+                                    f"Failed to parse first message timestamp for conversation {conversation_id}: {e}"
+                                )
+                                updated_at = None
+                except Exception as e:
+                    logger.error(
+                        f"Error fetching first message timestamp for conversation {conversation_id}: {e}",
+                        exc_info=True,
+                    )
+                    updated_at = None
+
+            # Final fallback to epoch if we still don't have a timestamp
             if not updated_at:
                 logger.warning(
-                    f"Conversation {conv.get('id')} has no valid updated_at - using epoch timestamp"
+                    f"Conversation {conv.get('id')} has no valid timestamp - using epoch as last resort"
                 )
                 updated_at = (
-                    datetime.fromtimestamp(0, tz=timezone.utc).isoformat() + "Z"
+                    datetime.fromtimestamp(0, tz=timezone.utc)
+                    .isoformat()
+                    .replace("+00:00", "Z")
                 )
 
             result.append(

@@ -23,11 +23,11 @@ export interface UpdateStaveRequest extends Partial<CreateStaveRequest> {
 }
 
 class StavesService {
-  private readonly endpoint = '/staves/'
+  private readonly endpoint = '/staves'
 
   async getAll(): Promise<Stave[]> {
-    const response = await apiService.get<Stave[]>(this.endpoint)
-    return response.data
+    const response = await apiService.get<Stave[]>(`${this.endpoint}/`)
+    return response.data || []
   }
 
   async getById(id: string): Promise<Stave> {
@@ -36,7 +36,7 @@ class StavesService {
   }
 
   async create(stave: CreateStaveRequest): Promise<Stave> {
-    const response = await apiService.post<Stave>(this.endpoint, stave)
+    const response = await apiService.post<Stave>(`${this.endpoint}/`, stave)
     return response.data
   }
 
@@ -51,7 +51,7 @@ class StavesService {
 
   async testConnection(id: string): Promise<{ success: boolean; message: string }> {
     const response = await apiService.post<{ success: boolean; message: string }>(
-      `${this.endpoint}/${id}/test-connection`,
+      `/stave-actions/${id}/test-connection`,
     )
     return response.data
   }

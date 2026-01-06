@@ -33,7 +33,8 @@ export DATAMETRONOME_SECRET_KEY="${DATAMETRONOME_SECRET_KEY:-demo-secret-key-for
 export PODIUM_PORT="${PODIUM_PORT:-8000}"
 export PODIUM_HOST="${PODIUM_HOST:-0.0.0.0}"
 export PODIUM_API_BASE="http://localhost:${PODIUM_PORT}"
-export DATAMETRONOME_PORT="${DATAMETRONOME_PORT:-${PODIUM_PORT}}"
+# Ensure DATAMETRONOME_PORT matches PODIUM_PORT (PODIUM_PORT takes precedence)
+export DATAMETRONOME_PORT="${PODIUM_PORT}"
 export DATAMETRONOME_HOST="${DATAMETRONOME_HOST:-${PODIUM_HOST}}"
 export ENVIRONMENT="${ENVIRONMENT:-development}"
 export LOG_LEVEL="${LOG_LEVEL:-INFO}"
@@ -49,8 +50,21 @@ echo "🔧 Environment: ${ENVIRONMENT}"
 echo "📝 Log Level: ${LOG_LEVEL}"
 echo ""
 
+
 # Start the API server
-python3 -m uvicorn datametronome_podium.main:app \
+# Check for venv in root directory first, then podium directory
+if [ -d "../.venv" ]; then
+    echo "🐍 Using root virtual environment (../.venv)..."
+    python_cmd="../.venv/bin/python3"
+elif [ -d ".venv" ]; then
+    echo "🐍 Using virtual environment (.venv)..."
+    python_cmd=".venv/bin/python3"
+else
+    echo "🐍 Using system python..."
+    python_cmd="python3"
+fi
+
+$python_cmd -m uvicorn datametronome_podium.main:app \
     --host "${PODIUM_HOST}" \
     --port "${PODIUM_PORT}" \
     --reload
