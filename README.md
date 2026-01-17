@@ -7,8 +7,7 @@
 
   [![Python 3.13](https://img.shields.io/badge/python-3.13-blue.svg)](https://www.python.org/downloads/)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-  [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-blue.svg)](https://www.postgresql.org/)
-  [![Live Demo](https://img.shields.io/badge/demo-live-success.svg)](#-live-demo)
+  [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/TheDataMaestros/datametronome)
 </div>
 
 ---
