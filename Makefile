@@ -102,8 +102,8 @@ start-podium: install-podium ## Start the Podium backend
 start-ui: ## Start the UI
 	@bash -c 'set -a; [ -f .env ] && source .env; set +a; \
 	cd ui-nuxt && npm install && \
-	NUXT_PUBLIC_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8000}/api/v1" \
-	NUXT_PUBLIC_PODIUM_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8000}" \
+	NUXT_PUBLIC_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8001}/api/v1" \
+	NUXT_PUBLIC_PODIUM_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8001}" \
 	npm run dev -- --port $${UI_PORT:-3000}'
 
 retail-db: ## Generate the Retail demo dataset DB (SQLite)
