@@ -8,6 +8,7 @@ import os
 from contextlib import asynccontextmanager
 from typing import Any
 
+import logfire
 import uvicorn
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -203,6 +204,12 @@ def create_app() -> FastAPI:
 
     # Add root endpoints
     create_root_endpoints(app)
+
+    # Logfire observability: tracing, spans, request/response timing
+    # Sends to Logfire cloud only when LOGFIRE_TOKEN is set; otherwise console-only
+    logfire.configure(send_to_logfire="if-token-present")
+    logfire.instrument_fastapi(app)
+    logfire.instrument_httpx()  # Traces ADK agent's internal API calls via httpx
 
     return app
 

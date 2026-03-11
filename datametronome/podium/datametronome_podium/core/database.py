@@ -248,17 +248,34 @@ async def _create_tables() -> None:
             FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
         )
         """,
+        """
+        CREATE TABLE IF NOT EXISTS agent_traces (
+            id TEXT PRIMARY KEY,
+            conversation_id TEXT NOT NULL,
+            user_id TEXT NOT NULL,
+            user_message_preview TEXT,
+            intent TEXT,
+            model TEXT,
+            tool_calls TEXT,
+            duration_ms REAL,
+            created_at TEXT NOT NULL
+        )
+        """,
     ]
 
     for table_sql in tables:
         assert sqlite_connector is not None
         await sqlite_connector.execute(table_sql)
 
-    # Create indexes for chat_messages
+    # Create indexes for chat_messages and agent_traces
     indexes = [
         "CREATE INDEX IF NOT EXISTS idx_chat_messages_conversation_id ON chat_messages(conversation_id)",
         "CREATE INDEX IF NOT EXISTS idx_chat_messages_user_id ON chat_messages(user_id)",
         "CREATE INDEX IF NOT EXISTS idx_chat_messages_created_at ON chat_messages(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_agent_traces_conversation_id ON agent_traces(conversation_id)",
+        "CREATE INDEX IF NOT EXISTS idx_agent_traces_user_id ON agent_traces(user_id)",
+        "CREATE INDEX IF NOT EXISTS idx_agent_traces_created_at ON agent_traces(created_at)",
+        "CREATE INDEX IF NOT EXISTS idx_agent_traces_intent ON agent_traces(intent)",
     ]
     for index_sql in indexes:
         assert sqlite_connector is not None

@@ -129,6 +129,31 @@ active_staves = Gauge(
 scheduler_jobs = Gauge("scheduler_jobs", "Number of scheduled jobs", registry=registry)
 
 # =============================================================================
+# Chat / Agent Metrics (multi-agent Phase 0)
+# =============================================================================
+
+chat_requests_total = Counter(
+    "chat_requests_total",
+    "Total chat/agent requests",
+    ["status", "intent"],  # status: success, error; intent: quick, config, etc.
+    registry=registry,
+)
+
+chat_request_duration_seconds = Histogram(
+    "chat_request_duration_seconds",
+    "Chat request duration in seconds",
+    ["intent"],
+    registry=registry,
+)
+
+chat_tool_calls_total = Counter(
+    "chat_tool_calls_total",
+    "Total tool calls made by agent",
+    ["tool_name"],
+    registry=registry,
+)
+
+# =============================================================================
 # Business Metrics
 # =============================================================================
 
@@ -252,6 +277,29 @@ def record_check_run(
         anomalies_detected_total.labels(clef_id=clef_id, severity=severity).inc(
             anomaly_count
         )
+
+
+def record_chat_request(
+    status: str,
+    duration_seconds: float,
+    intent: str = "unknown",
+    tool_calls: list | None = None,
+):
+    """
+    Record chat/agent request metrics.
+
+    Args:
+        status: success or error
+        duration_seconds: Request duration
+        intent: Inferred intent (Phase 0: unknown until router)
+        tool_calls: List of tool call dicts with 'name' key
+    """
+    chat_requests_total.labels(status=status, intent=intent).inc()
+    chat_request_duration_seconds.labels(intent=intent).observe(duration_seconds)
+    if tool_calls:
+        for tc in tool_calls:
+            name = tc.get("name", "unknown") if isinstance(tc, dict) else "unknown"
+            chat_tool_calls_total.labels(tool_name=name).inc()
 
 
 def set_component_health(component: str, is_healthy: bool):

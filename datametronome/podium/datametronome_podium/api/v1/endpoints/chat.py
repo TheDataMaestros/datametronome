@@ -6,9 +6,11 @@ and AG-UI protocol. The agent can help users with data quality questions, config
 and troubleshooting.
 """
 
+import asyncio
 import json
 import logging
 import re
+import time
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
@@ -16,12 +18,43 @@ from typing import Any, Dict, List, Optional
 from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.config import settings
 from datametronome_podium.core.database import get_db
+from datametronome_podium.core.metrics import record_chat_request
 from datametronome_podium.services.adk_agent import ADKAgent
+from datametronome_podium.services.agent_tracing import (
+    record_agent_trace,
+    trace_duration,
+)
+from datametronome_podium.services.intent_router import (
+    classify_intent,
+    resolve_model_for_intent,
+)
+from datametronome_podium.services.orchestrator import (
+    MODE_CHAIN,
+    MODE_PARALLEL,
+    MODE_SINGLE,
+    get_agent_config,
+    plan_orchestration,
+)
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+
+def _user_friendly_error_detail(exc: Exception) -> str:
+    """Convert known errors to user-friendly messages."""
+    msg = str(exc).lower()
+    if "connect" in msg and ("11434" in msg or "ollama" in msg):
+        return (
+            "Cannot connect to Ollama. Is it running? "
+            "For Docker: ensure Ollama runs on the host and OLLAMA_API_BASE=http://host.docker.internal:11434 is set."
+        )
+    if "connection" in msg or "connection refused" in msg:
+        return "Connection failed. Check that the AI service (Ollama or API) is running and reachable."
+    if "rate limit" in msg or "429" in msg or "quota" in msg:
+        return "Rate limit or quota exceeded. Please try again in a few moments."
+    return f"Failed to process chat message: {str(exc)[:200]}"
 
 
 class ToolCall(BaseModel):
@@ -68,6 +101,10 @@ class ChatResponse(BaseModel):
     toolCalls: Optional[List[ToolCall]] = None
     finishReason: Optional[str] = None
     model: Optional[str] = None  # Model name that generated the response
+    intent: Optional[str] = None  # Classified intent (Phase 1 router)
+    agentType: Optional[str] = None  # Specialized agent used (Phase 2)
+    orchestrationMode: Optional[str] = None  # Phase 3: single, chain, parallel
+    agentChain: Optional[List[str]] = None  # Phase 3: agents used when mode=chain
 
 
 @router.post("/", response_model=ChatResponse)
@@ -110,12 +147,30 @@ async def send_chat_message(
             "finishReason": "stop"
         }
     """
+    start_time = time.perf_counter()
     try:
         # Generate or use existing conversation ID
         conversation_id = request.conversationId or f"conv-{uuid.uuid4().hex[:12]}"
 
+        # Phase 1: Intent classifier + router
+        intent = classify_intent(request.message)
+        resolved_model = resolve_model_for_intent(
+            intent=intent,
+            model_primary=settings.adk_model,
+            model_quick=settings.adk_model_quick or None,
+        )
+        # Phase 3: Orchestrator (single vs chain)
+        orchestration_mode, agent_types = plan_orchestration(intent, request.message)
+        logger.info(
+            "📋 Intent=%s → mode=%s agents=%s model=%s",
+            intent,
+            orchestration_mode,
+            agent_types,
+            resolved_model,
+        )
+
         # Check if ADK API key is configured (only required for Gemini, not Ollama)
-        model_name = settings.adk_model.lower()
+        model_name = resolved_model.lower()
         is_ollama = model_name.startswith("ollama_chat/")
         if not is_ollama and not settings.adk_api_key:
             raise HTTPException(
@@ -178,23 +233,114 @@ async def send_chat_message(
                     f"❌ Could not load conversation history: {e}", exc_info=True
                 )
 
-        # Initialize and use ADK agent
-        agent = ADKAgent(
-            model=settings.adk_model,
-            api_key=settings.adk_api_key,
-            api_url=settings.adk_api_url,
-        )
-
         # Prepare context with history
         context = request.context or {}
         if history_messages:
             context["history"] = history_messages
 
-        # Process message with ADK agent
-        agent_response = await agent.process_message(
-            message=request.message,
+        # Execute orchestration (single, chain, or parallel)
+        if orchestration_mode == MODE_PARALLEL and len(agent_types) >= 2:
+            # Parallel: run agents concurrently, combine outputs
+            async def run_agent(atype: str):
+                tool_names, instruction = get_agent_config(atype)
+                agent = ADKAgent(
+                    model=resolved_model,
+                    api_key=settings.adk_api_key,
+                    api_url=settings.adk_api_url,
+                    tool_names=tool_names,
+                    instruction=instruction,
+                )
+                return await agent.process_message(
+                    message=request.message,
+                    conversation_id=conversation_id,
+                    context=context,
+                )
+
+            results = await asyncio.gather(
+                *[run_agent(atype) for atype in agent_types],
+                return_exceptions=True,
+            )
+            parts = []
+            for i, r in enumerate(results):
+                if isinstance(r, Exception):
+                    parts.append(f"[{agent_types[i]} error: {r}]")
+                else:
+                    msg = r.get("message", "") or ""
+                    if msg:
+                        parts.append(f"**{agent_types[i].title()}:**\n{msg}")
+            response_message_combined = "\n\n---\n\n".join(parts) if parts else "No responses."
+            agent_response = {
+                "message": response_message_combined,
+                "toolCalls": [],
+                "model": resolved_model,
+            }
+        elif orchestration_mode == MODE_CHAIN and len(agent_types) >= 2:
+            # Chain: run agents in sequence, pass previous output to next
+            shared_state = {}
+            for i, atype in enumerate(agent_types):
+                tool_names, instruction = get_agent_config(atype)
+                agent = ADKAgent(
+                    model=resolved_model,
+                    api_key=settings.adk_api_key,
+                    api_url=settings.adk_api_url,
+                    tool_names=tool_names,
+                    instruction=instruction,
+                )
+                if i == 0:
+                    msg_to_send = request.message
+                else:
+                    prev = shared_state.get("previous_output", "")
+                    msg_to_send = (
+                        f"INVESTIGATION FINDINGS:\n{prev}\n\n"
+                        f"USER'S REQUEST: {request.message}\n\n"
+                        "Using the findings above, address the user's request (suggest fixes, "
+                        "recommend checks, or propose remedial actions)."
+                    )
+                    context["orchestrator"] = shared_state
+                resp = await agent.process_message(
+                    message=msg_to_send,
+                    conversation_id=conversation_id,
+                    context=context,
+                )
+                shared_state["previous_output"] = resp.get("message", "")
+                if i == len(agent_types) - 1:
+                    agent_response = resp
+        else:
+            # Single agent
+            agent_type = agent_types[0] if agent_types else "report"
+            tool_names, instruction = get_agent_config(agent_type)
+            agent = ADKAgent(
+                model=resolved_model,
+                api_key=settings.adk_api_key,
+                api_url=settings.adk_api_url,
+                tool_names=tool_names,
+                instruction=instruction,
+            )
+            agent_response = await agent.process_message(
+                message=request.message,
+                conversation_id=conversation_id,
+                context=context,
+            )
+
+        duration_ms = trace_duration(start_time)
+        user_id_for_trace = current_user.get("id") or current_user.get("username") or "anonymous"
+        tool_calls_for_trace = agent_response.get("toolCalls")
+        model_for_trace = agent_response.get("model") or resolved_model or "unknown"
+
+        await record_agent_trace(
             conversation_id=conversation_id,
-            context=context,
+            user_id=user_id_for_trace,
+            user_message=request.message,
+            intent=intent,
+            model=model_for_trace,
+            tool_calls=tool_calls_for_trace,
+            duration_ms=duration_ms,
+        )
+        record_chat_request(
+            status="success",
+            duration_seconds=duration_ms / 1000.0,
+            intent=intent,
+            tool_calls=tool_calls_for_trace,
         )
 
         msg_value = agent_response.get("message", "")
@@ -205,8 +351,8 @@ async def send_chat_message(
         model_raw = agent_response.get("model")
         if model_raw:
             model_name: str | None = str(model_raw)
-        elif settings.adk_model:
-            model_name = str(settings.adk_model)
+        elif resolved_model:
+            model_name = str(resolved_model)
         else:
             model_name = "unknown"
 
@@ -289,19 +435,45 @@ async def send_chat_message(
                 for i, tc in enumerate(tool_calls_list)
             ]
 
+        # agent_type for response: primary in single, last in chain
+        response_agent_type = agent_types[-1] if agent_types else "report"
+
         return ChatResponse(
             message=response_message,
             conversationId=conversation_id,
             toolCalls=response_tool_calls,
             finishReason=finish_reason,
-            model=model_name,  # Include model name in response
+            model=model_name,
+            intent=intent,
+            agentType=response_agent_type,
+            orchestrationMode=orchestration_mode,
+            agentChain=agent_types if orchestration_mode in (MODE_CHAIN, MODE_PARALLEL) else None,
         )
 
     except Exception as e:
+        duration_ms = trace_duration(start_time)
+        try:
+            err_user_id = current_user.get("id") or current_user.get("username") or "anonymous"
+            err_conv_id = request.conversationId or "error-conv"
+            err_msg = (request.message or "")[:500]
+            err_intent = classify_intent(err_msg) if err_msg else "unknown"
+            await record_agent_trace(
+                conversation_id=err_conv_id,
+                user_id=err_user_id,
+                user_message=err_msg,
+                intent=err_intent,
+                model=None,
+                tool_calls=None,
+                duration_ms=duration_ms,
+            )
+            record_chat_request(status="error", duration_seconds=duration_ms / 1000.0, intent=err_intent)
+        except Exception as trace_err:
+            logger.warning(f"Failed to record error trace: {trace_err}")
         logger.error(f"Error processing chat message: {str(e)}", exc_info=True)
+        detail = _user_friendly_error_detail(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to process chat message: {str(e)}",
+            detail=detail,
         )
 
 
@@ -461,6 +633,45 @@ async def get_conversation_history(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch conversation history: {str(e)}",
+        )
+
+
+@router.delete("/conversations/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_conversation(
+    conversation_id: str,
+    current_user: dict = Depends(get_current_user),
+) -> None:
+    """
+    Delete a conversation and all its messages for the current user.
+    """
+    try:
+        db = await get_db()
+        user_id = current_user.get("id") or current_user.get("username") or "anonymous"
+        # Check conversation exists and belongs to user
+        existing = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as cnt FROM chat_messages WHERE conversation_id = ? AND user_id = ?",
+                "params": [conversation_id, user_id],
+            }
+        )
+        cnt = (existing[0].get("cnt", 0) or 0) if existing else 0
+        if cnt == 0:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found or already deleted",
+            )
+        await db.execute(
+            "DELETE FROM chat_messages WHERE conversation_id = ? AND user_id = ?",
+            [conversation_id, user_id],
+        )
+        logger.info(f"🗑️ Deleted conversation {conversation_id} for user {user_id} ({cnt} messages)")
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting conversation: {str(e)}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to delete conversation: {str(e)}",
         )
 
 
