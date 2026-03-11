@@ -49,6 +49,8 @@ class ADKAgent:
         model: str | None = None,
         api_key: str | None = None,
         api_url: str | None = None,
+        tool_names: list[str] | None = None,
+        instruction: str | None = None,
     ):
         """Initialize the ADK agent.
 
@@ -56,10 +58,14 @@ class ADKAgent:
             model: Model identifier (e.g., 'ollama_chat/qwen2.5' for Ollama)
             api_key: API key (not needed for Ollama, required for Gemini)
             api_url: API endpoint URL (not used for Ollama)
+            tool_names: Subset of tool method names (Phase 2). If None, use all tools.
+            instruction: Override system instruction (Phase 2). If None, use default.
         """
         self.model_name = model or settings.adk_model
         self.api_key = api_key or settings.adk_api_key
         self.api_url = api_url or settings.adk_api_url
+        self.tool_names = tool_names
+        self.instruction_override = instruction
 
         # If we have an API key and using a Gemini model, ensure we use the explicit 'gemini/' provider
         # prefix to force using Google AI Studio (API Key) instead of Vertex AI (ADC).
@@ -107,14 +113,20 @@ class ADKAgent:
 
                 # Create the root agent with tools
                 # ADK Agent accepts 'instruction' (singular) for system instructions
+                instruction = (
+                    self.instruction_override
+                    if self.instruction_override
+                    else self._get_system_instructions()
+                )
+                tools = self._get_adk_tools()
                 self.agent = Agent(
                     model=model_obj,
                     name="datametronome_assistant",
                     description="AI assistant for DataMetronome data quality platform. "
                     "Helps users understand their data quality status, configure checks, "
                     "and troubleshoot issues.",
-                    instruction=self._get_system_instructions(),
-                    tools=self._get_adk_tools(),
+                    instruction=instruction,
+                    tools=tools,
                 )
                 logger.info(f"✅ ADK Agent initialized with model: {self.model_name}")
                 # Log available methods for debugging
@@ -176,6 +188,11 @@ DataMetronome is a data quality monitoring platform that helps organizations mon
 
 Your role is to help users understand their data quality status, configure checks, and troubleshoot issues.
 
+CRITICAL: PROACTIVE EXPLORATION - NEVER ASK FOR IDs WHEN YOU CAN EXPLORE
+- When a user asks "what staves are active?", "show me the staves", "list my data sources", "what checks are running?", or any similar exploration question — IMMEDIATELY call list_staves or list_clefs. Do NOT ask the user for IDs.
+- Use active_only=True when the user asks about "active" staves or clefs specifically.
+- Only ask for a specific ID when the user wants details about a single item AND has not already mentioned its name or ID in the conversation.
+
 CRITICAL: CONVERSATION CONTEXT AND MEMORY
 - You MUST maintain conversation context throughout the entire conversation
 - When a user refers to "this stave", "the stave", "it", "that", or similar phrases, you MUST look in the conversation history to understand what they're referring to
@@ -190,13 +207,13 @@ Key concepts in DataMetronome:
 - Checks: Execution results of clefs - these are the actual results from running quality checks
 
 Available tools:
-- list_staves: List all data sources (staves) in the system
+- list_staves: List all data sources (staves) in the system. Supports active_only=True to filter only active staves.
 - get_stave: Get details about a specific data source
 - create_stave: Create a new data source (stave)
 - list_stave_tables: List all tables in a specific data source, optionally with their structure/schema
 - get_table_sample: Get a sample of data from a specific table to analyze data patterns and identify important fields
 - suggest_quality_checks: Intelligently suggest quality checks based on table structure, column names, and data types. Can optionally analyze sample data for better suggestions
-- list_clefs: List all data quality checks (clefs)
+- list_clefs: List all data quality checks (clefs). Supports stave_id to filter by stave and active_only=True to filter only active clefs.
 - get_clef: Get details about a specific quality check
 - list_checks: List check execution results
 - get_summary_report: Get a summary report of system status
@@ -228,29 +245,35 @@ Always remember: DataMetronome is the platform you're helping with. It's a real 
 Be concise but informative. If a user asks about their data sources, tables, checks, or quality status, use the appropriate tools to get current information."""
 
     def _get_adk_tools(self):  # type: ignore[return-type]
-        """Get ADK tool definitions.
-
-        Returns:
-            List of ADK tool definitions
-        """
-        # ADK tools are defined as functions that the agent can call
-        # We'll define them as async functions that the agent can invoke
-        return [
+        """Get ADK tool definitions. If tool_names set, return only those tools."""
+        all_tools = [
             self.list_staves,
             self.get_stave,
             self.create_stave,
-            self.list_stave_tables,  # Add table listing tool
-            self.get_table_sample,  # Get sample data from a table
-            self.suggest_quality_checks,  # Smart quality check suggestions
+            self.list_stave_tables,
+            self.get_table_sample,
+            self.suggest_quality_checks,
             self.list_clefs,
             self.get_clef,
             self.list_checks,
             self.get_summary_report,
             self.get_quality_report,
         ]
+        if self.tool_names:
+            tool_map = {m.__name__: m for m in all_tools}
+            return [tool_map[n] for n in self.tool_names if n in tool_map]
+        return all_tools
 
-    async def list_staves(self, limit: int = 100, skip: int = 0) -> dict[str, object]:
-        """List all data sources (staves) in DataMetronome."""
+    async def list_staves(
+        self, limit: int = 100, skip: int = 0, active_only: bool = False
+    ) -> dict[str, object]:
+        """List all data sources (staves) in DataMetronome.
+
+        Args:
+            limit: Maximum number of staves to return (default: 100)
+            skip: Number of staves to skip for pagination (default: 0)
+            active_only: If True, return only active staves (is_active=True). Default: False (all staves)
+        """
         try:
             from datetime import datetime
 
@@ -258,12 +281,20 @@ Be concise but informative. If a user asks about their data sources, tables, che
             from datametronome_podium.services.stave_service import deserialize_stave
 
             db = await get_db()
-            staves = await db.query(
-                {
-                    "sql": "SELECT * FROM staves ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    "params": [limit, skip],
-                }
-            )
+            if active_only:
+                staves = await db.query(
+                    {
+                        "sql": "SELECT * FROM staves WHERE is_active = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                        "params": [limit, skip],
+                    }
+                )
+            else:
+                staves = await db.query(
+                    {
+                        "sql": "SELECT * FROM staves ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                        "params": [limit, skip],
+                    }
+                )
 
             staves_list = []
             for stave in staves:
@@ -1344,9 +1375,20 @@ Be concise but informative. If a user asks about their data sources, tables, che
         return suggestions
 
     async def list_clefs(
-        self, limit: int = 100, skip: int = 0, stave_id: str | None = None
+        self,
+        limit: int = 100,
+        skip: int = 0,
+        stave_id: str | None = None,
+        active_only: bool = False,
     ) -> dict[str, object]:
-        """List all data quality checks (clefs) in DataMetronome."""
+        """List all data quality checks (clefs) in DataMetronome.
+
+        Args:
+            limit: Maximum number of clefs to return (default: 100)
+            skip: Number of clefs to skip for pagination (default: 0)
+            stave_id: If provided, only return clefs for this stave
+            active_only: If True, return only active clefs (is_active=True). Default: False (all clefs)
+        """
         try:
             from datetime import datetime
 
@@ -1356,11 +1398,25 @@ Be concise but informative. If a user asks about their data sources, tables, che
             db = await get_db()
 
             # Build query based on filters
-            if stave_id:
+            if stave_id and active_only:
+                clefs = await db.query(
+                    {
+                        "sql": "SELECT * FROM clefs WHERE stave_id = ? AND is_active = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                        "params": [stave_id, limit, skip],
+                    }
+                )
+            elif stave_id:
                 clefs = await db.query(
                     {
                         "sql": "SELECT * FROM clefs WHERE stave_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
                         "params": [stave_id, limit, skip],
+                    }
+                )
+            elif active_only:
+                clefs = await db.query(
+                    {
+                        "sql": "SELECT * FROM clefs WHERE is_active = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                        "params": [limit, skip],
                     }
                 )
             else:
