@@ -31,9 +31,11 @@ Faker
 watchdog
 apscheduler
 
-# HTTP client for ADK agent
+# HTTP client (used by existing endpoints)
 httpx>=0.25.0
 
-# Google ADK for agent functionality (required for Ollama/Gemini agent)
-google-adk>=0.1.0
-litellm>=1.0.0  # Required by google-adk.models.lite_llm
+# Pydantic AI for multi-agent orchestration
+pydantic-ai>=1.0.0
+
+# Observability (tracing, spans, evals) - Pydantic Logfire
+logfire[fastapi,httpx]>=0.20.0

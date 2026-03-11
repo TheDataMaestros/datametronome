@@ -74,26 +74,36 @@ class Settings(BaseSettings):
         ge=1,
     )
 
-    # AI Agent / ADK Configuration
-    adk_api_key: str = Field(
+    # AI Agent Configuration
+    ai_provider: str = Field(
+        default="ollama",
+        description="AI provider: anthropic | openai | gemini | ollama",
+        validation_alias="DATAMETRONOME_AI_PROVIDER",
+    )
+    ai_model: str = Field(
+        default="qwen2.5",
+        description="Model name for the main agents (e.g. claude-sonnet-4-6, gpt-4o, qwen2.5)",
+        validation_alias="DATAMETRONOME_AI_MODEL",
+    )
+    ai_api_key: str = Field(
         default="",
-        env="DATAMETRONOME_ADK_API_KEY",
-        description="API key for ADK agent (not needed for Ollama)",
+        description="API key for the AI provider (not needed for Ollama)",
+        validation_alias="DATAMETRONOME_AI_API_KEY",
     )
-    adk_model: str = Field(
-        default="ollama_chat/qwen2.5",
-        env="DATAMETRONOME_ADK_MODEL",
-        description="ADK model identifier (e.g., 'ollama_chat/qwen2.5' for Ollama or 'gemini-2.0-flash-exp' for Gemini)",
+    ai_router_model: str | None = Field(
+        default=None,
+        description="Optional cheaper model for the router agent (e.g. claude-haiku-4-5). If unset, uses ai_model.",
+        validation_alias="DATAMETRONOME_AI_ROUTER_MODEL",
     )
-    adk_api_url: str = Field(
-        default="https://generativelanguage.googleapis.com/v1beta",
-        env="DATAMETRONOME_ADK_API_URL",
-        description="ADK API endpoint URL (not used for Ollama)",
+    ai_base_url: str | None = Field(
+        default=None,
+        description="Custom base URL (required for Ollama: http://localhost:11434/v1)",
+        validation_alias="DATAMETRONOME_AI_BASE_URL",
     )
     ollama_api_base: str = Field(
         default="http://localhost:11434",
-        env="OLLAMA_API_BASE",
-        description="Ollama API base URL (e.g., 'http://192.168.0.35:11434' for remote instance)",
+        description="Ollama API base URL (legacy compat). Used when ai_provider=ollama and ai_base_url is unset.",
+        validation_alias="OLLAMA_API_BASE",
     )
 
     @field_validator("log_level")
