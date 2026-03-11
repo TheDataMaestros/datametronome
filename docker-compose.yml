@@ -24,16 +24,24 @@ services:
     build:
       context: .
       dockerfile: datametronome/podium/Dockerfile
+    env_file:
+      - .env
     ports:
       - "8001:8001"
     environment:
       - DATAMETRONOME_SECRET_KEY=your-super-secret-key-that-is-at-least-32-characters-long
-      - DATAMETRONOME_DATABASE_URL=sqlite:///./datametronome.db
+      - DATAMETRONOME_DATABASE_URL=sqlite+aiosqlite:////app/data/datametronome.db
       - DATAMETRONOME_DEBUG=true
       - DATAMETRONOME_HOST=0.0.0.0
       - DATAMETRONOME_PORT=8001
+      - DATAMETRONOME_ALLOWED_ORIGINS=http://localhost:3000
+      # Ollama on host: use host.docker.internal (Mac/Windows). Override in .env if needed.
+      - OLLAMA_API_BASE=http://host.docker.internal:11434
     volumes:
+      - ./data:/app/data
       - ./reports:/app/reports
+      # Mount podium source for live reload (no rebuild needed when editing code)
+      - ./datametronome/podium:/app/datametronome/podium
     depends_on:
       postgres:
         condition: service_healthy
@@ -42,6 +50,27 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  # UI (optional - for full stack testing)
+  ui:
+    build:
+      context: ./ui-nuxt
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    environment:
+      NUXT_PUBLIC_API_BASE: http://localhost:8001/api/v1
+      NUXT_PUBLIC_PODIUM_API_BASE: http://localhost:8001
+    volumes:
+      # Bind-mount source for live reload – edits on the host are picked up instantly
+      - ./ui-nuxt:/app
+      # Preserve the container's node_modules so they aren't hidden by the bind mount
+      - /app/node_modules
+    depends_on:
+      podium:
+        condition: service_healthy
+    profiles:
+      - full
 
 volumes:
   postgres_data:

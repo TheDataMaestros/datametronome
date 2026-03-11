@@ -21,6 +21,7 @@ RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/sqlite
 RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/bigquery
 RUN uv pip install --system --no-cache-dir -e ./datametronome/brain/base
 RUN uv pip install --system --no-cache-dir -e ./datametronome/podium
+RUN uv pip install --system --no-cache-dir 'logfire[fastapi,httpx]>=0.20.0'
 
 # Create reports directory
 RUN mkdir -p reports
