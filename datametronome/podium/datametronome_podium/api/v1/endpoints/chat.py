@@ -198,6 +198,8 @@ async def send_chat_message(
         agent_result = await run_chat(
             message=request.message,
             history=history_messages,
+            conversation_id=conversation_id,
+            user_id=user_id,
         )
         intent = agent_result["intent"]
         orchestration_mode = agent_result["mode"]

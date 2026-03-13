@@ -22,6 +22,12 @@ from datametronome_podium.services.agent_factory import (
     build_model_from_settings,
     build_router_model_from_settings,
 )
+from datametronome_podium.services.workflow_state import (
+    create_checkpoint,
+    update_checkpoint,
+    find_active_checkpoint,
+    log_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +81,8 @@ async def run_chat(
     message: str,
     history: list[dict],
     *,
+    conversation_id: str | None = None,
+    user_id: str | None = None,
     router_history_window: int = 6,
 ) -> dict[str, Any]:
     """Run the full chat pipeline: route -> dispatch -> respond.
@@ -82,6 +90,8 @@ async def run_chat(
     Args:
         message: Current user message
         history: Full conversation history as list of {role, content} dicts
+        conversation_id: Optional conversation ID for checkpoint tracking
+        user_id: Optional user ID for checkpoint tracking
         router_history_window: How many recent messages to send to the router for context
 
     Returns:
@@ -100,12 +110,43 @@ async def run_chat(
         decision.intent, decision.mode, decision.agents, decision.reasoning,
     )
 
-    if decision.mode == "parallel" and len(decision.agents) >= 2:
-        response_message = await _run_parallel(message, decision, all_history)
-    elif decision.mode == "chain" and len(decision.agents) >= 2:
-        response_message = await _run_chain(message, decision, all_history)
-    else:
-        response_message = await _run_single(message, decision, all_history)
+    # Check for paused checkpoint to resume, or create a new one
+    checkpoint_id = None
+    if conversation_id and user_id:
+        existing = await find_active_checkpoint(conversation_id)
+        if existing and existing["status"] == "paused":
+            checkpoint_id = existing["id"]
+            logger.info("Resuming paused checkpoint %s", checkpoint_id)
+            await update_checkpoint(checkpoint_id, status="running")
+            await log_event(checkpoint_id, "node_entered", "resume", {
+                "resumed_from": existing.get("current_node"),
+            })
+        else:
+            workflow_name = f"{decision.mode}:{'+'.join(decision.agents)}"
+            checkpoint_id = await create_checkpoint(conversation_id, user_id, workflow_name)
+        await log_event(checkpoint_id, "decision_made", "router", {
+            "intent": decision.intent,
+            "mode": decision.mode,
+            "agents": decision.agents,
+            "reasoning": decision.reasoning,
+        })
+
+    try:
+        if decision.mode == "parallel" and len(decision.agents) >= 2:
+            response_message = await _run_parallel(message, decision, all_history, checkpoint_id)
+        elif decision.mode == "chain" and len(decision.agents) >= 2:
+            response_message = await _run_chain(message, decision, all_history, checkpoint_id)
+        else:
+            response_message = await _run_single(message, decision, all_history, checkpoint_id)
+
+        if checkpoint_id:
+            await update_checkpoint(checkpoint_id, status="completed")
+
+    except Exception as e:
+        if checkpoint_id:
+            await log_event(checkpoint_id, "error", None, {"error": str(e)})
+            await update_checkpoint(checkpoint_id, status="failed")
+        raise
 
     return {
         "message": response_message,
@@ -120,23 +161,41 @@ async def _run_single(
     message: str,
     decision: RoutingDecision,
     history: list[ModelMessage],
+    checkpoint_id: str | None = None,
 ) -> str:
     agent_type = decision.agents[0] if decision.agents else "report"
+
+    if checkpoint_id:
+        await log_event(checkpoint_id, "node_entered", agent_type)
+        await update_checkpoint(checkpoint_id, current_node=agent_type)
+
     agent = _get_agent_builder(agent_type)()
     result = await agent.run(message, message_history=history)
-    return str(result.output)
+    output = str(result.output)
+
+    if checkpoint_id:
+        await log_event(checkpoint_id, "node_completed", agent_type, {
+            "output_preview": output[:200],
+        })
+
+    return output
 
 
 async def _run_chain(
     message: str,
     decision: RoutingDecision,
     history: list[ModelMessage],
+    checkpoint_id: str | None = None,
 ) -> str:
     """Run agents in sequence. Each agent after the first receives the previous output."""
     previous_output = ""
     last_result = ""
 
     for i, agent_type in enumerate(decision.agents):
+        if checkpoint_id:
+            await log_event(checkpoint_id, "node_entered", agent_type, {"step": i})
+            await update_checkpoint(checkpoint_id, current_node=agent_type)
+
         agent = _get_agent_builder(agent_type)()
 
         if i == 0:
@@ -153,6 +212,16 @@ async def _run_chain(
         previous_output = str(result.output)
         last_result = previous_output
 
+        if checkpoint_id:
+            await log_event(checkpoint_id, "node_completed", agent_type, {
+                "step": i,
+                "output_preview": previous_output[:200],
+            })
+            await update_checkpoint(
+                checkpoint_id,
+                state_data={"step": i, "agent": agent_type, "output": previous_output[:500]},
+            )
+
     return last_result
 
 
@@ -160,8 +229,14 @@ async def _run_parallel(
     message: str,
     decision: RoutingDecision,
     history: list[ModelMessage],
+    checkpoint_id: str | None = None,
 ) -> str:
     """Run agents concurrently, combine their outputs."""
+    if checkpoint_id:
+        for agent_type in decision.agents:
+            await log_event(checkpoint_id, "node_entered", agent_type)
+        await update_checkpoint(checkpoint_id, current_node=",".join(decision.agents))
+
     async def run_agent(agent_type: str) -> tuple[str, str]:
         agent = _get_agent_builder(agent_type)()
         result = await agent.run(message, message_history=history)
@@ -176,9 +251,15 @@ async def _run_parallel(
     for r in results:
         if isinstance(r, Exception):
             parts.append(f"[Error: {r}]")
+            if checkpoint_id:
+                await log_event(checkpoint_id, "error", None, {"error": str(r)})
         else:
             agent_type, text = r
             if text:
                 parts.append(f"**{agent_type.title()}:**\n{text}")
+            if checkpoint_id:
+                await log_event(checkpoint_id, "node_completed", agent_type, {
+                    "output_preview": text[:200],
+                })
 
     return "\n\n---\n\n".join(parts) if parts else "No responses received."
