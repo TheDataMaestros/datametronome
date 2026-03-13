@@ -42,6 +42,20 @@ class PostgresReadOnlyPulse(Pulse, Readable):
         self._password = password
         self._kwargs = kwargs
         self._pool = None
+        self._txn_conn = None
+        self._txn = None
+
+    async def _get_conn(self):
+        """Get the active transaction connection, or acquire from pool."""
+        if self._txn_conn is not None:
+            return self._txn_conn, False
+        conn = await self._pool.acquire()
+        return conn, True
+
+    async def _release_conn(self, conn, should_release):
+        """Release connection back to pool if not in a transaction."""
+        if should_release:
+            await self._pool.release(conn)
 
     async def connect(self):
         """Establish connection pool to PostgreSQL."""
@@ -106,10 +120,10 @@ class PostgresReadOnlyPulse(Pulse, Readable):
 
             if query_type == "parameterized":
                 sql = query_config.get("sql")
-                params = query_config.get("params", {})
+                params = query_config.get("params", [])
                 if not sql:
                     raise ValueError("Query config dict must contain 'sql' key")
-                return await self.query_with_params(sql, params)
+                return await self.query_with_params(sql, params if params else None)
 
             elif query_type == "table_info":
                 table_name = query_config.get("table_name")
@@ -119,7 +133,7 @@ class PostgresReadOnlyPulse(Pulse, Readable):
 
             elif query_type == "custom":
                 sql = query_config.get("sql")
-                params = query_config.get("params", {})
+                params = query_config.get("params", [])
                 timeout_ms = query_config.get("timeout_ms")
 
                 if not sql:
@@ -132,7 +146,7 @@ class PostgresReadOnlyPulse(Pulse, Readable):
                     pass
 
                 if params:
-                    return await self.query_with_params(sql, params)
+                    return await self.query_with_params(sql, params if params else None)
                 else:
                     return await self._simple_query(sql)
 
@@ -150,25 +164,24 @@ class PostgresReadOnlyPulse(Pulse, Readable):
             records = await conn.fetch(sql)
             return [dict(record) for record in records]
 
-    async def query_with_params(self, query: str, *args, **kwargs) -> list:
-        """
-        Execute a parameterized SQL query and return results.
+    async def query_with_params(self, sql: str, params: list | None = None) -> list:
+        """Execute a parameterized query. Returns list of dicts.
 
         Args:
-            query: SQL query string with placeholders
-            *args: Positional parameters for the query
-            **kwargs: Named parameters for the query
-
-        Returns:
-            List of dictionaries representing the query results
+            sql: SQL string with $1, $2 placeholders.
+            params: Parameter list. Unpacked as positional args for asyncpg.
         """
         if not self._pool:
             raise RuntimeError("Not connected to database. Call connect() first.")
-
-        assert self._pool is not None
-        async with self._pool.acquire() as conn:
-            records = await conn.fetch(query, *args, **kwargs)
-            return [dict(record) for record in records]
+        conn, should_release = await self._get_conn()
+        try:
+            if params:
+                rows = await conn.fetch(sql, *params)
+            else:
+                rows = await conn.fetch(sql)
+            return [dict(row) for row in rows]
+        finally:
+            await self._release_conn(conn, should_release)
 
     async def get_table_info(self, table_name: str) -> list | dict:
         """
@@ -196,7 +209,7 @@ class PostgresReadOnlyPulse(Pulse, Readable):
         ORDER BY ordinal_position
         """
 
-        columns = await self.query_with_params(query, table_name)
+        columns = await self.query_with_params(query, [table_name])
 
         # Get table size
         size_query = """
@@ -206,7 +219,7 @@ class PostgresReadOnlyPulse(Pulse, Readable):
         """
 
         try:
-            size_info = await self.query_with_params(size_query, table_name)
+            size_info = await self.query_with_params(size_query, [table_name])
             exists = size_info[0]["exists"] if size_info else 0
         except:
             exists = 0
@@ -236,7 +249,7 @@ class PostgresReadOnlyPulse(Pulse, Readable):
         AND table_type = 'BASE TABLE'
         ORDER BY table_name
         """
-        results = await self.query_with_params(query, schema)
+        results = await self.query_with_params(query, [schema])
         return [row["table_name"] for row in results]
 
     async def __aenter__(self):
