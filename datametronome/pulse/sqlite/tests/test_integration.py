@@ -182,7 +182,8 @@ class TestSQLitePulseIntegration:
         result = await sqlite_pulse.execute(
             "UPDATE users SET active = ? WHERE name = ?", [False, "Alice"]
         )
-        assert result is True
+        assert isinstance(result, int)
+        assert result == 1  # 1 row affected
 
         # Verify update
         alice = await sqlite_pulse.query_with_params(
@@ -362,19 +363,22 @@ class TestSQLiteWriteonlyPulseIntegration:
             "INSERT INTO users (name, email, active) VALUES (?, ?, ?)",
             ["Charlie", "charlie@example.com", True],
         )
-        assert result is True
+        assert isinstance(result, int)
+        assert result == 1  # 1 row affected
 
         # Test UPDATE
         result = await writeonly_pulse.execute(
             "UPDATE users SET active = ? WHERE name = ?", [False, "Charlie"]
         )
-        assert result is True
+        assert isinstance(result, int)
+        assert result == 1  # 1 row affected
 
         # Test DELETE
         result = await writeonly_pulse.execute(
             "DELETE FROM users WHERE name = ?", ["Charlie"]
         )
-        assert result is True
+        assert isinstance(result, int)
+        assert result == 1  # 1 row affected
 
     @pytest.mark.integration
     @pytest.mark.asyncio

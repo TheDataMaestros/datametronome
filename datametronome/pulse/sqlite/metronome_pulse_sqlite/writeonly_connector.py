@@ -21,6 +21,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
         self.connection = None
         # Serialize writes to avoid "database is locked" under concurrent access.
         self._write_lock = asyncio.Lock()
+        self._in_transaction = False
 
     # region agent log
     def _agent_log(
@@ -273,29 +274,78 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
                 self.connection.rollback()
             raise RuntimeError(f"Operations failed: {e}")
 
-    async def execute(self, sql, params=None):
-        """Execute raw SQL."""
-        if not await self.is_connected():
-            raise RuntimeError("Not connected to SQLite database")
+    async def execute(self, sql: str, params: list | None = None) -> int:
+        """Execute a SQL statement. Returns rows affected.
 
+        Args:
+            sql: SQL string with ? placeholders.
+            params: Parameter list (optional).
+
+        Returns:
+            Number of rows affected. 0 for DDL statements.
+        """
         async with self._write_lock:
+            if not self.connection:
+                raise RuntimeError("Not connected to database. Call connect() first.")
             try:
-                if not self.connection:
-                    raise RuntimeError("Not connected")
                 cursor = self.connection.cursor()
                 if params:
                     cursor.execute(sql, params)
                 else:
                     cursor.execute(sql)
-
-                if not self.connection:
-                    raise RuntimeError("Not connected to database")
-                self.connection.commit()
-                return True
+                # Only auto-commit if NOT inside a transaction
+                if not self._in_transaction:
+                    self.connection.commit()
+                return cursor.rowcount if cursor.rowcount >= 0 else 0
             except Exception as e:
-                if self.connection:
+                if not self._in_transaction:
                     self.connection.rollback()
-                raise RuntimeError(f"Execute failed: {e}")
+                raise
+
+    async def execute_many(self, sql: str, params_list: list[list]) -> None:
+        """Execute a SQL statement multiple times with different params.
+
+        Args:
+            sql: SQL string with ? placeholders.
+            params_list: List of parameter lists.
+        """
+        async with self._write_lock:
+            if not self.connection:
+                raise RuntimeError("Not connected to database. Call connect() first.")
+            try:
+                cursor = self.connection.cursor()
+                cursor.executemany(sql, params_list)
+                if not self._in_transaction:
+                    self.connection.commit()
+            except Exception as e:
+                if not self._in_transaction:
+                    self.connection.rollback()
+                raise
+
+    async def begin_transaction(self) -> None:
+        """Begin a transaction. Subsequent execute() calls will NOT auto-commit."""
+        if not self.connection:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        self._in_transaction = True
+        self.connection.execute("BEGIN")
+
+    async def commit_transaction(self) -> None:
+        """Commit the current transaction."""
+        if not self.connection:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        try:
+            self.connection.commit()
+        finally:
+            self._in_transaction = False
+
+    async def rollback_transaction(self) -> None:
+        """Roll back the current transaction."""
+        if not self.connection:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        try:
+            self.connection.rollback()
+        finally:
+            self._in_transaction = False
 
     async def copy_records(self, table_name, records):
         """Bulk insert records using SQLite's efficient INSERT."""

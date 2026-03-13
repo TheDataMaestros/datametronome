@@ -210,21 +210,17 @@ class SQLiteReadonlyPulse(Pulse, Readable):
         except Exception as e:
             raise RuntimeError(f"Unexpected error during query: {e}")
 
-    async def query_with_params(self, sql, params):
+    async def query_with_params(self, sql: str, params: list | None = None) -> list[dict]:
         """Execute parameterized query (convenience method).
 
         Args:
             sql: SQL query string with placeholders
-            params: Parameters for the query (list, tuple, or dict)
+            params: Parameters for the query (list or None)
 
         Returns:
             List of dictionaries representing query results
-
-        Raises:
-            RuntimeError: If not connected or query validation fails
-            sqlite3.Error: If SQLite operation fails
         """
-        return await self.query({"sql": sql, "params": params})
+        return await self.query({"sql": sql, "params": params or []})
 
     async def get_table_info(self, table_name):
         """Get table schema information.
