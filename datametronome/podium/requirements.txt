@@ -37,5 +37,8 @@ httpx>=0.25.0
 # Pydantic AI for multi-agent orchestration
 pydantic-ai>=1.0.0
 
+# Database connectors (DataPulse)
+metronome-pulse-postgres>=0.1.0
+
 # Observability (tracing, spans, evals) - Pydantic Logfire
 logfire[fastapi,httpx]>=0.20.0

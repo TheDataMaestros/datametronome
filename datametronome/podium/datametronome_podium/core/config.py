@@ -35,7 +35,7 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = Field(
-        default="sqlite:///./data/datametronome.db",
+        default="postgresql://testuser:testpass@localhost:5432/datametronome_test",
         validation_alias="DATAMETRONOME_DATABASE_URL",
     )
 
