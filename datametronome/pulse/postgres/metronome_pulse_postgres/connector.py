@@ -56,6 +56,38 @@ class PostgresPulse(Pulse, Readable, Writable):
         if should_release:
             await self._pool.release(conn)
 
+    async def begin_transaction(self) -> None:
+        """Begin a transaction. Acquires a dedicated connection from the pool."""
+        if not self._pool:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        if self._txn_conn is not None:
+            raise RuntimeError("Transaction already active.")
+        self._txn_conn = await self._pool.acquire()
+        self._txn = self._txn_conn.transaction()
+        await self._txn.start()
+
+    async def commit_transaction(self) -> None:
+        """Commit the current transaction and release the connection."""
+        if self._txn is None:
+            raise RuntimeError("No active transaction to commit.")
+        try:
+            await self._txn.commit()
+        finally:
+            await self._pool.release(self._txn_conn)
+            self._txn = None
+            self._txn_conn = None
+
+    async def rollback_transaction(self) -> None:
+        """Roll back the current transaction and release the connection."""
+        if self._txn is None:
+            raise RuntimeError("No active transaction to rollback.")
+        try:
+            await self._txn.rollback()
+        finally:
+            await self._pool.release(self._txn_conn)
+            self._txn = None
+            self._txn_conn = None
+
     async def connect(self):
         """Establish connection pool to PostgreSQL."""
         self._pool = await asyncpg.create_pool(
