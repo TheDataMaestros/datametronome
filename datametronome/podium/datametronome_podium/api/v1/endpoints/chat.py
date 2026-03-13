@@ -1,15 +1,13 @@
 """
 Chat/Agent endpoints for DataMetronome Podium.
 
-This module provides endpoints for interacting with AI agents using ADK (Agent Development Kit)
-and AG-UI protocol. The agent can help users with data quality questions, configuration,
+This module provides endpoints for interacting with AI agents via Pydantic AI.
+The agent can help users with data quality questions, configuration,
 and troubleshooting.
 """
 
-import asyncio
 import json
 import logging
-import re
 import time
 import uuid
 from datetime import datetime, timezone
@@ -19,22 +17,11 @@ from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.config import settings
 from datametronome_podium.core.database import get_db
 from datametronome_podium.core.metrics import record_chat_request
-from datametronome_podium.services.adk_agent import ADKAgent
 from datametronome_podium.services.agent_tracing import (
     record_agent_trace,
     trace_duration,
 )
-from datametronome_podium.services.intent_router import (
-    classify_intent,
-    resolve_model_for_intent,
-)
-from datametronome_podium.services.orchestrator import (
-    MODE_CHAIN,
-    MODE_PARALLEL,
-    MODE_SINGLE,
-    get_agent_config,
-    plan_orchestration,
-)
+from datametronome_podium.services.orchestrator import run_chat
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 
@@ -152,32 +139,6 @@ async def send_chat_message(
         # Generate or use existing conversation ID
         conversation_id = request.conversationId or f"conv-{uuid.uuid4().hex[:12]}"
 
-        # Phase 1: Intent classifier + router
-        intent = classify_intent(request.message)
-        resolved_model = resolve_model_for_intent(
-            intent=intent,
-            model_primary=settings.adk_model,
-            model_quick=settings.adk_model_quick or None,
-        )
-        # Phase 3: Orchestrator (single vs chain)
-        orchestration_mode, agent_types = plan_orchestration(intent, request.message)
-        logger.info(
-            "📋 Intent=%s → mode=%s agents=%s model=%s",
-            intent,
-            orchestration_mode,
-            agent_types,
-            resolved_model,
-        )
-
-        # Check if ADK API key is configured (only required for Gemini, not Ollama)
-        model_name = resolved_model.lower()
-        is_ollama = model_name.startswith("ollama_chat/")
-        if not is_ollama and not settings.adk_api_key:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="ADK API key not configured. Please set DATAMETRONOME_ADK_API_KEY environment variable.",
-            )
-
         # Load conversation history for context
         db = await get_db()
         # Get user identifier - users table has 'id' field
@@ -233,94 +194,26 @@ async def send_chat_message(
                     f"❌ Could not load conversation history: {e}", exc_info=True
                 )
 
-        # Prepare context with history
-        context = request.context or {}
-        if history_messages:
-            context["history"] = history_messages
+        # Run the AI pipeline (router → sub-agents)
+        agent_result = await run_chat(
+            message=request.message,
+            history=history_messages,
+        )
+        intent = agent_result["intent"]
+        orchestration_mode = agent_result["mode"]
+        agent_types = agent_result["agents"]
+        resolved_model = agent_result.get("model", "pydantic-ai")
 
-        # Execute orchestration (single, chain, or parallel)
-        if orchestration_mode == MODE_PARALLEL and len(agent_types) >= 2:
-            # Parallel: run agents concurrently, combine outputs
-            async def run_agent(atype: str):
-                tool_names, instruction = get_agent_config(atype)
-                agent = ADKAgent(
-                    model=resolved_model,
-                    api_key=settings.adk_api_key,
-                    api_url=settings.adk_api_url,
-                    tool_names=tool_names,
-                    instruction=instruction,
-                )
-                return await agent.process_message(
-                    message=request.message,
-                    conversation_id=conversation_id,
-                    context=context,
-                )
+        logger.info(
+            "📋 Intent=%s → mode=%s agents=%s",
+            intent, orchestration_mode, agent_types,
+        )
 
-            results = await asyncio.gather(
-                *[run_agent(atype) for atype in agent_types],
-                return_exceptions=True,
-            )
-            parts = []
-            for i, r in enumerate(results):
-                if isinstance(r, Exception):
-                    parts.append(f"[{agent_types[i]} error: {r}]")
-                else:
-                    msg = r.get("message", "") or ""
-                    if msg:
-                        parts.append(f"**{agent_types[i].title()}:**\n{msg}")
-            response_message_combined = "\n\n---\n\n".join(parts) if parts else "No responses."
-            agent_response = {
-                "message": response_message_combined,
-                "toolCalls": [],
-                "model": resolved_model,
-            }
-        elif orchestration_mode == MODE_CHAIN and len(agent_types) >= 2:
-            # Chain: run agents in sequence, pass previous output to next
-            shared_state = {}
-            for i, atype in enumerate(agent_types):
-                tool_names, instruction = get_agent_config(atype)
-                agent = ADKAgent(
-                    model=resolved_model,
-                    api_key=settings.adk_api_key,
-                    api_url=settings.adk_api_url,
-                    tool_names=tool_names,
-                    instruction=instruction,
-                )
-                if i == 0:
-                    msg_to_send = request.message
-                else:
-                    prev = shared_state.get("previous_output", "")
-                    msg_to_send = (
-                        f"INVESTIGATION FINDINGS:\n{prev}\n\n"
-                        f"USER'S REQUEST: {request.message}\n\n"
-                        "Using the findings above, address the user's request (suggest fixes, "
-                        "recommend checks, or propose remedial actions)."
-                    )
-                    context["orchestrator"] = shared_state
-                resp = await agent.process_message(
-                    message=msg_to_send,
-                    conversation_id=conversation_id,
-                    context=context,
-                )
-                shared_state["previous_output"] = resp.get("message", "")
-                if i == len(agent_types) - 1:
-                    agent_response = resp
-        else:
-            # Single agent
-            agent_type = agent_types[0] if agent_types else "report"
-            tool_names, instruction = get_agent_config(agent_type)
-            agent = ADKAgent(
-                model=resolved_model,
-                api_key=settings.adk_api_key,
-                api_url=settings.adk_api_url,
-                tool_names=tool_names,
-                instruction=instruction,
-            )
-            agent_response = await agent.process_message(
-                message=request.message,
-                conversation_id=conversation_id,
-                context=context,
-            )
+        agent_response = {
+            "message": agent_result["message"],
+            "toolCalls": None,
+            "model": resolved_model,
+        }
 
         duration_ms = trace_duration(start_time)
         user_id_for_trace = current_user.get("id") or current_user.get("username") or "anonymous"
@@ -447,7 +340,7 @@ async def send_chat_message(
             intent=intent,
             agentType=response_agent_type,
             orchestrationMode=orchestration_mode,
-            agentChain=agent_types if orchestration_mode in (MODE_CHAIN, MODE_PARALLEL) else None,
+            agentChain=agent_types if orchestration_mode in ("chain", "parallel") else None,
         )
 
     except Exception as e:
@@ -456,17 +349,16 @@ async def send_chat_message(
             err_user_id = current_user.get("id") or current_user.get("username") or "anonymous"
             err_conv_id = request.conversationId or "error-conv"
             err_msg = (request.message or "")[:500]
-            err_intent = classify_intent(err_msg) if err_msg else "unknown"
             await record_agent_trace(
                 conversation_id=err_conv_id,
                 user_id=err_user_id,
                 user_message=err_msg,
-                intent=err_intent,
+                intent="unknown",
                 model=None,
                 tool_calls=None,
                 duration_ms=duration_ms,
             )
-            record_chat_request(status="error", duration_seconds=duration_ms / 1000.0, intent=err_intent)
+            record_chat_request(status="error", duration_seconds=duration_ms / 1000.0, intent="unknown")
         except Exception as trace_err:
             logger.warning(f"Failed to record error trace: {trace_err}")
         logger.error(f"Error processing chat message: {str(e)}", exc_info=True)
@@ -519,7 +411,7 @@ async def get_conversation_history(
         )
 
         # Get model name from settings for assistant messages
-        model_name = settings.adk_model or "unknown"
+        model_name = settings.ai_model or "unknown"
 
         result = []
         first_message_timestamp = None  # Store first valid timestamp as fallback

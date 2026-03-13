@@ -2,7 +2,7 @@
 Configuration management for DataMetronome Podium.
 """
 
-from pydantic import Field, field_validator
+from pydantic import ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -14,63 +14,63 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     # Logging
     log_level: str = Field(default="INFO")
-    debug: bool = Field(default=False, env="DATAMETRONOME_DEBUG")
+    debug: bool = Field(default=False, validation_alias="DATAMETRONOME_DEBUG")
 
     # Server
-    host: str = Field(default="0.0.0.0", env="DATAMETRONOME_HOST")
-    port: int = Field(default=8001, env="DATAMETRONOME_PORT", ge=1, le=65535)
+    host: str = Field(default="0.0.0.0", validation_alias="DATAMETRONOME_HOST")
+    port: int = Field(default=8001, validation_alias="DATAMETRONOME_PORT", ge=1, le=65535)
 
     # Security
     secret_key: str = Field(
         default="test-secret-key-for-development-only-32-chars",
-        env="DATAMETRONOME_SECRET_KEY",
+        validation_alias="DATAMETRONOME_SECRET_KEY",
         min_length=32,
     )
     algorithm: str = "HS256"
     access_token_expire_minutes: int = Field(
         default=30,
-        env="DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES",
+        validation_alias="DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES",
         ge=1,
     )
 
     # Database
     database_url: str = Field(
         default="sqlite:///./data/datametronome.db",
-        env="DATAMETRONOME_DATABASE_URL",
+        validation_alias="DATAMETRONOME_DATABASE_URL",
     )
 
     # CORS
     allowed_origins: list[str] | str = Field(
         default=["http://localhost:3000", "http://localhost:8501"],
-        env="DATAMETRONOME_ALLOWED_ORIGINS",
+        validation_alias="DATAMETRONOME_ALLOWED_ORIGINS",
     )
 
     # Scheduler
-    scheduler_enabled: bool = Field(default=True, env="DATAMETRONOME_SCHEDULER_ENABLED")
+    scheduler_enabled: bool = Field(default=True, validation_alias="DATAMETRONOME_SCHEDULER_ENABLED")
     scheduler_timezone: str = Field(
         default="UTC",
-        env="DATAMETRONOME_SCHEDULER_TIMEZONE",
+        validation_alias="DATAMETRONOME_SCHEDULER_TIMEZONE",
     )
     scheduler_max_instances: int = Field(
         default=3,
-        env="DATAMETRONOME_SCHEDULER_MAX_INSTANCES",
+        validation_alias="DATAMETRONOME_SCHEDULER_MAX_INSTANCES",
         ge=1,
     )
     scheduler_max_workers: int = Field(
         default=10,
-        env="DATAMETRONOME_SCHEDULER_MAX_WORKERS",
+        validation_alias="DATAMETRONOME_SCHEDULER_MAX_WORKERS",
         ge=1,
     )
 
     # Job Queue
-    job_queue_size: int = Field(default=1000, env="DATAMETRONOME_JOB_QUEUE_SIZE", ge=1)
-    worker_pool_size: int = Field(default=4, env="DATAMETRONOME_WORKER_POOL_SIZE", ge=1)
+    job_queue_size: int = Field(default=1000, validation_alias="DATAMETRONOME_JOB_QUEUE_SIZE", ge=1)
+    worker_pool_size: int = Field(default=4, validation_alias="DATAMETRONOME_WORKER_POOL_SIZE", ge=1)
 
     # Metrics
-    metrics_enabled: bool = Field(default=True, env="DATAMETRONOME_METRICS_ENABLED")
+    metrics_enabled: bool = Field(default=True, validation_alias="DATAMETRONOME_METRICS_ENABLED")
     metrics_retention_days: int = Field(
         default=90,
-        env="DATAMETRONOME_METRICS_RETENTION_DAYS",
+        validation_alias="DATAMETRONOME_METRICS_RETENTION_DAYS",
         ge=1,
     )
 
@@ -140,11 +140,12 @@ class Settings(BaseSettings):
             return ["http://localhost:3000"]
         return v
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        env_prefix = "DATAMETRONOME_"
-        extra = "ignore"
+    model_config = ConfigDict(
+        env_file=".env",
+        case_sensitive=False,
+        env_prefix="DATAMETRONOME_",
+        extra="ignore",
+    )
 
 
 # Global settings instance
