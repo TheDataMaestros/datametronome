@@ -30,7 +30,7 @@ services:
       - "8001:8001"
     environment:
       - DATAMETRONOME_SECRET_KEY=your-super-secret-key-that-is-at-least-32-characters-long
-      - DATAMETRONOME_DATABASE_URL=sqlite+aiosqlite:////app/data/datametronome.db
+      - DATAMETRONOME_DATABASE_URL=postgresql://testuser:testpass@postgres:5432/datametronome_test
       - DATAMETRONOME_DEBUG=true
       - DATAMETRONOME_HOST=0.0.0.0
       - DATAMETRONOME_PORT=8001
