@@ -36,5 +36,6 @@ class StaveResponse(BaseModel):
     data_source_type: str
     connection_config: dict | str
     is_active: bool
+    paused: bool = False
     created_at: str
     updated_at: str
