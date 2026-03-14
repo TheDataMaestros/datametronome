@@ -6,6 +6,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
+from datametronome_podium.core.circuit_breaker import StaveCircuitBreaker
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.features.staves.repo import StaveRepo
@@ -20,6 +21,17 @@ VALID_DATA_SOURCE_TYPES = [
 
 def _repo() -> StaveRepo:
     return StaveRepo(get_executor())
+
+
+def _get_circuit_breaker() -> StaveCircuitBreaker | None:
+    """Get circuit breaker if Redis is available. Returns None otherwise."""
+    try:
+        import redis.asyncio as aioredis
+        from datametronome_podium.core.config import settings
+        client = aioredis.from_url(settings.redis_url)
+        return StaveCircuitBreaker(redis_client=client, executor=get_executor())
+    except Exception:
+        return None
 
 
 @router.get("/", response_model=list[StaveResponse])
@@ -112,6 +124,22 @@ async def update_stave(stave_id: str, stave_in: StaveUpdate):
         except (json.JSONDecodeError, TypeError):
             pass
     return data
+
+
+@router.post("/{stave_id}/unpause")
+async def unpause_stave(stave_id: str):
+    repo = _repo()
+    stave = await repo.get(stave_id)
+    if not stave:
+        raise HTTPException(status_code=404, detail="Stave not found")
+
+    cb = _get_circuit_breaker()
+    if cb:
+        await cb.reset(stave_id)
+    else:
+        await repo.update(stave_id, {"paused": False})
+
+    return {"message": "Stave unpaused", "stave_id": stave_id}
 
 
 @router.delete("/{stave_id}")
