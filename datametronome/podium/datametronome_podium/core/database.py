@@ -76,11 +76,6 @@ async def init_db() -> None:
     await connector.connect()
     logger.info("Database connected (dialect=%s)", dialect)
 
-    # Run migrations (pass connector directly to avoid circular imports)
-    from datametronome_podium.core.migrations.runner import run_migrations
-
-    await run_migrations(connector, dialect)
-
     # Seed default data
     from datametronome_podium.core.seeding import create_default_admin
     await create_default_admin(_executor)
