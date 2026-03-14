@@ -24,35 +24,12 @@ async def get_clefs(skip: int = 0, limit: int = 100) -> List[ClefResponse]:
     """
     try:
         db = await get_db()
-        import logging
-
-        logger = logging.getLogger(__name__)
-
-        # Log which database file we're using
-        db_file = getattr(db, "database_path", "unknown")
-        logger.info(f"Using database file: {db_file}")
-
-        # Try a simple count query first
-        count_result = await db.query(
-            {"sql": "SELECT COUNT(*) as count FROM clefs", "params": []}
-        )
-        logger.info(f"COUNT query result: {count_result}")
-
-        # Try without ORDER BY
-        clefs_no_order = await db.query(
-            {"sql": "SELECT * FROM clefs LIMIT ? OFFSET ?", "params": [limit, skip]}
-        )
-        logger.info(f"Query without ORDER BY returned: {len(clefs_no_order)} clefs")
-
-        # Try the original query
         clefs = await db.query(
             {
                 "sql": "SELECT * FROM clefs ORDER BY created_at DESC LIMIT ? OFFSET ?",
                 "params": [limit, skip],
             }
         )
-        logger.info(f"Found {len(clefs)} clefs in database")
-        logger.info(f"Query params: limit={limit}, skip={skip}")
         from datametronome_podium.services.stave_service import deserialize_clef
 
         response_data = []
@@ -89,7 +66,6 @@ async def get_clefs(skip: int = 0, limit: int = 100) -> List[ClefResponse]:
                 logger.warning(
                     f"Failed to deserialize clef {clef.get('id', 'unknown')}: {e}"
                 )
-                logger.exception(e)
                 continue
         return response_data
     except Exception as e:

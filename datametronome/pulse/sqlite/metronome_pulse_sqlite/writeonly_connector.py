@@ -1,7 +1,5 @@
 import asyncio
-import json
 import sqlite3
-import time
 from pathlib import Path
 
 from metronome_pulse_core.interfaces import Pulse, Writable
@@ -22,31 +20,6 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
         # Serialize writes to avoid "database is locked" under concurrent access.
         self._write_lock = asyncio.Lock()
         self._in_transaction = False
-
-    # region agent log
-    def _agent_log(
-        self, hypothesis_id: str, location: str, message: str, data: dict
-    ) -> None:
-        try:
-            payload = {
-                "sessionId": "debug-session",
-                "runId": "pre-fix",
-                "hypothesisId": hypothesis_id,
-                "location": location,
-                "message": message,
-                "data": data,
-                "timestamp": int(time.time() * 1000),
-            }
-            with open(
-                "/Users/totolasso/repos/personal/datametronome/.cursor/debug.log",
-                "a",
-                encoding="utf-8",
-            ) as f:
-                f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
-
-    # endregion
 
     async def connect(self) -> None:
         """Connect to SQLite database."""
@@ -91,36 +64,6 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
 
         async with self._write_lock:
             try:
-                # region agent log
-                tables = []
-                try:
-                    tables = sorted(
-                        {
-                            str((r or {}).get("table"))
-                            for r in (data or [])
-                            if (r or {}).get("table")
-                        }
-                    )
-                except Exception:
-                    tables = []
-                first_id = None
-                try:
-                    first_id = (data or [{}])[0].get("id")
-                except Exception:
-                    first_id = None
-                self._agent_log(
-                    "H_SQLITE_WRITE",
-                    "metronome_pulse_sqlite/writeonly_connector.py:write",
-                    "sqlite write called",
-                    {
-                        "db_path": str(self.database_path),
-                        "operation_type": operation_type,
-                        "records": len(data) if data is not None else None,
-                        "tables": tables,
-                        "first_id": first_id,
-                    },
-                )
-                # endregion
                 if operation_type == "insert":
                     return await self._insert_data(data)
                 elif operation_type == "replace":
@@ -130,52 +73,15 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
                 else:
                     raise ValueError(f"Unsupported operation type: {operation_type}")
             except Exception as e:
-                # region agent log
-                self._agent_log(
-                    "H_SQLITE_WRITE_EXCEPTION",
-                    "metronome_pulse_sqlite/writeonly_connector.py:write",
-                    "sqlite write raised exception",
-                    {
-                        "db_path": str(self.database_path),
-                        "operation_type": operation_type,
-                        "error_type": type(e).__name__,
-                        "error": str(e),
-                    },
-                )
-                # endregion
                 raise RuntimeError(f"Write operation failed: {e}")
 
     async def _insert_data(self, data):
         """Insert data into tables (tables must already exist from Podium)."""
         try:
-            # region agent log
-            tables = []
-            try:
-                tables = sorted(
-                    {
-                        str((r or {}).get("table"))
-                        for r in (data or [])
-                        if (r or {}).get("table")
-                    }
-                )
-            except Exception:
-                tables = []
-            self._agent_log(
-                "H_SQLITE_INSERT",
-                "metronome_pulse_sqlite/writeonly_connector.py:_insert_data",
-                "sqlite insert starting",
-                {
-                    "db_path": str(self.database_path),
-                    "records": len(data) if data is not None else None,
-                    "tables": tables,
-                },
-            )
-            # endregion
             for record in data:
                 # Extract table name and data from record
                 table_name = record.get("table")
                 if not table_name:
-                    print("No table name specified in record")
                     continue
 
                 # Remove table name from data
@@ -200,18 +106,6 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
         except Exception as e:
             if self.connection:
                 self.connection.rollback()
-            # region agent log
-            self._agent_log(
-                "H_SQLITE_INSERT_EXCEPTION",
-                "metronome_pulse_sqlite/writeonly_connector.py:_insert_data",
-                "sqlite insert failed",
-                {
-                    "db_path": str(self.database_path),
-                    "error_type": type(e).__name__,
-                    "error": str(e),
-                },
-            )
-            # endregion
             raise RuntimeError(f"Insert failed: {e}")
 
     async def _replace_data(self, data):
