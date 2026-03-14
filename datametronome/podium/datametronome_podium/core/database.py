@@ -1,12 +1,14 @@
 """
-Database initialization and management for DataMetronome Podium.
+Database initialization and connection lifecycle.
 
-Connector-agnostic: picks PostgresPulse or SQLitePulse based on database_url.
+This module only manages the connection lifecycle. Query execution
+goes through QueryExecutor (core/query.py).
 """
 import logging
 from typing import Any
 from urllib.parse import urlparse
 
+from datametronome_podium.core.query import QueryExecutor
 from datametronome_podium.core.query_adapter import QueryAdapter
 
 logger = logging.getLogger(__name__)
@@ -14,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Global state
 connector: Any | None = None
 dialect: str = "postgresql"
-_adapter: QueryAdapter | None = None
+_executor: QueryExecutor | None = None
 
 
 def _parse_pg_url(url: str) -> dict[str, Any]:
@@ -61,22 +63,15 @@ async def _create_connector(database_url: str) -> tuple[Any, str]:
         return conn, "sqlite"
 
 
-def _get_adapter() -> QueryAdapter:
-    """Get the QueryAdapter for the current dialect."""
-    global _adapter
-    if _adapter is None:
-        _adapter = QueryAdapter(dialect)
-    return _adapter
-
-
 async def init_db() -> None:
-    """Initialize database: create connector, run migrations, seed data."""
-    global connector, dialect, _adapter
+    """Initialize database: create connector, create executor, run seeding."""
+    global connector, dialect, _executor
 
     from datametronome_podium.core.config import settings
 
     connector, dialect = await _create_connector(settings.database_url)
-    _adapter = QueryAdapter(dialect)
+    adapter = QueryAdapter(dialect)
+    _executor = QueryExecutor(connector, adapter)
 
     await connector.connect()
     logger.info("Database connected (dialect=%s)", dialect)
@@ -86,56 +81,50 @@ async def init_db() -> None:
 
     await run_migrations(connector, dialect)
 
-    # Create default admin user
-    await _create_default_admin()
+    # Seed default data
+    from datametronome_podium.core.seeding import create_default_admin
+    await create_default_admin(_executor)
 
     logger.info("Database initialized successfully")
 
 
 async def close_db() -> None:
     """Close the database connector."""
-    global connector
+    global connector, _executor
     if connector:
         await connector.close()
         connector = None
+        _executor = None
 
 
 async def get_db():
-    """Get the DataPulse connector instance."""
+    """Get the raw DataPulse connector instance (for edge cases)."""
     global connector
     if not connector:
         await init_db()
     return connector
 
 
-# --- Normalized helper functions ---
+def get_executor() -> QueryExecutor:
+    """Get the QueryExecutor instance. Primary way to access the database."""
+    if _executor is None:
+        raise RuntimeError("Database not initialized. Call init_db() first.")
+    return _executor
 
 
-async def execute_query(
-    sql: str, params: list[Any] | None = None
-) -> list[dict[str, Any]]:
-    """Execute a query and return results as list of dicts."""
-    adapter = _get_adapter()
-    adapted_sql, adapted_params = adapter.adapt(sql, params)
-    conn = await get_db()
+# --- Backward compatibility (deprecated, will be removed in feature slice migration) ---
+# These functions allow existing code to keep working during the transition.
 
-    if adapted_params:
-        return await conn.query({"sql": adapted_sql, "params": adapted_params})
-    else:
-        return await conn.query(adapted_sql)
+
+async def execute_query(sql: str, params: list[Any] | None = None) -> list[dict[str, Any]]:
+    """DEPRECATED: Use get_executor().query() instead."""
+    return await get_executor().query(sql, params)
 
 
 async def execute_write(sql: str, params: list[Any] | None = None) -> bool:
-    """Execute a write statement (INSERT/UPDATE/DELETE). Returns True on success."""
-    adapter = _get_adapter()
-    adapted_sql, adapted_params = adapter.adapt(sql, params)
-    conn = await get_db()
-
+    """DEPRECATED: Use get_executor().execute() instead."""
     try:
-        if dialect == "postgresql":
-            await conn.execute(adapted_sql, *adapted_params) if adapted_params else await conn.execute(adapted_sql)
-        else:
-            await conn.execute(adapted_sql, adapted_params) if adapted_params else await conn.execute(adapted_sql)
+        await get_executor().execute(sql, params)
         return True
     except Exception:
         logger.exception("execute_write failed")
@@ -143,21 +132,10 @@ async def execute_write(sql: str, params: list[Any] | None = None) -> bool:
 
 
 async def insert_data(table: str, data: dict[str, Any]) -> bool:
-    """Insert a single row into a table."""
-    conn = await get_db()
-
+    """DEPRECATED: Use get_executor().insert() instead."""
     try:
-        if dialect == "sqlite":
-            result = await conn.write([data], table)
-            return bool(result) if result is not None else True
-        else:
-            columns = list(data.keys())
-            placeholders = ", ".join(f"${i+1}" for i in range(len(columns)))
-            col_names = ", ".join(columns)
-            sql = f"INSERT INTO {table} ({col_names}) VALUES ({placeholders})"
-            values = list(data.values())
-            await conn.execute(sql, *values)
-            return True
+        await get_executor().insert(table, data)
+        return True
     except Exception:
         logger.exception("insert_data failed for table=%s", table)
         return False
@@ -166,22 +144,13 @@ async def insert_data(table: str, data: dict[str, Any]) -> bool:
 async def update_data(
     table: str, data: dict[str, Any], where_clause: str, where_params: list[Any]
 ) -> bool:
-    """Update rows in a table."""
-    adapter = _get_adapter()
-
+    """DEPRECATED: Use get_executor().update() instead."""
     set_clauses = [f"{k} = ?" for k in data.keys()]
     set_values = list(data.values())
     sql = f"UPDATE {table} SET {', '.join(set_clauses)} WHERE {where_clause}"
     all_params = set_values + where_params
-
-    adapted_sql, adapted_params = adapter.adapt(sql, all_params)
-    conn = await get_db()
-
     try:
-        if dialect == "postgresql":
-            await conn.execute(adapted_sql, *adapted_params)
-        else:
-            await conn.execute(adapted_sql, adapted_params)
+        await get_executor().execute(sql, all_params)
         return True
     except Exception:
         logger.exception("update_data failed")
@@ -189,18 +158,11 @@ async def update_data(
 
 
 async def delete_data(table: str, where_clause: str, where_params: list[Any]) -> bool:
-    """Delete rows from a table."""
-    adapter = _get_adapter()
-    adapted_where, adapted_params = adapter.adapt(
-        f"DELETE FROM {table} WHERE {where_clause}", where_params
-    )
-    conn = await get_db()
-
+    """DEPRECATED: Use get_executor().execute() instead."""
     try:
-        if dialect == "postgresql":
-            await conn.execute(adapted_where, *adapted_params) if adapted_params else await conn.execute(adapted_where)
-        else:
-            await conn.execute(adapted_where, adapted_params) if adapted_params else await conn.execute(adapted_where)
+        await get_executor().execute(
+            f"DELETE FROM {table} WHERE {where_clause}", where_params
+        )
         return True
     except Exception:
         logger.exception("delete_data failed")
@@ -218,30 +180,3 @@ async def get_db_connection_status() -> bool:
     except Exception:
         logger.error("Database health check failed", exc_info=True)
         return False
-
-
-async def _create_default_admin() -> None:
-    """Create default admin user for development."""
-    try:
-        existing = await execute_query(
-            "SELECT * FROM users WHERE username = ?", ["admin"]
-        )
-        if existing:
-            logger.info("Admin user already exists")
-            return
-
-        from datametronome_podium.api.v1.endpoints.auth import get_password_hash
-
-        await insert_data("users", {
-            "id": "admin-001",
-            "username": "admin",
-            "email": "admin@datametronome.dev",
-            "hashed_password": get_password_hash("admin"),
-            "is_active": True,
-            "is_superuser": True,
-            "created_at": "2025-01-01T00:00:00Z",
-            "updated_at": "2025-01-01T00:00:00Z",
-        })
-        logger.info("Default admin user created (admin/admin)")
-    except Exception as e:
-        logger.warning("Could not create default admin user: %s", e)

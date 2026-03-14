@@ -31,47 +31,36 @@ class TestParseURL:
 
 
 @pytest.mark.asyncio
-async def test_execute_query_sqlite():
-    """execute_query should pass params as list for SQLite."""
-    mock_conn = AsyncMock()
-    mock_conn.query = AsyncMock(return_value=[{"id": 1}])
+async def test_execute_query_delegates_to_executor():
+    """execute_query should delegate to QueryExecutor.query()."""
+    mock_executor = AsyncMock()
+    mock_executor.query = AsyncMock(return_value=[{"id": 1}])
 
-    with patch("datametronome_podium.core.database.get_db", return_value=mock_conn), \
-         patch("datametronome_podium.core.database.dialect", "sqlite"), \
-         patch("datametronome_podium.core.database._adapter", None):
+    with patch("datametronome_podium.core.database.get_executor", return_value=mock_executor):
         result = await execute_query("SELECT * FROM t WHERE id = ?", [1])
         assert result == [{"id": 1}]
+        mock_executor.query.assert_called_once_with("SELECT * FROM t WHERE id = ?", [1])
 
 
 @pytest.mark.asyncio
-async def test_execute_write_postgresql():
-    """execute_write should splat params for PostgreSQL."""
-    mock_conn = AsyncMock()
-    mock_conn.execute = AsyncMock()
+async def test_execute_write_delegates_to_executor():
+    """execute_write should delegate to QueryExecutor.execute()."""
+    mock_executor = AsyncMock()
+    mock_executor.execute = AsyncMock(return_value=1)
 
-    with patch("datametronome_podium.core.database.get_db", return_value=mock_conn), \
-         patch("datametronome_podium.core.database.dialect", "postgresql"), \
-         patch("datametronome_podium.core.database._adapter", None):
+    with patch("datametronome_podium.core.database.get_executor", return_value=mock_executor):
         result = await execute_write("INSERT INTO t (id) VALUES (?)", [1])
         assert result is True
-        mock_conn.execute.assert_called_once()
-        args = mock_conn.execute.call_args[0]
-        assert args[0] == "INSERT INTO t (id) VALUES ($1)"
-        assert args[1] == 1  # splatted, not [1]
+        mock_executor.execute.assert_called_once_with("INSERT INTO t (id) VALUES (?)", [1])
 
 
 @pytest.mark.asyncio
-async def test_insert_data_postgresql():
-    """insert_data for PostgreSQL should build raw INSERT, not use write()."""
-    mock_conn = AsyncMock()
-    mock_conn.execute = AsyncMock()
+async def test_insert_data_delegates_to_executor():
+    """insert_data should delegate to QueryExecutor.insert()."""
+    mock_executor = AsyncMock()
+    mock_executor.insert = AsyncMock(return_value=1)
 
-    with patch("datametronome_podium.core.database.get_db", return_value=mock_conn), \
-         patch("datametronome_podium.core.database.dialect", "postgresql"), \
-         patch("datametronome_podium.core.database._adapter", None):
+    with patch("datametronome_podium.core.database.get_executor", return_value=mock_executor):
         result = await insert_data("users", {"id": "1", "name": "test"})
         assert result is True
-        mock_conn.execute.assert_called_once()
-        sql = mock_conn.execute.call_args[0][0]
-        assert "INSERT INTO users" in sql
-        assert "$1" in sql
+        mock_executor.insert.assert_called_once_with("users", {"id": "1", "name": "test"})
