@@ -1,6 +1,26 @@
-"""Tests: sub-agents can be built and respond with TestModel."""
+"""Tests: sub-agents can be built and respond with TestModel.
+
+Uses a mock database to prevent real DB connections and asyncpg concurrency issues.
+"""
 import pytest
+from unittest.mock import AsyncMock, patch
 from pydantic_ai.models.test import TestModel
+
+
+@pytest.fixture(autouse=True)
+def mock_db():
+    """Mock get_db so agent tools don't hit a real database."""
+    mock_connector = AsyncMock()
+    mock_connector.query.return_value = []
+    mock_connector.query_with_params.return_value = []
+    mock_connector.execute.return_value = 0
+
+    with patch(
+        "datametronome_podium.services.agent_tools.get_db",
+        new_callable=AsyncMock,
+        return_value=mock_connector,
+    ):
+        yield mock_connector
 
 
 @pytest.mark.asyncio
