@@ -57,7 +57,6 @@ async def record_agent_trace(
         await db.write(
             [
                 {
-                    "table": "agent_traces",
                     "id": trace_id,
                     "conversation_id": conversation_id,
                     "user_id": user_id,

@@ -200,7 +200,8 @@ class PostgresPulse(Pulse, Readable, Writable):
         if not data:
             return
 
-        columns = list(data[0].keys())
+        # Strip "table" key from records — it's metadata, not a column
+        columns = [k for k in data[0].keys() if k != "table"]
         records = [tuple(record[col] for col in columns) for record in data]
 
         assert self._pool is not None
@@ -361,15 +362,45 @@ class PostgresPulse(Pulse, Readable, Writable):
             records = await conn.fetch(sql)
             return [dict(record) for record in records]
 
+    @staticmethod
+    def _rewrite_placeholders(sql: str) -> str:
+        """Replace ? placeholders with $1, $2, ... for asyncpg.
+
+        Skips ? inside string literals.
+        """
+        if "?" not in sql:
+            return sql
+        result = []
+        param_index = 0
+        in_string = False
+        i = 0
+        while i < len(sql):
+            char = sql[i]
+            if char == "'":
+                if in_string and i + 1 < len(sql) and sql[i + 1] == "'":
+                    result.append("''")
+                    i += 2
+                    continue
+                in_string = not in_string
+                result.append(char)
+            elif char == "?" and not in_string:
+                param_index += 1
+                result.append(f"${param_index}")
+            else:
+                result.append(char)
+            i += 1
+        return "".join(result)
+
     async def query_with_params(self, sql: str, params: list | None = None) -> list:
         """Execute a parameterized query. Returns list of dicts.
 
         Args:
-            sql: SQL string with $1, $2 placeholders.
+            sql: SQL string with $1/$2 or ? placeholders.
             params: Parameter list. Unpacked as positional args for asyncpg.
         """
         if not self._pool:
             raise RuntimeError("Not connected to database. Call connect() first.")
+        sql = self._rewrite_placeholders(sql)
         conn, should_release = await self._get_conn()
         try:
             if params:
@@ -384,7 +415,7 @@ class PostgresPulse(Pulse, Readable, Writable):
         """Execute a SQL statement. Returns rows affected.
 
         Args:
-            sql: SQL string with $1, $2 placeholders (PostgreSQL native).
+            sql: SQL string with $1/$2 or ? placeholders.
             params: Parameter list. Unpacked as positional args for asyncpg.
 
         Returns:
@@ -392,6 +423,7 @@ class PostgresPulse(Pulse, Readable, Writable):
         """
         if not self._pool:
             raise RuntimeError("Not connected to database. Call connect() first.")
+        sql = self._rewrite_placeholders(sql)
         conn, should_release = await self._get_conn()
         try:
             if params:

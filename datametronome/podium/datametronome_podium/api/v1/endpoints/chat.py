@@ -269,7 +269,6 @@ async def send_chat_message(
             await db.write(
                 [
                     {
-                        "table": "chat_messages",
                         "id": message_id,
                         "conversation_id": conversation_id,
                         "user_id": user_id,
@@ -295,7 +294,6 @@ async def send_chat_message(
             await db.write(
                 [
                     {
-                        "table": "chat_messages",
                         "id": assistant_message_id,
                         "conversation_id": conversation_id,
                         "user_id": user_id,

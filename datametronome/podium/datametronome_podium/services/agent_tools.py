@@ -30,7 +30,7 @@ async def list_staves(
         if active_only:
             staves = await db.query(
                 {
-                    "sql": "SELECT * FROM staves WHERE is_active = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    "sql": "SELECT * FROM staves WHERE is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
                     "params": [limit, skip],
                 }
             )
@@ -514,7 +514,7 @@ async def list_clefs(
         if stave_id and active_only:
             clefs = await db.query(
                 {
-                    "sql": "SELECT * FROM clefs WHERE stave_id = ? AND is_active = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    "sql": "SELECT * FROM clefs WHERE stave_id = ? AND is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
                     "params": [stave_id, limit, skip],
                 }
             )
@@ -528,7 +528,7 @@ async def list_clefs(
         elif active_only:
             clefs = await db.query(
                 {
-                    "sql": "SELECT * FROM clefs WHERE is_active = 1 ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                    "sql": "SELECT * FROM clefs WHERE is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
                     "params": [limit, skip],
                 }
             )
@@ -641,7 +641,7 @@ async def get_summary_report(days: int = 7) -> dict[str, object]:
 
         staves_count = await db.query(
             {
-                "sql": "SELECT COUNT(*) as count FROM staves WHERE is_active = 1",
+                "sql": "SELECT COUNT(*) as count FROM staves WHERE is_active = TRUE",
                 "params": [],
             }
         )
@@ -649,7 +649,7 @@ async def get_summary_report(days: int = 7) -> dict[str, object]:
 
         clefs_count = await db.query(
             {
-                "sql": "SELECT COUNT(*) as count FROM clefs WHERE is_active = 1",
+                "sql": "SELECT COUNT(*) as count FROM clefs WHERE is_active = TRUE",
                 "params": [],
             }
         )
