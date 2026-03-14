@@ -140,7 +140,13 @@ export function extractErrorMessage(err: unknown, fallback: string): string {
   if (err && typeof err === 'object' && 'message' in err) {
     const m = (err as ApiError).message
     if (typeof m === 'string') return m
-    if (Array.isArray(m)) return m.map((e: any) => e?.msg ?? String(e)).filter(Boolean).join('; ') || fallback
+    if (Array.isArray(m))
+      return (
+        m
+          .map((e: any) => e?.msg ?? String(e))
+          .filter(Boolean)
+          .join('; ') || fallback
+      )
   }
   if (err instanceof Error) return err.message
   return fallback

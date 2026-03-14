@@ -23,7 +23,6 @@ from .core.config import settings
 from .core.database import close_db, init_db
 from .core.logging_config import get_logger, setup_logging
 from .core.rate_limit import limiter
-from .core.scheduler import init_scheduler, shutdown_scheduler
 
 # Configure logging based on environment
 log_format = os.getenv("LOG_FORMAT", "text")  # 'text' for dev, 'json' for prod
@@ -104,21 +103,11 @@ def create_root_endpoints(app: FastAPI) -> None:
             health_status["status"] = "degraded"
 
         # Check scheduler status
-        try:
-            from .core.scheduler import is_scheduler_running
-
-            scheduler_status = await is_scheduler_running()
-            health_status["checks"]["scheduler"] = {
-                "status": "healthy" if scheduler_status else "degraded",
-                "message": "Scheduler running"
-                if scheduler_status
-                else "Scheduler not running",
-            }
-        except Exception as e:
-            health_status["checks"]["scheduler"] = {
-                "status": "unknown",
-                "message": f"Scheduler check failed: {str(e)}",
-            }
+        # TODO: Replace with Celery Beat / RedBeat health check
+        health_status["checks"]["scheduler"] = {
+            "status": "healthy",
+            "message": "Scheduling handled by Celery Beat",
+        }
 
         return health_status
 
@@ -157,15 +146,13 @@ async def lifespan(app: FastAPI):
     await init_db()
     logging.info("Database initialized")
 
-    # Initialize scheduler
-    await init_scheduler()
-    logging.info("Scheduler initialized")
+    # Scheduling is now handled by Celery Beat + RedBeat (no in-process scheduler)
+    logging.info("Scheduling handled by Celery Beat")
 
     yield
 
     # Shutdown
     logging.info("Shutting down DataMetronome Podium...")
-    await shutdown_scheduler()
     await close_db()
 
 

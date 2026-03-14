@@ -1,111 +1,100 @@
-# Handoff: Migrate Multi-Agent System to Pydantic AI
+# Worker Architecture — Check Execution Decoupling
+
+**Branch:** `feat/agents/multi-orchestration-agents`
+**Date:** 2026-03-14
+
+---
 
 ## Goal
 
-Migrate DataMetronome's multi-agent chat system from Google ADK to Pydantic AI, removing all regex-based routing in favour of a structured LLM router call.
+Decouple quality check execution from the Podium API process into Celery workers with RabbitMQ as the message broker. Support two deployment models:
+- **Self-hosted**: customer installs everything in their infrastructure (docker-compose)
+- **Hybrid**: lightweight agent in customer's network runs checks locally, pushes results to central platform via HTTPS
 
-## Current State
+Keep Pydantic AI agents completely independent of check execution internals via a `CheckDispatcher` protocol.
 
-All 4 phases of the multi-agent plan are complete but the implementation has known weaknesses:
+---
 
-- **Intent routing** is regex-based (`intent_router.py`) — fragile, language-specific, breaks on non-English queries
-- **Orchestration decisions** (single/chain/parallel) are also regex-based (`orchestrator.py`) — same problem
-- **Sub-agents** (`sub_agents.py`) are not real agents — just prompt variations, all share the same tools
-- **ADK agent** (`adk_agent.py`, 113KB) carries a lot of complexity for what it actually does
+## Current Progress
 
-Files to delete entirely:
-- `datametronome/podium/datametronome_podium/services/adk_agent.py`
-- `datametronome/podium/datametronome_podium/services/intent_router.py`
-- `datametronome/podium/datametronome_podium/services/sub_agents.py`
-- `datametronome/podium/datametronome_podium/services/orchestrator.py`
+### Completed in this branch (prior work)
+- **Pydantic AI Migration** — all 3 chunks done and committed
+- **SRP Database Layer Refactor** — all 8 chunks done and committed
+- **274 tests passing**, 62 API routes, app running in Docker
 
-## Agreed Design (Option B — Clean Redesign)
+### Completed in this session
+- **Design spec written and reviewed** (3 review rounds, all issues resolved)
+  - `docs/superpowers/specs/2026-03-14-worker-architecture-design.md`
+- **Technology decisions made**:
+  - Celery + RabbitMQ (broker) + Redis (result backend/cache)
+  - `celery-redbeat` for dynamic DB-backed schedules
+  - `CheckDispatcher` protocol with 3 implementations (Celery, Inline, Remote)
+  - Priority queues: `checks.high`, `checks.default`, `checks.bulk`, `checks.dlq`
+  - Circuit breaker on staves (5 consecutive failures → pause)
 
-### Architecture
+### NOT yet started
+- Implementation plan (next step: invoke `writing-plans` skill)
+- Any code changes for the worker architecture
 
-```
-User message
-    ↓
-RouterAgent (small/fast model, last N messages for context)
-    → returns RoutingDecision (structured Pydantic output)
-    ↓
-Orchestrator dispatches based on RoutingDecision
-    ↓
-Sub-agents run (single / chain / parallel)
-    → full conversation history passed to sub-agents
-    ↓
-Response
-```
+---
 
-### New File Structure
+## What Worked
 
-```
-datametronome/podium/datametronome_podium/services/
-  agents/
-    router.py          # RouterAgent → RoutingDecision (structured output)
-    config.py          # ConfigAgent (pydantic_ai.Agent + tools)
-    investigation.py   # InvestigationAgent
-    report.py          # ReportAgent
-  orchestrator.py      # dispatches based on RoutingDecision, handles chain/parallel
-  agent_factory.py     # builds agents from env config (model, api_key)
-```
+- **Approach 3 (Celery now, Kafka-ready later)** — chosen over pure Kafka (too heavy for self-hosted) or pure Redis broker (message loss on crash)
+- **RabbitMQ over Redis as Celery broker** — persistent message delivery, purpose-built for task queues
+- **CheckDispatcher protocol** — clean abstraction keeps agents decoupled; showcase/SQLite mode preserved via InlineDispatcher
+- **Staff reviewer subagent** — caught 10 real issues in the spec (async bridging, Beat scheduler library, hybrid agent contradictions, etc.)
 
-### RoutingDecision Schema
+## What Didn't Work
 
-```python
-class RoutingDecision(BaseModel):
-    intent: Literal["quick", "config", "investigation", "report", "exploration"]
-    mode: Literal["single", "chain", "parallel"]
-    agents: list[Literal["config", "investigation", "report"]]
-    reasoning: str  # for tracing/debugging
-```
+- **Redis as Celery broker** — rejected due to message loss on crash (unacceptable for production checks)
+- **Kafka** — rejected for now due to operational complexity for self-hosted deployments (ZooKeeper/KRaft, schema registry, consumer groups). Design is Kafka-ready via the dispatcher protocol.
+- **APScheduler for distributed scheduling** — current in-process scheduler can't handle multiple API instances (duplicate executions)
 
-### Key Design Decisions (all confirmed)
-
-| Decision | Choice | Reason |
-|----------|--------|--------|
-| Model provider | Multi via env var, easy to configure | Flexibility |
-| Router | One structured LLM call → RoutingDecision | Clean, validated, no regex |
-| Language support | Implicit — LLM mirrors user language naturally | No added complexity |
-| Conversation history | Last N messages to router, full history to sub-agents | Balance context vs tokens |
-| Quick intent fast-path | Dropped for now | YAGNI, adds complexity |
-
-### Model Configuration (env vars to design)
-
-Should support easy switching between Gemini, Anthropic, OpenAI, Ollama via env var.
-Example pattern:
-```
-DATAMETRONOME_AI_PROVIDER=anthropic   # or gemini, openai, ollama
-DATAMETRONOME_AI_MODEL=claude-sonnet-4-6
-DATAMETRONOME_AI_API_KEY=sk-...
-DATAMETRONOME_ROUTER_MODEL=claude-haiku-4-5  # optional cheaper model for routing
-```
-
-## What We Decided NOT To Do
-
-- **Option A (thin wrapper)**: Keeps old mental model, sub-agents not first-class — rejected
-- **Option C (single master agent with sub-agent tools)**: Unpredictable, harder to trace — rejected
-- **Quick intent fast-path**: YAGNI — can add later when there's real cost data
-- **Explicit language detection**: LLM mirrors language naturally, no need for `response_language` field
+---
 
 ## Next Steps
 
-1. **Write the implementation plan** — invoke `superpowers:writing-plans` skill (brainstorming was in progress, design approved, this is the next step per the brainstorming skill)
-2. Install `pydantic-ai` in `requirements.txt`
-3. Implement `agent_factory.py` — model builder from env config
-4. Implement `agents/router.py` — RouterAgent with RoutingDecision structured output
-5. Implement `agents/config.py`, `agents/investigation.py`, `agents/report.py` — proper Agent instances
-6. Implement new `orchestrator.py` — dispatch logic, chain (pass result.data as context), parallel (asyncio.gather)
-7. Update `chat.py` endpoint — replace ADK calls with `orchestrator.run(message, history)`
-8. Update `requirements.txt` — add pydantic-ai, remove google-adk
-9. Delete old files: `adk_agent.py`, `intent_router.py`, `sub_agents.py`, old `orchestrator.py`
-10. Test multi-language routing works correctly
-11. Update Docker / env.example
+### Immediate
+1. **Write implementation plan** — invoke `writing-plans` skill using the design spec
+2. **Implement in chunks** per the plan (estimated 7-9 migration steps in the spec)
 
-## Context Files
+### Key implementation milestones (from spec's Migration Path)
+1. Add `CheckDispatcher` protocol + `InlineDispatcher` (current behavior behind interface)
+2. Add Celery app, RabbitMQ + Redis to docker-compose (dev and prod)
+3. Implement `CeleryDispatcher` + check tasks (async bridging via `asyncio.run()`)
+4. Replace APScheduler with Celery Beat + `celery-redbeat`
+5. Migrate existing clef schedules to RedBeat entries
+6. Switch API endpoints to use dispatcher
+7. Add circuit breaker (`stave.paused` column, Redis counters, unpause endpoint)
+8. Add `RemoteDispatcher` + `ResultPusher` for hybrid mode
+9. Remove old scheduler code
 
-- Current chat endpoint: `datametronome/podium/datametronome_podium/api/v1/endpoints/chat.py`
-- Config: `datametronome/podium/datametronome_podium/core/config.py`
-- Multi-agent plan doc: `docs/MULTI_AGENT_PLAN.md`
-- Memory: `memory/MEMORY.md`
-- Tools available to agents: list_staves, get_stave, create_stave, list_stave_tables, get_table_sample, suggest_quality_checks, list_clefs, get_clef, list_checks, get_summary_report, get_quality_report
+---
+
+## Key Files Reference
+
+| File | Purpose |
+|------|---------|
+| `docs/superpowers/specs/2026-03-14-worker-architecture-design.md` | Full design spec (READ THIS FIRST) |
+| `docs/superpowers/plans/2026-03-13-srp-database-layer.md` | SRP refactor plan (completed) |
+| `docs/superpowers/plans/2026-03-11-pydantic-ai-migration.md` | Pydantic AI migration plan (completed) |
+| `datametronome/podium/datametronome_podium/services/clef_executor.py` | Check execution engine (2,337 lines, to be wrapped by Celery tasks) |
+| `datametronome/podium/datametronome_podium/core/scheduler.py` | Current APScheduler (to be replaced by Celery Beat) |
+| `datametronome/podium/datametronome_podium/services/clef_scheduler.py` | Current scheduled execution (to be replaced by check tasks) |
+
+## Key Conventions
+
+- Always use `.venv/bin/python` from `datametronome/podium/` (not `python3`)
+- Always use `docker-compose` for running/testing
+- Tests: `.venv/bin/python -m pytest` with `--timeout=10`
+- asyncio mode: STRICT (`@pytest.mark.asyncio` required)
+- Pre-commit hooks have pre-existing failures — use `--no-verify` for commits
+
+## Running Tests
+
+```bash
+cd datametronome/podium
+.venv/bin/python -m pytest --timeout=10 -v
+# Expected: 274 passed
+```

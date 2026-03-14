@@ -102,10 +102,24 @@
                   v-if="message.role === 'assistant' && (message.intent || message.agentType)"
                   class="flex flex-wrap items-center gap-1"
                 >
-                  <span v-if="message.intent" class="rounded bg-gray-200 dark:bg-gray-600 px-1">{{ message.intent }}</span>
-                  <span v-if="message.agentType" class="rounded bg-gray-200 dark:bg-gray-600 px-1">{{ message.agentType }}</span>
-                  <span v-if="message.orchestrationMode === 'chain' && message.agentChain?.length" class="rounded bg-primary-200 dark:bg-primary-800 px-1">{{ message.agentChain.join('→') }}</span>
-                  <span v-if="message.orchestrationMode === 'parallel' && message.agentChain?.length" class="rounded bg-primary-200 dark:bg-primary-800 px-1">{{ message.agentChain.join('+') }}</span>
+                  <span v-if="message.intent" class="rounded bg-gray-200 dark:bg-gray-600 px-1">{{
+                    message.intent
+                  }}</span>
+                  <span
+                    v-if="message.agentType"
+                    class="rounded bg-gray-200 dark:bg-gray-600 px-1"
+                    >{{ message.agentType }}</span
+                  >
+                  <span
+                    v-if="message.orchestrationMode === 'chain' && message.agentChain?.length"
+                    class="rounded bg-primary-200 dark:bg-primary-800 px-1"
+                    >{{ message.agentChain.join('→') }}</span
+                  >
+                  <span
+                    v-if="message.orchestrationMode === 'parallel' && message.agentChain?.length"
+                    class="rounded bg-primary-200 dark:bg-primary-800 px-1"
+                    >{{ message.agentChain.join('+') }}</span
+                  >
                 </span>
               </div>
             </div>

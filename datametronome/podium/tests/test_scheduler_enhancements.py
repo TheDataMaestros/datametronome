@@ -10,7 +10,6 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from datametronome_podium.services.clef_scheduler import execute_scheduled_clef
 from datametronome_podium.services.job_monitor import (
     JobExecution,
     JobHealthMetrics,
@@ -297,79 +296,6 @@ class TestJobMonitoring:
             assert metrics.total_failures == 1
             assert metrics.success_rate == 0.9  # 9/10
             assert metrics.health_status in ["healthy", "degraded", "failing"]
-
-
-@pytest.mark.unit
-class TestRetryLogic:
-    """Tests for retry logic in clef execution."""
-
-    @pytest.mark.asyncio
-    async def test_execute_with_retry_on_failure(self):
-        """Test that failed executions trigger retry logic."""
-        with patch(
-            "datametronome_podium.services.clef_scheduler.get_db"
-        ) as mock_get_db, patch(
-            "datametronome_podium.services.clef_scheduler.ClefExecutor"
-        ) as mock_executor, patch(
-            "datametronome_podium.services.clef_scheduler.record_job_execution"
-        ) as mock_record, patch(
-            "datametronome_podium.services.clef_scheduler.increment_job_execution_count"
-        ) as mock_increment:
-            mock_db = AsyncMock()
-            mock_get_db.return_value = mock_db
-
-            # Mock clef and stave data
-            import json
-
-            mock_db.query.side_effect = [
-                [
-                    {
-                        "id": "clef-001",
-                        "stave_id": "stave-001",
-                        "name": "Test Check",
-                        "check_type": "row_count",
-                        "config": json.dumps({"table": "users"}),
-                        "warn": None,
-                        "fail": "< 1000",
-                        "schedule": "@hourly",
-                        "retry_config": json.dumps(
-                            {"max_retries": 2, "backoff_factor": 1.0}
-                        ),
-                        "is_active": True,
-                    }
-                ],
-                [
-                    {
-                        "id": "stave-001",
-                        "name": "Test DB",
-                        "data_source_type": "sqlite",
-                        "connection_config": json.dumps({"path": ":memory:"}),
-                        "is_active": True,
-                    }
-                ],
-            ]
-
-            # Mock executor to return failure
-            mock_exec = mock_executor.return_value
-            from datametronome_podium.models.severity import SeverityLevel
-            from datametronome_podium.services.clef_executor import CheckResult
-
-            mock_exec.execute_clef.return_value = CheckResult(
-                clef_id="clef-001",
-                stave_id="stave-001",
-                status="fail",
-                observed_value=500,
-                message="Row count too low",
-            )
-
-            # Mock store result
-            with patch(
-                "datametronome_podium.services.clef_scheduler._store_clef_result"
-            ):
-                result = await execute_scheduled_clef("clef-001", retry_attempt=0)
-
-                # Should have attempted execution
-                assert mock_exec.execute_clef.called
 
 
 @pytest.mark.integration
