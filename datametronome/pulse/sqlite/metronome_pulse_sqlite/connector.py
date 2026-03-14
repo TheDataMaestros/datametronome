@@ -135,6 +135,15 @@ class SQLitePulse(Pulse, Readable, Writable):
             raise RuntimeError("Not connected to SQLite database")
         await self._writeonly.rollback_transaction()
 
+    async def __aenter__(self):
+        """Async context manager entry."""
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        await self.close()
+
     async def copy_records(self, table_name, records):
         """Bulk insert records using SQLite's efficient INSERT."""
         if not await self.is_connected():
