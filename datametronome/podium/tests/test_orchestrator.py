@@ -86,12 +86,16 @@ async def test_run_chat_chain_mode():
     )
 
     with patch(
+        "datametronome_podium.services.orchestrator.settings"
+    ) as mock_settings, patch(
         "datametronome_podium.services.orchestrator._get_router_agent"
     ) as mock_router_factory, patch(
         "datametronome_podium.services.orchestrator._get_investigation_agent"
     ) as mock_inv_factory, patch(
         "datametronome_podium.services.orchestrator._get_config_agent"
     ) as mock_cfg_factory:
+        mock_settings.ai_provider = "anthropic"  # Force LLM routing path
+
         mock_router = AsyncMock()
         mock_router.run.return_value = MagicMock(output=mock_routing)
         mock_router_factory.return_value = mock_router
@@ -127,12 +131,16 @@ async def test_run_chat_parallel_mode():
     )
 
     with patch(
+        "datametronome_podium.services.orchestrator.settings"
+    ) as mock_settings, patch(
         "datametronome_podium.services.orchestrator._get_router_agent"
     ) as mock_router_factory, patch(
         "datametronome_podium.services.orchestrator._get_report_agent"
     ) as mock_report_factory, patch(
         "datametronome_podium.services.orchestrator._get_config_agent"
     ) as mock_cfg_factory:
+        mock_settings.ai_provider = "anthropic"  # Force LLM routing path
+
         mock_router = AsyncMock()
         mock_router.run.return_value = MagicMock(output=mock_routing)
         mock_router_factory.return_value = mock_router

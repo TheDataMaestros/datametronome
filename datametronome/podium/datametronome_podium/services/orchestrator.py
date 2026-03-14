@@ -14,6 +14,8 @@ from typing import Any
 
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 
+from datametronome_podium.core.config import settings
+
 from datametronome_podium.services.agents.router import RoutingDecision, build_router_agent
 from datametronome_podium.services.agents.config import build_config_agent
 from datametronome_podium.services.agents.investigation import build_investigation_agent
@@ -131,14 +133,19 @@ async def run_chat(
     all_history = convert_history_to_messages(history)
     router_history = all_history[-router_history_window:] if all_history else []
 
-    router = _get_router_agent()
-    try:
-        routing_result = await router.run(message, message_history=router_history)
-        decision: RoutingDecision = routing_result.output  # .output not .data in 1.67.0
-    except Exception as e:
-        # Fallback for models that can't produce structured output (e.g. small Ollama models)
-        logger.warning("Router structured output failed (%s), using fallback routing", e)
+    # Skip LLM routing for Ollama — too slow and unreliable for structured output.
+    # Use instant keyword-based routing instead, save the LLM call for the actual agent.
+    if settings.ai_provider == "ollama":
         decision = _fallback_route(message)
+        logger.info("Using keyword routing for Ollama (skipping LLM router)")
+    else:
+        router = _get_router_agent()
+        try:
+            routing_result = await router.run(message, message_history=router_history)
+            decision = routing_result.output  # .output not .data in 1.67.0
+        except Exception as e:
+            logger.warning("Router structured output failed (%s), using fallback routing", e)
+            decision = _fallback_route(message)
 
     logger.info(
         "Router decision: intent=%s mode=%s agents=%s reasoning=%r",
