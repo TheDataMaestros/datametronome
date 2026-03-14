@@ -15,6 +15,12 @@ bcrypt==4.0.1
 # Scheduling (minimal)
 apscheduler>=3.10.0
 
+# Task queue (Celery + RabbitMQ + Redis)
+celery[redis]>=5.3.0
+celery-redbeat>=2.0.0
+redis>=5.0.0
+flower>=2.0.0
+
 # Monitoring and metrics
 prometheus-client>=0.19.0
 
