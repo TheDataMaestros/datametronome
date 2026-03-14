@@ -2,6 +2,8 @@
 Configuration management for DataMetronome Podium.
 """
 
+from typing import Literal
+
 from pydantic import ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings
 
@@ -67,7 +69,7 @@ class Settings(BaseSettings):
     worker_pool_size: int = Field(default=4, validation_alias="DATAMETRONOME_WORKER_POOL_SIZE", ge=1)
 
     # Celery / Worker
-    dispatch_mode: str = Field(
+    dispatch_mode: Literal["inline", "celery", "remote"] = Field(
         default="inline",
         description="Check dispatch mode: inline | celery | remote",
         validation_alias="DATAMETRONOME_DISPATCH_MODE",

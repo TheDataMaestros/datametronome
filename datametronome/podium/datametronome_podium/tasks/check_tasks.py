@@ -134,7 +134,11 @@ def execute_check(self, clef_id: str) -> dict[str, Any]:
     """
     try:
         return asyncio.run(_run_check(clef_id))
+    except ValueError:
+        # Permanent failures (clef not found, stave paused) — don't retry
+        raise
     except Exception as exc:
+        # Transient failures (DB timeout, connection error) — retry
         logger.error("execute_check failed for clef %s: %s", clef_id, exc)
         raise self.retry(exc=exc)
 
