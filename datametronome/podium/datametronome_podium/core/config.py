@@ -66,6 +66,30 @@ class Settings(BaseSettings):
     job_queue_size: int = Field(default=1000, validation_alias="DATAMETRONOME_JOB_QUEUE_SIZE", ge=1)
     worker_pool_size: int = Field(default=4, validation_alias="DATAMETRONOME_WORKER_POOL_SIZE", ge=1)
 
+    # Celery / Worker
+    dispatch_mode: str = Field(
+        default="inline",
+        description="Check dispatch mode: inline | celery | remote",
+        validation_alias="DATAMETRONOME_DISPATCH_MODE",
+    )
+    celery_broker_url: str = Field(
+        default="amqp://guest:guest@rabbitmq:5672//",
+        validation_alias="DATAMETRONOME_CELERY_BROKER_URL",
+    )
+    celery_result_backend: str = Field(
+        default="redis://redis:6379/0",
+        validation_alias="DATAMETRONOME_CELERY_RESULT_BACKEND",
+    )
+    redis_url: str = Field(
+        default="redis://redis:6379/0",
+        validation_alias="DATAMETRONOME_REDIS_URL",
+    )
+    celery_concurrency: int = Field(
+        default=4,
+        validation_alias="DATAMETRONOME_CELERY_CONCURRENCY",
+        ge=1,
+    )
+
     # Metrics
     metrics_enabled: bool = Field(default=True, validation_alias="DATAMETRONOME_METRICS_ENABLED")
     metrics_retention_days: int = Field(
