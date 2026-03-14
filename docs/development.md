@@ -1,122 +1,6 @@
-# 👨‍💻 DataMetronome Development Guide
+# Development Guide
 
-Complete guide for contributing to DataMetronome development.
-
----
-
-## Table of Contents
-
-- [Getting Started](#getting-started)
-- [Development Environment Setup](#development-environment-setup)
-- [Project Structure](#project-structure)
-- [CODE RULE CLUB](#code-rule-club)
-- [Development Workflow](#development-workflow)
-- [Testing](#testing)
-- [Code Quality](#code-quality)
-- [Contributing](#contributing)
-
----
-
-## Getting Started
-
-### Prerequisites
-
-- **Python 3.11+** (project tests on 3.11, 3.12, 3.13)
-- **Git** for version control
-- **Docker & Docker Compose** (optional, for testing)
-- **PostgreSQL 15+** (optional, for integration tests)
-- **uv** or **pip** for package management
-
-### Fork and Clone
-
-```bash
-# Fork the repository on GitHub first, then:
-git clone https://github.com/YOUR_USERNAME/datametronome.git
-cd datametronome
-
-# Add upstream remote
-git remote add upstream https://github.com/datametronome/datametronome.git
-```
-
----
-
-## Development Environment Setup
-
-### Option 1: Local Development (Recommended)
-
-```bash
-# Create virtual environment
-python3.11 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Upgrade pip
-pip install --upgrade pip
-
-# Create .env file from env.example
-make setup-env
-
-# Install all pulse packages in development mode
-pip install -e ./datametronome/pulse/core
-pip install -e ./datametronome/pulse/postgres
-pip install -e ./datametronome/pulse/postgres-psycopg3
-pip install -e ./datametronome/pulse/postgres-sqlalchemy
-pip install -e ./datametronome/pulse/sqlite
-
-# Install podium
-pip install -e ./datametronome/podium
-
-# Install UI dependencies
-npm install --prefix ui-nuxt
-
-# Install development dependencies
-pip install pytest pytest-asyncio pytest-cov pytest-mock
-pip install black isort flake8 mypy
-pip install pre-commit
-```
-
-### Option 2: Using uv (Faster)
-
-```bash
-# Install uv if you haven't
-curl -LsSf https://astral.sh/uv/install.sh | sh
-
-# Create .env file from env.example
-make setup-env
-
-# Install packages
-uv pip install -e ./datametronome/pulse/core
-uv pip install -e ./datametronome/pulse/postgres
-# ... repeat for other packages
-
-# Install dev dependencies
-uv pip install pytest pytest-asyncio pytest-cov black isort flake8 mypy
-```
-
-### Option 3: Docker Development
-
-```bash
-# Start all services
-docker-compose up -d
-
-# Access running containers
-docker-compose exec podium bash
-
-# View logs
-docker-compose logs -f
-
-# Stop services
-docker-compose down
-```
-
-### Setup Pre-commit Hooks
-
-```bash
-# Install pre-commit hooks
-pre-commit install
-
-# Run manually
-pre-commit run --all-files
-```
+This guide covers the project structure, testing, database migrations, and contribution workflow for DataMetronome.
 
 ---
 
@@ -124,435 +8,373 @@ pre-commit run --all-files
 
 ```
 datametronome/
-├── datametronome/           # Main source code
-│   ├── brain/              # Analytics and profiling (internal)
-│   │   └── base/
-│   ├── podium/             # FastAPI backend (application)
+├── datametronome/
+│   ├── brain/                  # AI agent layer
+│   │   ├── base/               #   Core agent abstractions
+│   │   └── advanced/           #   Advanced agent capabilities
+│   ├── pulse/                  # Database connector layer
+│   │   ├── core/               #   PulseProtocol + shared interfaces
+│   │   ├── sqlite/             #   SQLite connector
+│   │   ├── postgres/           #   PostgreSQL connector (asyncpg)
+│   │   ├── postgres-psycopg3/  #   PostgreSQL connector (psycopg3)
+│   │   ├── postgres-sqlalchemy/#   PostgreSQL connector (SQLAlchemy)
+│   │   ├── bigquery/           #   BigQuery connector
+│   │   └── api/                #   API-based connector
+│   ├── podium/                 # FastAPI backend (main application)
 │   │   ├── datametronome_podium/
-│   │   │   ├── api/        # API endpoints
-│   │   │   ├── core/       # Core configuration
-│   │   │   ├── models/     # Pydantic models
-│   │   │   └── services/   # Business logic
-│   │   └── tests/          # Podium tests
-│   ├── pulse/              # DataPulse connectors (PyPI packages)
-│   │   ├── core/           # Base interfaces
-│   │   ├── postgres/       # PostgreSQL (asyncpg)
-│   │   ├── postgres-psycopg3/  # PostgreSQL (psycopg3)
-│   │   ├── postgres-sqlalchemy/  # PostgreSQL (SQLAlchemy)
-│   │   └── sqlite/         # SQLite connector
-│   └── ui-nuxt/            # UI dashboard (application)
-├── docs/                   # Documentation
-├── scripts/                # Utility scripts
-├── tests/                  # End-to-end tests
-├── .github/workflows/      # CI/CD pipelines
-└── docker-compose.yml      # Docker configuration
+│   │   │   ├── api/            #   API routes (v1 endpoints)
+│   │   │   ├── core/           #   Database, config, security
+│   │   │   ├── features/       #   Feature slices (see below)
+│   │   │   ├── models/         #   SQLAlchemy models
+│   │   │   ├── services/       #   Business logic services
+│   │   │   └── main.py         #   Application entry point
+│   │   ├── alembic/            #   Database migrations
+│   │   └── tests/              #   Test suite (274 tests)
+│   ├── plugins/                # Plugin system
+│   └── docs/                   # Internal documentation
+├── ui-nuxt/                    # Nuxt 3 frontend
+├── docs/                       # Project documentation
+├── docker-compose.yml          # Container orchestration
+├── Makefile                    # Development shortcuts
+└── env.example                 # Environment variable template
 ```
 
-### Package Types
+### Feature Slices
 
-Following [PACKAGE_STRUCTURE.md](../datametronome/PACKAGE_STRUCTURE.md):
+The backend follows a feature-slice architecture. Each feature is a self-contained module under `datametronome/podium/datametronome_podium/features/`:
 
-**PyPI Packages** (can be `pip install`ed):
-- `pulse/core/`
-- `pulse/postgres/`
-- `pulse/postgres-psycopg3/`
-- `pulse/postgres-sqlalchemy/`
-- `pulse/sqlite/`
+```
+features/
+├── analytics/     # Metrics, trends, reports
+├── chat/          # AI chat conversations
+├── checks/        # Data quality check results
+├── clefs/         # Check definitions (what to check)
+├── scheduler/     # Scheduled job management
+├── staves/        # Data source connections
+├── traces/        # AI agent execution traces
+├── users/         # User management
+└── workflows/     # Multi-step workflow definitions
+```
 
-**Applications** (run standalone):
-- `podium/` - FastAPI backend
-- `ui-nuxt/` - UI dashboard
+Each feature slice contains:
 
-**Internal** (not distributed):
-- `brain/base/` - Internal utilities
+| File | Purpose |
+| ---- | ------- |
+| `model.py` | SQLAlchemy model definition |
+| `repo.py` | Repository (all database queries) |
+| `schema.py` | Pydantic schemas for request/response |
+| `router.py` | FastAPI router (if the feature exposes API endpoints) |
 
 ---
 
-## CODE RULE CLUB
+## Development Environment Setup
 
-DataMetronome follows **CODE RULE CLUB** principles (our coding standards):
+### Option 1: Docker (Recommended)
 
-### 1. **Unit Tests First**
-Unit tests are **MOST IMPORTANT** and must pass before anything else.
+```bash
+# Create .env from template
+cp env.example .env
 
-```python
-# Good: Clear, focused unit test
-def test_user_email_validation():
-    """Test that invalid emails are rejected."""
-    with pytest.raises(ValidationError):
-        User(username="test", email="invalid-email")
+# Start API + PostgreSQL
+docker compose up -d
+
+# Start with UI as well
+docker compose --profile full up -d
 ```
 
-### 2. **Integration Tests with Proper Database Setup**
-Integration tests must use real database instances to test:
-- Partitions (weekly, daily, monthly)
-- All CRUD operations
-- Transaction handling
+Source code is bind-mounted into containers, so edits on your machine are picked up immediately with auto-reload.
 
-```python
-@pytest.fixture
-async def postgres_db():
-    """Provide a real PostgreSQL database for testing."""
-    conn = await asyncpg.connect(
-        host=os.getenv("POSTGRES_HOST", "localhost"),
-        database=os.getenv("POSTGRES_DB", "testdb"),
-        user=os.getenv("POSTGRES_USER", "testuser"),
-        password=os.getenv("POSTGRES_PASSWORD", "testpass")
-    )
-    yield conn
-    await conn.close()
+### Option 2: Local Development
+
+**Prerequisites:** Python 3.13+, Node.js 20+, PostgreSQL 15+ (or use Docker for the database only)
+
+```bash
+# Start PostgreSQL via Docker
+docker compose up -d postgres
+
+# Create virtual environment
+cd datametronome/podium
+python3.13 -m venv .venv
+source .venv/bin/activate
+
+# Install all packages (from repo root)
+cd ../..
+.venv/bin/pip install -e ./datametronome/pulse/core \
+                      -e ./datametronome/pulse/sqlite \
+                      -e ./datametronome/pulse/postgres \
+                      -e ./datametronome/brain/base \
+                      -e ./datametronome/podium
+
+# Install dev dependencies
+.venv/bin/pip install pytest pytest-asyncio pytest-timeout black isort mypy
+
+# Run database migrations
+cd datametronome/podium
+DATABASE_URL="${DATAMETRONOME_DATABASE_URL}" alembic upgrade head
+
+# Start the API
+cd ../..
+.venv/bin/python -m datametronome_podium.main
 ```
 
-### 3. **Built-in Type Hints**
-Use Python's built-in type hint syntax (no `typing` module imports when possible):
+**Frontend:**
 
-```python
-# Good: Built-in types
-def process_data(items: list[dict[str, int]]) -> tuple[int, int]:
-    ...
-
-# Avoid: Importing from typing
-from typing import List, Dict, Tuple
-def process_data(items: List[Dict[str, int]]) -> Tuple[int, int]:
-    ...
+```bash
+cd ui-nuxt
+npm install
+NUXT_PUBLIC_API_BASE=http://localhost:8001/api/v1 \
+NUXT_PUBLIC_PODIUM_API_BASE=http://localhost:8001 \
+npm run dev
 ```
 
-### 4. **Asyncpg for Database Interactions**
-Use asyncpg for PostgreSQL and Pydantic models (no SQLAlchemy in core):
+---
+
+## Running Tests
+
+The test suite uses pytest with strict async mode. Always run from `datametronome/podium`:
+
+```bash
+cd datametronome/podium
+
+# Run all tests
+.venv/bin/python -m pytest tests/ -v --timeout=10
+
+# Run a specific test file
+.venv/bin/python -m pytest tests/test_staves.py -v --timeout=10
+
+# Run tests matching a keyword
+.venv/bin/python -m pytest tests/ -k "test_chat" -v --timeout=10
+
+# With coverage
+.venv/bin/python -m pytest tests/ --cov=datametronome_podium --cov-report=term-missing
+```
+
+Key details:
+- **asyncio mode:** strict -- async tests require `@pytest.mark.asyncio`
+- **Timeout:** use `--timeout=10` to catch hanging tests
+- **Current count:** 274 tests
+
+---
+
+## Docker Development
+
+### Rebuilding After Changes
+
+Most code changes are picked up automatically via bind mounts. Rebuild when you change dependencies or Dockerfiles:
+
+```bash
+# Rebuild all images
+docker compose build
+
+# Rebuild only the API
+docker compose build podium
+
+# Rebuild the UI (after package.json changes)
+docker compose build ui
+
+# Restart with fresh builds
+docker compose up -d --build
+```
+
+### Viewing Logs
+
+```bash
+# All services
+docker compose logs -f
+
+# Single service
+docker compose logs -f podium
+
+# Last 100 lines
+docker compose logs --tail=100 podium
+```
+
+### Accessing the Database
+
+```bash
+docker compose exec postgres psql -U testuser -d datametronome_test
+```
+
+---
+
+## Database Migrations
+
+DataMetronome uses [Alembic](https://alembic.sqlalchemy.org/) for schema migrations. Migration files live in `datametronome/podium/alembic/versions/`.
+
+### Running Migrations
+
+```bash
+cd datametronome/podium
+
+# Apply all pending migrations
+DATABASE_URL="${DATAMETRONOME_DATABASE_URL}" alembic upgrade head
+
+# Check current migration state
+DATABASE_URL="${DATAMETRONOME_DATABASE_URL}" alembic current
+
+# View migration history
+DATABASE_URL="${DATAMETRONOME_DATABASE_URL}" alembic history
+```
+
+### Creating a New Migration
+
+```bash
+cd datametronome/podium
+
+# Auto-generate from model changes
+DATABASE_URL="${DATAMETRONOME_DATABASE_URL}" alembic revision --autogenerate -m "add_new_column"
+
+# Create an empty migration for manual SQL
+DATABASE_URL="${DATAMETRONOME_DATABASE_URL}" alembic revision -m "custom_migration"
+```
+
+In Docker, migrations run automatically on container startup (see the Podium Dockerfile `CMD`).
+
+---
+
+## Adding a New Feature Slice
+
+Follow this pattern to add a new feature to the backend.
+
+### 1. Create the feature directory
+
+```bash
+mkdir datametronome/podium/datametronome_podium/features/my_feature
+touch datametronome/podium/datametronome_podium/features/my_feature/__init__.py
+```
+
+### 2. Define the model (`model.py`)
 
 ```python
-# Good: asyncpg + Pydantic
+from sqlalchemy import Column, Integer, String, DateTime
+from sqlalchemy.sql import func
+from datametronome_podium.core.database import Base
+
+class MyFeature(Base):
+    __tablename__ = "my_features"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())
+```
+
+### 3. Define schemas (`schema.py`)
+
+```python
 from pydantic import BaseModel
+from datetime import datetime
 
-class User(BaseModel):
+class MyFeatureCreate(BaseModel):
+    name: str
+
+class MyFeatureRead(BaseModel):
     id: int
-    username: str
-    email: str
+    name: str
+    created_at: datetime
 
-async def get_user(conn, user_id: int) -> User:
-    row = await conn.fetchrow("SELECT * FROM users WHERE id = $1", user_id)
-    return User(**row)
+    model_config = {"from_attributes": True}
 ```
 
-### 5. **CI Tests on Python 3.11, 3.12, 3.13**
-All code must pass tests on these three versions.
+### 4. Create the repository (`repo.py`)
+
+```python
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from .model import MyFeature
+from .schema import MyFeatureCreate
+
+class MyFeatureRepo:
+    def __init__(self, session: AsyncSession):
+        self.session = session
+
+    async def create(self, data: MyFeatureCreate) -> MyFeature:
+        obj = MyFeature(**data.model_dump())
+        self.session.add(obj)
+        await self.session.flush()
+        return obj
+
+    async def get_by_id(self, feature_id: int) -> MyFeature | None:
+        result = await self.session.execute(
+            select(MyFeature).where(MyFeature.id == feature_id)
+        )
+        return result.scalar_one_or_none()
+```
+
+### 5. Add the router (`router.py`)
+
+```python
+from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
+from datametronome_podium.core.database import get_session
+from .repo import MyFeatureRepo
+from .schema import MyFeatureCreate, MyFeatureRead
+
+router = APIRouter(prefix="/my-features", tags=["my-features"])
+
+@router.post("/", response_model=MyFeatureRead)
+async def create(data: MyFeatureCreate, session: AsyncSession = Depends(get_session)):
+    repo = MyFeatureRepo(session)
+    obj = await repo.create(data)
+    await session.commit()
+    return obj
+```
+
+### 6. Register the router
+
+Wire the new router into the application by importing it in the API layer and including it on the FastAPI app.
+
+### 7. Create a migration
+
+```bash
+cd datametronome/podium
+DATABASE_URL="${DATAMETRONOME_DATABASE_URL}" alembic revision --autogenerate -m "add_my_feature_table"
+```
 
 ---
 
 ## Development Workflow
 
-### 1. Create a Feature Branch
-
-```bash
-# Update your fork
-git fetch upstream
-git checkout main
-git merge upstream/main
-
-# Create feature branch
-git checkout -b feature/your-feature-name
+```mermaid
+graph TD
+    A[Create feature branch] --> B[Write tests -- RED]
+    B --> C[Write implementation -- GREEN]
+    C --> D[Refactor]
+    D --> E{All tests pass?}
+    E -->|Yes| F[Create pull request]
+    E -->|No| B
+    F --> G[Code review]
+    G --> H[Merge to main]
 ```
 
-### 2. Make Your Changes
+### Branch Naming
 
-Follow the coding standards:
-- Write clear, descriptive commit messages
-- Add tests for new functionality
-- Update documentation as needed
-- Follow PEP 8 style guide
+- `feat/description` -- new features
+- `fix/description` -- bug fixes
+- `docs/description` -- documentation changes
+- `refactor/description` -- code improvements
 
-### 3. Test Your Changes
+### Commit Message Format
 
-```bash
-# Run unit tests
-pytest tests/test_unit.py -v
+- `feat:` -- new feature
+- `fix:` -- bug fix
+- `docs:` -- documentation changes
+- `test:` -- adding or updating tests
+- `refactor:` -- code refactoring
+- `perf:` -- performance improvement
+- `chore:` -- maintenance tasks
 
-# Run all tests
-pytest -v
+### Code Style
 
-# With coverage
-pytest --cov=datametronome_podium --cov-report=term-missing
-```
-
-### 4. Format and Lint
+- **Python:** Format with `black`, sort imports with `isort`, type-check with `mypy`
+- **TypeScript/Vue:** Follow Nuxt conventions
+- Use built-in type hints (`list[str]` not `List[str]`)
 
 ```bash
 # Format code
-black datametronome/
-isort datametronome/
+make format
 
-# Lint
-flake8 datametronome/
-mypy datametronome/ --ignore-missing-imports
-```
-
-### 5. Commit Your Changes
-
-```bash
-git add .
-git commit -m "feat: add new anomaly detection algorithm
-
-- Implemented LSTM-based detection
-- Added tests for time series data
-- Updated documentation"
-```
-
-**Commit Message Format:**
-- `feat:` - New feature
-- `fix:` - Bug fix
-- `docs:` - Documentation changes
-- `test:` - Adding or updating tests
-- `refactor:` - Code refactoring
-- `chore:` - Maintenance tasks
-
-### 6. Push and Create Pull Request
-
-```bash
-git push origin feature/your-feature-name
-```
-
-Then create a PR on GitHub with:
-- Clear description of changes
-- Link to related issues
-- Screenshots (if UI changes)
-- Test results
-
----
-
-## Testing
-
-### Test Organization
-
-```
-tests/
-├── test_unit.py           # Unit tests (run first, most important)
-├── test_integration_database.py  # Integration tests with DB
-└── test_api_integration.py      # API integration tests
-```
-
-### Running Tests
-
-```bash
-# Unit tests only (fastest)
-cd datametronome/podium
-pytest tests/test_unit.py -v
-
-# Integration tests (requires database)
-export POSTGRES_HOST=localhost
-export POSTGRES_DB=testdb
-export POSTGRES_USER=testuser
-export POSTGRES_PASSWORD=testpass
-pytest tests/test_integration_database.py -v
-
-# All tests
-pytest tests/ -v
-
-# Specific test
-pytest tests/test_unit.py::TestUserModel::test_user_creation -v
-
-# With coverage
-pytest tests/ --cov=datametronome_podium --cov-report=html
-```
-
-### Writing Tests
-
-#### Unit Test Example
-
-```python
-import pytest
-from pydantic import ValidationError
-from datametronome_podium.models.user import User
-
-class TestUserModel:
-    """Unit tests for User model."""
-
-    def test_user_creation_valid_data(self):
-        """Test creating user with valid data."""
-        user = User(
-            username="testuser",
-            email="test@example.com",
-            full_name="Test User"
-        )
-        assert user.username == "testuser"
-        assert user.email == "test@example.com"
-
-    def test_user_validation_invalid_email(self):
-        """Test that invalid email raises ValidationError."""
-        with pytest.raises(ValidationError) as exc_info:
-            User(
-                username="testuser",
-                email="not-an-email",
-                full_name="Test"
-            )
-        assert "email" in str(exc_info.value)
-```
-
-#### Integration Test Example
-
-```python
-import pytest
-import asyncpg
-
-@pytest.fixture
-async def db_connection():
-    """Provide database connection."""
-    conn = await asyncpg.connect(
-        host="localhost",
-        database="testdb",
-        user="testuser",
-        password="testpass"
-    )
-
-    # Setup: create test table
-    await conn.execute("""
-        CREATE TABLE IF NOT EXISTS test_users (
-            id SERIAL PRIMARY KEY,
-            username VARCHAR(100),
-            email VARCHAR(255)
-        )
-    """)
-
-    yield conn
-
-    # Teardown: clean up
-    await conn.execute("DROP TABLE test_users")
-    await conn.close()
-
-@pytest.mark.asyncio
-async def test_user_crud_operations(db_connection):
-    """Test complete CRUD cycle."""
-    # Create
-    user_id = await db_connection.fetchval(
-        "INSERT INTO test_users (username, email) VALUES ($1, $2) RETURNING id",
-        "testuser", "test@example.com"
-    )
-    assert user_id is not None
-
-    # Read
-    user = await db_connection.fetchrow(
-        "SELECT * FROM test_users WHERE id = $1",
-        user_id
-    )
-    assert user["username"] == "testuser"
-
-    # Update
-    await db_connection.execute(
-        "UPDATE test_users SET email = $1 WHERE id = $2",
-        "new@example.com", user_id
-    )
-
-    # Verify update
-    updated = await db_connection.fetchrow(
-        "SELECT email FROM test_users WHERE id = $1",
-        user_id
-    )
-    assert updated["email"] == "new@example.com"
-
-    # Delete
-    await db_connection.execute(
-        "DELETE FROM test_users WHERE id = $1",
-        user_id
-    )
-
-    # Verify deletion
-    deleted = await db_connection.fetchrow(
-        "SELECT * FROM test_users WHERE id = $1",
-        user_id
-    )
-    assert deleted is None
-```
-
-### Test Database Setup
-
-```bash
-# Using Docker
-docker run -d \
-  --name postgres-test \
-  -e POSTGRES_DB=testdb \
-  -e POSTGRES_USER=testuser \
-  -e POSTGRES_PASSWORD=testpass \
-  -p 5432:5432 \
-  postgres:15
-
-# Or use docker-compose
-docker-compose -f docker-compose.test.yml up -d
-```
-
----
-
-## Code Quality
-
-### Code Formatting
-
-We use **Black** for consistent formatting:
-
-```bash
-# Format all code
-black datametronome/
-
-# Check without modifying
-black --check datametronome/
-
-# Format specific file
-black datametronome/podium/models/user.py
-```
-
-### Import Sorting
-
-We use **isort** for organized imports:
-
-```bash
-# Sort imports
-isort datametronome/
-
-# Check only
-isort --check-only datametronome/
-```
-
-### Linting
-
-We use **flake8** for linting:
-
-```bash
-# Lint all code
-flake8 datametronome/
-
-# With specific rules
-flake8 datametronome/ --max-line-length=100 --ignore=E203,W503
-```
-
-### Type Checking
-
-We use **mypy** for static type checking:
-
-```bash
-# Type check
-mypy datametronome/ --ignore-missing-imports
-
-# Strict mode
-mypy datametronome/ --strict
-```
-
-### Pre-commit Configuration
-
-`.pre-commit-config.yaml`:
-```yaml
-repos:
-  - repo: https://github.com/psf/black
-    rev: 23.3.0
-    hooks:
-      - id: black
-        language_version: python3.11
-
-  - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
-
-  - repo: https://github.com/pycqa/flake8
-    rev: 6.0.0
-    hooks:
-      - id: flake8
+# Check linting
+make lint
 ```
 
 ---
@@ -561,134 +383,44 @@ repos:
 
 ### Pull Request Process
 
-1. **Fork the repository**
-2. **Create a feature branch**
-3. **Make your changes** (with tests!)
-4. **Run the full test suite**
-5. **Update documentation**
-6. **Submit PR** with clear description
+1. Fork the repository
+2. Create a feature branch from `main`
+3. Make your changes with tests
+4. Run the full test suite
+5. Update documentation as needed
+6. Submit a PR with a clear description
 
 ### PR Checklist
 
-- [ ] Tests pass (`pytest tests/ -v`)
+- [ ] Tests pass (`.venv/bin/python -m pytest tests/ -v --timeout=10`)
 - [ ] Code formatted (`black datametronome/`)
 - [ ] Imports sorted (`isort datametronome/`)
-- [ ] Linting passes (`flake8 datametronome/`)
-- [ ] Type hints added
-- [ ] Documentation updated
-- [ ] CHANGELOG.md updated (if applicable)
+- [ ] Type hints added for new code
+- [ ] Documentation updated if needed
 - [ ] Commit messages follow convention
 
-### Code Review Process
-
-1. **Automated checks** run via GitHub Actions
-2. **Code review** by maintainers
-3. **Feedback** addressed in follow-up commits
-4. **Approval** and merge by maintainers
-
 ---
 
-## Development Tips
-
-### Debugging
-
-```python
-# Use breakpoint() for debugging
-async def my_function():
-    result = await some_async_call()
-    breakpoint()  # Execution pauses here
-    return result
-
-# Or use logging
-import logging
-logger = logging.getLogger(__name__)
-
-async def my_function():
-    logger.debug(f"Processing {len(items)} items")
-    ...
-```
-
-### Working with Async Code
-
-```python
-# Run async function in sync context
-import asyncio
-
-async def my_async_function():
-    return await some_operation()
-
-# In script or REPL
-result = asyncio.run(my_async_function())
-
-# In Jupyter notebook
-await my_async_function()
-```
-
-### Testing Database Migrations
+## Useful Make Commands
 
 ```bash
-# Create test database
-createdb datametronome_test
-
-# Run migrations
-python scripts/migrate_database.py
-
-# Test
-pytest tests/test_integration_database.py
-
-# Cleanup
-dropdb datametronome_test
-```
-
----
-
-## Building Packages
-
-### For Local Testing
-
-```bash
-cd datametronome/pulse/postgres
-python -m build
-pip install dist/metronome_pulse_postgres-*.whl
-```
-
-### For PyPI (Maintainers Only)
-
-```bash
-# Build
-python -m build
-
-# Upload to TestPyPI
-python -m twine upload --repository testpypi dist/*
-
-# Test installation
-pip install --index-url https://test.pypi.org/simple/ metronome-pulse-postgres
-
-# Upload to PyPI
-python -m twine upload dist/*
+make help           # List all commands
+make test           # Run tests
+make lint           # Check code style
+make format         # Auto-format code
+make clean          # Remove build artifacts
+make docker-up      # Start API + database
+make docker-up-full # Start API + database + UI
+make docker-down    # Stop containers
+make docker-build   # Rebuild images
 ```
 
 ---
 
 ## Getting Help
 
-- 📖 Read the [documentation](quickstart.md)
-- 💬 Ask in [GitHub Discussions](https://github.com/datametronome/datametronome/discussions)
-- 🐛 Report bugs in [Issues](https://github.com/datametronome/datametronome/issues)
-- 📧 Email: dev@datametronome.dev
-
----
-
-## Resources
-
-- [Quick Start](quickstart.md)
-- [API Reference](api.md)
-- [Architecture](architecture.md)
-- [Contributing Guide](../CONTRIBUTING.md)
-- [CODE RULE CLUB](../datametronome/PACKAGE_STRUCTURE.md)
-
----
-
-**Happy coding! 🎵**
-
-*Thanks for contributing to DataMetronome!*
+- Read the [Getting Started guide](getting-started.md)
+- Check the [Configuration Reference](configuration.md)
+- Browse the [API docs](api.md) or visit http://localhost:8001/docs
+- Report bugs in [GitHub Issues](https://github.com/datametronome/datametronome/issues)
+- Ask questions in [GitHub Discussions](https://github.com/datametronome/datametronome/discussions)
