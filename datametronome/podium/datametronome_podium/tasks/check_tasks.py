@@ -24,6 +24,17 @@ from datametronome_podium.services.stave_service import deserialize_clef, deseri
 logger = logging.getLogger(__name__)
 
 
+def _get_circuit_breaker(executor):
+    """Create a circuit breaker if Redis is available."""
+    try:
+        import redis.asyncio as aioredis
+        from datametronome_podium.core.circuit_breaker import StaveCircuitBreaker
+        client = aioredis.from_url(settings.redis_url)
+        return StaveCircuitBreaker(redis_client=client, threshold=5, executor=executor)
+    except Exception:
+        return None
+
+
 async def _execute_check_async(
     clef_id: str,
     connector: Any,
@@ -49,9 +60,30 @@ async def _execute_check_async(
         raise ValueError(f"Stave not found: {clef.stave_id}")
     stave = deserialize_stave(stave_rows[0])
 
+    # Check circuit breaker (Redis may be unavailable — fail open)
+    cb = _get_circuit_breaker(executor)
+    try:
+        if cb and await cb.is_tripped(stave.id):
+            raise ValueError(f"Stave {stave.id} is paused due to consecutive failures")
+    except ValueError:
+        raise
+    except Exception:
+        cb = None
+
     # Execute the check
     clef_executor = ClefExecutor()
     result = await clef_executor.execute_clef(clef, stave)
+
+    # Record result in circuit breaker
+    if cb:
+        try:
+            is_success = result.status in ("pass", "warn")
+            if is_success:
+                await cb.record_success(stave.id)
+            else:
+                await cb.record_failure(stave.id)
+        except Exception:
+            pass
 
     # Store result
     metadata_for_storage = dict(result.metadata or {})
