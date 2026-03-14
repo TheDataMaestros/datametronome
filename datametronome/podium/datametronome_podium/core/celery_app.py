@@ -62,5 +62,5 @@ celery_app.conf.update(
     redbeat_redis_url=settings.redis_url,
 )
 
-# Auto-discover tasks in the tasks package
-celery_app.autodiscover_tasks(["datametronome_podium.tasks"])
+# Explicitly include task modules (autodiscover expects tasks.py, ours is check_tasks.py)
+celery_app.conf.include = ["datametronome_podium.tasks.check_tasks"]
