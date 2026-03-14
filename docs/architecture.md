@@ -51,8 +51,16 @@ graph TB
         ANALYTICS["analytics/"]
     end
 
-    subgraph "Processing"
-        SCHEDULER["APScheduler<br/>Cron Jobs"]
+    subgraph "Worker Infrastructure"
+        RMQ["RabbitMQ<br/>Message Broker"]
+        WORKER["Celery Worker<br/>Check Runner"]
+        BEAT["Celery Beat<br/>+ RedBeat"]
+        REDIS["Redis<br/>Results + Cache"]
+        CB["Circuit Breaker"]
+    end
+
+    subgraph "Check Execution"
+        DISPATCHER["CheckDispatcher<br/>Inline | Celery | Remote"]
         EXECUTOR["ClefExecutor<br/>Check Runner"]
     end
 
@@ -71,7 +79,16 @@ graph TB
     AGENTS --> TOOLS
     TOOLS --> QE
     STAVES & CLEFS & CHECKS --> QE
-    SCHEDULER --> EXECUTOR
+    FASTAPI --> DISPATCHER
+    DISPATCHER -->|inline| EXECUTOR
+    DISPATCHER -->|celery| RMQ
+    RMQ --> WORKER
+    WORKER --> EXECUTOR
+    WORKER --> CB
+    CB --> REDIS
+    BEAT -->|send_task| RMQ
+    BEAT -.->|schedules| REDIS
+    WORKER -->|result| REDIS
     EXECUTOR --> QE
     QE --> QA
     QA --> PULSE
@@ -85,6 +102,7 @@ graph TB
 - **Database-agnostic** -- the same codebase runs on SQLite (dev) and PostgreSQL (production)
 - **Multi-agent AI** -- Pydantic AI agents with structured routing, tool calling, and workflow checkpoints
 - **Observability** -- Prometheus metrics endpoint, agent traces, Logfire integration
+- **Decoupled check execution** -- CheckDispatcher protocol with pluggable backends (inline, Celery, remote). See [Worker Architecture](architecture/worker-architecture.md)
 
 ---
 
@@ -109,13 +127,18 @@ datametronome_podium/
 │   ├── scheduler/     # Scheduler job persistence
 │   └── analytics/     # Quality analytics queries
 ├── core/
-│   ├── config.py      # Pydantic Settings (env-driven)
-│   ├── database.py    # Connection lifecycle, get_executor()
-│   ├── query.py       # QueryExecutor (all DB access)
-│   ├── query_adapter.py  # SQLite <-> PostgreSQL translation
-│   ├── scheduler.py   # APScheduler init + job management
-│   ├── middleware.py   # MetricsMiddleware
-│   └── rate_limit.py  # slowapi rate limiter
+│   ├── config.py           # Pydantic Settings (env-driven)
+│   ├── database.py         # Connection lifecycle, get_executor()
+│   ├── query.py            # QueryExecutor (all DB access)
+│   ├── query_adapter.py    # SQLite <-> PostgreSQL translation
+│   ├── check_dispatcher.py # CheckDispatcher protocol + InlineDispatcher
+│   ├── celery_dispatcher.py # CeleryDispatcher (production)
+│   ├── dispatcher_factory.py # Singleton factory (config-driven)
+│   ├── celery_app.py       # Celery app config, queues, RedBeat
+│   ├── worker_db.py        # Per-task DB session factory
+│   ├── circuit_breaker.py  # Stave circuit breaker (Redis)
+│   ├── middleware.py        # MetricsMiddleware
+│   └── rate_limit.py       # slowapi rate limiter
 ├── services/
 │   ├── orchestrator.py    # Multi-agent routing + dispatch
 │   ├── agent_factory.py   # Model builder (Anthropic/OpenAI/Gemini/Ollama)
@@ -125,10 +148,12 @@ datametronome_podium/
 │   │   ├── config.py      # ConfigAgent
 │   │   ├── investigation.py  # InvestigationAgent
 │   │   └── report.py      # ReportAgent
-│   ├── clef_scheduler.py  # Scheduled check execution
-│   ├── clef_executor.py   # Check runner
+│   ├── clef_executor.py   # Check runner (2300+ lines, 40+ check types)
 │   ├── workflow_state.py  # Checkpoint CRUD + event logging
 │   └── agent_tracing.py   # Trace recording
+├── tasks/
+│   ├── check_tasks.py     # execute_check Celery task
+│   └── result_pusher.py   # ResultPusher (hybrid mode)
 ├── api/
 │   ├── deps.py        # get_current_user dependency
 │   └── v1/            # API router aggregation
@@ -250,6 +275,7 @@ erDiagram
         text data_source_type
         text connection_config
         boolean is_active
+        boolean paused
         text created_at
         text updated_at
     }
@@ -394,7 +420,8 @@ erDiagram
 - A **check** may detect **anomalies** in the data
 - **Chat messages** belong to conversations and are linked to users
 - **Workflow checkpoints** track multi-agent orchestration state, with **events** as an audit trail
-- **Scheduler jobs** persist APScheduler state across restarts, with **job executions** tracking each run
+- **Scheduler jobs** persist scheduling state, with **job executions** tracking each run
+- **Staves** can be **paused** by the circuit breaker after consecutive check failures
 
 ---
 
@@ -444,30 +471,59 @@ sequenceDiagram
 
 ---
 
-## Scheduling
+## Check Execution & Scheduling
 
-DataMetronome uses [APScheduler](https://apscheduler.readthedocs.io/) (AsyncIOScheduler) to run clefs on cron schedules.
+Checks are dispatched through the **CheckDispatcher protocol**, which decouples the API from execution. Three dispatch modes are supported:
+
+| Mode | Backend | Use Case |
+|------|---------|----------|
+| `inline` | No broker | Showcase, SQLite, development |
+| `celery` | RabbitMQ + Redis | Production, multi-worker |
+| `remote` | Local + HTTPS push | Hybrid deployment (future) |
 
 ```mermaid
 flowchart TD
-    STARTUP["App Startup<br/>lifespan()"] --> INIT["init_scheduler()"]
-    INIT --> RESTORE["Restore persisted jobs<br/>from scheduler_jobs table"]
-    INIT --> LOAD["load_and_schedule_all_clefs()<br/>from clefs table"]
+    subgraph "Triggers"
+        UI["UI 'Run Now'"]
+        AGENT["AI Agent"]
+        BEAT["Celery Beat<br/>+ RedBeat"]
+    end
 
-    RESTORE --> APS["APScheduler<br/>(AsyncIOScheduler)"]
-    LOAD --> APS
+    subgraph "Dispatch"
+        DF["get_dispatcher()"]
+        UI --> DF
+        AGENT --> DF
+    end
 
-    APS -->|"cron trigger fires"| EXEC["execute_scheduled_clef(clef_id)"]
-    EXEC --> FETCH["Fetch clef + stave<br/>from database"]
-    FETCH --> RUNNER["ClefExecutor.execute_clef()"]
-    RUNNER --> STORE["Store check result<br/>in checks table"]
-    STORE --> RECORD["Record job execution<br/>in job_executions table"]
+    subgraph "Queues (Celery mode)"
+        HIGH["checks.high<br/>(user waiting)"]
+        DEFAULT["checks.default<br/>(scheduled)"]
+        BULK["checks.bulk<br/>(batch ops)"]
+    end
 
-    RUNNER -->|"failed + retry configured"| RETRY["Exponential backoff<br/>then retry"]
-    RETRY --> EXEC
+    DF -->|"CeleryDispatcher"| HIGH
+    BEAT -->|"send_task()"| DEFAULT
+
+    subgraph "Worker"
+        TASK["execute_check(clef_id)<br/>asyncio.run() bridge"]
+        WDB["worker_db_session()<br/>per-task DB lifecycle"]
+        EXEC["ClefExecutor"]
+        CB["Circuit Breaker<br/>Redis counters"]
+    end
+
+    HIGH --> TASK
+    DEFAULT --> TASK
+    BULK --> TASK
+    TASK --> WDB --> EXEC
+    TASK --> CB
+
+    EXEC -->|result| PG["Postgres<br/>(checks table)"]
+    TASK -->|result| REDIS["Redis<br/>(result backend)"]
 ```
 
 ### Schedule Configuration
+
+Celery Beat with **celery-redbeat** handles scheduling. Schedules are stored in Redis and updated atomically when clefs are created/modified via the API. Beat runs as a single container — no duplicate execution across replicas.
 
 Clefs accept standard 5-field cron expressions or shorthands:
 
@@ -479,14 +535,17 @@ Clefs accept standard 5-field cron expressions or shorthands:
 | `@monthly` | `0 0 1 * *` | First of each month |
 | `*/5 * * * *` | (as-is) | Every 5 minutes |
 
-### Scheduler Settings
+### Worker Settings
 
 ```bash
-DATAMETRONOME_SCHEDULER_ENABLED=true
-DATAMETRONOME_SCHEDULER_TIMEZONE=UTC
-DATAMETRONOME_SCHEDULER_MAX_INSTANCES=3   # max concurrent runs of same job
-DATAMETRONOME_SCHEDULER_MAX_WORKERS=10    # threadpool size for sync tasks
+DATAMETRONOME_DISPATCH_MODE=inline          # inline | celery | remote
+DATAMETRONOME_CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+DATAMETRONOME_CELERY_RESULT_BACKEND=redis://redis:6379/0
+DATAMETRONOME_REDIS_URL=redis://redis:6379/0
+DATAMETRONOME_CELERY_CONCURRENCY=4
 ```
+
+For detailed architecture, see [Worker Architecture](architecture/worker-architecture.md) and [ADR-0001](decisions/ADR-0001-decouple-check-execution-with-celery-workers.md).
 
 ---
 
@@ -541,7 +600,9 @@ The secret key must be at least 32 characters. The default is only suitable for 
 | Validation | Pydantic v2 | Settings, schemas, domain models |
 | AI Framework | Pydantic AI | Multi-agent orchestration |
 | Auth | python-jose + passlib | JWT tokens, bcrypt hashing |
-| Scheduler | APScheduler | Cron-based check execution |
+| Task Queue | Celery 5.6 + RabbitMQ | Distributed check execution |
+| Scheduling | Celery Beat + celery-redbeat | Cron-based check scheduling (Redis-backed) |
+| Result Backend | Redis 7 | Task results + cache + RedBeat schedules |
 | Rate Limiting | slowapi | Per-endpoint rate limits |
 | Metrics | prometheus-client | /metrics endpoint |
 | Observability | Logfire (optional) | Distributed tracing |
@@ -557,16 +618,28 @@ The secret key must be at least 32 characters. The default is only suitable for 
 
 ```mermaid
 graph LR
-    subgraph "docker-compose"
+    subgraph "docker-compose (default)"
         UI["ui-nuxt<br/>:3000"]
         API["podium<br/>:8001"]
         DB[("PostgreSQL<br/>:5432")]
+        RMQ["RabbitMQ<br/>:5672 / :15672"]
+        REDIS["Redis<br/>:6379"]
+    end
+
+    subgraph "docker-compose --profile worker"
+        WORKER["podium-worker<br/>Celery"]
+        BEAT["podium-beat<br/>Celery Beat"]
     end
 
     DEV["Developer"] --> UI
     DEV --> API
     UI -->|HTTP| API
     API -->|asyncpg| DB
+    API -->|dispatch| RMQ
+    RMQ --> WORKER
+    WORKER -->|result| REDIS
+    BEAT -->|schedule| RMQ
+    BEAT -.-> REDIS
 ```
 
 ### Application Lifecycle
@@ -575,15 +648,15 @@ graph LR
 stateDiagram-v2
     [*] --> Starting: uvicorn start
     Starting --> DBInit: init_db()
-    DBInit --> SchedulerInit: init_scheduler()
-    SchedulerInit --> Running: lifespan yield
+    DBInit --> Running: lifespan yield
     Running --> ShuttingDown: SIGTERM
-    ShuttingDown --> SchedulerStop: shutdown_scheduler()
-    SchedulerStop --> DBClose: close_db()
+    ShuttingDown --> DBClose: close_db()
     DBClose --> [*]
+
+    note right of Running: Scheduling handled by Celery Beat\n(separate container)
 ```
 
-The `lifespan()` context manager in `main.py` handles startup (database init, scheduler init) and shutdown (scheduler stop, database close) in the correct order.
+The `lifespan()` context manager in `main.py` handles startup (database init) and shutdown (database close). Scheduling is handled externally by Celery Beat — no scheduler lifecycle in the API process.
 
 ---
 
