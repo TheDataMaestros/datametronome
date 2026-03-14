@@ -1,139 +1,59 @@
 """
 Clef action endpoints - Run now and view results functionality.
-
-This module provides endpoints for executing clefs immediately and viewing
-their execution results.
 """
 
-import asyncio
+import json
 import logging
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict
 
-from datametronome_podium.core.database import get_db, insert_data
-from datametronome_podium.services.clef_executor import ClefExecutor
-from datametronome_podium.services.connection_tester import ConnectionTester
-from datametronome_podium.services.stave_service import (
-    deserialize_clef,
-    deserialize_stave,
-)
 from fastapi import APIRouter, HTTPException, Query, status
+
+from datametronome_podium.core.check_dispatcher import JobStatus
+from datametronome_podium.core.database import get_db
+from datametronome_podium.core.dispatcher_factory import get_dispatcher
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
-@router.post("/{clef_id}/run-now")
+@router.post("/{clef_id}/run-now", status_code=status.HTTP_202_ACCEPTED)
 async def run_clef_now(clef_id: str) -> Dict[str, Any]:
-    """
-    Execute a clef immediately.
-
-    This endpoint runs a data quality check immediately, bypassing the schedule.
-    It returns the execution result with status, observed value, and metadata.
-
-    Args:
-        clef_id: ID of the clef to execute
-
-    Returns:
-        Check execution result with status, message, and metadata
-
-    Example Response:
-        {
-            "success": true,
-            "clef_id": "clef-email-check-001",
-            "stave_id": "stave-prod-db-001",
-            "status": "pass",
-            "observed_value": 0.02,
-            "message": "Email null rate within acceptable limits",
-            "execution_time": 0.456,
-            "metadata": {
-                "table": "users",
-                "column": "email",
-                "total_rows": 10000,
-                "null_rows": 200
-            }
-        }
-    """
+    """Dispatch a clef for immediate execution. Returns 202 with job_id."""
     try:
-        # Get the clef and its stave from database
-        db = await get_db()
-
-        # Get clef
-        clefs = await db.query(
-            {"sql": "SELECT * FROM clefs WHERE id = ?", "params": [clef_id]}
-        )
-
-        if not clefs:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Clef not found"
-            )
-
-        clef = deserialize_clef(clefs[0])
-
-        # Get stave
-        staves = await db.query(
-            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [clef.stave_id]}
-        )
-
-        if not staves:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Associated stave not found",
-            )
-
-        stave = deserialize_stave(staves[0])
-
-        # Execute the clef
-        executor = ClefExecutor()
-        result = await executor.execute_clef(clef, stave)
-
-        # Store the result in database
-        import json
-
-        # Persist metadata in checks.details, and always include observed_value so the UI can chart it.
-        metadata_for_storage = dict(result.metadata or {})
-        metadata_for_storage["observed_value"] = result.observed_value
-
-        check_data = {
-            "id": f"check-{clef_id}-{datetime.now(timezone.utc).isoformat()}",
-            "stave_id": stave.id,
-            "clef_id": clef.id,
-            "check_type": clef.check_type,
-            "status": result.status,
-            "message": result.message,
-            "details": json.dumps(metadata_for_storage)
-            if metadata_for_storage
-            else None,
-            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
-            "execution_time": result.execution_time,
-            "anomalies_count": result.anomalies_count,
-            "severity": result.severity.value,  # Store the severity value: "harmony", "dissonance", "cacophony"
-        }
-
-        await insert_data("checks", check_data)
-
-        # Log the execution
-        logger.info(f"Clef {clef_id} executed: {result.status}")
-
+        dispatcher = get_dispatcher()
+        job_id = await dispatcher.dispatch(clef_id)
+        logger.info("Dispatched clef %s, job_id=%s", clef_id, job_id)
         return {
-            "success": True,
-            "clef_id": clef.id,
-            "stave_id": stave.id,
-            "status": result.status,
-            "observed_value": result.observed_value,
-            "message": result.message,
-            "execution_time": result.execution_time,
-            "metadata": result.metadata,
-            "check_id": check_data["id"],
+            "job_id": job_id,
+            "clef_id": clef_id,
+            "status": "pending",
         }
-
-    except HTTPException:
-        raise
     except Exception as e:
-        logger.error(f"Clef execution failed for {clef_id}: {e}")
+        logger.error("Failed to dispatch clef %s: %s", clef_id, e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Clef execution failed: {str(e)}",
+            detail=f"Failed to dispatch check: {str(e)}",
+        )
+
+
+@router.get("/jobs/{job_id}/status")
+async def get_job_status(job_id: str) -> Dict[str, Any]:
+    """Get the status and result of a dispatched check job."""
+    try:
+        dispatcher = get_dispatcher()
+        job_status = await dispatcher.get_status(job_id)
+        result = await dispatcher.get_result(job_id) if job_status == JobStatus.COMPLETED else None
+
+        return {
+            "job_id": job_id,
+            "status": job_status.value,
+            "result": result,
+        }
+    except Exception as e:
+        logger.error("Failed to get job status %s: %s", job_id, e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to get job status: {str(e)}",
         )
 
 
