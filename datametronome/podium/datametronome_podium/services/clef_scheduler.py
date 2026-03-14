@@ -12,7 +12,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-from datametronome_podium.api.schemas.clef import ClefResponse
+from datametronome_podium.features.clefs.schema import ClefResponse
 from datametronome_podium.core.database import get_db
 from datametronome_podium.core.scheduler import (
     add_scheduled_job,

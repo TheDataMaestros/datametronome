@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.config import settings
-from datametronome_podium.core.database import get_db
+from datametronome_podium.core.database import execute_query, get_db
 from datametronome_podium.core.metrics import record_chat_request
 from datametronome_podium.services.agent_tracing import (
     record_agent_trace,
@@ -139,7 +139,6 @@ async def send_chat_message(
         # Generate or use existing conversation ID
         conversation_id = request.conversationId or f"conv-{uuid.uuid4().hex[:12]}"
 
-        # Load conversation history for context
         db = await get_db()
         # Get user identifier - users table has 'id' field
         user_id = current_user.get("id") or current_user.get("username") or "anonymous"
@@ -153,17 +152,15 @@ async def send_chat_message(
                 logger.info(
                     f"📚 Loading conversation history for conversation_id={conversation_id}, user_id={user_id}"
                 )
-                history = await db.query(
-                    {
-                        "sql": """
-                            SELECT role, content, tool_calls, created_at
-                            FROM chat_messages
-                            WHERE conversation_id = ? AND user_id = ?
-                            ORDER BY created_at ASC
-                            LIMIT 20
-                        """,
-                        "params": [conversation_id, user_id],
-                    }
+                history = await execute_query(
+                    """
+                    SELECT role, content, tool_calls, created_at
+                    FROM chat_messages
+                    WHERE conversation_id = ? AND user_id = ?
+                    ORDER BY created_at ASC
+                    LIMIT 20
+                    """,
+                    [conversation_id, user_id],
                 )
                 logger.info(
                     f"📚 Found {len(history)} messages in database for conversation {conversation_id}"

@@ -8,8 +8,11 @@ import os
 from contextlib import asynccontextmanager
 from typing import Any
 
-import logfire
 import uvicorn
+try:
+    import logfire
+except ImportError:
+    logfire = None  # type: ignore
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -205,11 +208,15 @@ def create_app() -> FastAPI:
     # Add root endpoints
     create_root_endpoints(app)
 
-    # Logfire observability: tracing, spans, request/response timing
+    # Logfire observability: tracing, spans, request/response timing (optional)
     # Sends to Logfire cloud only when LOGFIRE_TOKEN is set; otherwise console-only
-    logfire.configure(send_to_logfire="if-token-present")
-    logfire.instrument_fastapi(app)
-    logfire.instrument_httpx()  # Traces ADK agent's internal API calls via httpx
+    if logfire is not None:
+        try:
+            logfire.configure(send_to_logfire="if-token-present")
+            logfire.instrument_fastapi(app)
+            logfire.instrument_httpx()  # Traces ADK agent's internal API calls via httpx
+        except Exception as e:  # e.g. missing opentelemetry-instrumentation-fastapi
+            logger.warning("Logfire instrumentation skipped: %s", e)
 
     return app
 

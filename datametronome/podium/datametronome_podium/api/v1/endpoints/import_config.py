@@ -8,8 +8,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
-from datametronome_podium.api.schemas.clef import ClefCreate
-from datametronome_podium.api.schemas.stave import StaveCreate
+from datametronome_podium.features.clefs.schema import ClefCreate
+from datametronome_podium.features.staves.schema import StaveCreate
 from datametronome_podium.core.database import get_db
 from datametronome_podium.services.env_interpolator import (
     InterpolationError,

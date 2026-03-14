@@ -1,31 +1,39 @@
 """
 Main API router for DataMetronome Podium v1.
+
+Uses feature-based routers for CRUD (staves, clefs, checks).
+Complex endpoints (auth, chat, actions, scheduler) stay in api/v1/endpoints/.
 """
 
 from fastapi import APIRouter
 
+# Feature-based routers (new architecture)
+from datametronome_podium.features.staves.router import router as staves_router
+from datametronome_podium.features.clefs.router import router as clefs_router
+from datametronome_podium.features.checks.router import router as checks_router
+
+# Complex endpoints that stay in api/v1/endpoints/ (not yet migrated)
 from .endpoints import (
     auth,
     chat,
-    checks,
     clef_actions,
-    clefs,
     import_config,
     metrics,
     reports,
     scheduler,
     stave_actions,
-    staves,
     trends,
 )
 
 api_router = APIRouter()
 
-# Include all endpoint routers
+# Feature-based routers (CRUD via QueryExecutor + Repos)
+api_router.include_router(staves_router, prefix="/staves", tags=["data sources"])
+api_router.include_router(clefs_router, prefix="/clefs", tags=["rule sets"])
+api_router.include_router(checks_router, prefix="/checks", tags=["checks"])
+
+# Complex endpoints (auth, orchestration, actions, scheduling)
 api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])
-api_router.include_router(staves.router, prefix="/staves", tags=["data sources"])
-api_router.include_router(clefs.router, prefix="/clefs", tags=["rule sets"])
-api_router.include_router(checks.router, prefix="/checks", tags=["checks"])
 api_router.include_router(metrics.router, prefix="/metrics", tags=["metrics"])
 api_router.include_router(reports.router, prefix="/reports", tags=["reporting"])
 api_router.include_router(
