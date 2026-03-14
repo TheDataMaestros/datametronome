@@ -39,5 +39,5 @@ ENV DATAMETRONOME_DATABASE_URL=sqlite+aiosqlite:////app/data/datametronome.db
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD ["/bin/sh", "-c", "curl -fsS \"http://localhost:${DATAMETRONOME_PORT:-8001}/health\" || exit 1"]
 
-# Run the application
-CMD ["python", "-m", "datametronome_podium.main"]
+# Run Alembic migrations then start the application
+CMD ["sh", "-c", "cd /app/datametronome/podium && DATABASE_URL=${DATAMETRONOME_DATABASE_URL} alembic upgrade head && cd /app && python -m datametronome_podium.main"]
