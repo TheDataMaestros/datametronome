@@ -31,6 +31,36 @@ from datametronome_podium.services.workflow_state import (
 
 logger = logging.getLogger(__name__)
 
+
+def _fallback_route(message: str) -> RoutingDecision:
+    """Keyword-based fallback when the LLM can't produce structured output.
+
+    Works with any model — no structured output needed.
+    """
+    msg = message.lower()
+
+    if any(w in msg for w in ["create", "add", "configure", "set up", "connect"]):
+        return RoutingDecision(
+            intent="config", mode="single", agents=["config"],
+            reasoning="Fallback: detected config keywords",
+        )
+    if any(w in msg for w in ["why", "fail", "error", "broken", "diagnose", "wrong"]):
+        return RoutingDecision(
+            intent="investigation", mode="single", agents=["investigation"],
+            reasoning="Fallback: detected investigation keywords",
+        )
+    if any(w in msg for w in ["report", "summary", "overview", "dashboard", "status"]):
+        return RoutingDecision(
+            intent="report", mode="single", agents=["report"],
+            reasoning="Fallback: detected report keywords",
+        )
+    # Default: report agent handles general questions
+    return RoutingDecision(
+        intent="quick", mode="single", agents=["report"],
+        reasoning="Fallback: defaulting to report agent",
+    )
+
+
 # --- Lazy agent factories (allow monkeypatching in tests) ---
 
 
@@ -102,8 +132,13 @@ async def run_chat(
     router_history = all_history[-router_history_window:] if all_history else []
 
     router = _get_router_agent()
-    routing_result = await router.run(message, message_history=router_history)
-    decision: RoutingDecision = routing_result.output  # .output not .data in 1.67.0
+    try:
+        routing_result = await router.run(message, message_history=router_history)
+        decision: RoutingDecision = routing_result.output  # .output not .data in 1.67.0
+    except Exception as e:
+        # Fallback for models that can't produce structured output (e.g. small Ollama models)
+        logger.warning("Router structured output failed (%s), using fallback routing", e)
+        decision = _fallback_route(message)
 
     logger.info(
         "Router decision: intent=%s mode=%s agents=%s reasoning=%r",

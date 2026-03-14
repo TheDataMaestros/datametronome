@@ -59,4 +59,5 @@ def build_router_agent(model: Model) -> Agent[None, RoutingDecision]:
         model=model,
         output_type=RoutingDecision,
         system_prompt=_ROUTER_SYSTEM_PROMPT,
+        retries=3,
     )
