@@ -6,6 +6,7 @@ from datetime import datetime, timezone, timedelta
 
 from datametronome_podium.core.query import QueryExecutor
 from datametronome_podium.features.insights.model import (
+    BusinessReport,
     DataProfile,
     BaselineSnapshot,
     InsightReport,
@@ -39,6 +40,9 @@ _PROFILE_JSON_FIELDS = (
 )
 _REPORT_JSON_FIELDS = ("dimensions", "anomalies", "suggestions", "key_findings")
 _SNAPSHOT_JSON_FIELDS = ("table_metrics", "column_stats")
+_BUSINESS_REPORT_JSON_FIELDS = (
+    "kpis", "top_performers", "bottom_performers", "trends", "opportunities", "risks"
+)
 
 
 class InsightsRepo:
@@ -153,9 +157,10 @@ class InsightsRepo:
     # --- InsightSuggestion ---
 
     async def create_suggestion(self, suggestion: InsightSuggestion) -> int:
-        return await self.db.insert(
-            "insight_suggestions", suggestion.model_dump()
-        )
+        data = suggestion.model_dump()
+        if data.get("check_spec") is not None and not isinstance(data["check_spec"], str):
+            data["check_spec"] = _json_field(data["check_spec"])
+        return await self.db.insert("insight_suggestions", data)
 
     async def list_suggestions(
         self, stave_id: str, status: str | None = None, limit: int = 50
@@ -181,7 +186,12 @@ class InsightsRepo:
         rows = await self.db.select(
             "insight_suggestions", where={"id": suggestion_id}
         )
-        return InsightSuggestion(**dict(rows[0])) if rows else None
+        if not rows:
+            return None
+        row = dict(rows[0])
+        cs = row.get("check_spec")
+        row["check_spec"] = _parse_json(cs) if cs and cs != "null" else None
+        return InsightSuggestion(**row)
 
     async def update_suggestion_status(
         self, suggestion_id: str, status: str, dismiss_reason: str | None = None
@@ -264,3 +274,39 @@ class InsightsRepo:
             "insight_created_checks", where={"report_id": report_id}
         )
         return [InsightCreatedCheck(**dict(row)) for row in rows]
+
+    # --- BusinessReport ---
+
+    async def create_business_report(self, report: BusinessReport) -> int:
+        data = report.model_dump()
+        for field in _BUSINESS_REPORT_JSON_FIELDS:
+            data[field] = _json_field(data[field])
+        return await self.db.insert("business_reports", data)
+
+    async def get_latest_business_report(
+        self, stave_id: str
+    ) -> BusinessReport | None:
+        rows = await self.db.query(
+            "SELECT * FROM business_reports "
+            "WHERE stave_id = ? ORDER BY generated_at DESC LIMIT 1",
+            [stave_id],
+        )
+        if not rows:
+            return None
+        return self._row_to_business_report(rows[0])
+
+    async def list_business_reports(
+        self, stave_id: str, limit: int = 20
+    ) -> list[BusinessReport]:
+        rows = await self.db.query(
+            "SELECT * FROM business_reports "
+            "WHERE stave_id = ? ORDER BY generated_at DESC LIMIT ?",
+            [stave_id, limit],
+        )
+        return [self._row_to_business_report(row) for row in rows]
+
+    def _row_to_business_report(self, row: dict) -> BusinessReport:
+        r = dict(row)
+        for field in _BUSINESS_REPORT_JSON_FIELDS:
+            r[field] = _parse_json(r.get(field))
+        return BusinessReport(**r)
