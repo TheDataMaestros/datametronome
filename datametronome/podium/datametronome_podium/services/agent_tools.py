@@ -273,10 +273,12 @@ async def get_table_sample(
         tester = ConnectionTester()
         connector = await tester.get_connector(stave, read_only=True)
 
+        config = stave.connection_config if isinstance(stave.connection_config, dict) else {}
         if stave.data_source_type == "bigquery":
             query = f"SELECT * FROM `{table_name}` LIMIT {limit}"
         elif stave.data_source_type in ["postgres", "postgresql"]:
-            query = f'SELECT * FROM "{table_name}" LIMIT {limit}'
+            pg_schema = config.get("schema", "public")
+            query = f'SELECT * FROM "{pg_schema}"."{table_name}" LIMIT {limit}'
         else:
             query = f"SELECT * FROM {table_name} LIMIT {limit}"
 
