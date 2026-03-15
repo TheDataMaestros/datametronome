@@ -67,6 +67,24 @@ class InsightSuggestion(BaseModel):
     based_on: str
     status: Literal["pending", "accepted", "dismissed"] = "pending"
     resolved_at: str | None = None
+    # Lifecycle fields (added migration 005)
+    read_at: str | None = None
+    read_by: str | None = None
+    dismiss_reason: str | None = None
+    assigned_to: str | None = None
+    assigned_at: str | None = None
+    created_at: str
+
+
+class Notification(BaseModel):
+    id: str
+    user_id: str
+    type: str
+    title: str
+    body: str
+    reference_type: str = "suggestion"
+    reference_id: str | None = None
+    read_at: str | None = None
     created_at: str
 
 

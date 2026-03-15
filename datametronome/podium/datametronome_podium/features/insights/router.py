@@ -3,6 +3,9 @@ from fastapi import APIRouter, HTTPException
 
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.features.insights.repo import InsightsRepo
+import uuid
+
+from datametronome_podium.features.insights.model import Notification
 from datametronome_podium.features.insights.schema import (
     DataProfileResponse,
     InsightReportResponse,
@@ -10,6 +13,9 @@ from datametronome_podium.features.insights.schema import (
     SuggestionResponse,
     SnapshotResponse,
     AnalyzeRequest,
+    DismissRequest,
+    AssignRequest,
+    NotificationResponse,
 )
 
 router = APIRouter()
@@ -169,6 +175,48 @@ async def list_suggestions(stave_id: str, status: str | None = None):
     return [s.model_dump() for s in results]
 
 
+@router.post("/{stave_id}/suggestions/{suggestion_id}/read")
+async def mark_suggestion_read(stave_id: str, suggestion_id: str, username: str = "admin"):
+    """Mark a suggestion as read by a user."""
+    repo = _repo()
+    sug = await repo.get_suggestion(suggestion_id)
+    if not sug:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    await repo.mark_suggestion_read(suggestion_id, username)
+    updated = await repo.get_suggestion(suggestion_id)
+    return {"id": suggestion_id, "read_at": updated.read_at if updated else None, "read_by": username}
+
+
+@router.post("/{stave_id}/suggestions/{suggestion_id}/assign")
+async def assign_suggestion(stave_id: str, suggestion_id: str, body: AssignRequest):
+    """Assign a suggestion to a user and create a notification."""
+    from datetime import datetime, timezone
+    repo = _repo()
+    sug = await repo.get_suggestion(suggestion_id)
+    if not sug:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    await repo.assign_suggestion(suggestion_id, body.assigned_to)
+
+    # Create notification for the assignee
+    user = await repo.get_user_by_username(body.assigned_to)
+    if user:
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        notif = Notification(
+            id=f"notif-{uuid.uuid4().hex[:12]}",
+            user_id=user["id"],
+            type="suggestion_assigned",
+            title="New suggestion assigned to you",
+            body=f"[{sug.priority.upper()}] {sug.action[:120]}",
+            reference_type="suggestion",
+            reference_id=suggestion_id,
+            read_at=None,
+            created_at=now,
+        )
+        await repo.create_notification(notif)
+
+    return {"id": suggestion_id, "assigned_to": body.assigned_to}
+
+
 @router.post("/{stave_id}/suggestions/{suggestion_id}/accept")
 async def accept_suggestion(stave_id: str, suggestion_id: str):
     """Accept an insight suggestion."""
@@ -181,11 +229,28 @@ async def accept_suggestion(stave_id: str, suggestion_id: str):
 
 
 @router.post("/{stave_id}/suggestions/{suggestion_id}/dismiss")
-async def dismiss_suggestion(stave_id: str, suggestion_id: str):
-    """Dismiss an insight suggestion."""
+async def dismiss_suggestion(stave_id: str, suggestion_id: str, body: DismissRequest = DismissRequest()):
+    """Dismiss an insight suggestion with an optional reason."""
     repo = _repo()
     sug = await repo.get_suggestion(suggestion_id)
     if not sug:
         raise HTTPException(status_code=404, detail="Suggestion not found")
-    await repo.update_suggestion_status(suggestion_id, "dismissed")
-    return {"id": suggestion_id, "status": "dismissed"}
+    await repo.update_suggestion_status(suggestion_id, "dismissed", dismiss_reason=body.reason)
+    return {"id": suggestion_id, "status": "dismissed", "reason": body.reason}
+
+
+# --- Notifications ---
+
+
+@router.get("/notifications/{user_id}", response_model=list[NotificationResponse])
+async def list_notifications(user_id: str, unread_only: bool = False):
+    """List notifications for a user."""
+    results = await _repo().list_notifications(user_id, unread_only=unread_only)
+    return [n.model_dump() for n in results]
+
+
+@router.post("/notifications/{notification_id}/read")
+async def mark_notification_read(notification_id: str):
+    """Mark a notification as read."""
+    await _repo().mark_notification_read(notification_id)
+    return {"id": notification_id, "read": True}

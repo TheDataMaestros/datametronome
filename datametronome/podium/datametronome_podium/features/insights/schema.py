@@ -41,7 +41,32 @@ class SuggestionResponse(BaseModel):
     based_on: str
     status: str
     resolved_at: str | None = None
+    read_at: str | None = None
+    read_by: str | None = None
+    dismiss_reason: str | None = None
+    assigned_to: str | None = None
+    assigned_at: str | None = None
     created_at: str
+
+
+class NotificationResponse(BaseModel):
+    id: str
+    user_id: str
+    type: str
+    title: str
+    body: str
+    reference_type: str
+    reference_id: str | None = None
+    read_at: str | None = None
+    created_at: str
+
+
+class DismissRequest(BaseModel):
+    reason: str | None = None
+
+
+class AssignRequest(BaseModel):
+    assigned_to: str
 
 
 class DashboardResponse(BaseModel):

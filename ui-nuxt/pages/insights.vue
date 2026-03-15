@@ -13,14 +13,17 @@
           What the AI found in your data — anomalies, findings, and actionable suggestions.
         </p>
       </div>
-      <UButton
-        color="primary"
-        icon="i-heroicons-sparkles"
-        :loading="isAnalyzing"
-        @click="triggerAnalysis"
-      >
-        Re-analyze
-      </UButton>
+      <div class="flex items-center gap-3">
+        <span v-if="analyzeStatus" class="text-xs text-slate-400 italic">{{ analyzeStatus }}</span>
+        <UButton
+          color="primary"
+          icon="i-heroicons-sparkles"
+          :loading="isAnalyzing"
+          @click="triggerAnalysis"
+        >
+          Re-analyze
+        </UButton>
+      </div>
     </div>
 
     <!-- Loading state -->
@@ -200,11 +203,12 @@
             {{ item.dashboard.pending_suggestions.length }} Pending Suggestion{{ item.dashboard.pending_suggestions.length !== 1 ? 's' : '' }}
           </p>
         </div>
-        <div class="space-y-3">
+        <div class="space-y-4">
           <div
             v-for="sug in item.dashboard.pending_suggestions"
             :key="sug.id"
             class="flex gap-3 p-4 rounded-lg bg-amber-500/8 border border-amber-500/20"
+            @mouseenter="markRead(item.staveId, sug)"
           >
             <div class="flex-shrink-0 mt-0.5">
               <span
@@ -215,13 +219,48 @@
               </span>
             </div>
             <div class="flex-1 min-w-0">
-              <div class="flex items-center gap-2 mb-1">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
                 <span class="text-xs font-medium text-amber-300 capitalize">{{ sug.category }}</span>
+                <span v-if="sug.assigned_to" class="flex items-center gap-1 text-xs px-1.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300">
+                  <Icon name="i-heroicons-user" class="w-3 h-3" />
+                  {{ sug.assigned_to }}
+                </span>
               </div>
               <p class="text-sm text-slate-200 font-medium leading-snug">{{ sug.action }}</p>
               <p v-if="sug.reasoning" class="text-xs text-slate-400 mt-1.5 leading-relaxed">{{ sug.reasoning }}</p>
               <p v-if="sug.based_on" class="text-xs text-slate-500 mt-1">Based on: {{ sug.based_on }}</p>
+
+              <!-- Lifecycle timeline -->
+              <div class="flex flex-wrap items-center gap-x-4 gap-y-1 mt-3 pt-3 border-t border-amber-500/10">
+                <!-- Suggested -->
+                <span class="flex items-center gap-1 text-[11px] text-slate-500">
+                  <Icon name="i-heroicons-clock" class="w-3 h-3" />
+                  Suggested {{ formatTimeAgo(sug.created_at) }}
+                  <span class="text-slate-600">·</span>
+                  <span class="text-slate-600">{{ formatDate(sug.created_at) }}</span>
+                </span>
+                <!-- Read -->
+                <span v-if="sug.read_at" class="flex items-center gap-1 text-[11px] text-slate-500">
+                  <Icon name="i-heroicons-eye" class="w-3 h-3 text-blue-400" />
+                  <span class="text-blue-300">Read</span> by <span class="text-blue-300">{{ sug.read_by }}</span>
+                  <span class="text-slate-600">·</span>
+                  <span class="text-slate-600">{{ formatDate(sug.read_at) }}</span>
+                </span>
+                <span v-else class="flex items-center gap-1 text-[11px] text-slate-600">
+                  <Icon name="i-heroicons-eye-slash" class="w-3 h-3" />
+                  Unread
+                </span>
+                <!-- Assigned -->
+                <span v-if="sug.assigned_at" class="flex items-center gap-1 text-[11px] text-slate-500">
+                  <Icon name="i-heroicons-user-circle" class="w-3 h-3 text-indigo-400" />
+                  <span class="text-indigo-300">Assigned to {{ sug.assigned_to }}</span>
+                  <span class="text-slate-600">·</span>
+                  <span class="text-slate-600">{{ formatDate(sug.assigned_at) }}</span>
+                </span>
+              </div>
             </div>
+
+            <!-- Action buttons -->
             <div class="flex-shrink-0 flex flex-col gap-2">
               <UButton
                 size="xs"
@@ -235,13 +274,23 @@
               </UButton>
               <UButton
                 size="xs"
-                color="gray"
+                color="red"
                 variant="ghost"
                 icon="i-heroicons-x-mark"
-                :loading="dismissingId === sug.id"
-                @click="dismissSuggestion(item.staveId, sug)"
+                @click="openDismissModal(item.staveId, sug)"
               >
                 Dismiss
+              </UButton>
+              <UButton
+                v-if="!sug.assigned_to"
+                size="xs"
+                color="indigo"
+                variant="ghost"
+                icon="i-heroicons-user-plus"
+                :loading="assigningId === sug.id"
+                @click="assignToMe(item.staveId, sug)"
+              >
+                Assign me
               </UButton>
             </div>
           </div>
@@ -250,10 +299,54 @@
 
     </div>
   </div>
+
+  <!-- Dismiss modal -->
+  <div v-if="dismissModal.open" class="fixed inset-0 z-50 flex items-center justify-center p-4" @click.self="dismissModal.open = false">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+    <div class="relative intelligence-panel rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <div class="flex items-start gap-3 mb-4">
+        <div class="w-9 h-9 rounded-xl bg-red-500/20 flex items-center justify-center flex-shrink-0">
+          <Icon name="i-heroicons-x-mark" class="w-5 h-5 text-red-400" />
+        </div>
+        <div>
+          <h3 class="font-semibold text-white">Dismiss suggestion</h3>
+          <p class="text-xs text-slate-400 mt-0.5 leading-relaxed line-clamp-2">{{ dismissModal.suggestion?.action }}</p>
+        </div>
+      </div>
+      <div class="mb-5">
+        <label class="text-xs font-medium text-slate-400 mb-1.5 block">Reason <span class="text-slate-600">(optional)</span></label>
+        <textarea
+          v-model="dismissModal.reason"
+          rows="3"
+          placeholder="e.g. Already addressed by recent pipeline change…"
+          class="w-full rounded-lg bg-slate-800/60 border border-slate-700 text-sm text-slate-200 placeholder-slate-600 px-3 py-2 resize-none focus:outline-none focus:border-blue-500/60"
+        />
+      </div>
+      <div class="flex gap-3">
+        <UButton
+          color="red"
+          :loading="isDismissing"
+          class="flex-1"
+          @click="confirmDismiss"
+        >
+          Dismiss
+        </UButton>
+        <UButton
+          color="gray"
+          variant="ghost"
+          class="flex-1"
+          @click="dismissModal.open = false"
+        >
+          Cancel
+        </UButton>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { insightsService, type InsightDashboard, type InsightReport, type DataProfile, type InsightSuggestion } from '~/services/insights'
+import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({
   middleware: 'auth',
@@ -263,6 +356,8 @@ definePageMeta({
 useHead({ title: 'Insights - DataMetronome' })
 
 const { staves, fetchStaves } = useStaves()
+const authStore = useAuthStore()
+const currentUser = computed(() => authStore.user?.username ?? 'admin')
 
 interface StaveInsight {
   staveId: string
@@ -274,9 +369,16 @@ interface StaveInsight {
 
 const isLoading = ref(true)
 const isAnalyzing = ref(false)
+const analyzeStatus = ref('')
 const acceptingId = ref<string | null>(null)
-const dismissingId = ref<string | null>(null)
+const assigningId = ref<string | null>(null)
 const staveInsights = ref<StaveInsight[]>([])
+
+// Dismiss modal state
+const dismissModal = ref<{ open: boolean; staveId: string; suggestion: InsightSuggestion | null; reason: string }>({
+  open: false, staveId: '', suggestion: null, reason: '',
+})
+const isDismissing = ref(false)
 
 async function loadInsights() {
   isLoading.value = true
@@ -312,12 +414,55 @@ async function loadInsights() {
   }
 }
 
+/** Trigger analysis and poll until the task completes (up to 3 minutes). */
 async function triggerAnalysis() {
   isAnalyzing.value = true
+  analyzeStatus.value = 'Dispatching…'
   try {
-    await Promise.all(staves.value.map((s) => insightsService.triggerAnalysis(s.id).catch(() => {})))
-    await new Promise((r) => setTimeout(r, 2000))
+    // Trigger for all staves and collect task IDs
+    const tasks = await Promise.all(
+      staves.value.map(async (s) => {
+        try {
+          const t = await insightsService.triggerAnalysis(s.id)
+          return { staveId: s.id, taskId: t.task_id }
+        } catch {
+          return null
+        }
+      }),
+    )
+    const validTasks = tasks.filter(Boolean) as { staveId: string; taskId: string }[]
+
+    if (validTasks.length === 0) {
+      analyzeStatus.value = 'Failed to dispatch'
+      return
+    }
+
+    analyzeStatus.value = 'Analyzing… (this takes ~30s)'
+
+    // Poll until all tasks complete or 3-minute timeout
+    const deadline = Date.now() + 3 * 60_000
+    let pending = [...validTasks]
+    while (pending.length > 0 && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 4000))
+      const checks = await Promise.all(
+        pending.map(async (t) => {
+          try {
+            const status = await insightsService.pollAnalysis(t.staveId, t.taskId)
+            return { ...t, done: status.status === 'completed' || status.status === 'unknown' }
+          } catch {
+            return { ...t, done: true }
+          }
+        }),
+      )
+      pending = checks.filter((c) => !c.done)
+      if (pending.length > 0) {
+        analyzeStatus.value = `Analyzing… (${pending.length} remaining)`
+      }
+    }
+
+    analyzeStatus.value = 'Done! Refreshing…'
     await loadInsights()
+    analyzeStatus.value = ''
   } finally {
     isAnalyzing.value = false
   }
@@ -333,14 +478,50 @@ async function acceptSuggestion(staveId: string, sug: InsightSuggestion) {
   }
 }
 
-async function dismissSuggestion(staveId: string, sug: InsightSuggestion) {
-  dismissingId.value = sug.id
+function openDismissModal(staveId: string, sug: InsightSuggestion) {
+  dismissModal.value = { open: true, staveId, suggestion: sug, reason: '' }
+}
+
+async function confirmDismiss() {
+  if (!dismissModal.value.suggestion) return
+  isDismissing.value = true
   try {
-    await insightsService.dismissSuggestion(staveId, sug.id)
+    await insightsService.dismissSuggestion(
+      dismissModal.value.staveId,
+      dismissModal.value.suggestion.id,
+      dismissModal.value.reason || undefined,
+    )
+    dismissModal.value.open = false
     await loadInsights()
   } finally {
-    dismissingId.value = null
+    isDismissing.value = false
   }
+}
+
+async function assignToMe(staveId: string, sug: InsightSuggestion) {
+  assigningId.value = sug.id
+  try {
+    await insightsService.assign(staveId, sug.id, currentUser.value)
+    await loadInsights()
+  } finally {
+    assigningId.value = null
+  }
+}
+
+async function markRead(staveId: string, sug: InsightSuggestion) {
+  if (sug.read_at) return
+  try {
+    await insightsService.markRead(staveId, sug.id, currentUser.value)
+    // Update local state immediately without full reload
+    const item = staveInsights.value.find((i) => i.staveId === staveId)
+    if (item?.dashboard) {
+      const s = item.dashboard.pending_suggestions.find((s) => s.id === sug.id)
+      if (s) {
+        s.read_at = new Date().toISOString()
+        s.read_by = currentUser.value
+      }
+    }
+  } catch { /* silent */ }
 }
 
 // Helpers
@@ -388,6 +569,13 @@ function formatTimeAgo(ts?: string | null) {
   const diffH = Math.floor(diffMin / 60)
   if (diffH < 24) return `${diffH}h ago`
   return `${Math.floor(diffH / 24)}d ago`
+}
+
+function formatDate(ts?: string | null) {
+  if (!ts) return null
+  const d = new Date(ts)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 onMounted(loadInsights)

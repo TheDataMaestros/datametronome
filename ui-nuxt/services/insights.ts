@@ -19,6 +19,12 @@ export interface InsightSuggestion {
   reasoning: string
   based_on: string
   status: string
+  resolved_at: string | null
+  read_at: string | null
+  read_by: string | null
+  dismiss_reason: string | null
+  assigned_to: string | null
+  assigned_at: string | null
   created_at: string
 }
 
@@ -27,7 +33,7 @@ export interface InsightReport {
   stave_id: string
   report_type: string
   health_score: number
-  dimensions: { name: string; score: number; description?: string }[]
+  dimensions: { name: string; label?: string; score: number; trend?: string; delta?: number; details?: string }[]
   anomalies: InsightAnomaly[]
   suggestions: { priority: string; category: string; action: string; reasoning: string }[]
   summary: string
@@ -39,7 +45,7 @@ export interface InsightDashboard {
   stave_id: string
   health_score: number
   health_trend: 'improving' | 'declining' | 'stable'
-  dimensions: { name: string; score: number; description?: string }[]
+  dimensions: { name: string; label?: string; score: number; trend?: string; delta?: number; details?: string }[]
   active_anomalies: InsightAnomaly[]
   pending_suggestions: InsightSuggestion[]
   ai_created_checks: { id: string; clef_id: string; rationale: string }[]
@@ -58,6 +64,18 @@ export interface DataProfile {
   updated_at: string
 }
 
+export interface InsightNotification {
+  id: string
+  user_id: string
+  type: string
+  title: string
+  body: string
+  reference_type: string
+  reference_id: string | null
+  read_at: string | null
+  created_at: string
+}
+
 class InsightsService {
   async getDashboard(staveId: string): Promise<InsightDashboard> {
     const response = await apiService.get<InsightDashboard>(`/insights/${staveId}/dashboard`)
@@ -74,12 +92,20 @@ class InsightsService {
     return response.data
   }
 
+  async markRead(staveId: string, suggestionId: string, username: string = 'admin'): Promise<void> {
+    await apiService.post(`/insights/${staveId}/suggestions/${suggestionId}/read?username=${encodeURIComponent(username)}`, {})
+  }
+
+  async assign(staveId: string, suggestionId: string, assignedTo: string): Promise<void> {
+    await apiService.post(`/insights/${staveId}/suggestions/${suggestionId}/assign`, { assigned_to: assignedTo })
+  }
+
   async acceptSuggestion(staveId: string, suggestionId: string): Promise<void> {
     await apiService.post(`/insights/${staveId}/suggestions/${suggestionId}/accept`, {})
   }
 
-  async dismissSuggestion(staveId: string, suggestionId: string): Promise<void> {
-    await apiService.post(`/insights/${staveId}/suggestions/${suggestionId}/dismiss`, {})
+  async dismissSuggestion(staveId: string, suggestionId: string, reason?: string): Promise<void> {
+    await apiService.post(`/insights/${staveId}/suggestions/${suggestionId}/dismiss`, { reason: reason ?? null })
   }
 
   async triggerAnalysis(staveId: string): Promise<{ task_id: string; status: string }> {
@@ -88,6 +114,23 @@ class InsightsService {
       {},
     )
     return response.data
+  }
+
+  async pollAnalysis(staveId: string, taskId: string): Promise<{ status: string; report_id?: string }> {
+    const response = await apiService.get<{ task_id: string; status: string; report_id?: string }>(
+      `/insights/${staveId}/analyze/${taskId}`,
+    )
+    return response.data
+  }
+
+  async getNotifications(userId: string, unreadOnly = false): Promise<InsightNotification[]> {
+    const params = unreadOnly ? '?unread_only=true' : ''
+    const response = await apiService.get<InsightNotification[]>(`/insights/notifications/${userId}${params}`)
+    return response.data
+  }
+
+  async markNotificationRead(notificationId: string): Promise<void> {
+    await apiService.post(`/insights/notifications/${notificationId}/read`, {})
   }
 }
 

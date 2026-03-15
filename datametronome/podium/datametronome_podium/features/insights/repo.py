@@ -11,6 +11,7 @@ from datametronome_podium.features.insights.model import (
     InsightReport,
     InsightSuggestion,
     InsightCreatedCheck,
+    Notification,
 )
 
 
@@ -183,14 +184,71 @@ class InsightsRepo:
         return InsightSuggestion(**dict(rows[0])) if rows else None
 
     async def update_suggestion_status(
-        self, suggestion_id: str, status: str
+        self, suggestion_id: str, status: str, dismiss_reason: str | None = None
+    ) -> int:
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        data: dict = {"status": status, "resolved_at": now}
+        if dismiss_reason is not None:
+            data["dismiss_reason"] = dismiss_reason
+        return await self.db.update(
+            "insight_suggestions", data, where={"id": suggestion_id}
+        )
+
+    async def mark_suggestion_read(self, suggestion_id: str, username: str) -> int:
+        """Record when a user first viewed this suggestion."""
+        rows = await self.db.select(
+            "insight_suggestions", where={"id": suggestion_id}
+        )
+        if not rows or rows[0].get("read_at"):
+            return 0  # already read or not found
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        return await self.db.update(
+            "insight_suggestions",
+            {"read_at": now, "read_by": username},
+            where={"id": suggestion_id},
+        )
+
+    async def assign_suggestion(
+        self, suggestion_id: str, assigned_to: str
     ) -> int:
         now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
         return await self.db.update(
             "insight_suggestions",
-            {"status": status, "resolved_at": now},
+            {"assigned_to": assigned_to, "assigned_at": now},
             where={"id": suggestion_id},
         )
+
+    # --- Notification ---
+
+    async def create_notification(self, notification: Notification) -> int:
+        return await self.db.insert("notifications", notification.model_dump())
+
+    async def list_notifications(
+        self, user_id: str, unread_only: bool = False, limit: int = 50
+    ) -> list[Notification]:
+        if unread_only:
+            rows = await self.db.query(
+                "SELECT * FROM notifications WHERE user_id = ? AND read_at IS NULL "
+                "ORDER BY created_at DESC LIMIT ?",
+                [user_id, limit],
+            )
+        else:
+            rows = await self.db.query(
+                "SELECT * FROM notifications WHERE user_id = ? "
+                "ORDER BY created_at DESC LIMIT ?",
+                [user_id, limit],
+            )
+        return [Notification(**dict(row)) for row in rows]
+
+    async def mark_notification_read(self, notification_id: str) -> int:
+        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        return await self.db.update(
+            "notifications", {"read_at": now}, where={"id": notification_id}
+        )
+
+    async def get_user_by_username(self, username: str) -> dict | None:
+        rows = await self.db.select("users", where={"username": username})
+        return dict(rows[0]) if rows else None
 
     # --- InsightCreatedCheck ---
 
