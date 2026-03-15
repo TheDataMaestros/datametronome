@@ -55,7 +55,7 @@ class InsightPipelineService:
         try:
             table_names = await _list_tables_for_stave(connector, stave)
             schema, samples = await _collect_schema_and_samples(
-                connector, table_names
+                connector, table_names, stave
             )
         finally:
             try:
@@ -101,13 +101,13 @@ class InsightPipelineService:
         from pydantic_ai import Agent
 
         from datametronome_podium.services.agent_factory import (
-            build_model_from_settings,
+            build_heavy_model_from_settings,
         )
         from datametronome_podium.services.agents.insight_models import (
             LLMDomainClassification,
         )
 
-        model = build_model_from_settings()
+        model = build_heavy_model_from_settings()
 
         candidate_info = _format_candidate_info(candidates)
         schema_summary = {
@@ -172,7 +172,7 @@ class InsightPipelineService:
         from pydantic_ai import Agent
 
         from datametronome_podium.services.agent_factory import (
-            build_model_from_settings,
+            build_heavy_model_from_settings,
         )
         from datametronome_podium.services.agents.insight import (
             _build_system_prompt,
@@ -191,7 +191,7 @@ class InsightPipelineService:
             historical_context=historical_ctx,
         )
 
-        model = build_model_from_settings()
+        model = build_heavy_model_from_settings()
         agent: Agent[None, LLMInsightReport] = Agent(
             model=model,
             output_type=LLMInsightReport,
@@ -479,11 +479,20 @@ async def _list_tables_for_stave(connector: Any, stave: Any) -> list[str]:
 
 
 async def _collect_schema_and_samples(
-    connector: Any, table_names: list[str]
+    connector: Any, table_names: list[str], stave: Any = None
 ) -> tuple[dict, dict]:
-    """Collect schema info and sample data for discovered tables."""
+    """Collect schema info, row counts, and sample data for discovered tables."""
     schema: dict[str, Any] = {}
     samples: dict[str, Any] = {}
+
+    # Build schema prefix for SQL queries (e.g., "olist".)
+    sql_prefix = ""
+    if stave:
+        config = stave.connection_config if isinstance(stave.connection_config, dict) else {}
+        ds_type = (stave.data_source_type or "").lower()
+        if ds_type in ("postgres", "postgresql"):
+            pg_schema = config.get("schema", "public")
+            sql_prefix = f'"{pg_schema}".'
 
     for name in table_names[:20]:
         if hasattr(connector, "get_table_info"):
@@ -493,13 +502,39 @@ async def _collect_schema_and_samples(
             except Exception as exc:
                 logger.warning("Failed to get schema for %s: %s", name, exc)
 
+        # Get row count via COUNT(*)
+        row_count = 0
+        if hasattr(connector, "query"):
+            try:
+                count_sql = f'SELECT COUNT(*) as cnt FROM {sql_prefix}"{name}"'
+                count_result = await connector.query(
+                    {"sql": count_sql}
+                )
+                if count_result and isinstance(count_result, list) and len(count_result) > 0:
+                    row = count_result[0]
+                    if isinstance(row, dict):
+                        row_count = row.get("cnt", row.get("count", 0))
+            except Exception as exc:
+                logger.warning("Failed to count rows for %s: %s", name, exc)
+
+        # Get sample data
+        sample_data: dict[str, Any] = {}
         if hasattr(connector, "sample_table"):
             try:
-                sample = await connector.sample_table(name, limit=100)
-                samples[name] = sample
+                raw_sample = await connector.sample_table(name, limit=100)
+                if isinstance(raw_sample, list):
+                    sample_data = {"rows": raw_sample}
+                elif isinstance(raw_sample, dict):
+                    sample_data = raw_sample
+                else:
+                    sample_data = {}
             except Exception as exc:
                 logger.warning("Failed to sample table %s: %s", name, exc)
-                samples[name] = {"error": str(exc)}
+                sample_data = {"error": str(exc)}
+
+        # Merge row_count into sample data
+        sample_data["row_count"] = row_count
+        samples[name] = sample_data
 
     return schema, samples
 

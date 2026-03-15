@@ -89,7 +89,8 @@ def _get_report_agent():
 
 
 def _get_insight_agent():
-    return build_insight_agent(build_model_from_settings())
+    from datametronome_podium.services.agent_factory import build_heavy_model_from_settings
+    return build_insight_agent(build_heavy_model_from_settings())
 
 
 def _get_agent_builder(agent_type: str):

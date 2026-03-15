@@ -121,3 +121,29 @@ def build_router_model_from_settings() -> Model:
         api_key=settings.ai_api_key or None,
         base_url=base_url,
     )
+
+
+def build_heavy_model_from_settings() -> Model:
+    """Build a more capable model for complex analysis tasks.
+
+    Uses ai_heavy_model if set (e.g. gemini-2.5-pro for deep analysis),
+    otherwise falls back to ai_model.
+    """
+    from datametronome_podium.core.config import settings
+
+    heavy_model_name = settings.ai_heavy_model or settings.ai_model
+    base_url = settings.ai_base_url
+    if settings.ai_provider == "ollama" and not base_url:
+        base_url = settings.ollama_api_base.rstrip("/") + "/v1"
+
+    logger.info(
+        "Building heavy model: provider=%s model=%s",
+        settings.ai_provider,
+        heavy_model_name,
+    )
+    return build_model(
+        provider=settings.ai_provider,
+        model_name=heavy_model_name,
+        api_key=settings.ai_api_key or None,
+        base_url=base_url,
+    )

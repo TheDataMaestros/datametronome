@@ -32,15 +32,41 @@ def _get_or_create_redis_client():
 
 
 def _dispatch_auto_scan(stave_id: str) -> None:
-    """Fire-and-forget: dispatch auto-scan + register daily schedule."""
-    try:
-        from datametronome_podium.tasks.intelligence_tasks import run_auto_scan
-        from datametronome_podium.services.intelligence_scheduler import register_daily_intelligence
-        run_auto_scan.delay(stave_id)
-        register_daily_intelligence(stave_id)
-    except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning("Failed to dispatch auto-scan for %s: %s", stave_id, e)
+    """Fire-and-forget: dispatch auto-scan + register daily schedule.
+
+    Retries once after 2 seconds if the first attempt fails (e.g., Celery not ready).
+    """
+    import logging
+    import threading
+
+    log = logging.getLogger(__name__)
+
+    def _dispatch():
+        try:
+            from datametronome_podium.tasks.intelligence_tasks import run_auto_scan
+            run_auto_scan.delay(stave_id)
+            log.info("Auto-scan dispatched for stave %s", stave_id)
+        except Exception as e:
+            log.warning("Auto-scan dispatch failed for %s: %s. Retrying in 2s...", stave_id, e)
+            import time
+            time.sleep(2)
+            try:
+                from datametronome_podium.tasks.intelligence_tasks import run_auto_scan
+                run_auto_scan.delay(stave_id)
+                log.info("Auto-scan dispatched for stave %s (retry)", stave_id)
+            except Exception as e2:
+                log.error("Auto-scan dispatch failed permanently for %s: %s", stave_id, e2)
+
+    def _register_schedule():
+        try:
+            from datametronome_podium.services.intelligence_scheduler import register_daily_intelligence
+            register_daily_intelligence(stave_id)
+        except Exception:
+            pass
+
+    # Run in background threads to not block the API response
+    threading.Thread(target=_dispatch, daemon=True).start()
+    threading.Thread(target=_register_schedule, daemon=True).start()
 
 
 def _repo() -> StaveRepo:
