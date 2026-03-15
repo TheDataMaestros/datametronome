@@ -47,6 +47,7 @@ class SuggestionResponse(BaseModel):
     assigned_to: str | None = None
     assigned_at: str | None = None
     created_at: str
+    check_spec: dict | None = None
 
 
 class NotificationResponse(BaseModel):
@@ -69,6 +70,48 @@ class AssignRequest(BaseModel):
     assigned_to: str
 
 
+class KPIResultResponse(BaseModel):
+    name: str
+    label: str
+    value: float
+    unit: str
+    vs_benchmark: str | None = None
+    trend_direction: str
+
+
+class PerformerInsightResponse(BaseModel):
+    entity_type: str
+    entity_name: str
+    metric: str
+    value: float
+    unit: str
+    vs_average: float
+    drill_down_explanation: str
+
+
+class TrendInsightResponse(BaseModel):
+    metric: str
+    direction: str
+    magnitude: float
+    timeframe: str
+    explanation: str
+
+
+class BusinessReportResponse(BaseModel):
+    id: str
+    stave_id: str
+    snapshot_id: str
+    business_health_score: int
+    executive_summary: str
+    kpis: list[dict] = []
+    top_performers: list[dict] = []
+    bottom_performers: list[dict] = []
+    trends: list[dict] = []
+    opportunities: list[str] = []
+    risks: list[str] = []
+    generated_at: str
+
+
 class DashboardResponse(BaseModel):
     stave_id: str
     health_score: int
@@ -78,6 +121,7 @@ class DashboardResponse(BaseModel):
     pending_suggestions: list[dict] = []
     ai_created_checks: list[dict] = []
     last_analyzed_at: str | None = None
+    business_report: BusinessReportResponse | None = None
 
 
 class SnapshotResponse(BaseModel):
