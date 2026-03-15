@@ -30,3 +30,45 @@ suggested_checks:
     schedule: "0 0 * * *"
     config:
       threshold_std_devs: 3
+
+kpi_queries:
+  monthly_recurring_revenue: |
+    SELECT COALESCE(SUM(amount), 0) as value
+    FROM {schema}."invoices"
+    WHERE status = 'paid'
+      AND date_trunc('month', created_at) = date_trunc('month', NOW())
+  active_subscriptions: |
+    SELECT COUNT(*) as value
+    FROM {schema}."subscriptions"
+    WHERE status = 'active'
+  trial_conversion_rate: |
+    SELECT
+      COUNT(CASE WHEN status = 'active' THEN 1 END)::float /
+      NULLIF(COUNT(*), 0) as value
+    FROM {schema}."subscriptions"
+    WHERE created_at >= NOW() - INTERVAL '90 days'
+  churn_this_month: |
+    SELECT COUNT(*) as value
+    FROM {schema}."subscriptions"
+    WHERE status = 'cancelled'
+      AND date_trunc('month', updated_at) = date_trunc('month', NOW())
+
+performer_dimensions:
+  - entity: plan
+    rank_query: |
+      SELECT p.name as name,
+             COUNT(s.id) as value,
+             'subscriptions' as unit
+      FROM {schema}."plans" p
+      JOIN {schema}."subscriptions" s ON s.plan_id = p.id
+      WHERE s.status = 'active'
+      GROUP BY p.name
+      ORDER BY value DESC
+      LIMIT {limit}
+    drill_query: |
+      SELECT date_trunc('month', s.created_at)::date as period,
+             COUNT(*) as new_subscriptions
+      FROM {schema}."subscriptions" s
+      JOIN {schema}."plans" p ON s.plan_id = p.id
+      WHERE p.name = '{entity_name}'
+      GROUP BY period ORDER BY period DESC LIMIT 6

@@ -10,3 +10,7 @@ metrics: []
 patterns: []
 
 suggested_checks: []
+
+# BI track: intentionally empty — generic domain has no business-specific KPI queries
+kpi_queries: {}
+performer_dimensions: []

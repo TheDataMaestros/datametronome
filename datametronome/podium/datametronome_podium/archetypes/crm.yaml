@@ -31,3 +31,38 @@ suggested_checks:
       column: email
       check: not_null_percentage
       threshold: 0.85
+
+kpi_queries:
+  total_open_opportunities: |
+    SELECT COUNT(*) as value
+    FROM {schema}."opportunities"
+    WHERE status = 'open'
+  pipeline_value: |
+    SELECT COALESCE(SUM(amount), 0) as value
+    FROM {schema}."opportunities"
+    WHERE status = 'open'
+  won_this_month: |
+    SELECT COUNT(*) as value
+    FROM {schema}."opportunities"
+    WHERE status = 'won'
+      AND date_trunc('month', closed_at) = date_trunc('month', NOW())
+
+performer_dimensions:
+  - entity: salesperson
+    rank_query: |
+      SELECT owner_name as name,
+             COALESCE(SUM(amount), 0) as value,
+             '$' as unit
+      FROM {schema}."opportunities"
+      WHERE status = 'won'
+        AND date_trunc('month', closed_at) = date_trunc('month', NOW())
+      GROUP BY owner_name
+      ORDER BY value DESC
+      LIMIT {limit}
+    drill_query: |
+      SELECT date_trunc('month', closed_at)::date as period,
+             COUNT(*) as deals_won,
+             COALESCE(SUM(amount), 0) as revenue
+      FROM {schema}."opportunities"
+      WHERE owner_name = '{entity_name}' AND status = 'won'
+      GROUP BY period ORDER BY period DESC LIMIT 6
