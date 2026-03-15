@@ -196,3 +196,31 @@ async def test_analyze_business_llm_failure_raises():
             mock_agent_cls.return_value.run = AsyncMock(side_effect=Exception("LLM down"))
             with pytest.raises(Exception, match="LLM down"):
                 await service.analyze_business("stave-1", snapshot, profile=None)
+
+
+@pytest.mark.asyncio
+async def test_collect_schema_and_samples_gets_row_count():
+    """Row counts should come from COUNT(*) queries, not sample data."""
+    from datametronome_podium.features.insights.service import _collect_schema_and_samples
+
+    mock_connector = AsyncMock()
+    mock_connector.get_table_info = AsyncMock(return_value={"columns": ["id", "name"]})
+    mock_connector.query = AsyncMock(return_value=[{"cnt": 500}])
+    mock_connector.sample_table = AsyncMock(return_value=[{"id": 1, "name": "test"}])
+
+    schema, samples = await _collect_schema_and_samples(mock_connector, ["orders"])
+    assert samples["orders"]["row_count"] == 500
+
+
+@pytest.mark.asyncio
+async def test_collect_schema_and_samples_row_count_fallback_on_error():
+    """When COUNT(*) query fails, row_count should default to 0."""
+    from datametronome_podium.features.insights.service import _collect_schema_and_samples
+
+    mock_connector = AsyncMock()
+    mock_connector.get_table_info = AsyncMock(return_value={"columns": ["id"]})
+    mock_connector.query = AsyncMock(side_effect=Exception("permission denied"))
+    mock_connector.sample_table = AsyncMock(return_value=[{"id": 1}])
+
+    schema, samples = await _collect_schema_and_samples(mock_connector, ["secret_table"])
+    assert samples["secret_table"]["row_count"] == 0

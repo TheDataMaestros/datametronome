@@ -1,208 +1,271 @@
 <template>
-  <div class="min-h-screen bg-gray-50 dark:bg-gray-900">
-    <!-- Sidebar -->
-    <div class="fixed inset-y-0 left-0 z-50 w-64 bg-white dark:bg-gray-800 shadow-lg">
-      <!-- Header -->
-      <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-200 dark:border-gray-700">
-        <div class="flex items-center justify-center w-8 h-8 rounded-lg gradient-primary">
-          <Icon name="i-heroicons-musical-note" class="w-5 h-5 text-white" />
+  <div class="dm-shell">
+    <!-- ===================== SIDEBAR ===================== -->
+    <aside class="dm-sidebar" :class="{ 'is-collapsed': collapsed }">
+      <!-- Logo -->
+      <div class="dm-sidebar__logo">
+        <div class="dm-logo-icon">
+          <div class="dm-logo-icon__bg" />
+          <div class="dm-logo-icon__pulse" />
+          <svg class="dm-logo-icon__svg" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 2.5L18.5 17.5H1.5L10 2.5Z" stroke="rgba(255,255,255,0.9)" stroke-width="1.35" stroke-linejoin="round" />
+            <line x1="10" y1="16" x2="14.8" y2="7.2" stroke="white" stroke-width="1.35" stroke-linecap="round" />
+            <circle cx="14.8" cy="6.6" r="1.4" fill="white" />
+            <circle cx="10" cy="16" r="0.8" fill="rgba(255,255,255,0.55)" />
+          </svg>
         </div>
-        <div class="flex flex-col">
-          <h1 class="text-lg font-bold text-gray-900 dark:text-white">DataMetronome</h1>
-          <p class="text-xs text-gray-500 dark:text-gray-400">Data Quality Platform</p>
+        <div class="dm-logo-text">
+          <span class="dm-logo-text__brand">DataMetronome</span>
+          <span class="dm-logo-text__sub">Data Quality Platform</span>
         </div>
+        <!-- Collapse toggle -->
+        <button class="dm-collapse-btn" :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'" @click="toggleCollapse">
+          <Icon
+            :name="collapsed ? 'i-heroicons-chevron-right' : 'i-heroicons-chevron-left'"
+            class="w-3.5 h-3.5"
+          />
+        </button>
       </div>
 
       <!-- Navigation -->
-      <nav class="flex-1 px-3 py-4 space-y-1">
+      <nav class="dm-nav">
+        <span class="dm-nav__section-label">Navigation</span>
         <NuxtLink
           v-for="item in navigationItems"
           :key="item.to"
           :to="item.to"
-          class="flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-colors"
-          :class="[
-            $route.path === item.to
-              ? 'bg-primary-50 text-primary-700 dark:bg-primary-900 dark:text-primary-300'
-              : 'text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700',
-          ]"
+          class="dm-nav__item"
+          :class="{ 'is-active': isActive(item.to) }"
+          :title="collapsed ? item.label : undefined"
         >
-          <Icon :name="item.icon" class="w-5 h-5" />
-          <span>{{ item.label }}</span>
-          <UBadge v-if="item.badge" :color="item.badgeColor" size="sm" class="ml-auto">
+          <span class="dm-nav__accent" />
+          <Icon :name="item.icon" class="dm-nav__icon" />
+          <span class="dm-nav__label">{{ item.label }}</span>
+          <UBadge
+            v-if="item.badge && !collapsed"
+            :color="item.badgeColor"
+            variant="solid"
+            size="xs"
+            class="ml-auto text-xs"
+          >
             {{ item.badge }}
           </UBadge>
         </NuxtLink>
       </nav>
 
-      <!-- Footer -->
-      <div class="p-4 border-t border-gray-200 dark:border-gray-700">
-        <div class="flex items-center gap-3">
-          <UAvatar :src="user?.avatar || undefined" :alt="user?.name || 'Admin User'" size="sm" />
-          <div class="flex-1 min-w-0">
-            <p class="text-sm font-medium text-gray-900 dark:text-white truncate">
-              {{ user?.name || 'Admin User' }}
-            </p>
-            <p class="text-xs text-gray-500 dark:text-gray-400 truncate">
-              {{ user?.email || 'admin@datametronome.dev' }}
-            </p>
+      <!-- User Footer -->
+      <div class="dm-sidebar__footer">
+        <div class="dm-user" :title="collapsed ? (user?.name || 'Admin User') : undefined">
+          <UAvatar :src="user?.avatar || undefined" :alt="user?.name || 'Admin'" size="sm" />
+          <div class="dm-user__info">
+            <span class="dm-user__name">{{ user?.name || 'Admin User' }}</span>
+            <span class="dm-user__email">{{ user?.email || 'admin@datametronome.dev' }}</span>
           </div>
           <UDropdown :items="userMenuItems">
-            <UButton color="gray" variant="ghost" icon="i-heroicons-ellipsis-vertical" size="sm" />
+            <button class="dm-user__menu-btn">
+              <Icon name="i-heroicons-ellipsis-vertical" class="w-3.5 h-3.5" />
+            </button>
           </UDropdown>
         </div>
       </div>
-    </div>
+    </aside>
 
-    <!-- Main Content -->
-    <div class="pl-64">
-      <!-- Top Navigation -->
-      <header
-        class="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700"
-      >
-        <div class="px-6 py-4">
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-4">
-              <h2 class="text-xl font-semibold text-gray-900 dark:text-white">
-                {{ pageTitle }}
-              </h2>
-            </div>
-            <div class="flex items-center gap-3">
-              <UButton
-                color="gray"
-                variant="ghost"
-                icon="i-heroicons-bell"
-                :badge="notificationCount > 0 ? notificationCount : undefined"
-                @click="showNotifications = !showNotifications"
-              />
-              <UButton
-                color="gray"
-                variant="ghost"
-                icon="i-heroicons-cog-6-tooth"
-                @click="showSettings = !showSettings"
-              />
-              <UButton
-                color="primary"
-                variant="solid"
-                icon="i-heroicons-arrow-path"
-                @click="refreshData"
-                :loading="isRefreshing"
-              >
-                Refresh
-              </UButton>
-            </div>
+    <!-- ===================== MAIN ===================== -->
+    <div class="dm-main" :style="{ marginLeft: collapsed ? '62px' : '256px' }">
+      <!-- Header -->
+      <header class="dm-header">
+        <div class="dm-header__left">
+          <h2 class="dm-page-title">{{ pageTitle }}</h2>
+        </div>
+
+        <div class="dm-header__right">
+          <!-- Notification bell + dropdown -->
+          <div ref="notifRef" class="dm-notif-wrapper">
+            <button
+              class="dm-header__action"
+              :class="{ 'dm-header__action--active': showNotifications }"
+              title="Notifications"
+              @click="toggleNotifications"
+            >
+              <Icon name="i-heroicons-bell" class="w-4 h-4" />
+              <span v-if="unreadCount > 0" class="dm-notif-dot">
+                {{ unreadCount > 9 ? '9+' : unreadCount }}
+              </span>
+            </button>
+
+            <Transition name="dm-notif-panel">
+              <div v-if="showNotifications" class="dm-notif-panel">
+                <div class="dm-notif-panel__header">
+                  <span class="dm-notif-panel__title">Notifications</span>
+                  <button v-if="unreadCount > 0" class="dm-notif-panel__mark-all" @click="markAllRead">
+                    Mark all read
+                  </button>
+                </div>
+                <div v-if="isLoading" class="dm-notif-panel__empty">
+                  <Icon name="i-heroicons-arrow-path" class="w-5 h-5 animate-spin opacity-40" />
+                </div>
+                <div v-else-if="notifications.length === 0" class="dm-notif-panel__empty">
+                  <Icon name="i-heroicons-bell-slash" class="w-8 h-8 mb-2 opacity-20" />
+                  <p class="dm-notif-panel__empty-title">No new notifications</p>
+                  <p class="dm-notif-panel__empty-sub">Failed and warning checks will appear here</p>
+                </div>
+                <div v-else class="dm-notif-panel__list">
+                  <button
+                    v-for="n in notifications.slice(0, 5)"
+                    :key="n.id"
+                    class="dm-notif-item"
+                    :class="{ 'dm-notif-item--unread': !n.read }"
+                    @click="handleNotifClick(n)"
+                  >
+                    <span class="dm-notif-item__icon" :class="`dm-notif-item__icon--${n.type}`">
+                      <Icon :name="n.type === 'error' ? 'i-heroicons-x-circle' : 'i-heroicons-exclamation-triangle'" class="w-3.5 h-3.5" />
+                    </span>
+                    <span class="dm-notif-item__content">
+                      <span class="dm-notif-item__title">{{ n.title }}</span>
+                      <span class="dm-notif-item__body">{{ n.body }}</span>
+                      <span class="dm-notif-item__meta">{{ n.source }} · {{ formatTimeAgo(n.timestamp) }}</span>
+                    </span>
+                    <span v-if="!n.read" class="dm-notif-item__unread-dot" />
+                  </button>
+                </div>
+                <div class="dm-notif-panel__footer">
+                  <NuxtLink to="/notifications" class="dm-notif-panel__see-all" @click="showNotifications = false">
+                    See all notifications
+                    <Icon name="i-heroicons-arrow-right" class="w-3.5 h-3.5" />
+                  </NuxtLink>
+                </div>
+              </div>
+            </Transition>
           </div>
+
+          <button class="dm-header__action" title="Settings" @click="showSettings = !showSettings">
+            <Icon name="i-heroicons-cog-6-tooth" class="w-4 h-4" />
+          </button>
+
+          <button class="dm-header__btn-primary" :disabled="isRefreshing" @click="refreshData">
+            <Icon name="i-heroicons-arrow-path" class="w-3.5 h-3.5" :class="{ 'animate-spin': isRefreshing }" />
+            <span>Refresh</span>
+          </button>
         </div>
       </header>
 
       <!-- Page Content -->
-      <main class="p-6">
+      <main class="dm-content">
         <slot />
       </main>
     </div>
 
-    <!-- Chat Widget -->
     <ChatWidget />
   </div>
 </template>
 
 <script setup lang="ts">
 import { useAuthStore } from '~/stores/auth'
+import { useNotifications } from '~/composables/useNotifications'
 
 const authStore = useAuthStore()
-
 const route = useRoute()
+
+const { notifications, unreadCount, isLoading, fetchNotifications, markRead, markAllRead } =
+  useNotifications()
+
+// ── Collapse state (persisted) ──────────────────────────────────────────────
+const COLLAPSE_KEY = 'dm:sidebar-collapsed'
+
+const collapsed = ref(false)
+
+onMounted(() => {
+  try {
+    collapsed.value = localStorage.getItem(COLLAPSE_KEY) === 'true'
+  } catch {}
+  fetchNotifications()
+})
+
+function toggleCollapse() {
+  collapsed.value = !collapsed.value
+  try {
+    localStorage.setItem(COLLAPSE_KEY, String(collapsed.value))
+  } catch {}
+}
+
+// ── Page title ───────────────────────────────────────────────────────────────
 const pageTitle = computed(() => {
   const titles: Record<string, string> = {
     index: 'Dashboard',
     anomalies: 'Anomalies',
+    'ml-anomalies': 'ML Anomalies',
     trends: 'Trends & Patterns',
     staves: 'Data Sources',
     clefs: 'Quality Checks',
     chat: 'Chat History',
+    reports: 'Reports',
+    investigation: 'Investigation',
+    insights: 'AI Insights',
+    notifications: 'Notifications',
     settings: 'Settings',
   }
   return titles[route.name as string] || 'DataMetronome'
 })
 
+function isActive(to: string) {
+  if (to === '/') return route.path === '/'
+  return route.path.startsWith(to)
+}
+
+// ── Auth / user ──────────────────────────────────────────────────────────────
 const user = computed(() => authStore.user)
-const notificationCount = ref(3)
 const showNotifications = ref(false)
 const showSettings = ref(false)
 const isRefreshing = ref(false)
+const notifRef = ref<HTMLElement | null>(null)
 
+onClickOutside(notifRef, () => { showNotifications.value = false })
+
+function toggleNotifications() {
+  showNotifications.value = !showNotifications.value
+}
+
+function handleNotifClick(n: { id: string; type: string }) {
+  markRead(n.id)
+  showNotifications.value = false
+  navigateTo('/notifications')
+}
+
+function formatTimeAgo(timestamp: string) {
+  const date = new Date(timestamp)
+  if (Number.isNaN(date.getTime())) return ''
+  const diffMin = Math.floor((Date.now() - date.getTime()) / 60_000)
+  if (diffMin < 1) return 'just now'
+  if (diffMin < 60) return `${diffMin}m ago`
+  const diffH = Math.floor(diffMin / 60)
+  if (diffH < 24) return `${diffH}h ago`
+  return `${Math.floor(diffH / 24)}d ago`
+}
+
+// ── Navigation ───────────────────────────────────────────────────────────────
 const navigationItems = [
-  {
-    to: '/',
-    icon: 'i-heroicons-home',
-    label: 'Dashboard',
-    badge: null,
-  },
-  {
-    to: '/anomalies',
-    icon: 'i-heroicons-exclamation-triangle',
-    label: 'Anomalies',
-    badge: '2',
-    badgeColor: 'red',
-  },
-  {
-    to: '/trends',
-    icon: 'i-heroicons-chart-bar',
-    label: 'Trends & Patterns',
-    badge: null,
-  },
-  {
-    to: '/staves',
-    icon: 'i-heroicons-server',
-    label: 'Data Sources',
-    badge: null,
-  },
-  {
-    to: '/clefs',
-    icon: 'i-heroicons-check-circle',
-    label: 'Quality Checks',
-    badge: null,
-  },
-  {
-    to: '/chat',
-    icon: 'i-heroicons-chat-bubble-left-right',
-    label: 'Chat History',
-    badge: null,
-  },
+  { to: '/', icon: 'i-heroicons-squares-2x2', label: 'Dashboard', badge: null },
+  { to: '/anomalies', icon: 'i-heroicons-exclamation-triangle', label: 'Anomalies', badge: null, badgeColor: 'red' },
+  { to: '/trends', icon: 'i-heroicons-chart-bar', label: 'Trends', badge: null },
+  { to: '/insights', icon: 'i-heroicons-sparkles', label: 'AI Insights', badge: null },
+  { to: '/staves', icon: 'i-heroicons-server', label: 'Data Sources', badge: null },
+  { to: '/clefs', icon: 'i-heroicons-check-circle', label: 'Quality Checks', badge: null },
+  { to: '/chat', icon: 'i-heroicons-chat-bubble-left-right', label: 'Chat', badge: null },
+  { to: '/reports', icon: 'i-heroicons-document-chart-bar', label: 'Reports', badge: null },
+  { to: '/investigation', icon: 'i-heroicons-magnifying-glass', label: 'Investigation', badge: null },
 ]
 
 const userMenuItems = [
-  [
-    {
-      label: 'Profile',
-      icon: 'i-heroicons-user',
-      click: () => navigateTo('/profile'),
-    },
-  ],
-  [
-    {
-      label: 'Settings',
-      icon: 'i-heroicons-cog-6-tooth',
-      click: () => navigateTo('/settings'),
-    },
-  ],
-  [
-    {
-      label: 'Sign out',
-      icon: 'i-heroicons-arrow-right-on-rectangle',
-      click: () => authStore.logout(),
-    },
-  ],
+  [{ label: 'Profile', icon: 'i-heroicons-user', click: () => navigateTo('/profile') }],
+  [{ label: 'Settings', icon: 'i-heroicons-cog-6-tooth', click: () => navigateTo('/settings') }],
+  [{ label: 'Sign out', icon: 'i-heroicons-arrow-right-on-rectangle', click: () => authStore.logout() }],
 ]
 
 async function refreshData() {
   isRefreshing.value = true
   try {
-    // Refresh all data stores
-    await Promise.all([
-      authStore.refreshUserData(),
-      // Add other store refresh calls here
-    ])
-    await new Promise((resolve) => setTimeout(resolve, 1000)) // Simulate refresh
+    await Promise.all([authStore.refreshUserData(), fetchNotifications()])
+    await new Promise((resolve) => setTimeout(resolve, 600))
   } finally {
     isRefreshing.value = false
   }

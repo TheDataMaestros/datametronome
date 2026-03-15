@@ -405,7 +405,11 @@ class InsightPipelineService:
     # ------------------------------------------------------------------
 
     async def run_auto_scan(self, stave_id: str) -> InsightReport:
-        """Stages 1 -> 2 -> 3 -> 5 (no business analysis)."""
+        """Full pipeline: 1 -> 2 -> 3 -> 4 -> 5.
+
+        Includes business analysis so the first scan immediately produces
+        a real health score, anomalies, and suggestions.
+        """
         discovery = await self._discover_schema(stave_id)
         classification = await self.classify_domain(
             discovery["tables"], discovery["schema"], discovery["samples"],
@@ -413,8 +417,18 @@ class InsightPipelineService:
         snapshot = await self.capture_baseline(
             stave_id, discovery, snapshot_type="auto_scan",
         )
+        # Fetch existing profile (None on first run — analysis still works)
+        profile = await self.repo.get_profile(stave_id)
+        try:
+            analysis = await self.analyze_business(stave_id, snapshot, profile)
+        except Exception as exc:
+            logger.warning(
+                "Business analysis failed in auto_scan for stave %s: %s — persisting without analysis",
+                stave_id, exc,
+            )
+            analysis = None
         return await self.persist_results(
-            stave_id, snapshot, analysis=None,
+            stave_id, snapshot, analysis,
             classification=classification, discovery=discovery,
         )
 

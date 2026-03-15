@@ -9,6 +9,20 @@ def test_build_insight_agent_returns_agent():
     assert agent is not None
 
 
+def test_build_insight_agent_has_insight_tools():
+    agent = build_insight_agent(TestModel())
+    # Should have INSIGHT_TOOLS (9 tools including intelligence-specific ones)
+    assert len(agent._function_toolset.tools) >= 9
+
+
+def test_build_insight_agent_has_conversational_prompt():
+    agent = build_insight_agent(TestModel())
+    # The system prompt should be conversational, not schema-output focused
+    prompt = agent._system_prompts[0]
+    assert "conversational" in prompt.lower() or "plain English" in prompt
+    assert "exact schema" not in prompt
+
+
 def test_build_insight_agent_with_archetype_context():
     archetype = {
         "name": "e-commerce",

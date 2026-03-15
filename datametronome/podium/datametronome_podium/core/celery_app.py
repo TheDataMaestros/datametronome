@@ -6,6 +6,7 @@ Result backend: Redis (redis://)
 Scheduler: celery-redbeat (reads schedules from Redis)
 """
 from celery import Celery
+from celery.schedules import crontab
 from kombu import Queue
 
 from datametronome_podium.core.config import settings
@@ -46,6 +47,8 @@ celery_app.conf.update(
         "datametronome.run_daily_intelligence": {"queue": QUEUE_INTELLIGENCE},
         "datametronome.run_on_demand_analysis": {"queue": QUEUE_INTELLIGENCE},
         "datametronome.prune_old_snapshots": {"queue": QUEUE_DEFAULT},
+        "datametronome.olist_simulate_ingestion": {"queue": QUEUE_INTELLIGENCE},
+        "datametronome.run_daily_intelligence_all_staves": {"queue": QUEUE_INTELLIGENCE},
     },
 
     # Retry defaults
@@ -72,4 +75,27 @@ celery_app.conf.update(
 celery_app.conf.include = [
     "datametronome_podium.tasks.check_tasks",
     "datametronome_podium.tasks.intelligence_tasks",
+    "datametronome_podium.tasks.olist_simulation",
 ]
+
+# ── Periodic schedules (celery-redbeat reads these from conf on startup) ────
+celery_app.conf.beat_schedule = {
+    # Simulate new Olist orders every 4 hours so the AI sees live data flow
+    "olist-simulate-ingestion-every-4h": {
+        "task": "datametronome.olist_simulate_ingestion",
+        "schedule": crontab(minute=0, hour="*/4"),
+        "options": {"queue": "intelligence.default"},
+    },
+    # Re-run the full intelligence pipeline across all staves daily at 06:00 UTC
+    "daily-intelligence-all-staves": {
+        "task": "datametronome.run_daily_intelligence_all_staves",
+        "schedule": crontab(minute=0, hour=6),
+        "options": {"queue": "intelligence.default"},
+    },
+    # Weekly snapshot pruning (Sundays 03:00 UTC)
+    "prune-old-snapshots-weekly": {
+        "task": "datametronome.prune_old_snapshots",
+        "schedule": crontab(minute=0, hour=3, day_of_week=0),
+        "options": {"queue": "checks.default"},
+    },
+}

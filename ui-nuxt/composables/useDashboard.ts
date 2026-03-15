@@ -27,6 +27,7 @@ export const useDashboard = () => {
         distribution: {},
         total_checks: 0,
         checks_24h: 0,
+        intelligence: undefined,
       }
     } finally {
       isLoading.value = false

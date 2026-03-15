@@ -3,19 +3,24 @@
     <!-- Welcome Header -->
     <div class="flex items-center justify-between">
       <div>
-        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Welcome back</h1>
-        <p class="mt-2 text-gray-600 dark:text-gray-400">
+        <p class="dm-label mb-2">Overview</p>
+        <h1
+          style="font-family: var(--dm-font-display); font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; color: var(--dm-text-primary); line-height: 1.15;"
+        >
+          Welcome back
+        </h1>
+        <p class="mt-2 text-sm" style="color: var(--dm-text-secondary);">
           Here's what's happening with your data quality monitoring system.
         </p>
       </div>
       <div class="flex items-center gap-3">
         <UButton
-          color="primary"
-          variant="outline"
+          color="gray"
+          variant="ghost"
           icon="i-heroicons-arrow-down-tray"
           @click="exportDashboard"
         >
-          Export Data
+          Export
         </UButton>
         <UButton
           color="primary"
@@ -29,53 +34,321 @@
     </div>
 
     <!-- System Health Metrics -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <UCard class="gradient-primary text-white">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm opacity-90">Success Rate</p>
-            <p class="text-3xl font-bold">{{ systemMetrics.successRate }}%</p>
-            <p class="text-sm opacity-90">
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <p class="dm-label mb-2">Success Rate</p>
+            <p class="dm-stat-value">{{ systemMetrics.successRate }}<span class="text-lg opacity-70">%</span></p>
+            <p class="text-xs mt-1.5 opacity-70">
               {{ systemMetrics.successRateChange > 0 ? '+' : ''
-              }}{{ systemMetrics.successRateChange }}% from yesterday
+              }}{{ systemMetrics.successRateChange }}% vs yesterday
             </p>
           </div>
-          <Icon name="i-heroicons-check-circle" class="w-8 h-8 opacity-80" />
+          <Icon name="i-heroicons-check-circle" class="w-7 h-7 opacity-50 flex-shrink-0" />
         </div>
       </UCard>
 
       <UCard class="gradient-success text-white">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm opacity-90">Active Sources</p>
-            <p class="text-3xl font-bold">{{ systemMetrics.activeSources }}</p>
-            <p class="text-sm opacity-90">{{ systemMetrics.totalSources }} total configured</p>
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <p class="dm-label mb-2">Active Sources</p>
+            <p class="dm-stat-value">{{ systemMetrics.activeSources }}</p>
+            <p class="text-xs mt-1.5 opacity-70">{{ systemMetrics.totalSources }} total configured</p>
           </div>
-          <Icon name="i-heroicons-server" class="w-8 h-8 opacity-80" />
+          <Icon name="i-heroicons-server" class="w-7 h-7 opacity-50 flex-shrink-0" />
         </div>
       </UCard>
 
       <UCard class="gradient-warning text-white">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm opacity-90">Quality Checks</p>
-            <p class="text-3xl font-bold">{{ systemMetrics.activeChecks }}</p>
-            <p class="text-sm opacity-90">{{ systemMetrics.scheduledChecks }} scheduled</p>
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <p class="dm-label mb-2">Quality Checks</p>
+            <p class="dm-stat-value">{{ systemMetrics.activeChecks }}</p>
+            <p class="text-xs mt-1.5 opacity-70">{{ systemMetrics.scheduledChecks }} scheduled</p>
           </div>
-          <Icon name="i-heroicons-check-circle" class="w-8 h-8 opacity-80" />
+          <Icon name="i-heroicons-check-circle" class="w-7 h-7 opacity-50 flex-shrink-0" />
         </div>
       </UCard>
 
       <UCard class="gradient-error text-white">
-        <div class="flex items-center justify-between">
-          <div>
-            <p class="text-sm opacity-90">Anomalies</p>
-            <p class="text-3xl font-bold">{{ systemMetrics.anomalies }}</p>
-            <p class="text-sm opacity-90">Last 24 hours</p>
+        <div class="flex items-center justify-between gap-4">
+          <div class="min-w-0">
+            <p class="dm-label mb-2">Anomalies</p>
+            <p class="dm-stat-value">{{ systemMetrics.anomalies }}</p>
+            <p class="text-xs mt-1.5 opacity-70">Last 24 hours</p>
           </div>
-          <Icon name="i-heroicons-exclamation-triangle" class="w-8 h-8 opacity-80" />
+          <Icon name="i-heroicons-exclamation-triangle" class="w-7 h-7 opacity-50 flex-shrink-0" />
         </div>
       </UCard>
+    </div>
+
+    <!-- Intelligence Pulse Section -->
+    <div v-if="intelligence && intelligence.totalReports > 0" class="space-y-3">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
+            Intelligence Pulse
+          </h2>
+          <span class="intelligence-domain-badge">
+            <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            AI Active
+          </span>
+        </div>
+        <UButton
+          color="gray"
+          variant="ghost"
+          size="sm"
+          icon="i-heroicons-chat-bubble-left-right"
+          @click="navigateTo('/chat')"
+        >
+          Ask AI
+        </UButton>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <!-- Health Score Gauge -->
+        <div
+          class="intelligence-panel rounded-xl p-5 flex flex-col items-center justify-center gap-2"
+        >
+          <p class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">
+            Data Health
+          </p>
+          <div class="relative">
+            <svg width="130" height="130" viewBox="0 0 100 100" aria-label="Health score gauge">
+              <!-- Track arc (270° = 75% of circumference, r=42, C≈264) -->
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                fill="none"
+                stroke="rgba(148, 163, 184, 0.15)"
+                stroke-width="7"
+                stroke-dasharray="198 264"
+                stroke-linecap="round"
+                transform="rotate(-135 50 50)"
+              />
+              <!-- Score arc -->
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                fill="none"
+                :stroke="intelligence.arcColor"
+                stroke-width="7"
+                stroke-linecap="round"
+                stroke-dasharray="198 264"
+                :stroke-dashoffset="198 - intelligence.arcLength"
+                transform="rotate(-135 50 50)"
+                class="health-arc-fill"
+              />
+              <text
+                x="50"
+                y="48"
+                text-anchor="middle"
+                fill="white"
+                font-size="22"
+                font-weight="700"
+                font-family="ui-monospace, monospace"
+              >
+                {{ Math.round(intelligence.avgHealthScore) }}
+              </text>
+              <text
+                x="50"
+                y="62"
+                text-anchor="middle"
+                fill="rgba(148, 163, 184, 0.6)"
+                font-size="8.5"
+              >
+                / 100
+              </text>
+            </svg>
+          </div>
+          <div class="text-center">
+            <p
+              class="text-sm font-semibold"
+              :class="{
+                'text-emerald-400': intelligence.avgHealthScore >= 80,
+                'text-amber-400':
+                  intelligence.avgHealthScore >= 50 && intelligence.avgHealthScore < 80,
+                'text-red-400': intelligence.avgHealthScore < 50,
+              }"
+            >
+              {{
+                intelligence.avgHealthScore >= 80
+                  ? 'Strong'
+                  : intelligence.avgHealthScore >= 50
+                    ? 'Moderate'
+                    : 'Needs Attention'
+              }}
+            </p>
+            <p class="text-xs text-slate-500 mt-0.5">
+              {{ intelligence.totalReports }}
+              {{ intelligence.totalReports !== 1 ? 'reports' : 'report' }} generated
+            </p>
+          </div>
+        </div>
+
+        <!-- Source Coverage -->
+        <div class="intelligence-panel rounded-xl p-5 flex flex-col justify-between">
+          <p class="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">
+            Source Coverage
+          </p>
+          <div class="space-y-4">
+            <div>
+              <div class="flex justify-between items-baseline mb-2">
+                <span class="text-3xl font-bold text-white">{{
+                  intelligence.profiledSources
+                }}</span>
+                <span class="text-sm text-slate-400">of {{ systemMetrics.activeSources }} active</span>
+              </div>
+              <div class="h-2 rounded-full bg-slate-700 overflow-hidden">
+                <div
+                  class="h-full rounded-full transition-all duration-1000 ease-out"
+                  :style="{
+                    width: `${intelligence.profiledRatio}%`,
+                    background: 'linear-gradient(90deg, #3b82f6, #06b6d4)',
+                  }"
+                />
+              </div>
+              <p class="text-xs text-slate-500 mt-1">{{ intelligence.profiledRatio }}% profiled</p>
+            </div>
+
+            <!-- Top table metrics as business KPIs -->
+            <div v-if="Object.keys(intelligence.tableMetrics).length" class="space-y-1">
+              <div
+                v-for="(count, table) in topTableMetrics"
+                :key="table"
+                class="flex justify-between items-center text-xs"
+              >
+                <span class="text-slate-500 capitalize">{{ formatTableName(String(table)) }}</span>
+                <span class="text-slate-300 font-medium tabular-nums">{{ count.toLocaleString() }}</span>
+              </div>
+            </div>
+
+            <button
+              class="w-full flex items-center gap-3 pt-3 border-t border-slate-700/50 hover:opacity-80 transition-opacity text-left"
+              @click="navigateTo('/insights')"
+            >
+              <div
+                class="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0"
+              >
+                <Icon name="i-heroicons-chart-bar-square" class="w-4 h-4 text-blue-400" />
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-medium text-white">
+                  {{ intelligence.totalReports }} Analysis Reports
+                </p>
+                <p class="text-xs text-slate-500">View AI findings →</p>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Action Items -->
+        <div class="intelligence-panel rounded-xl p-5 flex flex-col gap-3 overflow-hidden">
+          <div class="flex items-baseline justify-between">
+            <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">Action Items</p>
+            <p v-if="intelligence.lastAnalyzedAt" class="text-[11px] text-slate-500">
+              Data as of {{ formatAnalyzedAt(intelligence.lastAnalyzedAt) }}
+            </p>
+          </div>
+
+          <!-- Suggestions -->
+          <template v-if="intelligence.topSuggestions.length > 0">
+            <div
+              v-for="(sug, i) in intelligence.topSuggestions"
+              :key="'sug-' + i"
+              class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-2"
+            >
+              <div class="flex items-start gap-2">
+                <span
+                  class="flex-shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded mt-0.5"
+                  :class="sug.priority === 'high' ? 'bg-red-500/30 text-red-300' : 'bg-amber-500/20 text-amber-400'"
+                >{{ sug.priority }}</span>
+                <p class="text-xs font-medium text-amber-200 leading-snug line-clamp-2">{{ sug.action }}</p>
+              </div>
+              <div class="flex gap-2 pt-1">
+                <UButton size="xs" color="amber" variant="soft" icon="i-heroicons-magnifying-glass" @click.stop="navigateTo('/investigation')">
+                  Investigate
+                </UButton>
+                <UButton size="xs" color="gray" variant="ghost" icon="i-heroicons-arrow-right" @click.stop="navigateTo('/insights')">
+                  Full Report
+                </UButton>
+              </div>
+            </div>
+          </template>
+          <button
+            v-else-if="intelligence.pendingSuggestions > 0"
+            class="w-full flex items-center justify-between p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 hover:bg-amber-500/20 transition-colors"
+            @click="navigateTo('/insights')"
+          >
+            <div class="flex items-center gap-2">
+              <Icon name="i-heroicons-light-bulb" class="w-4 h-4 text-amber-400" />
+              <span class="text-sm text-amber-300 font-medium">{{ intelligence.pendingSuggestions }} Suggestion{{ intelligence.pendingSuggestions !== 1 ? 's' : '' }}</span>
+            </div>
+            <Icon name="i-heroicons-arrow-right" class="w-4 h-4 text-amber-400" />
+          </button>
+
+          <!-- Anomalies -->
+          <template v-if="intelligence.topAnomalies.length > 0">
+            <div
+              v-for="(ano, i) in intelligence.topAnomalies"
+              :key="'ano-' + i"
+              class="p-3 rounded-lg bg-red-500/10 border border-red-500/20 space-y-2"
+            >
+              <div class="flex items-start gap-2">
+                <span class="flex-shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-500/30 text-red-300 mt-0.5">
+                  {{ ano.severity }}
+                </span>
+                <div class="min-w-0">
+                  <p class="text-xs font-medium text-red-200 leading-snug line-clamp-2">{{ ano.description }}</p>
+                  <p v-if="ano.table" class="text-[11px] text-slate-500 mt-0.5">table: <code class="text-slate-400">{{ ano.table }}</code></p>
+                </div>
+              </div>
+              <div class="flex gap-2 pt-1">
+                <UButton size="xs" color="red" variant="soft" icon="i-heroicons-magnifying-glass" @click.stop="navigateTo('/investigation')">
+                  Investigate
+                </UButton>
+                <UButton size="xs" color="gray" variant="ghost" icon="i-heroicons-arrow-path" @click.stop="triggerReanalyze">
+                  Re-analyze
+                </UButton>
+              </div>
+            </div>
+          </template>
+          <button
+            v-else-if="intelligence.criticalAnomalies > 0"
+            class="w-full flex items-center justify-between p-3 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+            @click="navigateTo('/insights')"
+          >
+            <div class="flex items-center gap-2">
+              <Icon name="i-heroicons-exclamation-triangle" class="w-4 h-4 text-red-400" />
+              <span class="text-sm text-red-300 font-medium">{{ intelligence.criticalAnomalies }} Critical Anomal{{ intelligence.criticalAnomalies !== 1 ? 'ies' : 'y' }}</span>
+            </div>
+            <Icon name="i-heroicons-arrow-right" class="w-4 h-4 text-red-400" />
+          </button>
+
+          <!-- All clear -->
+          <div
+            v-else-if="intelligence.pendingSuggestions === 0 && intelligence.criticalAnomalies === 0"
+            class="flex items-center gap-2 p-3 rounded-lg bg-slate-700/30 border border-slate-600/20"
+          >
+            <Icon name="i-heroicons-check-circle" class="w-4 h-4 text-emerald-400" />
+            <span class="text-sm text-slate-400">No Critical Issues</span>
+          </div>
+
+          <UButton
+            color="primary"
+            variant="soft"
+            block
+            size="sm"
+            icon="i-heroicons-sparkles"
+            @click="navigateTo('/insights')"
+          >
+            View All Insights
+          </UButton>
+        </div>
+      </div>
     </div>
 
     <!-- Charts Row -->
@@ -153,7 +426,7 @@
         <template #header>
           <div class="flex items-center justify-between">
             <h3 class="text-lg font-semibold">Recent Activity</h3>
-            <UButton color="primary" variant="ghost" size="sm" @click="navigateTo('/anomalies')">
+            <UButton color="primary" variant="ghost" size="sm" @click="navigateTo('/insights')">
               View All
             </UButton>
           </div>
@@ -226,7 +499,7 @@
             variant="outline"
             block
             icon="i-heroicons-magnifying-glass"
-            @click="navigateTo('/investigation')"
+            @click="navigateTo('/insights')"
           >
             Investigate Data
           </UButton>
@@ -311,6 +584,46 @@ const systemMetrics = computed(() => {
     scheduledChecks: dashboardMetrics.value.scheduled_checks,
     anomalies: dashboardMetrics.value.anomalies,
   }
+})
+
+// Intelligence Pulse — derived from dashboard metrics intelligence section
+const intelligence = computed(() => {
+  const data = dashboardMetrics.value?.intelligence
+  if (!data) return null
+
+  const score = data.avg_health_score ?? 0
+  const maxArc = 198 // 75% of circumference (r=42, C≈264)
+  const arcLength = maxArc * Math.min(Math.max(score, 0), 100) / 100
+  const arcColor = score >= 80 ? '#2ed573' : score >= 50 ? '#ffa502' : '#ff4757'
+  const activeSources = dashboardMetrics.value?.active_sources ?? 0
+  const profiledRatio =
+    activeSources > 0 ? Math.min(100, Math.round((data.profiled_sources / activeSources) * 100)) : 0
+
+  return {
+    avgHealthScore: score,
+    arcLength,
+    arcColor,
+    totalReports: data.total_reports ?? 0,
+    profiledSources: data.profiled_sources ?? 0,
+    pendingSuggestions: data.pending_suggestions ?? 0,
+    insightAnomalies: data.insight_anomalies ?? 0,
+    criticalAnomalies: data.critical_anomalies ?? 0,
+    profiledRatio,
+    topSuggestions: data.top_suggestions ?? [],
+    topAnomalies: data.top_anomalies ?? [],
+    lastAnalyzedAt: data.last_analyzed_at ?? null,
+    tableMetrics: data.table_metrics ?? {},
+  }
+})
+
+// Top 4 table row counts for business KPI display
+const topTableMetrics = computed(() => {
+  if (!intelligence.value?.tableMetrics) return {}
+  const entries = Object.entries(intelligence.value.tableMetrics)
+    .filter(([, count]) => count > 0)
+    .sort(([, a], [, b]) => (b as number) - (a as number))
+    .slice(0, 4)
+  return Object.fromEntries(entries)
 })
 
 // Recent activity from latest checks
@@ -419,6 +732,16 @@ function formatStatusLabel(status?: string) {
   return status.charAt(0).toUpperCase() + status.slice(1)
 }
 
+function formatTableName(table: string) {
+  return table.replace(/_/g, ' ')
+}
+
+function formatAnalyzedAt(ts: string) {
+  const date = new Date(ts)
+  if (Number.isNaN(date.getTime())) return 'unknown'
+  return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
 function humanizeCheckType(checkType?: string) {
   if (!checkType) return 'Data quality'
   return checkType
@@ -428,6 +751,21 @@ function humanizeCheckType(checkType?: string) {
 }
 
 // Actions
+const isReanalyzing = ref(false)
+
+async function triggerReanalyze() {
+  if (isReanalyzing.value || !staves.value.length) return
+  isReanalyzing.value = true
+  try {
+    const { insightsService } = await import('~/services/insights')
+    await Promise.all(staves.value.map((s) => insightsService.triggerAnalysis(s.id).catch(() => {})))
+    await new Promise((r) => setTimeout(r, 1500))
+    await fetchMetrics()
+  } finally {
+    isReanalyzing.value = false
+  }
+}
+
 async function runAllChecks() {
   isRunningChecks.value = true
   try {

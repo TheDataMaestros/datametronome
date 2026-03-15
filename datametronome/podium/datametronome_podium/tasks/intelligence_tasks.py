@@ -13,6 +13,21 @@ from datametronome_podium.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+
+def _run_async(coro):
+    """Run an async coroutine in a fresh event loop (safe for Celery prefork workers).
+
+    asyncio.set_event_loop(loop) is required so that any internal calls to
+    asyncio.get_event_loop() (in httpx, asyncpg, redis) get the new loop,
+    not the closed loop from a previous task on the same worker process.
+    """
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        return loop.run_until_complete(coro)
+    finally:
+        loop.close()
+
 LOCK_PREFIX = "intelligence:lock"
 LOCK_TTL = 1800  # 30 minutes
 
@@ -46,7 +61,7 @@ def _get_redis_client():
 def run_auto_scan(self, stave_id: str) -> dict[str, Any]:
     """Auto-scan triggered after stave creation. Stages 1->2->3->5."""
     try:
-        return asyncio.run(_run_auto_scan_async(stave_id))
+        return _run_async(_run_auto_scan_async(stave_id))
     except Exception as exc:
         logger.error("Auto-scan failed for stave %s: %s", stave_id, exc)
         raise self.retry(exc=exc)
@@ -61,7 +76,7 @@ def run_auto_scan(self, stave_id: str) -> dict[str, Any]:
 def run_daily_intelligence(self, stave_id: str) -> dict[str, Any]:
     """Scheduled daily intelligence. Full pipeline 1->2->3->4->5."""
     try:
-        return asyncio.run(_run_daily_async(stave_id))
+        return _run_async(_run_daily_async(stave_id))
     except Exception as exc:
         logger.error("Daily intelligence failed for stave %s: %s", stave_id, exc)
         raise
@@ -78,7 +93,7 @@ def run_on_demand_analysis(
 ) -> dict[str, Any]:
     """On-demand analysis triggered by user. Stages 3->4->5."""
     try:
-        return asyncio.run(_run_on_demand_async(stave_id, conversation_id))
+        return _run_async(_run_on_demand_async(stave_id, conversation_id))
     except Exception as exc:
         logger.error(
             "On-demand analysis failed for stave %s: %s", stave_id, exc
@@ -93,7 +108,7 @@ def run_on_demand_analysis(
 def prune_old_snapshots() -> dict[str, Any]:
     """Weekly task: delete raw snapshots beyond 90 days."""
     try:
-        return asyncio.run(_prune_snapshots_async())
+        return _run_async(_prune_snapshots_async())
     except Exception as exc:
         logger.error("Snapshot pruning failed: %s", exc)
         return {"status": "failed", "error": str(exc)}
