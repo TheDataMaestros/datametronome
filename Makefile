@@ -1,152 +1,22 @@
-.PHONY: help setup-env install install-dev install-podium test lint format clean docker-up docker-down docker-build prototype docker-prototype docker-up-full docker-migrate migrate retail-db setup-db
+.PHONY: help up up-workers down test migrate logs
 
-help: ## Show this help message
-	@echo "DataMetronome - Available commands:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+help: ## Show available commands
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $$1, $$2}'
 
-setup-env: ## Create .env file from env.example
-	@if [ -f .env ]; then \
-		echo "⚠️  .env already exists. Skipping..."; \
-	else \
-		cp env.example .env; \
-		echo "✅ Created .env from env.example"; \
-		echo "📝 Please edit .env with your configuration"; \
-	fi
+up: ## Start the full stack (podium + postgres + redis + rabbitmq + UI)
+	docker-compose --profile full up -d --build
 
-install: ## Install all packages in development mode
-	@if [ -d ".venv" ]; then \
-		echo "🐍 Installing in root .venv..."; \
-		.venv/bin/pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/pulse/bigquery -e ./datametronome/brain/base; \
-		.venv/bin/pip install -e ./datametronome/podium; \
-	else \
-		uv pip install -e ./datametronome/pulse/core; \
-		uv pip install -e ./datametronome/pulse/sqlite; \
-		uv pip install -e ./datametronome/pulse/bigquery; \
-		uv pip install -e ./datametronome/brain/base; \
-		python3 -m pip install -e ./datametronome/podium; \
-	fi
+up-workers: ## Start full stack + Celery worker + Beat scheduler
+	docker-compose --profile full --profile worker up -d --build
 
-install-podium: ## Install Podium runtime dependencies only
-	@if [ -d ".venv" ]; then \
-		echo "🐍 Installing in root .venv..."; \
-		.venv/bin/pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/pulse/bigquery -e ./datametronome/brain/base -e ./datametronome/podium; \
-	elif command -v uv >/dev/null 2>&1; then \
-		uv pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/pulse/bigquery -e ./datametronome/brain/base; \
-		python3 -m pip install -e ./datametronome/podium; \
-	else \
-		python3 -m pip install -e ./datametronome/pulse/core -e ./datametronome/pulse/sqlite -e ./datametronome/pulse/bigquery -e ./datametronome/brain/base -e ./datametronome/podium; \
-	fi
+down: ## Stop all services and clean up
+	docker-compose --profile full --profile worker down
 
-install-dev: ## Install development dependencies
-	uv pip install pytest pytest-asyncio black isort mypy pre-commit
-	pre-commit install
+test: ## Run tests locally via .venv (fast, uses SQLite)
+	cd datametronome/podium && .venv/bin/python -m pytest --timeout=10 -q $(ARGS)
 
-test: ## Run tests
-	pytest tests/ -v
+migrate: ## Run Alembic migrations inside Docker
+	docker-compose exec podium sh -c "cd /app/datametronome/podium && DATABASE_URL=\$$DATAMETRONOME_DATABASE_URL alembic upgrade head"
 
-lint: ## Run linting
-	black --check datametronome/ tests/
-	isort --check-only datametronome/ tests/
-	mypy datametronome/
-
-format: ## Format code
-	black datametronome/ tests/
-	isort datametronome/ tests/
-
-clean: ## Clean build artifacts
-	find . -type d -name __pycache__ -delete
-	find . -type f -name "*.pyc" -delete
-	find . -type f -name "*.pyo" -delete
-	find . -type f -name "*.pyd" -delete
-	find . -type f -name ".coverage" -delete
-	find . -type d -name "*.egg-info" -exec rm -rf {} +
-	find . -type d -name ".pytest_cache" -exec rm -rf {} +
-	find . -type d -name ".mypy_cache" -exec rm -rf {} +
-	rm -rf build/ dist/ .eggs/
-
-docker-up: ## Start all Docker services
-	docker-compose up -d
-
-docker-down: ## Stop all Docker services
-	docker-compose down
-
-docker-build: ## Build Docker images
-	docker-compose build
-
-docker-prototype: ## Quick prototype setup with Docker
-	@echo "🐳 Setting up DataMetronome prototype with Docker..."
-	$(MAKE) docker-build
-	$(MAKE) docker-up
-	@echo "🎉 Docker prototype ready!"
-	@echo "🚀 Backend: http://localhost:8001"
-	@echo "🎨 UI with live reload: make docker-up-full  →  http://localhost:3000"
-	@echo "🔑 Login with: admin / admin"
-	@echo ""
-	@echo "📊 To see logs: docker-compose logs -f"
-	@echo "🛑 To stop: make docker-down"
-
-docker-up-full: ## Start Docker with UI dev server (podium + postgres + ui with live reload)
-	docker-compose --profile full up -d
-
-docker-build-ui: ## (Re)build the UI dev image after package.json changes
-	docker-compose build ui
-
-docker-migrate: ## Run migrations inside Docker (uses ./data volume from podium service)
-	docker-compose run --rm -e DATAMETRONOME_DATABASE_URL=sqlite+aiosqlite:////app/data/datametronome.db podium python datametronome/podium/scripts/migrate_agent_traces.py
-
-prototype: ## Quick prototype setup and start (local)
-	@echo "Setting up DataMetronome prototype..."
-	$(MAKE) install
-	$(MAKE) install-dev
-	$(MAKE) setup-db
-	$(MAKE) init-prototype
-	@echo "🎉 Prototype ready!"
-	@echo "🚀 Start the backend: make start-podium"
-	@echo "🎨 Start the UI: make start-ui"
-	@echo "🔑 Login with: admin / admin"
-
-start-podium: install-podium ## Start the Podium backend
-	./start_podium.sh
-
-start-ui: ## Start the UI (ensure Podium is running on 8001: make start-podium)
-	@bash -c 'set -a; [ -f .env ] && source .env; set +a; \
-	cd ui-nuxt && npm install && \
-	NUXT_PUBLIC_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8001}/api/v1" \
-	NUXT_PUBLIC_PODIUM_API_BASE="http://127.0.0.1:$${PODIUM_PORT:-8001}" \
-	npm run dev -- --port $${UI_PORT:-3000}'
-
-retail-db: ## Generate the Retail demo dataset DB (SQLite)
-	@python3 showcase/retail_demo/generate_db.py --out datametronome/podium/data/retail.db
-
-retail-demo-setup: retail-db ## Generate retail DB and historical checks (requires Podium running)
-	@echo "📊 Generating historical check results..."
-	@python3 showcase/retail_demo/generate_db.py --out datametronome/podium/data/retail.db --generate-historical-checks
-
-setup-db: ## Initialize the database
-	@PY=python3; [ -f .venv/bin/python3 ] && PY=.venv/bin/python3; \
-	cd datametronome/podium && DATAMETRONOME_SECRET_KEY="dev-secret-key-change-in-production-32-chars" \
-		DATAMETRONOME_DATABASE_URL="sqlite+aiosqlite:///$(PWD)/data/datametronome.db" \
-		$$PY -c "import asyncio; from datametronome_podium.core.database import init_db; asyncio.run(init_db())"
-
-migrate: install-podium ## Run pending database migrations
-	@echo "🎵 Running migrations..."
-	@PY=python3; [ -f .venv/bin/python3 ] && PY=.venv/bin/python3; \
-	cd datametronome/podium && DATAMETRONOME_SECRET_KEY="dev-secret-key-change-in-production-32-chars" \
-		DATAMETRONOME_DATABASE_URL="$${DATAMETRONOME_DATABASE_URL:-sqlite+aiosqlite:///$(PWD)/data/datametronome.db}" \
-		$$PY scripts/migrate_agent_traces.py
-	@echo "✅ Migrations complete"
-
-init-prototype: ## Initialize prototype data
-	@echo "⚠️ init-prototype target removed - use community-demo instead"
-
-community-demo: install-dev ## Run DataMetronome Community Demo
-	@echo "🎵 Running DataMetronome Community Demo..."
-	@echo "Testing the complete ecosystem..."
-	@python3 community_demo.py
-
-test-quick: install-dev ## Quick system test
-	@echo "🚀 Quick system test..."
-	@python3 community_demo.py
-
-verify-multi-agent: ## Verify multi-agent (Phase 1–3). Podium must be running. Use --dry-run for no API.
-	@cd datametronome/podium && python3 scripts/verify_phase1_router.py --base-url "http://localhost:$${PODIUM_PORT:-8001}"
+logs: ## Tail docker-compose logs (use ARGS=podium to filter)
+	docker-compose logs -f $(ARGS)

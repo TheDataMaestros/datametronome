@@ -23,13 +23,23 @@ from datametronome_podium.services.stave_service import deserialize_clef, deseri
 
 logger = logging.getLogger(__name__)
 
+_redis_client = None
+
+
+def _get_or_create_redis_client():
+    """Return a cached Redis client, creating one on first call."""
+    global _redis_client
+    if _redis_client is None:
+        import redis.asyncio as aioredis
+        _redis_client = aioredis.from_url(settings.redis_url)
+    return _redis_client
+
 
 def _get_circuit_breaker(executor):
     """Create a circuit breaker if Redis is available."""
     try:
-        import redis.asyncio as aioredis
         from datametronome_podium.core.circuit_breaker import StaveCircuitBreaker
-        client = aioredis.from_url(settings.redis_url)
+        client = _get_or_create_redis_client()
         return StaveCircuitBreaker(redis_client=client, threshold=5, executor=executor)
     except Exception:
         return None
@@ -98,7 +108,7 @@ async def _execute_check_async(
         "status": result.status,
         "message": result.message,
         "details": json.dumps(metadata_for_storage),
-        "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "execution_time": result.execution_time,
         "anomalies_count": result.anomalies_count,
         "severity": result.severity.value,

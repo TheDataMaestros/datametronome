@@ -64,7 +64,7 @@ class ClefUpdate(BaseModel):
     is_active: bool | None = None
     warn: str | None = None
     fail: str | None = None
-    updated_at: str
+    updated_at: str | None = None
 
 
 class ClefResponse(BaseModel):

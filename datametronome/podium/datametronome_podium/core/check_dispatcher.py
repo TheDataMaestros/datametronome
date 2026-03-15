@@ -9,6 +9,10 @@ They never import Celery directly. Implementations:
 """
 from __future__ import annotations
 
+import json
+import logging
+import uuid
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Protocol, runtime_checkable
 
@@ -37,11 +41,6 @@ class CheckDispatcher(Protocol):
         """Get the result once complete. Returns None if not yet done."""
         ...
 
-
-import json
-import logging
-import uuid
-from datetime import datetime, timezone
 
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.services.clef_executor import ClefExecutor
@@ -104,7 +103,7 @@ class InlineDispatcher:
                 "status": result.status,
                 "message": result.message,
                 "details": json.dumps(metadata_for_storage),
-                "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 "execution_time": result.execution_time,
                 "anomalies_count": result.anomalies_count,
                 "severity": result.severity.value,
