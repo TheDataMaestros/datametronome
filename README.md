@@ -11,6 +11,7 @@
   [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-336791.svg)](https://www.postgresql.org/)
   [![Pydantic AI](https://img.shields.io/badge/Pydantic_AI-agents-e92063.svg)](https://ai.pydantic.dev/)
   [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+  [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/TheDataMaestros/datametronome)
 </div>
 
 ---
