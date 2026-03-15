@@ -228,6 +228,119 @@ class InsightPipelineService:
         return None
 
     # ------------------------------------------------------------------
+    # Track 2: Business Intelligence
+    # ------------------------------------------------------------------
+
+    async def _analyze_business_intelligence(
+        self,
+        stave_id: str,
+        snapshot: BaselineSnapshot,
+        profile: DataProfile | None,
+    ) -> dict[str, Any] | None:
+        """Run the BusinessIntelligenceAgent against the live data source."""
+        if not profile or profile.domain_type == "generic":
+            logger.info(
+                "Skipping BI analysis for stave %s — no domain profile",
+                stave_id,
+            )
+            return None
+
+        from datametronome_podium.archetypes import load_archetype
+        from datametronome_podium.services.agent_factory import (
+            build_heavy_model_from_settings,
+        )
+        from datametronome_podium.services.agents.business_intelligence import (
+            BIQueryDeps,
+            build_bi_agent,
+        )
+        from datametronome_podium.services.connection_tester import ConnectionTester
+        from datametronome_podium.services.stave_service import deserialize_stave
+
+        archetype = load_archetype(profile.domain_type)
+        if not archetype or not archetype.get("kpi_queries"):
+            logger.info(
+                "No BI archetype config for domain %s", profile.domain_type
+            )
+            return None
+
+        stave_rows = await self.executor.query(
+            "SELECT * FROM staves WHERE id = ?", [stave_id]
+        )
+        if not stave_rows:
+            return None
+        stave = deserialize_stave(stave_rows[0])
+        tester = ConnectionTester()
+        connector = await tester.get_connector(stave, read_only=True)
+
+        config = stave.connection_config or {}
+        ds_type = (stave.data_source_type or "").lower()
+        schema_prefix = ""
+        if ds_type in ("postgres", "postgresql"):
+            pg_schema = config.get("schema", "public")
+            schema_prefix = f'"{pg_schema}".'
+
+        deps = BIQueryDeps(
+            connector=connector,
+            schema_prefix=schema_prefix,
+            archetype=archetype,
+        )
+
+        try:
+            model = build_heavy_model_from_settings()
+            agent = build_bi_agent(model)
+            prompt = (
+                f"Analyze this {profile.domain_type} business. "
+                f"Available KPIs: {list(archetype.get('kpi_queries', {}).keys())}. "
+                f"Available performer dimensions: "
+                f"{[d.get('entity') for d in archetype.get('performer_dimensions', [])]}. "
+                "Call all available tools, then produce the full business report."
+            )
+            result = await agent.run(prompt, deps=deps)
+            return result.output.model_dump()
+        except Exception as exc:
+            logger.warning(
+                "BI analysis failed for stave %s: %s", stave_id, exc
+            )
+            return None
+        finally:
+            try:
+                await connector.close()
+            except Exception:
+                pass
+
+    async def _run_both_tracks(
+        self,
+        stave_id: str,
+        snapshot: BaselineSnapshot,
+        profile: DataProfile | None,
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        """Run Track 1 (data quality) and Track 2 (BI) concurrently."""
+        import asyncio as _asyncio
+
+        quality_task = self.analyze_business(stave_id, snapshot, profile)
+        bi_task = self._analyze_business_intelligence(stave_id, snapshot, profile)
+        results = await _asyncio.gather(
+            quality_task, bi_task, return_exceptions=True
+        )
+        quality = results[0] if not isinstance(results[0], Exception) else None
+        bi = results[1] if not isinstance(results[1], Exception) else None
+
+        if isinstance(results[0], Exception):
+            logger.warning(
+                "Track 1 (data quality) failed for stave %s: %s",
+                stave_id,
+                results[0],
+            )
+        if isinstance(results[1], Exception):
+            logger.warning(
+                "Track 2 (BI) failed for stave %s: %s",
+                stave_id,
+                results[1],
+            )
+
+        return quality, bi
+
+    # ------------------------------------------------------------------
     # Stage 5: Suggest + Act
     # ------------------------------------------------------------------
 
@@ -238,6 +351,7 @@ class InsightPipelineService:
         analysis: dict[str, Any] | None,
         classification: dict[str, Any] | None = None,
         discovery: dict[str, Any] | None = None,
+        bi_analysis: dict[str, Any] | None = None,
     ) -> InsightReport:
         """Persist analysis results: report, suggestions, checks, profile."""
         now = _utc_now_iso()
@@ -251,6 +365,12 @@ class InsightPipelineService:
 
         await self._persist_suggestions(stave_id, report, now)
         await self._persist_auto_checks(stave_id, report, analysis, now)
+
+        # Track 2: persist BI report if available
+        if bi_analysis:
+            await self._persist_business_report(
+                stave_id, snapshot.id, bi_analysis, now
+            )
 
         return report
 
@@ -343,6 +463,7 @@ class InsightPipelineService:
                 action=sug.get("action", ""),
                 reasoning=sug.get("reasoning", ""),
                 based_on=sug.get("based_on", ""),
+                check_spec=sug.get("check_spec"),
                 created_at=now,
             )
             await self.repo.create_suggestion(suggestion)
@@ -400,6 +521,33 @@ class InsightPipelineService:
         )
         await self.repo.create_check_link(link)
 
+    async def _persist_business_report(
+        self,
+        stave_id: str,
+        snapshot_id: str,
+        bi_analysis: dict[str, Any],
+        now: str,
+    ) -> None:
+        """Persist BusinessReport from BI track output."""
+        from datametronome_podium.features.insights.model import BusinessReport
+
+        report = BusinessReport(
+            id=f"br-{uuid.uuid4()}",
+            stave_id=stave_id,
+            snapshot_id=snapshot_id,
+            tenant_id="default",
+            business_health_score=bi_analysis.get("business_health_score", 0),
+            executive_summary=bi_analysis.get("executive_summary", ""),
+            kpis=bi_analysis.get("kpis", []),
+            top_performers=bi_analysis.get("top_performers", []),
+            bottom_performers=bi_analysis.get("bottom_performers", []),
+            trends=bi_analysis.get("trends", []),
+            opportunities=bi_analysis.get("opportunities", []),
+            risks=bi_analysis.get("risks", []),
+            generated_at=now,
+        )
+        await self.repo.create_business_report(report)
+
     # ------------------------------------------------------------------
     # Full pipeline orchestrations
     # ------------------------------------------------------------------
@@ -430,10 +578,11 @@ class InsightPipelineService:
         return await self.persist_results(
             stave_id, snapshot, analysis,
             classification=classification, discovery=discovery,
+            bi_analysis=None,
         )
 
     async def run_daily(self, stave_id: str) -> InsightReport:
-        """Full pipeline 1 -> 2 -> 3 -> 4 -> 5."""
+        """Full pipeline 1 -> 2 -> 3 -> 4 -> 5 (with parallel BI track)."""
         discovery = await self._discover_schema(stave_id)
         classification = await self.classify_domain(
             discovery["tables"], discovery["schema"], discovery["samples"],
@@ -442,22 +591,28 @@ class InsightPipelineService:
             stave_id, discovery, snapshot_type="daily",
         )
         profile = await self.repo.get_profile(stave_id)
-        analysis = await self.analyze_business(stave_id, snapshot, profile)
+        quality_analysis, bi_analysis = await self._run_both_tracks(
+            stave_id, snapshot, profile
+        )
         return await self.persist_results(
-            stave_id, snapshot, analysis,
+            stave_id, snapshot, quality_analysis,
             classification=classification, discovery=discovery,
+            bi_analysis=bi_analysis,
         )
 
     async def run_on_demand(self, stave_id: str) -> InsightReport:
-        """Stages 3 -> 4 -> 5 (reuse existing profile, fresh snapshot)."""
+        """Stages 3 -> 4 -> 5 (reuse existing profile, fresh snapshot + BI)."""
         discovery = await self._discover_schema(stave_id)
         snapshot = await self.capture_baseline(
             stave_id, discovery, snapshot_type="on_demand",
         )
         profile = await self.repo.get_profile(stave_id)
-        analysis = await self.analyze_business(stave_id, snapshot, profile)
+        quality_analysis, bi_analysis = await self._run_both_tracks(
+            stave_id, snapshot, profile
+        )
         return await self.persist_results(
-            stave_id, snapshot, analysis, discovery=discovery,
+            stave_id, snapshot, quality_analysis,
+            discovery=discovery, bi_analysis=bi_analysis,
         )
 
 
