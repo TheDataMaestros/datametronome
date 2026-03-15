@@ -1,8 +1,10 @@
 """Insights API router."""
+import logging
 from fastapi import APIRouter, HTTPException
 
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.features.insights.repo import InsightsRepo
+from datametronome_podium.features.insights.service import InsightPipelineService
 import uuid
 
 from datametronome_podium.features.insights.model import Notification
@@ -16,7 +18,10 @@ from datametronome_podium.features.insights.schema import (
     DismissRequest,
     AssignRequest,
     NotificationResponse,
+    BusinessReportResponse,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -89,6 +94,7 @@ async def get_dashboard(stave_id: str):
     suggestions = await repo.list_suggestions(stave_id, status="pending")
     check_links = await repo.list_check_links(report.id)
     trend = await _compute_health_trend(repo, stave_id)
+    business_report = await repo.get_latest_business_report(stave_id)
 
     return DashboardResponse(
         stave_id=stave_id,
@@ -102,6 +108,7 @@ async def get_dashboard(stave_id: str):
         pending_suggestions=[s.model_dump() for s in suggestions],
         ai_created_checks=[c.model_dump() for c in check_links],
         last_analyzed_at=report.created_at,
+        business_report=business_report.model_dump() if business_report else None,
     )
 
 
@@ -219,13 +226,35 @@ async def assign_suggestion(stave_id: str, suggestion_id: str, body: AssignReque
 
 @router.post("/{stave_id}/suggestions/{suggestion_id}/accept")
 async def accept_suggestion(stave_id: str, suggestion_id: str):
-    """Accept an insight suggestion."""
+    """Accept an insight suggestion. Auto-creates a clef if AI included a check_spec."""
+    from datetime import datetime, timezone
+
     repo = _repo()
     sug = await repo.get_suggestion(suggestion_id)
     if not sug:
         raise HTTPException(status_code=404, detail="Suggestion not found")
     await repo.update_suggestion_status(suggestion_id, "accepted")
-    return {"id": suggestion_id, "status": "accepted"}
+
+    check_created = False
+    if sug.check_spec:
+        try:
+            now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            service = InsightPipelineService(executor=get_executor())
+            await service._create_check_from_spec(
+                stave_id, sug.report_id, sug.check_spec, now
+            )
+            check_created = True
+        except Exception as exc:
+            logger.warning(
+                "Failed to create check from accepted suggestion %s: %s",
+                suggestion_id, exc,
+            )
+
+    return {
+        "id": suggestion_id,
+        "status": "accepted",
+        "check_created": check_created,
+    }
 
 
 @router.post("/{stave_id}/suggestions/{suggestion_id}/dismiss")
@@ -237,6 +266,31 @@ async def dismiss_suggestion(stave_id: str, suggestion_id: str, body: DismissReq
         raise HTTPException(status_code=404, detail="Suggestion not found")
     await repo.update_suggestion_status(suggestion_id, "dismissed", dismiss_reason=body.reason)
     return {"id": suggestion_id, "status": "dismissed", "reason": body.reason}
+
+
+# --- Business Reports ---
+
+
+@router.get(
+    "/{stave_id}/business", response_model=BusinessReportResponse
+)
+async def get_business_report(stave_id: str):
+    """Get the latest business intelligence report for a stave."""
+    report = await _repo().get_latest_business_report(stave_id)
+    if not report:
+        raise HTTPException(
+            status_code=404, detail="No business report found for this stave"
+        )
+    return report.model_dump()
+
+
+@router.get(
+    "/{stave_id}/business/history", response_model=list[BusinessReportResponse]
+)
+async def get_business_report_history(stave_id: str, limit: int = 20):
+    """List business intelligence report history for a stave."""
+    reports = await _repo().list_business_reports(stave_id, limit=limit)
+    return [r.model_dump() for r in reports]
 
 
 # --- Notifications ---
