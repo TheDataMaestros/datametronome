@@ -86,6 +86,135 @@
         </div>
       </div>
 
+      <!-- Management View -->
+      <div v-if="item.businessReport" class="intelligence-panel rounded-xl p-5 border border-blue-500/20">
+        <div class="flex items-center gap-2 mb-4">
+          <Icon name="i-heroicons-building-office-2" class="w-4 h-4 text-blue-400" />
+          <p class="text-xs font-semibold uppercase tracking-widest text-blue-300">Management View</p>
+          <span class="ml-auto text-xs font-bold px-2 py-0.5 rounded-lg"
+            :class="item.businessReport.business_health_score >= 70 ? 'bg-emerald-500/15 text-emerald-400' : item.businessReport.business_health_score >= 40 ? 'bg-amber-500/15 text-amber-400' : 'bg-red-500/15 text-red-400'">
+            Business Health {{ item.businessReport.business_health_score }}/100
+          </span>
+        </div>
+
+        <!-- Executive Summary -->
+        <p class="text-sm text-slate-200 leading-relaxed mb-5 max-w-3xl">
+          {{ item.businessReport.executive_summary }}
+        </p>
+
+        <!-- KPIs -->
+        <div v-if="item.businessReport.kpis.length" class="flex flex-wrap gap-3 mb-5">
+          <div
+            v-for="kpi in item.businessReport.kpis"
+            :key="kpi.name"
+            class="px-3 py-2 rounded-lg bg-slate-700/40 border border-slate-600/30"
+          >
+            <p class="text-[10px] uppercase tracking-widest text-slate-500 mb-0.5">{{ kpi.label }}</p>
+            <div class="flex items-baseline gap-1">
+              <span class="text-lg font-bold text-white font-mono">
+                {{ kpi.unit === '$' ? '$' : '' }}{{ typeof kpi.value === 'number' ? kpi.value.toLocaleString('en', {maximumFractionDigits: 1}) : kpi.value }}{{ kpi.unit !== '$' ? ' ' + kpi.unit : '' }}
+              </span>
+              <Icon
+                :name="kpi.trend_direction === 'up' ? 'i-heroicons-arrow-trending-up' : kpi.trend_direction === 'down' ? 'i-heroicons-arrow-trending-down' : 'i-heroicons-minus'"
+                class="w-3.5 h-3.5"
+                :class="kpi.trend_direction === 'up' ? 'text-emerald-400' : kpi.trend_direction === 'down' ? 'text-red-400' : 'text-slate-500'"
+              />
+            </div>
+            <p v-if="kpi.vs_benchmark" class="text-[10px] text-slate-500 mt-0.5">{{ kpi.vs_benchmark }}</p>
+          </div>
+        </div>
+
+        <!-- Performers -->
+        <div v-if="item.businessReport.top_performers.length || item.businessReport.bottom_performers.length"
+          class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-5">
+
+          <!-- Top -->
+          <div v-if="item.businessReport.top_performers.length">
+            <p class="text-xs font-semibold uppercase tracking-widest text-emerald-400 mb-2">Top Performers</p>
+            <div class="space-y-2">
+              <div
+                v-for="p in item.businessReport.top_performers"
+                :key="p.entity_name"
+                class="p-3 rounded-lg bg-emerald-500/8 border border-emerald-500/15"
+              >
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-semibold text-emerald-300 capitalize">{{ p.entity_type }}: {{ p.entity_name }}</span>
+                  <span class="text-xs font-mono text-emerald-400">+{{ p.vs_average.toFixed(1) }}% avg</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">{{ p.drill_down_explanation }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bottom -->
+          <div v-if="item.businessReport.bottom_performers.length">
+            <p class="text-xs font-semibold uppercase tracking-widest text-red-400 mb-2">Needs Attention</p>
+            <div class="space-y-2">
+              <div
+                v-for="p in item.businessReport.bottom_performers"
+                :key="p.entity_name"
+                class="p-3 rounded-lg bg-red-500/8 border border-red-500/15"
+              >
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-semibold text-red-300 capitalize">{{ p.entity_type }}: {{ p.entity_name }}</span>
+                  <span class="text-xs font-mono text-red-400">{{ p.vs_average.toFixed(1) }}% avg</span>
+                </div>
+                <p class="text-xs text-slate-400 leading-relaxed">{{ p.drill_down_explanation }}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Trends -->
+        <div v-if="item.businessReport.trends.length" class="flex flex-wrap gap-2 mb-4">
+          <span
+            v-for="trend in item.businessReport.trends"
+            :key="trend.metric"
+            class="flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border"
+            :class="trend.direction === 'up' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-300' : trend.direction === 'down' ? 'bg-red-500/10 border-red-500/20 text-red-300' : 'bg-slate-700/30 border-slate-600/20 text-slate-400'"
+          >
+            <Icon
+              :name="trend.direction === 'up' ? 'i-heroicons-arrow-trending-up' : trend.direction === 'down' ? 'i-heroicons-arrow-trending-down' : 'i-heroicons-minus'"
+              class="w-3 h-3"
+            />
+            {{ trend.metric }}: {{ trend.direction === 'up' ? '+' : trend.direction === 'down' ? '-' : '' }}{{ trend.magnitude.toFixed(1) }}% · {{ trend.timeframe }}
+          </span>
+        </div>
+
+        <!-- Opportunities + Risks -->
+        <div v-if="item.businessReport.opportunities.length || item.businessReport.risks.length"
+          class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div v-if="item.businessReport.opportunities.length">
+            <p class="text-xs font-semibold uppercase tracking-widest text-amber-400 mb-2">Opportunities</p>
+            <ul class="space-y-1">
+              <li v-for="(opp, i) in item.businessReport.opportunities" :key="i"
+                class="flex items-start gap-1.5 text-xs text-slate-300">
+                <Icon name="i-heroicons-arrow-right" class="w-3 h-3 text-amber-400 mt-0.5 flex-shrink-0" />
+                {{ opp }}
+              </li>
+            </ul>
+          </div>
+          <div v-if="item.businessReport.risks.length">
+            <p class="text-xs font-semibold uppercase tracking-widest text-red-400 mb-2">Risks</p>
+            <ul class="space-y-1">
+              <li v-for="(risk, i) in item.businessReport.risks" :key="i"
+                class="flex items-start gap-1.5 text-xs text-slate-300">
+                <Icon name="i-heroicons-exclamation-circle" class="w-3 h-3 text-red-400 mt-0.5 flex-shrink-0" />
+                {{ risk }}
+              </li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Management View skeleton (no BI report yet) -->
+      <div v-else class="intelligence-panel rounded-xl p-4 border border-slate-700/30">
+        <div class="flex items-center gap-2">
+          <Icon name="i-heroicons-building-office-2" class="w-4 h-4 text-slate-600" />
+          <p class="text-xs text-slate-600">Business analysis not yet available — run a full analysis to generate the management view.</p>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
         <!-- Health + Summary -->
@@ -101,7 +230,7 @@
                   :stroke="scoreColor(item.dashboard?.health_score ?? 0)"
                   stroke-width="8" stroke-linecap="round"
                   :stroke-dasharray="`${scoreArc(item.dashboard?.health_score ?? 0)} 264`"
-                  :stroke-dashoffset="198 - scoreArc(item.dashboard?.health_score ?? 0)"
+                  stroke-dashoffset="0"
                   transform="rotate(-135 50 50)" />
                 <text x="50" y="52" text-anchor="middle" fill="white" font-size="22" font-weight="700"
                   font-family="ui-monospace, monospace">{{ item.dashboard?.health_score ?? 0 }}</text>
@@ -426,7 +555,7 @@
 </template>
 
 <script setup lang="ts">
-import { insightsService, type InsightDashboard, type InsightReport, type DataProfile, type InsightSuggestion } from '~/services/insights'
+import { insightsService, type InsightDashboard, type InsightReport, type DataProfile, type InsightSuggestion, type BusinessReport } from '~/services/insights'
 import { useAuthStore } from '~/stores/auth'
 
 definePageMeta({
@@ -447,6 +576,7 @@ interface StaveInsight {
   report: InsightReport | null
   profile: DataProfile | null
   allSuggestions: InsightSuggestion[]
+  businessReport: BusinessReport | null
 }
 
 const isLoading = ref(true)
@@ -475,6 +605,7 @@ async function loadInsights() {
           report: null,
           profile: null,
           allSuggestions: [],
+          businessReport: null,
         }
         try {
           const [dashboard, report, profile, allSuggestions] = await Promise.all([
@@ -487,6 +618,7 @@ async function loadInsights() {
           item.report = report
           item.profile = profile
           item.allSuggestions = allSuggestions
+          item.businessReport = dashboard?.business_report ?? null
         } catch {
           // no insights for this stave yet
         }
@@ -556,7 +688,11 @@ async function triggerAnalysis() {
 async function acceptSuggestion(staveId: string, sug: InsightSuggestion) {
   acceptingId.value = sug.id
   try {
-    await insightsService.acceptSuggestion(staveId, sug.id)
+    const result = await insightsService.acceptSuggestion(staveId, sug.id)
+    if (result?.check_created) {
+      analyzeStatus.value = 'Suggestion accepted — monitoring check created'
+      setTimeout(() => { analyzeStatus.value = '' }, 4000)
+    }
     await loadInsights()
   } finally {
     acceptingId.value = null

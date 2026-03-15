@@ -52,6 +52,7 @@ export interface InsightDashboard {
   pending_suggestions: InsightSuggestion[]
   ai_created_checks: { id: string; clef_id: string; rationale: string }[]
   last_analyzed_at: string | null
+  business_report?: BusinessReport | null
 }
 
 export interface DataProfile {
@@ -76,6 +77,48 @@ export interface InsightNotification {
   reference_id: string | null
   read_at: string | null
   created_at: string
+}
+
+export interface KPIResult {
+  name: string
+  label: string
+  value: number
+  unit: string
+  vs_benchmark: string | null
+  trend_direction: 'up' | 'down' | 'stable'
+}
+
+export interface PerformerInsight {
+  entity_type: string
+  entity_name: string
+  metric: string
+  value: number
+  unit: string
+  vs_average: number
+  drill_down_explanation: string
+}
+
+export interface TrendInsight {
+  metric: string
+  direction: 'up' | 'down' | 'stable'
+  magnitude: number
+  timeframe: string
+  explanation: string
+}
+
+export interface BusinessReport {
+  id: string
+  stave_id: string
+  snapshot_id: string
+  business_health_score: number
+  executive_summary: string
+  kpis: KPIResult[]
+  top_performers: PerformerInsight[]
+  bottom_performers: PerformerInsight[]
+  trends: TrendInsight[]
+  opportunities: string[]
+  risks: string[]
+  generated_at: string
 }
 
 class InsightsService {
@@ -107,8 +150,9 @@ class InsightsService {
     await apiService.post(`/insights/${staveId}/suggestions/${suggestionId}/assign`, { assigned_to: assignedTo })
   }
 
-  async acceptSuggestion(staveId: string, suggestionId: string): Promise<void> {
-    await apiService.post(`/insights/${staveId}/suggestions/${suggestionId}/accept`, {})
+  async acceptSuggestion(staveId: string, suggestionId: string): Promise<{ id: string; status: string; check_created: boolean }> {
+    const response = await apiService.post<{ id: string; status: string; check_created: boolean }>(`/insights/${staveId}/suggestions/${suggestionId}/accept`, {})
+    return response.data
   }
 
   async dismissSuggestion(staveId: string, suggestionId: string, reason?: string): Promise<void> {
@@ -138,6 +182,15 @@ class InsightsService {
 
   async markNotificationRead(notificationId: string): Promise<void> {
     await apiService.post(`/insights/notifications/${notificationId}/read`, {})
+  }
+  async getBusinessReport(staveId: string): Promise<BusinessReport> {
+    const response = await apiService.get<BusinessReport>(`/insights/${staveId}/business`)
+    return response.data
+  }
+
+  async getBusinessReportHistory(staveId: string): Promise<BusinessReport[]> {
+    const response = await apiService.get<BusinessReport[]>(`/insights/${staveId}/business/history`)
+    return response.data
   }
 }
 
