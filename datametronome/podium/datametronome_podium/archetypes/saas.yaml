@@ -1,0 +1,32 @@
+name: saas
+description: SaaS / subscription platforms — users, subscriptions, invoices
+
+signatures:
+  required: [users, subscriptions, invoices]
+  optional: [plans, usage_events, tenants, payments, features, trials]
+
+metrics:
+  - name: monthly_recurring_revenue
+    query_hint: "SUM(amount) FROM invoices WHERE status='paid' AND period=current_month"
+    typical_range: [1000, 1000000]
+  - name: churn_rate_monthly
+    typical_range: [0.03, 0.07]
+  - name: trial_conversion_rate
+    typical_range: [0.10, 0.30]
+
+patterns:
+  - monthly_billing_cycle
+  - trial_expiry_spike
+  - usage_growth_trend
+
+suggested_checks:
+  - type: freshness
+    table: subscriptions
+    schedule: "0 * * * *"
+    config:
+      max_age_hours: 24
+  - type: row_count_anomaly
+    table: invoices
+    schedule: "0 0 * * *"
+    config:
+      threshold_std_devs: 3

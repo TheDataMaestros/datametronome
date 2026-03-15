@@ -11,6 +11,7 @@ from fastapi import APIRouter
 from datametronome_podium.features.staves.router import router as staves_router
 from datametronome_podium.features.clefs.router import router as clefs_router
 from datametronome_podium.features.checks.router import router as checks_router
+from datametronome_podium.features.insights.router import router as insights_router
 
 # Complex endpoints that stay in api/v1/endpoints/ (not yet migrated)
 from .endpoints import (
@@ -31,6 +32,7 @@ api_router = APIRouter()
 api_router.include_router(staves_router, prefix="/staves", tags=["data sources"])
 api_router.include_router(clefs_router, prefix="/clefs", tags=["rule sets"])
 api_router.include_router(checks_router, prefix="/checks", tags=["checks"])
+api_router.include_router(insights_router, prefix="/insights", tags=["intelligence"])
 
 # Complex endpoints (auth, orchestration, actions, scheduling)
 api_router.include_router(auth.router, prefix="/auth", tags=["authentication"])

@@ -1,0 +1,33 @@
+name: crm
+description: Marketing / CRM — contacts, campaigns, leads, deals
+
+signatures:
+  required: [contacts, campaigns, leads]
+  optional: [deals, activities, segments, emails, tasks, notes]
+
+metrics:
+  - name: lead_conversion_rate
+    typical_range: [0.01, 0.10]
+  - name: pipeline_velocity_days
+    typical_range: [7, 90]
+  - name: email_open_rate
+    typical_range: [0.15, 0.30]
+
+patterns:
+  - campaign_burst_activity
+  - lead_decay_over_time
+  - seasonal_engagement_shifts
+
+suggested_checks:
+  - type: freshness
+    table: leads
+    schedule: "0 0 * * *"
+    config:
+      max_age_hours: 48
+  - type: column_values
+    table: contacts
+    schedule: "0 6 * * *"
+    config:
+      column: email
+      check: not_null_percentage
+      threshold: 0.85

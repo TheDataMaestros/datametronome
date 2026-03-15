@@ -47,3 +47,22 @@ async def test_router_agent_structured_output_with_test_model():
     agent = build_router_agent(TestModel())
     result = await agent.run("What is the status of my data sources?")
     assert isinstance(result.output, RoutingDecision)
+
+
+def test_routing_decision_accepts_insight_intent():
+    from datametronome_podium.services.agents.router import RoutingDecision
+    decision = RoutingDecision(
+        intent="insight", mode="single", agents=["insight"],
+        reasoning="User wants data exploration",
+    )
+    assert decision.intent == "insight"
+    assert decision.agents == ["insight"]
+
+
+def test_routing_decision_insight_chain():
+    from datametronome_podium.services.agents.router import RoutingDecision
+    decision = RoutingDecision(
+        intent="insight", mode="chain", agents=["insight", "config"],
+        reasoning="Explore then configure",
+    )
+    assert decision.mode == "chain"

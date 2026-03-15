@@ -15,6 +15,7 @@ QUEUE_HIGH = "checks.high"
 QUEUE_DEFAULT = "checks.default"
 QUEUE_BULK = "checks.bulk"
 QUEUE_DLQ = "checks.dlq"
+QUEUE_INTELLIGENCE = "intelligence.default"
 
 celery_app = Celery(
     "datametronome",
@@ -34,12 +35,17 @@ celery_app.conf.update(
         Queue(QUEUE_DEFAULT, routing_key="checks.default"),
         Queue(QUEUE_BULK, routing_key="checks.bulk"),
         Queue(QUEUE_DLQ, routing_key="checks.dlq"),
+        Queue(QUEUE_INTELLIGENCE, routing_key="intelligence.default"),
     ),
     task_default_queue=QUEUE_DEFAULT,
 
     # Routing (task name matches the name= in @celery_app.task decorator)
     task_routes={
         "datametronome.execute_check": {"queue": QUEUE_DEFAULT},
+        "datametronome.run_auto_scan": {"queue": QUEUE_INTELLIGENCE},
+        "datametronome.run_daily_intelligence": {"queue": QUEUE_INTELLIGENCE},
+        "datametronome.run_on_demand_analysis": {"queue": QUEUE_INTELLIGENCE},
+        "datametronome.prune_old_snapshots": {"queue": QUEUE_DEFAULT},
     },
 
     # Retry defaults
@@ -63,4 +69,7 @@ celery_app.conf.update(
 )
 
 # Explicitly include task modules (autodiscover expects tasks.py, ours is check_tasks.py)
-celery_app.conf.include = ["datametronome_podium.tasks.check_tasks"]
+celery_app.conf.include = [
+    "datametronome_podium.tasks.check_tasks",
+    "datametronome_podium.tasks.intelligence_tasks",
+]

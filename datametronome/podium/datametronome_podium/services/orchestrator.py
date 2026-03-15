@@ -20,6 +20,7 @@ from datametronome_podium.services.agents.router import RoutingDecision, build_r
 from datametronome_podium.services.agents.config import build_config_agent
 from datametronome_podium.services.agents.investigation import build_investigation_agent
 from datametronome_podium.services.agents.report import build_report_agent
+from datametronome_podium.services.agents.insight import build_insight_agent
 from datametronome_podium.services.agent_factory import (
     build_model_from_settings,
     build_router_model_from_settings,
@@ -56,6 +57,11 @@ def _fallback_route(message: str) -> RoutingDecision:
             intent="report", mode="single", agents=["report"],
             reasoning="Fallback: detected report keywords",
         )
+    if any(w in msg for w in ["explore", "insight", "analyze", "what's happening", "how's my data", "business"]):
+        return RoutingDecision(
+            intent="insight", mode="single", agents=["insight"],
+            reasoning="Fallback: detected insight keywords",
+        )
     # Default: report agent handles general questions
     return RoutingDecision(
         intent="quick", mode="single", agents=["report"],
@@ -82,12 +88,17 @@ def _get_report_agent():
     return build_report_agent(build_model_from_settings())
 
 
+def _get_insight_agent():
+    return build_insight_agent(build_model_from_settings())
+
+
 def _get_agent_builder(agent_type: str):
     """Resolve agent builder by name — indirects through module globals so patches work."""
     builders = {
         "config": _get_config_agent,
         "investigation": _get_investigation_agent,
         "report": _get_report_agent,
+        "insight": _get_insight_agent,
     }
     return builders.get(agent_type, _get_report_agent)
 
