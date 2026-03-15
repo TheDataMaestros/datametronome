@@ -7,6 +7,8 @@ export interface InsightAnomaly {
   table: string
   evidence: string
   compared_to?: string
+  detected_at?: string | null
+  snapshot_at?: string | null
 }
 
 export interface InsightSuggestion {
@@ -89,6 +91,11 @@ class InsightsService {
 
   async getProfile(staveId: string): Promise<DataProfile> {
     const response = await apiService.get<DataProfile>(`/insights/${staveId}/profile`)
+    return response.data
+  }
+
+  async getAllSuggestions(staveId: string): Promise<InsightSuggestion[]> {
+    const response = await apiService.get<InsightSuggestion[]>(`/insights/${staveId}/suggestions`)
     return response.data
   }
 

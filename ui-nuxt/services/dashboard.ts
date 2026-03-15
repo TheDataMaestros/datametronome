@@ -13,6 +13,8 @@ export interface IntelligenceAnomaly {
   description: string
   table: string
   evidence: string
+  detected_at: string | null
+  snapshot_at: string | null
 }
 
 export interface IntelligenceMetrics {

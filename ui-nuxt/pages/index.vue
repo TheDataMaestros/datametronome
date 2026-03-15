@@ -301,9 +301,20 @@
                 <span class="flex-shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-500/30 text-red-300 mt-0.5">
                   {{ ano.severity }}
                 </span>
-                <div class="min-w-0">
+                <div class="min-w-0 flex-1">
                   <p class="text-xs font-medium text-red-200 leading-snug line-clamp-2">{{ ano.description }}</p>
                   <p v-if="ano.table" class="text-[11px] text-slate-500 mt-0.5">table: <code class="text-slate-400">{{ ano.table }}</code></p>
+                  <!-- Timestamps -->
+                  <div class="flex flex-wrap gap-x-3 gap-y-0.5 mt-1.5">
+                    <span v-if="ano.detected_at" class="flex items-center gap-1 text-[10px] text-slate-500">
+                      <Icon name="i-heroicons-magnifying-glass" class="w-2.5 h-2.5" />
+                      Detected {{ formatAnomalyTime(ano.detected_at) }}
+                    </span>
+                    <span v-if="ano.snapshot_at" class="flex items-center gap-1 text-[10px] text-slate-500">
+                      <Icon name="i-heroicons-camera" class="w-2.5 h-2.5" />
+                      Snapshot {{ formatAnomalyTime(ano.snapshot_at) }}
+                    </span>
+                  </div>
                 </div>
               </div>
               <div class="flex gap-2 pt-1">
@@ -740,6 +751,16 @@ function formatAnalyzedAt(ts: string) {
   const date = new Date(ts)
   if (Number.isNaN(date.getTime())) return 'unknown'
   return date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function formatAnomalyTime(ts: string | null | undefined) {
+  if (!ts) return ''
+  const date = new Date(ts)
+  if (Number.isNaN(date.getTime())) return ''
+  const diffMin = Math.floor((Date.now() - date.getTime()) / 60_000)
+  const relative = diffMin < 1 ? 'just now' : diffMin < 60 ? `${diffMin}m ago` : diffMin < 1440 ? `${Math.floor(diffMin / 60)}h ago` : `${Math.floor(diffMin / 1440)}d ago`
+  const abs = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+  return `${relative} · ${abs}`
 }
 
 function humanizeCheckType(checkType?: string) {

@@ -190,6 +190,21 @@
                 <span class="text-slate-500">Evidence: </span>{{ ano.evidence }}
               </p>
               <p v-if="ano.compared_to" class="text-xs text-slate-500 mt-1">vs {{ ano.compared_to }}</p>
+              <!-- Timestamps -->
+              <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-2 pt-2 border-t border-red-500/10">
+                <span class="flex items-center gap-1 text-[11px] text-slate-500">
+                  <Icon name="i-heroicons-magnifying-glass" class="w-3 h-3" />
+                  Detected {{ formatTimeAgo(ano.detected_at ?? item.dashboard?.last_analyzed_at) }}
+                  <span class="text-slate-600">·</span>
+                  <span class="text-slate-600">{{ formatDate(ano.detected_at ?? item.dashboard?.last_analyzed_at) }}</span>
+                </span>
+                <span v-if="ano.snapshot_at" class="flex items-center gap-1 text-[11px] text-slate-500">
+                  <Icon name="i-heroicons-camera" class="w-3 h-3" />
+                  Last snapshot {{ formatTimeAgo(ano.snapshot_at) }}
+                  <span class="text-slate-600">·</span>
+                  <span class="text-slate-600">{{ formatDate(ano.snapshot_at) }}</span>
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -297,6 +312,72 @@
         </div>
       </div>
 
+      <!-- Suggestion History -->
+      <div
+        v-if="item.allSuggestions.filter(s => s.status !== 'pending').length > 0"
+        class="intelligence-panel rounded-xl p-5"
+      >
+        <div class="flex items-center gap-2 mb-4">
+          <Icon name="i-heroicons-archive-box" class="w-4 h-4 text-slate-400" />
+          <p class="text-xs font-semibold uppercase tracking-widest text-slate-400">
+            Suggestion History
+          </p>
+          <span class="text-xs text-slate-600">({{ item.allSuggestions.filter(s => s.status !== 'pending').length }} resolved)</span>
+        </div>
+        <div class="space-y-3">
+          <div
+            v-for="sug in item.allSuggestions.filter(s => s.status !== 'pending')"
+            :key="sug.id"
+            class="flex gap-3 p-3 rounded-lg"
+            :class="sug.status === 'accepted' ? 'bg-emerald-500/8 border border-emerald-500/15' : 'bg-slate-700/20 border border-slate-600/20'"
+          >
+            <!-- Status icon -->
+            <div class="flex-shrink-0 mt-0.5">
+              <span
+                class="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
+                :class="sug.status === 'accepted' ? 'bg-emerald-500/25 text-emerald-300' : 'bg-slate-600/40 text-slate-400'"
+              >
+                <Icon :name="sug.status === 'accepted' ? 'i-heroicons-check' : 'i-heroicons-x-mark'" class="w-3 h-3 inline" />
+                {{ sug.status }}
+              </span>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 mb-0.5">
+                <span
+                  class="text-[10px] font-bold uppercase px-1 py-0.5 rounded"
+                  :class="sug.priority === 'high' ? 'bg-red-500/20 text-red-400' : 'bg-amber-500/15 text-amber-500'"
+                >{{ sug.priority }}</span>
+                <span class="text-xs text-slate-500 capitalize">{{ sug.category }}</span>
+              </div>
+              <p class="text-sm text-slate-300 leading-snug">{{ sug.action }}</p>
+              <!-- Dismiss reason -->
+              <p v-if="sug.dismiss_reason" class="text-xs text-slate-500 mt-1 italic">
+                <Icon name="i-heroicons-chat-bubble-left" class="w-3 h-3 inline mr-0.5" />Reason: {{ sug.dismiss_reason }}
+              </p>
+              <!-- Timeline -->
+              <div class="flex flex-wrap gap-x-4 gap-y-0.5 mt-2">
+                <span class="flex items-center gap-1 text-[11px] text-slate-600">
+                  <Icon name="i-heroicons-clock" class="w-3 h-3" />
+                  Suggested {{ formatDate(sug.created_at) }}
+                </span>
+                <span v-if="sug.read_at" class="flex items-center gap-1 text-[11px] text-slate-600">
+                  <Icon name="i-heroicons-eye" class="w-3 h-3" />
+                  Read by {{ sug.read_by }} · {{ formatDate(sug.read_at) }}
+                </span>
+                <span v-if="sug.assigned_to" class="flex items-center gap-1 text-[11px] text-slate-600">
+                  <Icon name="i-heroicons-user" class="w-3 h-3" />
+                  Assigned to {{ sug.assigned_to }} · {{ formatDate(sug.assigned_at) }}
+                </span>
+                <span class="flex items-center gap-1 text-[11px]" :class="sug.status === 'accepted' ? 'text-emerald-600' : 'text-slate-600'">
+                  <Icon :name="sug.status === 'accepted' ? 'i-heroicons-check-circle' : 'i-heroicons-x-circle'" class="w-3 h-3" />
+                  {{ sug.status === 'accepted' ? 'Accepted' : 'Dismissed' }} {{ formatDate(sug.resolved_at) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 
@@ -365,6 +446,7 @@ interface StaveInsight {
   dashboard: InsightDashboard | null
   report: InsightReport | null
   profile: DataProfile | null
+  allSuggestions: InsightSuggestion[]
 }
 
 const isLoading = ref(true)
@@ -392,16 +474,19 @@ async function loadInsights() {
           dashboard: null,
           report: null,
           profile: null,
+          allSuggestions: [],
         }
         try {
-          const [dashboard, report, profile] = await Promise.all([
+          const [dashboard, report, profile, allSuggestions] = await Promise.all([
             insightsService.getDashboard(stave.id),
             insightsService.getLatestReport(stave.id),
             insightsService.getProfile(stave.id),
+            insightsService.getAllSuggestions(stave.id),
           ])
           item.dashboard = dashboard
           item.report = report
           item.profile = profile
+          item.allSuggestions = allSuggestions
         } catch {
           // no insights for this stave yet
         }

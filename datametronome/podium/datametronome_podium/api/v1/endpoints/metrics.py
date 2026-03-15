@@ -490,9 +490,16 @@ async def _fetch_intelligence_metrics(db: Any) -> Dict[str, Any]:
         ]
 
         # Anomalies from most recent reports — count + top critical items
+        # Include created_at + snapshot's captured_at so UI can show "detected at / last snapshot"
         anomaly_reports = await db.query(
             {
-                "sql": "SELECT anomalies FROM insight_reports ORDER BY created_at DESC LIMIT 5",
+                "sql": (
+                    "SELECT r.anomalies, r.created_at AS report_at, "
+                    "s.captured_at AS snapshot_at "
+                    "FROM insight_reports r "
+                    "LEFT JOIN baseline_snapshots s ON r.snapshot_id = s.id "
+                    "ORDER BY r.created_at DESC LIMIT 5"
+                ),
                 "params": [],
             }
         )
@@ -520,6 +527,8 @@ async def _fetch_intelligence_metrics(db: Any) -> Dict[str, Any]:
                                     "description": a.get("description", a.get("title", "")),
                                     "table": a.get("table", ""),
                                     "evidence": a.get("evidence", ""),
+                                    "detected_at": row.get("report_at"),
+                                    "snapshot_at": row.get("snapshot_at"),
                                 })
             except (ValueError, TypeError):
                 pass
