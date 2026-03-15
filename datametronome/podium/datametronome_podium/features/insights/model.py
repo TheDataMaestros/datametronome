@@ -74,6 +74,7 @@ class InsightSuggestion(BaseModel):
     assigned_to: str | None = None
     assigned_at: str | None = None
     created_at: str
+    check_spec: dict | None = None  # populated by LLM when it recommends a monitoring check
 
 
 class Notification(BaseModel):
@@ -94,3 +95,46 @@ class InsightCreatedCheck(BaseModel):
     clef_id: str
     rationale: str
     created_at: str
+
+
+class KPIResult(BaseModel):
+    name: str
+    label: str
+    value: float
+    unit: str
+    vs_benchmark: str | None = None
+    trend_direction: Literal["up", "down", "stable"]
+
+
+class PerformerInsight(BaseModel):
+    entity_type: str
+    entity_name: str
+    metric: str
+    value: float
+    unit: str
+    vs_average: float
+    drill_down_explanation: str
+
+
+class TrendInsight(BaseModel):
+    metric: str
+    direction: Literal["up", "down", "stable"]
+    magnitude: float
+    timeframe: str
+    explanation: str
+
+
+class BusinessReport(BaseModel):
+    id: str
+    stave_id: str
+    snapshot_id: str
+    tenant_id: str
+    business_health_score: int
+    executive_summary: str
+    kpis: list[dict] = []
+    top_performers: list[dict] = []
+    bottom_performers: list[dict] = []
+    trends: list[dict] = []
+    opportunities: list[str] = []
+    risks: list[str] = []
+    generated_at: str
