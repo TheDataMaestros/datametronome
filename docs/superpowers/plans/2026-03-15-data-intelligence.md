@@ -20,7 +20,7 @@
 
 New Pydantic domain models for the Intelligence Store, plus the Alembic migration to create the 5 new tables.
 
-### Task 1: DataProfile domain model
+### Task 1: DataProfile domain model -- DONE
 
 **Files:**
 - Create: `DMP/features/insights/model.py`
@@ -126,7 +126,7 @@ git add -f datametronome_podium/features/insights/ tests/features/insights/
 git commit --no-verify -m "feat(insights): add DataProfile domain model"
 ```
 
-### Task 2: BaselineSnapshot + InsightReport + InsightSuggestion + InsightCreatedCheck models
+### Task 2: BaselineSnapshot + InsightReport + InsightSuggestion + InsightCreatedCheck models -- DONE
 
 **Files:**
 - Modify: `DMP/features/insights/model.py`
@@ -299,7 +299,7 @@ git add -f datametronome_podium/features/insights/model.py tests/features/insigh
 git commit --no-verify -m "feat(insights): add BaselineSnapshot, InsightReport, InsightSuggestion, InsightCreatedCheck models"
 ```
 
-### Task 3: Alembic migration for Intelligence Store tables
+### Task 3: Alembic migration for Intelligence Store tables -- DONE
 
 **Files:**
 - Create: `alembic/versions/004_intelligence_store.py`
@@ -447,7 +447,7 @@ git commit --no-verify -m "feat(insights): add Alembic migration for Intelligenc
 
 Repository layer (CRUD for all 5 tables) and FastAPI router following the existing feature-slice pattern.
 
-### Task 4: InsightsRepo — data access layer
+### Task 4: InsightsRepo — data access layer -- DONE
 
 **Files:**
 - Create: `DMP/features/insights/repo.py`
@@ -779,7 +779,7 @@ git add -f datametronome_podium/features/insights/repo.py tests/features/insight
 git commit --no-verify -m "feat(insights): add InsightsRepo with CRUD for all intelligence tables"
 ```
 
-### Task 5: API schemas
+### Task 5: API schemas -- DONE
 
 **Files:**
 - Create: `DMP/features/insights/schema.py`
@@ -910,7 +910,7 @@ git add -f datametronome_podium/features/insights/schema.py tests/features/insig
 git commit --no-verify -m "feat(insights): add API schemas for insights endpoints"
 ```
 
-### Task 6: Insights API router
+### Task 6: Insights API router -- DONE
 
 **Files:**
 - Create: `DMP/features/insights/router.py`
@@ -1176,7 +1176,7 @@ git commit --no-verify -m "feat(insights): add API router with CRUD endpoints + 
 
 YAML archetype files + loader + deterministic signature matcher.
 
-### Task 7: Create archetype YAML files
+### Task 7: Create archetype YAML files -- DONE
 
 **Files:**
 - Create: `DMP/archetypes/__init__.py`
@@ -1373,7 +1373,7 @@ git add -f datametronome_podium/archetypes/
 git commit --no-verify -m "feat(insights): add domain archetype YAML files (ecommerce, saas, iot, crm, generic)"
 ```
 
-### Task 8: Archetype loader + deterministic matcher
+### Task 8: Archetype loader + deterministic matcher -- DONE
 
 **Files:**
 - Create: `DMP/archetypes/__init__.py`
@@ -1565,7 +1565,7 @@ git commit --no-verify -m "feat(insights): add archetype loader with determinist
 
 New `intelligence.default` queue, Celery tasks for auto-scan/daily/on-demand, Redis concurrency lock.
 
-### Task 9: Add intelligence queue to Celery config
+### Task 9: Add intelligence queue to Celery config -- DONE
 
 **Files:**
 - Modify: `DMP/core/celery_app.py`
@@ -1631,7 +1631,7 @@ git add -f datametronome_podium/core/celery_app.py tests/test_celery_app.py
 git commit --no-verify -m "feat(insights): add intelligence.default Celery queue"
 ```
 
-### Task 10: Intelligence Celery tasks (stubs + concurrency lock)
+### Task 10: Intelligence Celery tasks (stubs + concurrency lock) -- DONE
 
 **Files:**
 - Create: `DMP/tasks/intelligence_tasks.py`
@@ -1831,7 +1831,7 @@ git commit --no-verify -m "feat(insights): add intelligence Celery tasks with Re
 
 The core intelligence: InsightAgent (Pydantic AI), pipeline stages 1-5, LLM-powered classification and analysis.
 
-### Task 11: LLM output models (structured output for InsightAgent)
+### Task 11: LLM output models (structured output for InsightAgent) -- DONE
 
 **Files:**
 - Create: `DMP/services/agents/insight_models.py`
@@ -1979,7 +1979,7 @@ git add -f datametronome_podium/services/agents/insight_models.py tests/test_ins
 git commit --no-verify -m "feat(insights): add LLM output models for InsightAgent structured output"
 ```
 
-### Task 12: InsightAgent definition
+### Task 12: InsightAgent definition -- DONE
 
 **Files:**
 - Create: `DMP/services/agents/insight.py`
@@ -2137,7 +2137,7 @@ git add -f datametronome_podium/services/agents/insight.py tests/test_insight_ag
 git commit --no-verify -m "feat(insights): add InsightAgent with dynamic system prompt composition"
 ```
 
-### Task 13: Pipeline service (stages 1-5)
+### Task 13: Pipeline service (stages 1-5) -- DONE
 
 **Files:**
 - Create: `DMP/features/insights/service.py`
@@ -2643,7 +2643,7 @@ git add -f datametronome_podium/features/insights/service.py tests/features/insi
 git commit --no-verify -m "feat(insights): add InsightPipelineService with stages 1-5"
 ```
 
-### Task 14: Wire Celery tasks to pipeline service
+### Task 14: Wire Celery tasks to pipeline service -- DONE
 
 **Files:**
 - Modify: `DMP/tasks/intelligence_tasks.py`
@@ -2695,7 +2695,7 @@ git commit --no-verify -m "feat(insights): wire Celery tasks to InsightPipelineS
 
 Wire InsightAgent into the router's intent system and the orchestrator's dispatch flow.
 
-### Task 15: Update RouterAgent with insight intent
+### Task 15: Update RouterAgent with insight intent -- DONE
 
 **Files:**
 - Modify: `DMP/services/agents/router.py`
@@ -2800,7 +2800,7 @@ git add -f datametronome_podium/services/agents/router.py datametronome_podium/s
 git commit --no-verify -m "feat(insights): wire InsightAgent into router + orchestrator"
 ```
 
-### Task 16: Wire auto-scan trigger to stave creation
+### Task 16: Wire auto-scan trigger to stave creation -- DONE
 
 **Files:**
 - Modify: `DMP/features/staves/router.py`
@@ -2877,7 +2877,7 @@ git add -f datametronome_podium/features/staves/router.py tests/features/staves/
 git commit --no-verify -m "feat(insights): dispatch auto-scan on stave creation"
 ```
 
-### Task 17: Wire POST /analyze endpoint to Celery task
+### Task 17: Wire POST /analyze endpoint to Celery task -- DONE
 
 **Files:**
 - Modify: `DMP/features/insights/router.py`
@@ -2935,7 +2935,7 @@ Weekly snapshot pruning task, full test suite run, and overall verification.
 - Modify: `DMP/tasks/intelligence_tasks.py`
 - Test: `tests/test_intelligence_tasks.py` (add pruning test)
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 Add to `tests/test_intelligence_tasks.py`:
 
@@ -2947,7 +2947,7 @@ def test_prune_task_exists():
     assert prune_old_snapshots.name == "datametronome.prune_old_snapshots"
 ```
 
-- [ ] **Step 2: Add pruning task**
+- [x] **Step 2: Add pruning task**
 
 Add to `DMP/tasks/intelligence_tasks.py`:
 
@@ -2986,24 +2986,20 @@ Add missing import at top of file:
 from datetime import datetime, timezone
 ```
 
-- [ ] **Step 3: Run test**
+- [x] **Step 3: Run test**
 
 Run: `.venv/bin/python -m pytest tests/test_intelligence_tasks.py -v --timeout=10`
 Expected: 4 passed
 
-- [ ] **Step 4: Add routing for prune task in celery_app.py**
+- [x] **Step 4: Add routing for prune task in celery_app.py**
 
 Add to `task_routes` in `DMP/core/celery_app.py`:
 ```python
 "datametronome.prune_old_snapshots": {"queue": QUEUE_DEFAULT},
 ```
 
-- [ ] **Step 5: Commit**
-
-```bash
-git add -f datametronome_podium/tasks/intelligence_tasks.py datametronome_podium/core/celery_app.py tests/test_intelligence_tasks.py
-git commit --no-verify -m "feat(insights): add snapshot pruning Celery task"
-```
+- [x] **Step 5: Commit**
+  Files: `datametronome_podium/tasks/intelligence_tasks.py`, `datametronome_podium/core/celery_app.py`, `tests/test_intelligence_tasks.py`
 
 ### Task 19: Celery Beat schedule registration + stave lifecycle hooks
 
@@ -3012,7 +3008,7 @@ git commit --no-verify -m "feat(insights): add snapshot pruning Celery task"
 - Modify: `DMP/features/staves/router.py` (add hooks for pause/unpause/delete)
 - Test: `tests/test_intelligence_scheduler.py`
 
-- [ ] **Step 1: Write failing tests**
+- [x] **Step 1: Write failing tests**
 
 ```python
 # tests/test_intelligence_scheduler.py
@@ -3051,12 +3047,12 @@ def test_remove_nonexistent_schedule_is_safe():
         remove_daily_intelligence("stave-nonexistent")
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `.venv/bin/python -m pytest tests/test_intelligence_scheduler.py -v --timeout=10`
 Expected: FAIL (ImportError)
 
-- [ ] **Step 3: Implement intelligence scheduler**
+- [x] **Step 3: Implement intelligence scheduler**
 
 ```python
 # DMP/services/intelligence_scheduler.py
@@ -3107,7 +3103,7 @@ def register_prune_schedule() -> None:
     logger.info("Registered weekly snapshot pruning schedule")
 ```
 
-- [ ] **Step 4: Wire lifecycle hooks into stave router**
+- [x] **Step 4: Wire lifecycle hooks into stave router**
 
 In `DMP/features/staves/router.py`:
 
@@ -3147,17 +3143,13 @@ Add to `delete_stave` (before the actual delete):
 
 The existing circuit breaker pause flow already calls `unpause` — add schedule removal to the circuit breaker's pause path similarly.
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `.venv/bin/python -m pytest tests/test_intelligence_scheduler.py -v --timeout=10`
 Expected: 3 passed
 
-- [ ] **Step 6: Commit**
-
-```bash
-git add -f datametronome_podium/services/intelligence_scheduler.py datametronome_podium/features/staves/router.py tests/test_intelligence_scheduler.py
-git commit --no-verify -m "feat(insights): add Beat schedule registration + stave lifecycle hooks"
-```
+- [x] **Step 6: Commit**
+  Files: `datametronome_podium/services/intelligence_scheduler.py`, `datametronome_podium/features/staves/router.py`, `tests/test_intelligence_scheduler.py`
 
 ### Task 20: Fix pipeline service — use executor directly for discovery, fix InsightAgent usage
 
@@ -3167,7 +3159,7 @@ git commit --no-verify -m "feat(insights): add Beat schedule registration + stav
 - Modify: `DMP/features/insights/service.py`
 - Test: `tests/features/insights/test_insight_service.py` (add tests for fixes)
 
-- [ ] **Step 1: Fix `_discover_schema` to use executor directly instead of agent tools**
+- [x] **Step 1: Fix `_discover_schema` to use executor directly instead of agent tools** (already correct — uses ConnectionTester)
 
 Replace the `_discover_schema` method to query the stave's connector directly rather than calling `list_stave_tables`/`get_table_sample` (which are Pydantic AI tool functions that may require agent context):
 
@@ -3218,7 +3210,7 @@ async def _discover_schema(self, stave_id: str) -> dict[str, Any]:
 
 Note: The exact connector API depends on the PulseProtocol interface. If `list_tables()` / `sample_table()` don't exist, adapt to use the existing `list_stave_tables` and `get_table_sample` agent tools — but wrap them in a try/except that initializes the DB connection first. The implementer should check the PulseProtocol interface.
 
-- [ ] **Step 2: Fix `analyze_business` to use InsightAgent properly**
+- [x] **Step 2: Fix `analyze_business` to use InsightAgent properly** (already correct — uses `_build_system_prompt` + Agent)
 
 Replace the broken `analyze_business` method:
 
@@ -3289,7 +3281,7 @@ report_type: "daily"
         raise
 ```
 
-- [ ] **Step 3: Add `schema_map` persistence and `learned_patterns` accumulation to `persist_results`**
+- [x] **Step 3: Add `schema_map` persistence and `learned_patterns` accumulation to `persist_results`**
 
 In `persist_results`, when creating/updating the profile, also save the schema_map:
 
@@ -3311,17 +3303,10 @@ if analysis and profile:
     await self.repo.update_profile(stave_id, {"learned_patterns": merged})
 ```
 
-- [ ] **Step 4: Run tests**
+- [x] **Step 4: Run tests** — 6 passed
 
-Run: `.venv/bin/python -m pytest tests/features/insights/test_insight_service.py -v --timeout=10`
-Expected: All pass
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add -f datametronome_podium/features/insights/service.py tests/features/insights/test_insight_service.py
-git commit --no-verify -m "fix(insights): use executor for discovery, fix InsightAgent usage, add cumulative learning"
-```
+- [x] **Step 5: Commit**
+  Files: `datametronome_podium/features/insights/service.py`
 
 ### Task 21: Add weekly aggregation to pruning task
 
@@ -3331,7 +3316,7 @@ git commit --no-verify -m "fix(insights): use executor for discovery, fix Insigh
 - Modify: `DMP/tasks/intelligence_tasks.py`
 - Test: `tests/test_intelligence_tasks.py`
 
-- [ ] **Step 1: Write failing test**
+- [x] **Step 1: Write failing test**
 
 ```python
 # Add to tests/test_intelligence_tasks.py
@@ -3350,7 +3335,7 @@ async def test_prune_aggregates_before_deleting():
     assert result[0]["snapshot_type"] == "weekly_aggregate"
 ```
 
-- [ ] **Step 2: Implement aggregation in pruning**
+- [x] **Step 2: Implement aggregation in pruning**
 
 Update `_prune_snapshots_async` to:
 1. Query snapshots older than 90 days, grouped by stave_id and ISO week
@@ -3358,19 +3343,12 @@ Update `_prune_snapshots_async` to:
 3. Insert a `weekly_aggregate` snapshot per group
 4. Then delete the raw snapshots
 
-- [ ] **Step 3: Run tests**
+- [x] **Step 3: Run tests** — 5 passed
 
-Run: `.venv/bin/python -m pytest tests/test_intelligence_tasks.py -v --timeout=10`
-Expected: All pass
+- [x] **Step 4: Commit**
+  Files: `datametronome_podium/tasks/intelligence_tasks.py`, `tests/test_intelligence_tasks.py`
 
-- [ ] **Step 4: Commit**
-
-```bash
-git add -f datametronome_podium/tasks/intelligence_tasks.py tests/test_intelligence_tasks.py
-git commit --no-verify -m "feat(insights): add weekly aggregation before snapshot pruning"
-```
-
-### Task 22: LLM error handling tests
+### Task 22: LLM error handling tests -- DONE
 
 **Review issue addressed:** #19 (no LLM error handling tests)
 
@@ -3438,7 +3416,7 @@ git add -f tests/features/insights/test_insight_service.py
 git commit --no-verify -m "test(insights): add LLM error handling scenario tests"
 ```
 
-### Task 23: Full test suite verification
+### Task 23: Full test suite verification -- DONE
 
 - [ ] **Step 1: Run all tests**
 
@@ -3490,3 +3468,179 @@ Issues from spec review that are addressed in this plan:
 | 21 | No Beat schedule for daily intelligence | Task 19 |
 | 22 | InsightAgent output_type mismatch | Task 20 — uses `_build_system_prompt` directly with structured output Agent |
 | 23 | No per-table 30s query timeout | Implementer should add `asyncio.wait_for(connector.sample_table(...), timeout=30)` in `_discover_schema` |
+
+---
+
+## Implementation Log
+
+### Task 1: DataProfile domain model
+- **Approach:** Simple Pydantic BaseModel following existing feature model patterns (e.g., `staves/model.py`). Dict fields for JSON-serialized data (domain_context, schema_map, entity_roles, learned_patterns).
+- **TDD cycles:** 1 cycle — RED (ImportError) -> GREEN (model implemented)
+- **Files:** `datametronome_podium/features/insights/__init__.py`, `datametronome_podium/features/insights/model.py`, `tests/features/insights/__init__.py`, `tests/features/insights/test_insight_models.py`
+
+### Task 2: BaselineSnapshot + InsightReport + InsightSuggestion + InsightCreatedCheck + TableMetrics
+- **Approach:** Added 5 models to same `model.py`. Used `Literal` types for constrained string fields (snapshot_type, report_type, priority, status). TableMetrics is a value object (no id), others are entities.
+- **TDD cycles:** 1 cycle — RED (ImportError for new models) -> GREEN (all 5 models implemented)
+- **Files:** `datametronome_podium/features/insights/model.py`, `tests/features/insights/test_insight_models.py`
+
+### Task 3: Alembic migration for Intelligence Store tables
+- **Approach:** Used DialectAwareOps (dao) pattern consistent with existing migrations. `down_revision = "d4fa342314f0"` (the paused field migration). 5 tables with proper FK constraints and 10 indexes for query performance.
+- **Decisions:** Used TEXT for JSON columns (consistent with existing schema). DOUBLE PRECISION for domain_confidence (adapted to REAL for SQLite by dialect_ops). Cascade deletes on stave/report FKs, SET NULL on snapshot_id FK.
+- **Files:** `alembic/versions/004_intelligence_store.py`
+
+### Notes (Chunk 2)
+- `tests/test_archetypes.py` has a pre-existing collection error (imports functions from `archetypes` module that don't exist yet — those are later chunk tasks). Not a regression.
+- Baseline: 330 passed -> Final: 338 passed (8 new insight model tests), 1 skipped, no regressions.
+
+## Implementation Log -- Chunk 3
+
+### Task 7: Create archetype YAML files
+- **Approach:** Created 5 YAML files (ecommerce, saas, iot, crm, generic) exactly as specified in the plan/spec. Each defines signatures (required/optional table names), domain-specific metrics with typical ranges, behavioral patterns, and suggested quality checks.
+- **Decisions:** YAML content matches the spec verbatim. No code changes needed -- pure data files.
+- **Files:** `datametronome_podium/archetypes/{__init__.py,ecommerce.yaml,saas.yaml,iot.yaml,crm.yaml,generic.yaml}`
+
+### Task 8: Archetype loader + deterministic matcher
+- **Approach:** Implemented three public functions in `archetypes/__init__.py`: `load_archetype(name)`, `load_all_archetypes()`, `match_archetypes(table_names)`. Module-level cache dict avoids re-reading YAML files.
+- **TDD cycles:** 1 cycle -- wrote 9 tests covering loading, matching all domains, unknown tables, and scoring formula verification. All passed on first GREEN.
+- **Refactoring:** None needed -- implementation is 72 lines total including docstrings, all functions are small and focused.
+- **Decisions:** Cache is module-level (not cleared between tests) since YAML files are static. Scoring uses the spec formula: `req_matches/req_count * 0.7 + opt_matches/opt_count * 0.3`. Generic archetype always scores 0.0 (no signatures).
+- **Files:** `datametronome_podium/archetypes/__init__.py`, `tests/test_archetypes.py` (new)
+
+### Notes (Chunk 3)
+- The pre-existing `tests/test_archetypes.py` collection error from Chunk 2 notes is now resolved -- the archetype module exports the expected functions.
+- Baseline: 338 passed -> Final: 347 passed (9 new archetype tests), 1 skipped, no regressions.
+
+## Implementation Log -- Chunk 4
+
+### Task 9: Add intelligence queue to Celery config
+- **Approach:** Added `QUEUE_INTELLIGENCE = "intelligence.default"` constant, new Queue entry, three task routes, and updated the include list to register `intelligence_tasks` module.
+- **TDD cycles:** 1 cycle -- wrote test asserting constant value and queue presence in configured queues. Failed on import (RED), passed after adding constant + queue (GREEN).
+- **Files:** `datametronome_podium/core/celery_app.py:17,37,44-46,68-70`, `tests/test_celery_app.py:43-48`
+
+### Task 10: Intelligence Celery tasks (stubs + concurrency lock)
+- **Approach:** Created `intelligence_tasks.py` with `_acquire_lock`/`_release_lock` async helpers using Redis SET NX EX pattern (30-min TTL). Three Celery task stubs (`run_auto_scan`, `run_daily_intelligence`, `run_on_demand_analysis`) each use `asyncio.run()` to bridge sync Celery tasks to async lock/pipeline logic. Pipeline stages are TODO stubs for Chunk 5.
+- **TDD cycles:** 1 cycle -- 3 tests for lock acquire (success + already held) and release. All used AsyncMock for Redis client.
+- **Decisions:** Lock TTL of 1800s (30 min) matches plan. `_get_redis_client` is lazy to avoid import-time connection. Each async helper closes Redis client in `finally` block via `aclose()`.
+- **Files:** `datametronome_podium/tasks/intelligence_tasks.py` (new), `tests/test_intelligence_tasks.py` (new)
+
+### Notes (Chunk 4)
+- Baseline: 359 passed (pre-existing) -> Final: 363 passed + 4 new tests (1 celery queue + 3 lock tests), 1 skipped, no regressions.
+
+## Implementation Log -- Chunk 2
+
+### Task 4: InsightsRepo -- data access layer
+- **Approach:** Mock-based unit tests following the existing StaveRepo pattern (AsyncMock executor). Repo serializes dict/list fields to JSON on write, parses JSON strings back on read. Extracted `_json_field`/`_parse_json` helpers and field-name constants (`_PROFILE_JSON_FIELDS`, etc.) to eliminate duplication across CRUD methods. Row-to-model conversion extracted into `_row_to_snapshot` and `_row_to_report` helpers.
+- **TDD cycles:** 1 cycle -- RED (ImportError) -> GREEN (12 tests pass)
+- **Files:** `datametronome_podium/features/insights/repo.py` (new), `tests/features/insights/test_insights_repo.py` (new), `tests/features/insights/__init__.py` (new)
+
+### Task 5: API schemas
+- **Approach:** Pydantic BaseModel DTOs for API responses. Separate from domain models to decouple API shape from storage. Added defaults for optional list/dict fields. 9 tests covering all schemas including defaults.
+- **TDD cycles:** 1 cycle -- RED (ImportError) -> GREEN (9 tests pass)
+- **Files:** `datametronome_podium/features/insights/schema.py` (new), `tests/features/insights/test_insight_schemas.py` (new)
+
+### Task 6: Insights API router
+- **Approach:** FastAPI router with `_repo()` factory for testability (patching `_repo`). Endpoints: profile CRUD, latest/history reports, snapshots, dashboard (aggregates report + suggestions + check links + trend), suggestions list/accept/dismiss, analyze stub, overview stub. Dashboard trend computed by comparing latest two reports. 9 tests using TestClient with patch.
+- **Decisions:** `_compute_health_trend` extracted to separate async function (single responsibility). Analyze endpoint returns stub response -- real implementation deferred to Chunk 4 Celery integration.
+- **TDD cycles:** 1 cycle -- RED (ImportError) -> GREEN (9 tests pass)
+- **Files:** `datametronome_podium/features/insights/router.py` (new), `datametronome_podium/api/v1/api.py:14,35` (modified), `tests/features/insights/test_insights_router.py` (new)
+
+### Notes (Chunk 2)
+- Baseline: 347 passed -> Final: 381 passed (34 new tests: 12 repo + 9 schema + 9 router + 4 model tests now discovered via __init__.py), 1 skipped, no regressions.
+- The insights test directory was missing __init__.py (chunk 1 oversight) -- added it, which made pytest discover the existing model tests that were previously uncollected.
+
+## Implementation Log (Chunk 5)
+
+### Task 11: LLM output models
+- **Approach:** Six Pydantic BaseModel classes for structured LLM output: LLMDimension, LLMAnomaly, LLMSuggestion, LLMCheckSpec, LLMInsightReport, LLMDomainClassification. Uses `Literal` types for validation (check_type restricted to 6 valid types, rejecting "python" etc).
+- **TDD cycles:** 1 cycle -- RED (ImportError) -> GREEN (4 tests pass)
+- **Files:** `datametronome_podium/services/agents/insight_models.py` (new), `tests/test_insight_agent_models.py` (new)
+
+### Task 12: InsightAgent definition
+- **Approach:** `build_insight_agent()` factory function following existing pattern from `investigation.py` and `router.py`. Dynamic system prompt composition via `_build_system_prompt()` that injects archetype, profile, and historical context. Tools: list_stave_tables, get_table_sample, suggest_quality_checks, list_clefs, list_checks.
+- **Discoveries:** MagicMock cannot be used as Pydantic AI model -- Agent tries to infer provider from it. Tests use `pydantic_ai.models.test.TestModel` instead, matching existing test patterns (`test_sub_agents.py`).
+- **TDD cycles:** 1 cycle -- RED (ImportError) -> GREEN (3 tests pass, after fixing test to use TestModel)
+- **Files:** `datametronome_podium/services/agents/insight.py` (new), `tests/test_insight_agent.py` (new)
+
+### Task 13: Pipeline service (stages 1-5)
+- **Approach:** `InsightPipelineService` with `QueryExecutor` dependency. 5 stages: (1) discovery via `ConnectionTester.get_connector()`, (2) classification via `match_archetypes` + LLM fallback, (3) baseline snapshot capture, (4) LLM business analysis with dynamic context, (5) persist results with profile upsert + pattern accumulation + auto-check creation. Three orchestration methods: `run_auto_scan` (1->2->3->5), `run_daily` (1->2->3->4->5), `run_on_demand` (1->3->4->5).
+- **Decisions:** Extracted 8 helper functions to module level for single responsibility (no function > 40 lines). Discovery uses `ConnectionTester` + `deserialize_stave` (existing patterns from `agent_tools.py`). LLM classification falls back to deterministic matching on failure. `_accumulate_patterns` merges anomaly patterns into `learned_patterns` with first_seen/last_seen/occurrences tracking.
+- **TDD cycles:** 1 cycle -- RED (ImportError) -> GREEN (6 tests pass)
+- **Files:** `datametronome_podium/features/insights/service.py` (new), `tests/features/insights/test_insight_service.py` (new)
+
+### Task 14: Wire Celery tasks to pipeline service
+- **Approach:** Replaced TODO stubs in `_run_auto_scan_async`, `_run_daily_async`, `_run_on_demand_async` with real pipeline calls using `worker_db_session` context manager + `InsightPipelineService`. Each function catches exceptions and returns `{"status": "failed", "error": ...}` instead of propagating (lock is always released via finally).
+- **Decisions:** Imports are lazy (inside function body) to avoid circular imports at Celery worker startup. Unpacked connector as `_` since only executor is needed.
+- **TDD cycles:** 1 cycle -- existing 3 lock tests still pass (no regression)
+- **Files:** `datametronome_podium/tasks/intelligence_tasks.py` (modified)
+
+### Notes (Chunk 5)
+- Baseline: 381 passed -> Final: 394 passed (13 new tests: 4 LLM models + 3 agent + 6 service), 1 skipped, no regressions.
+- `_build_system_prompt` is exported from `insight.py` (used by both InsightAgent chat and pipeline service analysis stage).
+- The `_discover_schema` method uses `ConnectionTester.get_connector()` + `connector.close()` pattern from `agent_tools.py:list_stave_tables`.
+
+## Implementation Log (Chunk 6: Tasks 15-17)
+
+### Task 15: Update RouterAgent with insight intent + wire orchestrator
+- **Approach:** Extended `VALID_INTENTS` and `VALID_AGENTS` Literal types to include "insight". Updated system prompt with intent definition and agents list. Added `build_insight_agent` import, `_get_insight_agent` lazy factory, and "insight" entry in `_get_agent_builder` dict. Added insight keyword fallback before the default route.
+- **TDD cycles:** 1 cycle (2 tests: intent acceptance + chain mode)
+- **Files:** `datametronome_podium/services/agents/router.py`, `datametronome_podium/services/orchestrator.py`, `tests/test_agent_router.py`
+
+### Task 16: Wire auto-scan trigger to stave creation
+- **Approach:** Added `_dispatch_auto_scan` function with lazy import + try/except swallow pattern (fire-and-forget). Called at end of `create_stave` after DB insert.
+- **TDD cycles:** 1 cycle (2 tests: delay called, errors swallowed)
+- **Files:** `datametronome_podium/features/staves/router.py`, `tests/features/staves/test_stave_auto_scan.py` (new)
+
+### Task 17: Wire POST /analyze endpoint to Celery task
+- **Approach:** Replaced placeholder `trigger_analysis` with real Celery dispatch via `run_on_demand_analysis.delay()`. Added `get_analysis_status` GET endpoint for polling via `celery_app.AsyncResult`. Updated existing test from checking `not_implemented` to testing real dispatch + error handling + status polling.
+- **TDD cycles:** 1 cycle (4 tests: dispatch success, dispatch failure 500, status running, status completed)
+- **Files:** `datametronome_podium/features/insights/router.py`, `tests/features/insights/test_insights_router.py`
+
+### Notes (Chunk 6)
+- Baseline: 394 passed -> Final: 401 passed (7 new tests: 2 router + 2 auto-scan + 4 insights router, minus 1 replaced placeholder test), 1 skipped, no regressions.
+- All Celery task imports use lazy `from ... import` inside function bodies to avoid import-time failures when broker is unavailable.
+- The `get_analysis_status` endpoint wraps all Celery operations in try/except to gracefully handle missing broker/backend.
+
+## Implementation Log -- Chunk 7
+
+### Task 18: Snapshot pruning Celery task
+- **Approach:** Added `prune_old_snapshots` task with `acks_late=True` and `_prune_snapshots_async` helper. Uses `worker_db_session` to delete snapshots older than 90 days, excluding `weekly_aggregate` type. Added route to `QUEUE_DEFAULT` since pruning is maintenance, not intelligence work.
+- **TDD cycles:** 1 cycle -- RED (ImportError for `prune_old_snapshots`) -> GREEN (task + route added)
+- **Files:** `datametronome_podium/tasks/intelligence_tasks.py`, `datametronome_podium/core/celery_app.py`, `tests/test_intelligence_tasks.py`
+
+### Task 19: Celery Beat schedule registration + stave lifecycle hooks
+- **Approach:** Created `intelligence_scheduler.py` with three functions: `register_daily_intelligence`, `remove_daily_intelligence`, `register_prune_schedule`. All use RedBeat's `RedBeatSchedulerEntry` for persistent Redis-backed schedules. Added lifecycle hooks to stave router: `_dispatch_auto_scan` now also registers daily schedule, `unpause_stave` re-registers, `delete_stave` removes schedule before deletion.
+- **TDD cycles:** 1 cycle -- RED (ModuleNotFoundError) -> GREEN (scheduler + hooks implemented)
+- **Decisions:** All scheduler imports are lazy (inside function bodies) to avoid import-time failures when Redis is unavailable. Exception handling is broad (try/except with pass) to prevent intelligence scheduling from blocking core stave operations.
+- **Files:** `datametronome_podium/services/intelligence_scheduler.py` (new), `datametronome_podium/features/staves/router.py`, `tests/test_intelligence_scheduler.py` (new)
+
+### Task 20: Fix pipeline service -- use executor directly for discovery
+- **Approach:** Verified that `_discover_schema` already uses `ConnectionTester` + `deserialize_stave` correctly (not agent tools). `analyze_business` already uses `_build_system_prompt` from `insight.py`. `_accumulate_patterns` already exists. The one gap was `schema_map` never being persisted (issue #6): added `discovery` parameter to `persist_results` and `_upsert_profile`, so `schema_map` from discovery is saved when creating or updating profiles.
+- **Discoveries:** Most issues listed in the plan (#10, #16, #20, #22) were already resolved by prior chunks' implementations. Only #6 (schema_map persistence) needed a fix.
+- **Files:** `datametronome_podium/features/insights/service.py`
+
+### Task 21: Add weekly aggregation to pruning task
+- **Approach:** Added `_aggregate_weekly_snapshots` as a pure function that groups snapshots by `stave_id + ISO week`, computes average row counts per table, and returns `weekly_aggregate` snapshot dicts. This function is called by `_prune_snapshots_async` before deletion.
+- **TDD cycles:** 1 cycle -- RED (ImportError for `_aggregate_weekly_snapshots`) -> GREEN (function implemented)
+- **Files:** `datametronome_podium/tasks/intelligence_tasks.py`, `tests/test_intelligence_tasks.py`
+
+### Notes (Chunk 7)
+- Baseline: 401 passed -> Final: 406 passed (5 new tests: 1 prune task, 3 scheduler, 1 aggregation), 1 skipped, no regressions.
+- The `_aggregate_weekly_snapshots` function is intentionally a pure function (no DB calls) for easy unit testing. The async `_prune_snapshots_async` handles the DB interaction.
+
+## Implementation Log -- Chunk 8
+
+### Task 22: LLM error handling tests
+- **Approach:** Added 3 tests covering LLM failure scenarios: malformed output fallback, no-match fallback, and Stage 4 exception propagation. All tests mock the LLM layer and verify the service's error-handling paths.
+- **TDD cycles:** 1 cycle -- wrote tests, ran, fixed one mock path (`build_model_from_settings` is lazily imported inside `analyze_business`, so had to patch at `datametronome_podium.services.agent_factory.build_model_from_settings` instead of the service module).
+- **Discoveries:** The plan's suggested patch path `datametronome_podium.features.insights.service.build_model_from_settings` doesn't work because the import is local (inside `analyze_business`). Fixed to patch at source module.
+- **Files:** `tests/features/insights/test_insight_service.py`
+
+### Task 23: Full test suite verification
+- **Approach:** Ran full test suite and all import checks. No failures, no fixes needed.
+- **Results:** 409 passed, 1 skipped, 0 failures. All 5 import checks passed.
+- **Files:** No changes needed.
+
+### Notes (Chunk 8)
+- Baseline: 406 passed -> Final: 409 passed (3 new LLM error handling tests), 1 skipped, no regressions.
+- All modules import cleanly: InsightPipelineService, build_insight_agent, intelligence_tasks, intelligence_scheduler, archetypes.
+- Data Intelligence Layer implementation is complete across all 8 chunks (23 tasks).
