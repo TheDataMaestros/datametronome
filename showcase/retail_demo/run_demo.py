@@ -17,10 +17,10 @@ sys.path.append(str(PROJECT_ROOT))
 # Add podium source to path
 sys.path.append(str(PROJECT_ROOT / "datametronome" / "podium"))
 
-from datametronome_podium.services.clef_executor import (  # type: ignore # noqa: E402
+from datametronome_podium.services.clef_executor import (  # noqa: E402
     ClefExecutor,
 )
-from datametronome_podium.services.stave_yaml_loader import (  # type: ignore # noqa: E402
+from datametronome_podium.services.stave_yaml_loader import (  # noqa: E402
     load_staves_from_yaml,
 )
 

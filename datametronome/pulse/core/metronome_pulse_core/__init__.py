@@ -13,10 +13,12 @@ from .interfaces import (
     Writable,
     WriteOnlyConnector,
 )
+from .protocol import PulseProtocol
 
 __version__ = "0.1.0"
 __all__ = [
     "Pulse",
+    "PulseProtocol",
     "Readable",
     "Writable",
     "ReadOnlyConnector",

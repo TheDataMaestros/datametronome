@@ -1,0 +1,71 @@
+{
+  "version": "1.0",
+  "description": "Sample queries with expected intent for Phase 1 router (multi-agent)",
+  "intents": ["quick", "config", "investigation", "report", "exploration"],
+  "examples": [
+    {
+      "query": "What's the status?",
+      "intent": "quick"
+    },
+    {
+      "query": "How many staves?",
+      "intent": "quick"
+    },
+    {
+      "query": "Hi",
+      "intent": "quick"
+    },
+    {
+      "query": "List my data sources",
+      "intent": "quick"
+    },
+    {
+      "query": "Create a new stave for PostgreSQL",
+      "intent": "config"
+    },
+    {
+      "query": "Suggest quality checks for the orders table",
+      "intent": "config"
+    },
+    {
+      "query": "Add a freshness check for updated_at",
+      "intent": "config"
+    },
+    {
+      "query": "What clefs do I have?",
+      "intent": "config"
+    },
+    {
+      "query": "Why did check X fail?",
+      "intent": "investigation"
+    },
+    {
+      "query": "What caused the anomaly yesterday?",
+      "intent": "investigation"
+    },
+    {
+      "query": "Investigate the failed checks",
+      "intent": "investigation"
+    },
+    {
+      "query": "Show me the quality report",
+      "intent": "report"
+    },
+    {
+      "query": "Give me a summary of the system",
+      "intent": "report"
+    },
+    {
+      "query": "What tables are in stave bigquery crime?",
+      "intent": "exploration"
+    },
+    {
+      "query": "Show me a sample of the users table",
+      "intent": "exploration"
+    },
+    {
+      "query": "List tables in the bigquery stave with structure",
+      "intent": "exploration"
+    }
+  ]
+}

@@ -188,7 +188,8 @@ def parse_staves(yaml_data: Dict[str, Any]) -> List[Stave]:
     if not isinstance(staves_data, list):
         raise YAMLLoadError("'staves' must be a list")
 
-    for i, stave_data in enumerate(staves_data):
+    for i, stave_entry in enumerate(staves_data):
+        stave_data: dict[str, Any] = stave_entry  # type: ignore[assignment]
         try:
             # Ensure connection_config exists
             if "connection_config" not in stave_data:
@@ -238,7 +239,8 @@ def parse_clefs(
         if not isinstance(clefs_data, list):
             raise YAMLLoadError("'clefs' must be a list")
 
-        for i, clef_data in enumerate(clefs_data):
+        for i, clef_entry in enumerate(clefs_data):
+            clef_data: dict[str, Any] = clef_entry  # type: ignore[assignment]
             try:
                 clef = _parse_single_clef(clef_data, stave_id_map)
                 if clef:
@@ -276,10 +278,11 @@ def parse_clefs(
             if not isinstance(checks, list):
                 raise YAMLLoadError("'clef.checks' must be a list")
 
-            for i, check_data in enumerate(checks):
+            for i, check_entry in enumerate(checks):
+                check_data: dict[str, Any] = check_entry  # type: ignore[assignment]
                 try:
                     # Convert nested format to flat format
-                    clef_data = _convert_nested_check_to_clef(
+                    nested_clef_data = _convert_nested_check_to_clef(
                         check_data,
                         default_table=default_table,
                         default_stave_id=default_stave_id,
@@ -287,8 +290,8 @@ def parse_clefs(
                         index=i,
                     )
 
-                    if clef_data:
-                        clef = _parse_single_clef(clef_data, stave_id_map)
+                    if nested_clef_data:
+                        clef = _parse_single_clef(nested_clef_data, stave_id_map)
                         if clef:
                             clefs.append(clef)
 

@@ -97,7 +97,7 @@ def main() -> None:
         raise RuntimeError(f"Showcase import failed: {result}")
 
     print("[showcase] executing imported clefs once (seed UI with results)...")
-    clefs = get_json(f"{podium_base}/api/v1/clefs/")  # type: ignore[assignment]
+    clefs = get_json(f"{podium_base}/api/v1/clefs/")
     retail_clefs = [c for c in clefs if c.get("stave_id") == "retail-db-001"]
 
     # Prefer executing "Level 1" style checks first so the UI has fast wins even if

@@ -13,8 +13,8 @@ from typing import Any, Optional
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, Field
-from statsmodels.tools.sm_exceptions import ConvergenceWarning
-from statsmodels.tsa.statespace.sarimax import SARIMAX
+from statsmodels.tools.sm_exceptions import ConvergenceWarning  # type: ignore[unresolved-import]
+from statsmodels.tsa.statespace.sarimax import SARIMAX  # type: ignore[unresolved-import]
 
 # Suppress convergence warnings for cleaner output
 warnings.filterwarnings("ignore", category=ConvergenceWarning)

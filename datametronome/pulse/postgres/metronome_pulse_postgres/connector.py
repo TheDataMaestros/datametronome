@@ -41,6 +41,56 @@ class PostgresPulse(Pulse, Readable, Writable):
         self._password = password
         self._kwargs = kwargs
         self._pool = None
+        self._txn_conn = None  # Transaction connection
+        self._txn = None       # Transaction object
+
+    async def _get_conn(self):
+        """Get the active transaction connection, or acquire from pool."""
+        if self._txn_conn is not None:
+            return self._txn_conn, False  # (conn, should_release)
+        if not self._pool:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        conn = await self._pool.acquire()
+        return conn, True
+
+    async def _release_conn(self, conn, should_release):
+        """Release connection back to pool if not in a transaction."""
+        if should_release and self._pool:
+            await self._pool.release(conn)
+
+    async def begin_transaction(self) -> None:
+        """Begin a transaction. Acquires a dedicated connection from the pool."""
+        if not self._pool:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        if self._txn_conn is not None:
+            raise RuntimeError("Transaction already active.")
+        self._txn_conn = await self._pool.acquire()
+        self._txn = self._txn_conn.transaction()
+        await self._txn.start()
+
+    async def commit_transaction(self) -> None:
+        """Commit the current transaction and release the connection."""
+        if self._txn is None:
+            raise RuntimeError("No active transaction to commit.")
+        try:
+            await self._txn.commit()
+        finally:
+            if self._pool and self._txn_conn:
+                await self._pool.release(self._txn_conn)
+            self._txn = None
+            self._txn_conn = None
+
+    async def rollback_transaction(self) -> None:
+        """Roll back the current transaction and release the connection."""
+        if self._txn is None:
+            raise RuntimeError("No active transaction to rollback.")
+        try:
+            await self._txn.rollback()
+        finally:
+            if self._pool and self._txn_conn:
+                await self._pool.release(self._txn_conn)
+            self._txn = None
+            self._txn_conn = None
 
     async def connect(self):
         """Establish connection pool to PostgreSQL."""
@@ -154,7 +204,8 @@ class PostgresPulse(Pulse, Readable, Writable):
         if not data:
             return
 
-        columns = list(data[0].keys())
+        # Strip "table" key from records — it's metadata, not a column
+        columns = [k for k in data[0].keys() if k != "table"]
         records = [tuple(record[col] for col in columns) for record in data]
 
         assert self._pool is not None
@@ -210,7 +261,7 @@ class PostgresPulse(Pulse, Readable, Writable):
                 params = query_config.get("params", [])
                 if not sql:
                     raise ValueError("Query config dict must contain 'sql' key")
-                return await self.query_with_params(sql, params)
+                return await self.query_with_params(sql, params if params else None)
 
             elif query_type == "table_info":
                 table_name = query_config.get("table_name")
@@ -233,7 +284,7 @@ class PostgresPulse(Pulse, Readable, Writable):
                     pass
 
                 if params:
-                    return await self.query_with_params(sql, *params)
+                    return await self.query_with_params(sql, params)
                 else:
                     return await self._simple_query(sql)
 
@@ -252,7 +303,7 @@ class PostgresPulse(Pulse, Readable, Writable):
             WHERE table_name = $1
             ORDER BY ordinal_position
         """
-        return await self.query_with_params(sql, table_name)
+        return await self.query_with_params(sql, [table_name])
 
     async def list_tables(self, schema: str = "public") -> list[str]:
         """
@@ -277,7 +328,7 @@ class PostgresPulse(Pulse, Readable, Writable):
         AND table_type = 'BASE TABLE'
         ORDER BY table_name
         """
-        results = await self.query_with_params(query, schema)
+        results = await self.query_with_params(query, [schema])
         return [row["table_name"] for row in results]
 
     async def apply_operations(
@@ -315,65 +366,102 @@ class PostgresPulse(Pulse, Readable, Writable):
             records = await conn.fetch(sql)
             return [dict(record) for record in records]
 
-    async def query_with_params(self, query: str, *args, **kwargs) -> list:
+    @staticmethod
+    def _rewrite_placeholders(sql: str) -> str:
+        """Replace ? placeholders with $1, $2, ... for asyncpg.
+
+        Skips ? inside string literals.
         """
-        Execute a parameterized SQL query and return results.
+        if "?" not in sql:
+            return sql
+        result = []
+        param_index = 0
+        in_string = False
+        i = 0
+        while i < len(sql):
+            char = sql[i]
+            if char == "'":
+                if in_string and i + 1 < len(sql) and sql[i + 1] == "'":
+                    result.append("''")
+                    i += 2
+                    continue
+                in_string = not in_string
+                result.append(char)
+            elif char == "?" and not in_string:
+                param_index += 1
+                result.append(f"${param_index}")
+            else:
+                result.append(char)
+            i += 1
+        return "".join(result)
+
+    async def query_with_params(self, sql: str, params: list | None = None) -> list:
+        """Execute a parameterized query. Returns list of dicts.
 
         Args:
-            query: SQL query string with placeholders
-            *args: Positional parameters for the query
-            **kwargs: Named parameters for the query
+            sql: SQL string with $1/$2 or ? placeholders.
+            params: Parameter list. Unpacked as positional args for asyncpg.
+        """
+        if not self._pool:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        sql = self._rewrite_placeholders(sql)
+        conn, should_release = await self._get_conn()
+        try:
+            if params:
+                rows = await conn.fetch(sql, *params)
+            else:
+                rows = await conn.fetch(sql)
+            return [dict(row) for row in rows]
+        finally:
+            await self._release_conn(conn, should_release)
+
+    async def execute(self, sql: str, params: list | None = None) -> int:
+        """Execute a SQL statement. Returns rows affected.
+
+        Args:
+            sql: SQL string with $1/$2 or ? placeholders.
+            params: Parameter list. Unpacked as positional args for asyncpg.
 
         Returns:
-            list of dictionaries representing the query results
+            Number of rows affected. 0 for DDL statements.
         """
         if not self._pool:
             raise RuntimeError("Not connected to database. Call connect() first.")
+        sql = self._rewrite_placeholders(sql)
+        conn, should_release = await self._get_conn()
+        try:
+            if params:
+                status = await conn.execute(sql, *params)
+            else:
+                status = await conn.execute(sql)
+            return self._parse_rows_affected(status)
+        finally:
+            await self._release_conn(conn, should_release)
 
-        assert self._pool is not None
-        async with self._pool.acquire() as conn:
-            records = await conn.fetch(query, *args, **kwargs)
-            return [dict(record) for record in records]
+    @staticmethod
+    def _parse_rows_affected(status: str) -> int:
+        """Parse rows affected from asyncpg status string.
 
-    async def execute(self, query: str, *args, **kwargs) -> str:
+        Examples: 'INSERT 0 1' -> 1, 'DELETE 3' -> 3, 'CREATE TABLE' -> 0
         """
-        Execute a SQL command that doesn't return results.
+        parts = status.split()
+        if len(parts) >= 2:
+            try:
+                return int(parts[-1])
+            except ValueError:
+                return 0
+        return 0
 
-        Args:
-            query: SQL command to execute
-            *args: Positional parameters
-            **kwargs: Named parameters
-
-        Returns:
-            Status message from the command
-
-        Raises:
-            RuntimeError: If not connected to the database
-            asyncpg.PostgresError: If the command fails
-        """
+    async def execute_many(self, sql: str, params_list: list[list]) -> None:
+        """Execute a SQL command multiple times with different parameters."""
         if not self._pool:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
-        async with self._pool.acquire() as conn:
-            return await conn.execute(query, *args, **kwargs)
-
-    async def execute_many(self, query: str, args_list: list) -> None:
-        """
-        Execute a SQL command multiple times with different parameters.
-
-        Args:
-            query: SQL command to execute
-            args_list: list of parameter tuples
-
-        Raises:
-            RuntimeError: If not connected to the database
-            asyncpg.PostgresError: If any command fails
-        """
-        if not self._pool:
-            raise RuntimeError("Not connected to database. Call connect() first.")
-
-        async with self._pool.acquire() as conn:
-            await conn.executemany(query, args_list)
+        conn, should_release = await self._get_conn()
+        try:
+            await conn.executemany(sql, params_list)
+        finally:
+            await self._release_conn(conn, should_release)
 
     async def __aenter__(self):
         """Async context manager entry."""

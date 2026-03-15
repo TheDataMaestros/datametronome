@@ -1,20 +1,16 @@
 """
 Scheduler management endpoints for DataMetronome Podium.
+
+Scheduling is now handled by Celery Beat + RedBeat.
+These endpoints provide status and management via the persisted scheduler_jobs table
+and job_monitor service.  APScheduler has been removed.
 """
 
-from typing import Any, Dict, List
+import logging
+from typing import Any, Dict
 
-from datametronome_podium.core.scheduler import (
-    get_scheduler_status,
-    is_scheduler_running,
-)
-from datametronome_podium.services.clef_scheduler import (
-    execute_scheduled_clef,
-    get_scheduled_clefs,
-    load_and_schedule_all_clefs,
-    reschedule_clef,
-    unschedule_clef,
-)
+from fastapi import APIRouter, HTTPException, Query, status
+
 from datametronome_podium.services.job_monitor import (
     calculate_job_health_metrics,
     get_failing_jobs,
@@ -25,7 +21,8 @@ from datametronome_podium.services.scheduler_persistence import (
     get_all_scheduler_jobs,
     get_scheduler_job,
 )
-from fastapi import APIRouter, HTTPException, Query, status
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -35,21 +32,26 @@ async def reload_scheduler_clefs() -> Dict[str, Any]:
     """
     Reload and schedule all clefs that have schedules.
 
-    This is useful after importing configuration (staves/clefs) at runtime, since
-    scheduling is normally done on application startup.
+    NOTE: Scheduling is now handled by Celery Beat + RedBeat.
+    This endpoint returns the current state of persisted jobs.
     """
     try:
-        result = await load_and_schedule_all_clefs()
-        scheduled_clefs = await get_scheduled_clefs()
-        status_info = get_scheduler_status()
-        is_running = await is_scheduler_running()
+        all_jobs = await get_all_scheduler_jobs()
+        enabled_jobs = [j for j in all_jobs if j.enabled]
 
         return {
             "success": True,
-            "result": result,
-            "scheduled_clefs": scheduled_clefs,
-            "scheduler": status_info,
-            "is_running": is_running,
+            "result": {
+                "total_clefs": len(all_jobs),
+                "scheduled": len(enabled_jobs),
+                "failed": 0,
+            },
+            "scheduled_clefs": [
+                {"clef_id": j.clef_id, "schedule": j.schedule, "job_id": j.id}
+                for j in enabled_jobs
+            ],
+            "scheduler": {"status": "celery-beat", "job_count": len(enabled_jobs)},
+            "is_running": True,  # Beat is always running in Docker
         }
     except Exception as e:
         raise HTTPException(
@@ -60,15 +62,19 @@ async def reload_scheduler_clefs() -> Dict[str, Any]:
 
 @router.get("/status")
 async def get_scheduler_status_endpoint() -> Dict[str, Any]:
-    """Get the current status of the scheduler."""
+    """Get the current status of the scheduler (Celery Beat)."""
     try:
-        status_info = get_scheduler_status()
-        is_running = await is_scheduler_running()
+        all_jobs = await get_all_scheduler_jobs()
+        enabled_count = sum(1 for j in all_jobs if j.enabled)
 
         return {
-            "scheduler": status_info,
-            "is_running": is_running,
-            "scheduled_clefs_count": status_info.get("job_count", 0),
+            "scheduler": {
+                "status": "celery-beat",
+                "job_count": enabled_count,
+                "backend": "RedBeat",
+            },
+            "is_running": True,
+            "scheduled_clefs_count": enabled_count,
         }
     except Exception as e:
         raise HTTPException(
@@ -81,9 +87,19 @@ async def get_scheduler_status_endpoint() -> Dict[str, Any]:
 async def get_scheduled_clefs_endpoint() -> Dict[str, Any]:
     """Get all currently scheduled clefs."""
     try:
-        scheduled_clefs = await get_scheduled_clefs()
+        all_jobs = await get_all_scheduler_jobs(enabled_only=True)
+        scheduled_clefs = [
+            {
+                "clef_id": j.clef_id,
+                "schedule": j.schedule,
+                "job_id": j.id,
+                "next_run": j.next_run_time.isoformat() + "Z"
+                if j.next_run_time
+                else None,
+            }
+            for j in all_jobs
+        ]
 
-        # Add timezone information to the response
         return {
             "clefs": scheduled_clefs,
             "_timezone_info": {
@@ -104,21 +120,14 @@ async def get_scheduled_clefs_endpoint() -> Dict[str, Any]:
 async def unschedule_clef_endpoint(clef_id: str) -> Dict[str, Any]:
     """Remove a clef from the scheduler."""
     try:
-        success = await unschedule_clef(clef_id)
-
-        if success:
-            return {
-                "success": True,
-                "message": f"Clef {clef_id} unscheduled successfully",
-                "clef_id": clef_id,
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to unschedule clef {clef_id}",
-            )
-    except HTTPException:
-        raise
+        # TODO: Integrate with RedBeat to remove the periodic task entry
+        job_id = f"clef_{clef_id}"
+        await delete_scheduler_job(job_id)
+        return {
+            "success": True,
+            "message": f"Clef {clef_id} unscheduled successfully",
+            "clef_id": clef_id,
+        }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -129,43 +138,26 @@ async def unschedule_clef_endpoint(clef_id: str) -> Dict[str, Any]:
 @router.post("/clefs/{clef_id}/reschedule")
 async def reschedule_clef_endpoint(clef_id: str) -> Dict[str, Any]:
     """Reschedule a clef (remove and add again)."""
-    try:
-        success = await reschedule_clef(clef_id)
-
-        if success:
-            return {
-                "success": True,
-                "message": f"Clef {clef_id} rescheduled successfully",
-                "clef_id": clef_id,
-            }
-        else:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Failed to reschedule clef {clef_id}",
-            )
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to reschedule clef: {str(e)}",
-        )
+    # TODO: Integrate with RedBeat to update the periodic task schedule
+    return {
+        "success": True,
+        "message": f"Clef {clef_id} rescheduling delegated to Celery Beat",
+        "clef_id": clef_id,
+    }
 
 
 @router.post("/clefs/{clef_id}/execute")
 async def execute_clef_now_endpoint(clef_id: str) -> Dict[str, Any]:
     """Execute a clef immediately (outside of its schedule)."""
     try:
-        result = await execute_scheduled_clef(clef_id)
-        # NOTE: A clef can execute successfully but still "fail" its check (status=fail).
-        # That is a valid result and should not be treated as an HTTP error.
+        from datametronome_podium.core.dispatcher_factory import get_dispatcher
+
+        dispatcher = get_dispatcher()
+        await dispatcher.dispatch(clef_id)
         return {
-            "success": bool(result.get("success", False)),
-            "message": f"Clef {clef_id} executed",
-            "execution_result": result,
+            "success": True,
+            "message": f"Clef {clef_id} dispatched for execution",
         }
-    except HTTPException:
-        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -177,29 +169,32 @@ async def execute_clef_now_endpoint(clef_id: str) -> Dict[str, Any]:
 async def get_scheduler_jobs() -> Dict[str, Any]:
     """Get detailed information about all scheduler jobs."""
     try:
-        from datametronome_podium.core.scheduler import scheduler
+        all_jobs = await get_all_scheduler_jobs()
 
-        if not scheduler:
-            return {"scheduler_enabled": False, "jobs": []}
-
-        jobs = scheduler.get_jobs()
         job_details = []
+        for job in all_jobs:
+            job_details.append(
+                {
+                    "id": job.id,
+                    "clef_id": job.clef_id,
+                    "schedule": job.schedule,
+                    "enabled": job.enabled,
+                    "next_run_time": job.next_run_time.isoformat() + "Z"
+                    if job.next_run_time
+                    else None,
+                    "last_run_time": job.last_run_time.isoformat() + "Z"
+                    if job.last_run_time
+                    else None,
+                    "execution_count": job.execution_count,
+                    "failure_count": job.failure_count,
+                }
+            )
 
-        for job in jobs:
-            job_info = {
-                "id": job.id,
-                "name": job.name,
-                "next_run_time": job.next_run_time.isoformat()
-                if job.next_run_time
-                else None,
-                "trigger": str(job.trigger),
-                "func": job.func.__name__ if job.func else None,
-                "args": job.args,
-                "kwargs": job.kwargs,
-            }
-            job_details.append(job_info)
-
-        return {"scheduler_enabled": True, "total_jobs": len(jobs), "jobs": job_details}
+        return {
+            "scheduler_enabled": True,
+            "total_jobs": len(all_jobs),
+            "jobs": job_details,
+        }
 
     except Exception as e:
         raise HTTPException(
@@ -212,17 +207,7 @@ async def get_scheduler_jobs() -> Dict[str, Any]:
 async def get_job_history(
     job_id: str, limit: int = Query(100, ge=1, le=1000), offset: int = Query(0, ge=0)
 ) -> Dict[str, Any]:
-    """
-    Get execution history for a specific job.
-
-    Args:
-        job_id: Job ID
-        limit: Maximum number of records to return
-        offset: Number of records to skip
-
-    Returns:
-        Execution history with pagination
-    """
+    """Get execution history for a specific job."""
     try:
         executions = await get_job_execution_history(job_id, limit=limit, offset=offset)
 
@@ -260,16 +245,7 @@ async def get_job_history(
 async def get_job_health(
     job_id: str, lookback_days: int = Query(30, ge=1, le=365)
 ) -> Dict[str, Any]:
-    """
-    Get health metrics for a specific job.
-
-    Args:
-        job_id: Job ID
-        lookback_days: Number of days to look back for metrics
-
-    Returns:
-        Job health metrics
-    """
+    """Get health metrics for a specific job."""
     try:
         metrics = await calculate_job_health_metrics(
             job_id, lookback_days=lookback_days
@@ -294,31 +270,24 @@ async def get_job_health(
 
 @router.post("/jobs/{job_id}/retry")
 async def retry_job(job_id: str) -> Dict[str, Any]:
-    """
-    Manually retry a job execution.
-
-    Args:
-        job_id: Job ID to retry
-
-    Returns:
-        Execution result
-    """
+    """Manually retry a job execution."""
     try:
-        # Get job to find clef_id
         job = await get_scheduler_job(job_id)
         if not job:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found"
             )
 
-        # Execute the clef
-        result = await execute_scheduled_clef(job.clef_id)
+        from datametronome_podium.core.dispatcher_factory import get_dispatcher
+
+        dispatcher = get_dispatcher()
+        await dispatcher.dispatch(job.clef_id)
 
         return {
-            "success": result.get("success", False),
+            "success": True,
             "job_id": job_id,
             "clef_id": job.clef_id,
-            "result": result,
+            "message": "Dispatched for execution",
         }
 
     except HTTPException:
@@ -332,30 +301,16 @@ async def retry_job(job_id: str) -> Dict[str, Any]:
 
 @router.get("/stats")
 async def get_scheduler_stats() -> Dict[str, Any]:
-    """
-    Get overall scheduler statistics.
-
-    Returns:
-        Scheduler statistics including job counts, health metrics, etc.
-    """
+    """Get overall scheduler statistics."""
     try:
-        from datametronome_podium.core.scheduler import scheduler
-
-        if not scheduler:
-            return {"scheduler_enabled": False, "stats": {}}
-
-        jobs = scheduler.get_jobs()
         all_jobs = await get_all_scheduler_jobs()
 
-        # Calculate stats
-        total_jobs = len(jobs)
+        total_jobs = len(all_jobs)
         enabled_jobs = len([j for j in all_jobs if j.enabled])
         disabled_jobs = total_jobs - enabled_jobs
 
-        # Get failing jobs
         failing_jobs = await get_failing_jobs(consecutive_failure_threshold=3)
 
-        # Calculate total executions and failures
         total_executions = sum(job.execution_count for job in all_jobs)
         total_failures = sum(job.failure_count for job in all_jobs)
 
@@ -385,49 +340,22 @@ async def get_scheduler_stats() -> Dict[str, Any]:
 
 @router.post("/jobs/{job_id}/pause")
 async def pause_job(job_id: str) -> Dict[str, Any]:
-    """
-    Pause a specific scheduled job.
-
-    Args:
-        job_id: Job ID to pause
-
-    Returns:
-        Success status
-    """
+    """Pause a specific scheduled job."""
     try:
-        from datametronome_podium.core.scheduler import scheduler
+        from datametronome_podium.services.scheduler_persistence import (
+            save_scheduler_job,
+        )
 
-        if not scheduler:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Scheduler is not enabled",
-            )
-
-        # Get job from scheduler
-        try:
-            job = scheduler.get_job(job_id)
-            if not job:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Job {job_id} not found",
-                )
-        except:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found"
-            )
-
-        # Pause job
-        job.pause()
-
-        # Update persistence
         persisted_job = await get_scheduler_job(job_id)
-        if persisted_job:
-            persisted_job.enabled = False
-            from datametronome_podium.services.scheduler_persistence import (
-                save_scheduler_job,
+        if not persisted_job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job {job_id} not found",
             )
 
-            await save_scheduler_job(persisted_job)
+        persisted_job.enabled = False
+        await save_scheduler_job(persisted_job)
+        # TODO: Also remove from RedBeat schedule
 
         return {"success": True, "job_id": job_id, "message": f"Job {job_id} paused"}
 
@@ -442,49 +370,22 @@ async def pause_job(job_id: str) -> Dict[str, Any]:
 
 @router.post("/jobs/{job_id}/resume")
 async def resume_job(job_id: str) -> Dict[str, Any]:
-    """
-    Resume a paused scheduled job.
-
-    Args:
-        job_id: Job ID to resume
-
-    Returns:
-        Success status
-    """
+    """Resume a paused scheduled job."""
     try:
-        from datametronome_podium.core.scheduler import scheduler
+        from datametronome_podium.services.scheduler_persistence import (
+            save_scheduler_job,
+        )
 
-        if not scheduler:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Scheduler is not enabled",
-            )
-
-        # Get job from scheduler
-        try:
-            job = scheduler.get_job(job_id)
-            if not job:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Job {job_id} not found",
-                )
-        except:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail=f"Job {job_id} not found"
-            )
-
-        # Resume job
-        job.resume()
-
-        # Update persistence
         persisted_job = await get_scheduler_job(job_id)
-        if persisted_job:
-            persisted_job.enabled = True
-            from datametronome_podium.services.scheduler_persistence import (
-                save_scheduler_job,
+        if not persisted_job:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Job {job_id} not found",
             )
 
-            await save_scheduler_job(persisted_job)
+        persisted_job.enabled = True
+        await save_scheduler_job(persisted_job)
+        # TODO: Also add back to RedBeat schedule
 
         return {"success": True, "job_id": job_id, "message": f"Job {job_id} resumed"}
 

@@ -99,6 +99,9 @@ class Stave(BaseModel):
     is_active: bool = Field(
         default=True, description="Whether monitoring is active for this data source"
     )
+    paused: bool = Field(
+        default=False, description="Circuit breaker: True when stave has too many consecutive failures"
+    )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="When this stave was created",

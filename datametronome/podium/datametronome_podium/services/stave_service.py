@@ -357,7 +357,7 @@ def create_range_check(
         ...     max_value=150
         ... )
     """
-    config = {"table": table, "column": column}
+    config: dict[str, Any] = {"table": table, "column": column}
     if min_value is not None:
         config["min"] = min_value
     if max_value is not None:
@@ -400,7 +400,7 @@ def create_volume_check(
         ...     expected_max=100000
         ... )
     """
-    config = {"table": table}
+    config: dict[str, Any] = {"table": table}
     if expected_min is not None:
         config["expected_min"] = expected_min
     if expected_max is not None:

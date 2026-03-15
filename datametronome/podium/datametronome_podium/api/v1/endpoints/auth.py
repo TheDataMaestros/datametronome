@@ -115,11 +115,8 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Query user from database using DataPulse
-    db = await get_db()
-    users = await db.query(
-        {"sql": "SELECT * FROM users WHERE username = ?", "params": [username]}
-    )
+    # Query user from database using DataPulse (execute_query adapts ? to $1 for Postgres)
+    users = await execute_query("SELECT * FROM users WHERE username = ?", [username])
     if not users:
         raise AuthenticationError("User not found")
 
@@ -140,14 +137,9 @@ async def login(user_credentials: UserLogin) -> dict[str, str]:
     Raises:
         HTTPException: If authentication fails.
     """
-    db = await get_db()
-
-    # Check if user exists
-    users = await db.query(
-        {
-            "sql": "SELECT * FROM users WHERE username = ?",
-            "params": [user_credentials.username],
-        }
+    # Check if user exists (execute_query adapts ? to $1 for Postgres)
+    users = await execute_query(
+        "SELECT * FROM users WHERE username = ?", [user_credentials.username]
     )
     user = users[0] if users else None
 
@@ -203,14 +195,9 @@ async def register(user_data: UserCreate) -> dict[str, str]:
     Raises:
         HTTPException: If registration fails.
     """
-    db = await get_db()
-
-    # Check if user already exists
-    existing_users = await db.query(
-        {
-            "sql": "SELECT * FROM users WHERE username = ?",
-            "params": [user_data.username],
-        }
+    # Check if user already exists (execute_query adapts ? to $1 for Postgres)
+    existing_users = await execute_query(
+        "SELECT * FROM users WHERE username = ?", [user_data.username]
     )
     if existing_users:
         raise HTTPException(

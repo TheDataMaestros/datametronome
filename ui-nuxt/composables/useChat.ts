@@ -1,4 +1,5 @@
 import { ref, readonly } from 'vue'
+import { extractErrorMessage } from '~/services/api'
 import { chatService, type ChatMessage, type ChatRequest, type ToolCall } from '~/services/chat'
 
 export const useChat = () => {
@@ -51,6 +52,11 @@ export const useChat = () => {
         role: 'assistant',
         content: response.message,
         toolCalls: response.toolCalls,
+        intent: response.intent,
+        agentType: response.agentType,
+        orchestrationMode: response.orchestrationMode,
+        agentChain: response.agentChain,
+        model: response.model,
       })
 
       return assistantMessage
@@ -64,7 +70,7 @@ export const useChat = () => {
           content: 'Request cancelled by user',
         })
       } else {
-        error.value = err instanceof Error ? err.message : 'Failed to send message'
+        error.value = extractErrorMessage(err, 'Failed to send message')
         console.error('Error sending chat message:', err)
 
         // Add error message
@@ -105,7 +111,7 @@ export const useChat = () => {
       messages.value = history
       conversationId.value = id
     } catch (err) {
-      error.value = err instanceof Error ? err.message : 'Failed to load conversation'
+      error.value = extractErrorMessage(err, 'Failed to load conversation')
       console.error('Error loading conversation:', err)
       throw err
     } finally {

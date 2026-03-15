@@ -43,8 +43,8 @@ elif [ -n "${DATAMETRONOME_PORT:-}" ]; then
     # PODIUM_PORT not set, but DATAMETRONOME_PORT is - use it for PODIUM_PORT
     export PODIUM_PORT="${DATAMETRONOME_PORT}"
 else
-    # Neither set, use default
-    export PODIUM_PORT="8000"
+    # Neither set, use default (must match UI NUXT_PUBLIC_API_BASE / PODIUM_PORT)
+    export PODIUM_PORT="8001"
 fi
 
 export PODIUM_HOST="${PODIUM_HOST:-0.0.0.0}"

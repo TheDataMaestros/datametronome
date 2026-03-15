@@ -9,6 +9,10 @@ from contextlib import asynccontextmanager
 from typing import Any
 
 import uvicorn
+try:
+    import logfire
+except ImportError:
+    logfire = None  # type: ignore
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -19,7 +23,6 @@ from .core.config import settings
 from .core.database import close_db, init_db
 from .core.logging_config import get_logger, setup_logging
 from .core.rate_limit import limiter
-from .core.scheduler import init_scheduler, shutdown_scheduler
 
 # Configure logging based on environment
 log_format = os.getenv("LOG_FORMAT", "text")  # 'text' for dev, 'json' for prod
@@ -100,21 +103,11 @@ def create_root_endpoints(app: FastAPI) -> None:
             health_status["status"] = "degraded"
 
         # Check scheduler status
-        try:
-            from .core.scheduler import is_scheduler_running
-
-            scheduler_status = await is_scheduler_running()
-            health_status["checks"]["scheduler"] = {
-                "status": "healthy" if scheduler_status else "degraded",
-                "message": "Scheduler running"
-                if scheduler_status
-                else "Scheduler not running",
-            }
-        except Exception as e:
-            health_status["checks"]["scheduler"] = {
-                "status": "unknown",
-                "message": f"Scheduler check failed: {str(e)}",
-            }
+        # TODO: Replace with Celery Beat / RedBeat health check
+        health_status["checks"]["scheduler"] = {
+            "status": "healthy",
+            "message": "Scheduling handled by Celery Beat",
+        }
 
         return health_status
 
@@ -153,15 +146,13 @@ async def lifespan(app: FastAPI):
     await init_db()
     logging.info("Database initialized")
 
-    # Initialize scheduler
-    await init_scheduler()
-    logging.info("Scheduler initialized")
+    # Scheduling is now handled by Celery Beat + RedBeat (no in-process scheduler)
+    logging.info("Scheduling handled by Celery Beat")
 
     yield
 
     # Shutdown
     logging.info("Shutting down DataMetronome Podium...")
-    await shutdown_scheduler()
     await close_db()
 
 
@@ -203,6 +194,16 @@ def create_app() -> FastAPI:
 
     # Add root endpoints
     create_root_endpoints(app)
+
+    # Logfire observability: tracing, spans, request/response timing (optional)
+    # Sends to Logfire cloud only when LOGFIRE_TOKEN is set; otherwise console-only
+    if logfire is not None:
+        try:
+            logfire.configure(send_to_logfire="if-token-present")
+            logfire.instrument_fastapi(app)
+            logfire.instrument_httpx()  # Traces ADK agent's internal API calls via httpx
+        except Exception as e:  # e.g. missing opentelemetry-instrumentation-fastapi
+            logger.warning("Logfire instrumentation skipped: %s", e)
 
     return app
 

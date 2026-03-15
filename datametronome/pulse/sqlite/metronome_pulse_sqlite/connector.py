@@ -73,7 +73,7 @@ class SQLitePulse(Pulse, Readable, Writable):
             raise RuntimeError("Not connected to SQLite database")
         return await self._readonly.query(query_config)
 
-    async def query_with_params(self, sql, params):
+    async def query_with_params(self, sql: str, params: list | None = None) -> list[dict]:
         """Execute parameterized query."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
@@ -105,11 +105,44 @@ class SQLitePulse(Pulse, Readable, Writable):
         assert destination is not None
         return await self._writeonly.write(data, destination, config)
 
-    async def execute(self, sql, params=None):
-        """Execute raw SQL."""
+    async def execute(self, sql: str, params: list | None = None) -> int:
+        """Execute raw SQL. Returns rows affected."""
         if not await self.is_connected():
             raise RuntimeError("Not connected to SQLite database")
         return await self._writeonly.execute(sql, params)
+
+    async def execute_many(self, sql: str, params_list: list[list]) -> None:
+        """Execute a SQL statement multiple times with different params."""
+        if not await self.is_connected():
+            raise RuntimeError("Not connected to SQLite database")
+        await self._writeonly.execute_many(sql, params_list)
+
+    async def begin_transaction(self) -> None:
+        """Begin a transaction."""
+        if not await self.is_connected():
+            raise RuntimeError("Not connected to SQLite database")
+        await self._writeonly.begin_transaction()
+
+    async def commit_transaction(self) -> None:
+        """Commit the current transaction."""
+        if not await self.is_connected():
+            raise RuntimeError("Not connected to SQLite database")
+        await self._writeonly.commit_transaction()
+
+    async def rollback_transaction(self) -> None:
+        """Roll back the current transaction."""
+        if not await self.is_connected():
+            raise RuntimeError("Not connected to SQLite database")
+        await self._writeonly.rollback_transaction()
+
+    async def __aenter__(self):
+        """Async context manager entry."""
+        await self.connect()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit."""
+        await self.close()
 
     async def copy_records(self, table_name, records):
         """Bulk insert records using SQLite's efficient INSERT."""

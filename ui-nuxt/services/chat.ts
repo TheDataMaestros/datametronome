@@ -9,6 +9,10 @@ export interface ChatMessage {
   toolResults?: ToolResult[]
   model?: string // Model name that generated the response
   finishReason?: string // Finish reason from the model
+  intent?: string
+  agentType?: string
+  orchestrationMode?: string
+  agentChain?: string[]
 }
 
 export interface ToolCall {
@@ -35,6 +39,10 @@ export interface ChatResponse {
   toolCalls?: ToolCall[]
   finishReason?: string
   model?: string // Model name that generated the response
+  intent?: string
+  agentType?: string
+  orchestrationMode?: string
+  agentChain?: string[]
 }
 
 class ChatService {
@@ -106,6 +114,10 @@ class ChatService {
         toolCalls: msg.toolCalls,
       }
     })
+  }
+
+  async deleteConversation(conversationId: string): Promise<void> {
+    await apiService.delete(`${this.endpoint}/conversations/${conversationId}`)
   }
 
   async listConversations(): Promise<Array<{ id: string; title: string; updatedAt: Date }>> {

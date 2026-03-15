@@ -1,5 +1,3 @@
-version: '3.8'
-
 # Production Docker Compose Configuration for DataMetronome
 #
 # Usage:
@@ -71,6 +69,35 @@ services:
           cpus: '0.25'
           memory: 128M
 
+  # RabbitMQ message broker (Production)
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: datametronome-rabbitmq-prod
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:?RABBITMQ_USER is required}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?RABBITMQ_PASSWORD is required}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "${RABBITMQ_PORT:-5672}:5672"
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+    networks:
+      - datametronome-network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.25'
+          memory: 128M
+
   # Podium API (Production)
   podium:
     build:
@@ -104,6 +131,12 @@ services:
       # Scheduler
       SCHEDULER_ENABLED: ${SCHEDULER_ENABLED:-true}
       SCHEDULER_TIMEZONE: ${SCHEDULER_TIMEZONE:-UTC}
+
+      # Celery / worker settings
+      DATAMETRONOME_DISPATCH_MODE: ${DATAMETRONOME_DISPATCH_MODE:-celery}
+      DATAMETRONOME_CELERY_BROKER_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672//
+      DATAMETRONOME_CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DATAMETRONOME_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
     volumes:
       - ./data:/app/data
       - ./reports:/app/reports
@@ -114,6 +147,8 @@ services:
       postgres:
         condition: service_healthy
       redis:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
@@ -133,6 +168,84 @@ services:
         reservations:
           cpus: '0.5'
           memory: 256M
+
+  # Celery worker — executes checks (Production)
+  podium-worker:
+    build:
+      context: ./datametronome/podium
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: 3.11
+    image: datametronome-podium:latest
+    container_name: datametronome-worker-prod
+    command: celery -A datametronome_podium.core.celery_app worker --loglevel=info -Q checks.high,checks.default,checks.bulk
+    environment:
+      DATAMETRONOME_SECRET_KEY: ${DATAMETRONOME_SECRET_KEY:?SECRET_KEY is required}
+      DATAMETRONOME_DATABASE_URL: postgresql://${POSTGRES_USER:-datametronome}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-datametronome}
+      DATAMETRONOME_CELERY_BROKER_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672//
+      DATAMETRONOME_CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DATAMETRONOME_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DATAMETRONOME_DISPATCH_MODE: celery
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: json
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - datametronome-network
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 256M
+
+  # Celery Beat — schedules checks via RedBeat (Production)
+  podium-beat:
+    build:
+      context: ./datametronome/podium
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: 3.11
+    image: datametronome-podium:latest
+    container_name: datametronome-beat-prod
+    command: celery -A datametronome_podium.core.celery_app beat --scheduler=redbeat.RedBeatScheduler --loglevel=info
+    environment:
+      DATAMETRONOME_SECRET_KEY: ${DATAMETRONOME_SECRET_KEY:?SECRET_KEY is required}
+      DATAMETRONOME_DATABASE_URL: postgresql://${POSTGRES_USER:-datametronome}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-datametronome}
+      DATAMETRONOME_CELERY_BROKER_URL: amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@rabbitmq:5672//
+      DATAMETRONOME_CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD}@redis:6379/0
+      DATAMETRONOME_REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      LOG_FORMAT: json
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - datametronome-network
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 64M
 
   # Nginx Reverse Proxy (Optional - for SSL termination)
   nginx:
@@ -228,6 +341,8 @@ volumes:
   postgres_data:
     driver: local
   redis_data:
+    driver: local
+  rabbitmq_data:
     driver: local
   prometheus_data:
     driver: local

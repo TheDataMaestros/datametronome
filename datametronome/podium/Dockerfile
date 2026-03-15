@@ -18,9 +18,11 @@ COPY . .
 # Install dependencies using uv (monorepo editable installs)
 RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/core
 RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/sqlite
+RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/postgres
 RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/bigquery
 RUN uv pip install --system --no-cache-dir -e ./datametronome/brain/base
 RUN uv pip install --system --no-cache-dir -e ./datametronome/podium
+RUN uv pip install --system --no-cache-dir 'logfire[fastapi,httpx]>=0.20.0'
 
 # Create reports directory
 RUN mkdir -p reports
@@ -38,5 +40,6 @@ ENV DATAMETRONOME_DATABASE_URL=sqlite+aiosqlite:////app/data/datametronome.db
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD ["/bin/sh", "-c", "curl -fsS \"http://localhost:${DATAMETRONOME_PORT:-8001}/health\" || exit 1"]
 
-# Run the application
-CMD ["python", "-m", "datametronome_podium.main"]
+# Run Alembic migrations then start the application
+# Fail fast on migration errors — do not mask failures with stamp
+CMD ["sh", "-c", "cd /app/datametronome/podium && DATABASE_URL=${DATAMETRONOME_DATABASE_URL} alembic upgrade head && cd /app && python -m datametronome_podium.main"]

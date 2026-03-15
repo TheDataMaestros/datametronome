@@ -1,7 +1,5 @@
 import asyncio
-import json
 import sqlite3
-import time
 from pathlib import Path
 
 from metronome_pulse_core.interfaces import Pulse, Writable
@@ -21,31 +19,7 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
         self.connection = None
         # Serialize writes to avoid "database is locked" under concurrent access.
         self._write_lock = asyncio.Lock()
-
-    # region agent log
-    def _agent_log(
-        self, hypothesis_id: str, location: str, message: str, data: dict
-    ) -> None:
-        try:
-            payload = {
-                "sessionId": "debug-session",
-                "runId": "pre-fix",
-                "hypothesisId": hypothesis_id,
-                "location": location,
-                "message": message,
-                "data": data,
-                "timestamp": int(time.time() * 1000),
-            }
-            with open(
-                "/Users/totolasso/repos/personal/datametronome/.cursor/debug.log",
-                "a",
-                encoding="utf-8",
-            ) as f:
-                f.write(json.dumps(payload, ensure_ascii=False) + "\n")
-        except Exception:
-            pass
-
-    # endregion
+        self._in_transaction = False
 
     async def connect(self) -> None:
         """Connect to SQLite database."""
@@ -90,36 +64,6 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
 
         async with self._write_lock:
             try:
-                # region agent log
-                tables = []
-                try:
-                    tables = sorted(
-                        {
-                            str((r or {}).get("table"))
-                            for r in (data or [])
-                            if (r or {}).get("table")
-                        }
-                    )
-                except Exception:
-                    tables = []
-                first_id = None
-                try:
-                    first_id = (data or [{}])[0].get("id")
-                except Exception:
-                    first_id = None
-                self._agent_log(
-                    "H_SQLITE_WRITE",
-                    "metronome_pulse_sqlite/writeonly_connector.py:write",
-                    "sqlite write called",
-                    {
-                        "db_path": str(self.database_path),
-                        "operation_type": operation_type,
-                        "records": len(data) if data is not None else None,
-                        "tables": tables,
-                        "first_id": first_id,
-                    },
-                )
-                # endregion
                 if operation_type == "insert":
                     return await self._insert_data(data)
                 elif operation_type == "replace":
@@ -129,52 +73,15 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
                 else:
                     raise ValueError(f"Unsupported operation type: {operation_type}")
             except Exception as e:
-                # region agent log
-                self._agent_log(
-                    "H_SQLITE_WRITE_EXCEPTION",
-                    "metronome_pulse_sqlite/writeonly_connector.py:write",
-                    "sqlite write raised exception",
-                    {
-                        "db_path": str(self.database_path),
-                        "operation_type": operation_type,
-                        "error_type": type(e).__name__,
-                        "error": str(e),
-                    },
-                )
-                # endregion
                 raise RuntimeError(f"Write operation failed: {e}")
 
     async def _insert_data(self, data):
         """Insert data into tables (tables must already exist from Podium)."""
         try:
-            # region agent log
-            tables = []
-            try:
-                tables = sorted(
-                    {
-                        str((r or {}).get("table"))
-                        for r in (data or [])
-                        if (r or {}).get("table")
-                    }
-                )
-            except Exception:
-                tables = []
-            self._agent_log(
-                "H_SQLITE_INSERT",
-                "metronome_pulse_sqlite/writeonly_connector.py:_insert_data",
-                "sqlite insert starting",
-                {
-                    "db_path": str(self.database_path),
-                    "records": len(data) if data is not None else None,
-                    "tables": tables,
-                },
-            )
-            # endregion
             for record in data:
                 # Extract table name and data from record
                 table_name = record.get("table")
                 if not table_name:
-                    print("No table name specified in record")
                     continue
 
                 # Remove table name from data
@@ -199,18 +106,6 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
         except Exception as e:
             if self.connection:
                 self.connection.rollback()
-            # region agent log
-            self._agent_log(
-                "H_SQLITE_INSERT_EXCEPTION",
-                "metronome_pulse_sqlite/writeonly_connector.py:_insert_data",
-                "sqlite insert failed",
-                {
-                    "db_path": str(self.database_path),
-                    "error_type": type(e).__name__,
-                    "error": str(e),
-                },
-            )
-            # endregion
             raise RuntimeError(f"Insert failed: {e}")
 
     async def _replace_data(self, data):
@@ -273,29 +168,78 @@ class SQLiteWriteonlyPulse(Pulse, Writable):
                 self.connection.rollback()
             raise RuntimeError(f"Operations failed: {e}")
 
-    async def execute(self, sql, params=None):
-        """Execute raw SQL."""
-        if not await self.is_connected():
-            raise RuntimeError("Not connected to SQLite database")
+    async def execute(self, sql: str, params: list | None = None) -> int:
+        """Execute a SQL statement. Returns rows affected.
 
+        Args:
+            sql: SQL string with ? placeholders.
+            params: Parameter list (optional).
+
+        Returns:
+            Number of rows affected. 0 for DDL statements.
+        """
         async with self._write_lock:
+            if not self.connection:
+                raise RuntimeError("Not connected to database. Call connect() first.")
             try:
-                if not self.connection:
-                    raise RuntimeError("Not connected")
                 cursor = self.connection.cursor()
                 if params:
                     cursor.execute(sql, params)
                 else:
                     cursor.execute(sql)
-
-                if not self.connection:
-                    raise RuntimeError("Not connected to database")
-                self.connection.commit()
-                return True
+                # Only auto-commit if NOT inside a transaction
+                if not self._in_transaction:
+                    self.connection.commit()
+                return cursor.rowcount if cursor.rowcount >= 0 else 0
             except Exception as e:
-                if self.connection:
+                if not self._in_transaction:
                     self.connection.rollback()
-                raise RuntimeError(f"Execute failed: {e}")
+                raise
+
+    async def execute_many(self, sql: str, params_list: list[list]) -> None:
+        """Execute a SQL statement multiple times with different params.
+
+        Args:
+            sql: SQL string with ? placeholders.
+            params_list: List of parameter lists.
+        """
+        async with self._write_lock:
+            if not self.connection:
+                raise RuntimeError("Not connected to database. Call connect() first.")
+            try:
+                cursor = self.connection.cursor()
+                cursor.executemany(sql, params_list)
+                if not self._in_transaction:
+                    self.connection.commit()
+            except Exception as e:
+                if not self._in_transaction:
+                    self.connection.rollback()
+                raise
+
+    async def begin_transaction(self) -> None:
+        """Begin a transaction. Subsequent execute() calls will NOT auto-commit."""
+        if not self.connection:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        self._in_transaction = True
+        self.connection.execute("BEGIN")
+
+    async def commit_transaction(self) -> None:
+        """Commit the current transaction."""
+        if not self.connection:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        try:
+            self.connection.commit()
+        finally:
+            self._in_transaction = False
+
+    async def rollback_transaction(self) -> None:
+        """Roll back the current transaction."""
+        if not self.connection:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        try:
+            self.connection.rollback()
+        finally:
+            self._in_transaction = False
 
     async def copy_records(self, table_name, records):
         """Bulk insert records using SQLite's efficient INSERT."""

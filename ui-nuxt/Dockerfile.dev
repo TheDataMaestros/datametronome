@@ -1,0 +1,20 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies into the image layer.
+# The source will be bind-mounted at runtime (docker-compose),
+# and node_modules is preserved via an anonymous volume so the
+# host mount doesn't overwrite the container-installed packages.
+COPY package.json package-lock.json ./
+RUN npm ci
+
+# Bind nuxt dev server to all interfaces so it is reachable from the host
+ENV HOST=0.0.0.0
+# Enable polling so file changes on the Docker-for-Mac/Windows volume are detected
+ENV CHOKIDAR_USEPOLLING=true
+ENV WATCHPACK_POLLING=true
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]

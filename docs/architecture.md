@@ -1,646 +1,663 @@
-# 🏗️ DataMetronome Architecture
+# DataMetronome Architecture
 
-This document provides a comprehensive overview of DataMetronome's system architecture, design principles, and component interactions.
+A comprehensive overview of the system architecture, data model, and request lifecycle.
 
 ---
 
 ## Table of Contents
 
 - [System Overview](#system-overview)
-- [Core Components](#core-components)
-- [Data Flow](#data-flow)
+- [Backend Architecture](#backend-architecture)
+- [Database Layer](#database-layer)
+- [Data Model](#data-model)
+- [Request Flow](#request-flow)
+- [Scheduling](#scheduling)
+- [Authentication](#authentication)
 - [Technology Stack](#technology-stack)
-- [Design Principles](#design-principles)
-- [Deployment Architecture](#deployment-architecture)
+- [Deployment](#deployment)
 
 ---
 
 ## System Overview
 
-DataMetronome follows a modular, layered architecture designed for scalability, performance, and extensibility.
+DataMetronome is a data quality monitoring platform. Users connect data sources ("staves"), define quality checks ("clefs"), and schedule automated execution. An AI assistant provides conversational access to configuration, investigation, and reporting.
 
 ```mermaid
 graph TB
-    subgraph "Presentation Layer"
-        UI[Web UI]
-        API_DOCS[API Documentation]
+    subgraph "Frontend"
+        UI["Nuxt 3 SPA<br/>Dashboard, Chat, Reports"]
     end
 
     subgraph "API Layer"
-        PODIUM[Podium FastAPI]
-        AUTH[Authentication]
-        ENDPOINTS[REST Endpoints]
+        FASTAPI["FastAPI<br/>REST + JWT Auth"]
+        MIDDLEWARE["Rate Limiting<br/>CORS<br/>Metrics"]
     end
 
-    subgraph "Business Logic Layer"
-        SERVICES[Services]
-        SCHEDULER[Task Scheduler]
-        DETECTOR[Anomaly Detection]
+    subgraph "AI Orchestration"
+        ORCH["Orchestrator<br/>Router + Dispatch"]
+        AGENTS["Sub-Agents<br/>Config | Investigation | Report"]
+        TOOLS["11 Agent Tools<br/>DB access, analysis"]
     end
 
-    subgraph "Data Access Layer"
-        PULSE_CORE[DataPulse Core]
-        PULSE_PG[PostgreSQL Pulse]
-        PULSE_SQLITE[SQLite Pulse]
-        PULSE_OTHER[Other Pulses]
+    subgraph "Feature Slices"
+        STAVES["staves/"]
+        CLEFS["clefs/"]
+        CHECKS["checks/"]
+        USERS["users/"]
+        CHAT["chat/"]
+        WF["workflows/"]
+        TRACES["traces/"]
+        SCHED["scheduler/"]
+        ANALYTICS["analytics/"]
+    end
+
+    subgraph "Worker Infrastructure"
+        RMQ["RabbitMQ<br/>Message Broker"]
+        WORKER["Celery Worker<br/>Check Runner"]
+        BEAT["Celery Beat<br/>+ RedBeat"]
+        REDIS["Redis<br/>Results + Cache"]
+        CB["Circuit Breaker"]
+    end
+
+    subgraph "Check Execution"
+        DISPATCHER["CheckDispatcher<br/>Inline | Celery | Remote"]
+        EXECUTOR["ClefExecutor<br/>Check Runner"]
     end
 
     subgraph "Data Layer"
-        DB_INTERNAL[(Internal DB)]
-        DB_MONITORED[(Monitored Databases)]
+        QE["QueryExecutor"]
+        QA["QueryAdapter<br/>SQLite / PostgreSQL"]
+        PULSE["PulseConnector<br/>SQLitePulse | PostgresPulse"]
+        DB[("PostgreSQL<br/>or SQLite")]
     end
 
-    UI -->|HTTP| PODIUM
-    PODIUM --> AUTH
-    PODIUM --> ENDPOINTS
-    ENDPOINTS --> SERVICES
-    SERVICES --> SCHEDULER
-    SERVICES --> DETECTOR
-    SERVICES --> PULSE_CORE
-    PULSE_CORE --> PULSE_PG
-    PULSE_CORE --> PULSE_SQLITE
-    PULSE_PG -->|Monitor| DB_MONITORED
-    PULSE_SQLITE -->|Store Config| DB_INTERNAL
+    UI -->|HTTP/JSON| FASTAPI
+    FASTAPI --> MIDDLEWARE
+    FASTAPI --> ORCH
+    FASTAPI --> STAVES & CLEFS & CHECKS & USERS
+    ORCH --> AGENTS
+    AGENTS --> TOOLS
+    TOOLS --> QE
+    STAVES & CLEFS & CHECKS --> QE
+    FASTAPI --> DISPATCHER
+    DISPATCHER -->|inline| EXECUTOR
+    DISPATCHER -->|celery| RMQ
+    RMQ --> WORKER
+    WORKER --> EXECUTOR
+    WORKER --> CB
+    CB --> REDIS
+    BEAT -->|send_task| RMQ
+    BEAT -.->|schedules| REDIS
+    WORKER -->|result| REDIS
+    EXECUTOR --> QE
+    QE --> QA
+    QA --> PULSE
+    PULSE --> DB
 ```
 
 ### Key Characteristics
 
-- **Async-First**: Built on asyncio for high-performance, non-blocking I/O
-- **Modular Design**: Independent components that can be deployed separately
-- **Plugin Architecture**: Extensible through DataPulse connectors
-- **API-Driven**: All functionality accessible via REST API
-- **Stateless Services**: Horizontally scalable without session affinity
+- **Async-first** -- built on `asyncio` and `asyncpg`/`aiosqlite` for non-blocking I/O
+- **Feature-slice architecture** -- each domain (staves, clefs, checks, ...) owns its model, repo, router, and schema
+- **Database-agnostic** -- the same codebase runs on SQLite (dev) and PostgreSQL (production)
+- **Multi-agent AI** -- Pydantic AI agents with structured routing, tool calling, and workflow checkpoints
+- **Observability** -- Prometheus metrics endpoint, agent traces, Logfire integration
+- **Decoupled check execution** -- CheckDispatcher protocol with pluggable backends (inline, Celery, remote). See [Worker Architecture](architecture/worker-architecture.md)
 
 ---
 
-## Core Components
+## Backend Architecture
 
-### 1. DataPulse Connectors
+The backend lives in `datametronome/podium/datametronome_podium/` and follows a **feature-slice** pattern. Each feature is a self-contained package with up to four files:
 
-**Purpose**: High-performance, async database connectivity layer
-
-**Key Features**:
-- Abstract base interfaces for consistency
-- Multiple database implementations (PostgreSQL, SQLite, more coming)
-- Connection pooling and optimization
-- Transaction support
-- Query building utilities
-
-**Component Diagram**:
-
-```mermaid
-classDiagram
-    class BasePulse {
-        <<abstract>>
-        +connect() async
-        +disconnect() async
-        +execute() async
-    }
-
-    class ReadablePulse {
-        <<abstract>>
-        +read() async
-        +query() async
-    }
-
-    class WritablePulse {
-        <<abstract>>
-        +write() async
-        +batch_write() async
-    }
-
-    class PostgresPulse {
-        +asyncpg_pool
-        +connect() async
-        +read() async
-        +write() async
-        +transaction() async
-    }
-
-    class SQLitePulse {
-        +aiosqlite_conn
-        +connect() async
-        +read() async
-        +write() async
-    }
-
-    BasePulse <|-- ReadablePulse
-    BasePulse <|-- WritablePulse
-    ReadablePulse <|-- PostgresPulse
-    WritablePulse <|-- PostgresPulse
-    ReadablePulse <|-- SQLitePulse
-    WritablePulse <|-- SQLitePulse
+```
+datametronome_podium/
+├── features/
+│   ├── staves/        # Data sources
+│   │   ├── model.py   # Pydantic domain model
+│   │   ├── repo.py    # QueryExecutor-based SQL repository
+│   │   ├── router.py  # FastAPI router (endpoints)
+│   │   └── schema.py  # Request/Response DTOs
+│   ├── clefs/         # Quality check definitions
+│   ├── checks/        # Check execution results
+│   ├── users/         # User accounts
+│   ├── chat/          # Conversation messages
+│   ├── workflows/     # Checkpoint + event state
+│   ├── traces/        # Agent observability traces
+│   ├── scheduler/     # Scheduler job persistence
+│   └── analytics/     # Quality analytics queries
+├── core/
+│   ├── config.py           # Pydantic Settings (env-driven)
+│   ├── database.py         # Connection lifecycle, get_executor()
+│   ├── query.py            # QueryExecutor (all DB access)
+│   ├── query_adapter.py    # SQLite <-> PostgreSQL translation
+│   ├── check_dispatcher.py # CheckDispatcher protocol + InlineDispatcher
+│   ├── celery_dispatcher.py # CeleryDispatcher (production)
+│   ├── dispatcher_factory.py # Singleton factory (config-driven)
+│   ├── celery_app.py       # Celery app config, queues, RedBeat
+│   ├── worker_db.py        # Per-task DB session factory
+│   ├── circuit_breaker.py  # Stave circuit breaker (Redis)
+│   ├── middleware.py        # MetricsMiddleware
+│   └── rate_limit.py       # slowapi rate limiter
+├── services/
+│   ├── orchestrator.py    # Multi-agent routing + dispatch
+│   ├── agent_factory.py   # Model builder (Anthropic/OpenAI/Gemini/Ollama)
+│   ├── agent_tools.py     # 11 tools shared by all agents
+│   ├── agents/
+│   │   ├── router.py      # RouterAgent (intent classification)
+│   │   ├── config.py      # ConfigAgent
+│   │   ├── investigation.py  # InvestigationAgent
+│   │   └── report.py      # ReportAgent
+│   ├── clef_executor.py   # Check runner (2300+ lines, 40+ check types)
+│   ├── workflow_state.py  # Checkpoint CRUD + event logging
+│   └── agent_tracing.py   # Trace recording
+├── tasks/
+│   ├── check_tasks.py     # execute_check Celery task
+│   └── result_pusher.py   # ResultPusher (hybrid mode)
+├── api/
+│   ├── deps.py        # get_current_user dependency
+│   └── v1/            # API router aggregation
+└── main.py            # FastAPI app factory + lifespan
 ```
 
-**Variants**:
-- **asyncpg** - Pure asyncpg implementation (fastest for PostgreSQL)
-- **psycopg3** - Modern psycopg3 async implementation
-- **SQLAlchemy** - ORM-based for complex queries
-- **SQLite** - Lightweight local storage
+### The Feature-Slice Pattern
 
-### 2. Podium API
+Each feature follows the same four-file structure:
 
-**Purpose**: Central REST API for all DataMetronome operations
+| File | Responsibility | Example |
+|------|---------------|---------|
+| `model.py` | Pydantic domain model with validation and business logic | `StaveModel`, `ClefModel` |
+| `repo.py` | SQL queries via `QueryExecutor` -- no raw driver calls | `StaveRepo.get_by_id()`, `ClefRepo.list_active()` |
+| `router.py` | FastAPI endpoints -- thin controllers that delegate to repos | `POST /staves`, `GET /clefs` |
+| `schema.py` | Request/Response DTOs (separate from domain models) | `StaveCreate`, `StaveResponse` |
 
-**Technology**: FastAPI with Pydantic for validation
-
-**Endpoints**:
-```
-/api/v1/
-├── auth/          # Authentication
-├── staves/        # Data sources
-├── clefs/         # Data quality checks
-├── check-runs/    # Execution history
-└── users/         # User management
-```
-
-**Key Features**:
-- JWT-based authentication
-- Automatic API documentation (Swagger/ReDoc)
-- Request validation with Pydantic
-- Async request handling
-- Role-based access control
-
-### 3. UI
-
-**Purpose**: Interactive dashboard for visualization and monitoring
-
-**Features**:
-- Real-time data quality monitoring with shared UI components
-- ML-powered anomaly detection overlays
-- Interactive visualizations (Chart.js + Vue Chart.js)
-- Custom API-driven exploration flows
-- Data profiling tools and clef configuration forms
-
-**Tabs**:
-1. **Overview** - System health and metrics
-2. **Anomalies** - Detected issues
-3. **ML Anomalies** - Machine learning insights
-4. **Trends & Patterns** - Time series analysis
-5. **Investigation** - Ad-hoc exploration
-
-### 4. Anomaly Detection Engine
-
-**Purpose**: Identify data quality issues and outliers
-
-**Algorithms**:
-- **Isolation Forest** - Statistical outlier detection
-- **Statistical Tests** - Z-score, IQR-based detection
-- **Rule-Based** - Custom thresholds and patterns
-- **Coming Soon**: LSTM, One-Class SVM, Autoencoders
-
-**Process Flow**:
-
-```mermaid
-sequenceDiagram
-    participant Scheduler
-    participant Engine as Anomaly Engine
-    participant DataPulse
-    participant Database
-    participant AlertService
-
-    Scheduler->>Engine: Trigger check
-    Engine->>DataPulse: Fetch data
-    DataPulse->>Database: Query
-    Database-->>DataPulse: Results
-    DataPulse-->>Engine: Data
-    Engine->>Engine: Apply ML model
-    Engine->>Engine: Statistical analysis
-    Engine->>Engine: Detect anomalies
-
-    alt Anomalies Found
-        Engine->>AlertService: Send alerts
-        AlertService-->>Engine: Confirmed
-    end
-
-    Engine-->>Scheduler: Check complete
-```
-
-### 5. Task Scheduler
-
-**Purpose**: Execute scheduled data quality checks
-
-**Technology**: APScheduler (async-compatible)
-
-**Features**:
-- Cron-style scheduling
-- Job persistence
-- Retry logic
-- Concurrent execution limits
-- Job monitoring
+This separation ensures:
+- **Testability** -- repos can be tested with a real `QueryExecutor` against an in-memory SQLite
+- **No coupling** -- routers never import models directly, schemas never import repos
+- **Consistency** -- every feature follows the same structure, easy to navigate
 
 ---
 
-## Data Flow
+## Database Layer
 
-### Check Execution Flow
+DataMetronome uses a three-layer abstraction that lets the same application code run unchanged on both SQLite and PostgreSQL.
+
+```mermaid
+flowchart LR
+    APP["Application Code<br/>(repos, services)"]
+    QE["QueryExecutor<br/>query(), execute(), insert()"]
+    QA["QueryAdapter<br/>adapt(sql, params)"]
+    PULSE["PulseConnector<br/>query_with_params(), execute()"]
+    DB[("Database<br/>SQLite or PostgreSQL")]
+
+    APP -->|"SQL with ? placeholders"| QE
+    QE -->|"(sql, params)"| QA
+    QA -->|"translated SQL"| PULSE
+    PULSE -->|"driver call"| DB
+
+    style QE fill:#e1f5fe
+    style QA fill:#fff3e0
+    style PULSE fill:#e8f5e9
+```
+
+### How Placeholder Translation Works
+
+All application SQL uses `?` as the placeholder character. The `QueryAdapter` rewrites these for the active dialect:
 
 ```mermaid
 flowchart TD
-    START([Scheduled Time]) --> SCHEDULER{Scheduler}
-    SCHEDULER --> FETCH_CLEF[Fetch Clef Config]
-    FETCH_CLEF --> CONNECT[Connect to Data Source]
-    CONNECT --> EXECUTE_QUERY[Execute SQL Query]
-    EXECUTE_QUERY --> COLLECT_DATA[Collect Data]
-    COLLECT_DATA --> ANALYZE{Anomaly Detection}
+    SQL["SELECT * FROM staves WHERE id = ? AND is_active = ?"]
+    ADAPTER{QueryAdapter}
 
-    ANALYZE -->|Normal| LOG_SUCCESS[Log Success]
-    ANALYZE -->|Anomalies| LOG_ANOMALY[Log Anomalies]
+    ADAPTER -->|"dialect = sqlite"| SQLITE["SELECT * FROM staves WHERE id = ? AND is_active = ?<br/>params: ['stave-123', 1]<br/>(booleans converted to 0/1)"]
 
-    LOG_ANOMALY --> ALERT{Alert Threshold?}
-    ALERT -->|Yes| SEND_ALERT[Send Notifications]
-    ALERT -->|No| STORE_RESULT
+    ADAPTER -->|"dialect = postgresql"| PG["SELECT * FROM staves WHERE id = $1 AND is_active = $2<br/>params: ['stave-123', True]<br/>(? rewritten to $N)"]
 
-    LOG_SUCCESS --> STORE_RESULT[Store in DB]
-    SEND_ALERT --> STORE_RESULT
-    STORE_RESULT --> DISCONNECT[Disconnect]
-    DISCONNECT --> END([Complete])
+    SQL --> ADAPTER
 ```
 
-### User Interaction Flow
+The adapter also handles DDL translation: `JSONB` becomes `TEXT` on SQLite, and `DOUBLE PRECISION` becomes `REAL`.
+
+### QueryExecutor API
+
+```python
+# Core operations
+await executor.query(sql, params)     # SELECT -> list[dict]
+await executor.execute(sql, params)   # INSERT/UPDATE/DELETE -> rows affected
+await executor.execute_ddl(sql)       # DDL with type translation
+
+# CRUD helpers (single-table convenience)
+await executor.select(table, columns, where, order_by, limit, offset)
+await executor.insert(table, data_dict)
+await executor.update(table, data_dict, where)
+await executor.delete(table, where)
+
+# Transactions
+async with executor.transaction():
+    await executor.insert("checks", check_data)
+    await executor.update("clefs", {"last_run": now}, {"id": clef_id})
+```
+
+### Connection Lifecycle
+
+On startup, `database.init_db()` parses the `DATAMETRONOME_DATABASE_URL` environment variable, creates the appropriate PulseConnector (`PostgresPulse` or `SQLitePulse`), wraps it with a `QueryAdapter`, and builds the global `QueryExecutor`:
+
+```python
+connector, dialect = await _create_connector(settings.database_url)
+adapter = QueryAdapter(dialect)
+_executor = QueryExecutor(connector, adapter)
+await connector.connect()
+```
+
+All application code accesses the database through `get_executor()`.
+
+---
+
+## Data Model
+
+```mermaid
+erDiagram
+    users {
+        text id PK
+        text username UK
+        text email UK
+        text hashed_password
+        boolean is_active
+        boolean is_superuser
+        text created_at
+        text updated_at
+    }
+
+    staves {
+        text id PK
+        text name
+        text description
+        text data_source_type
+        text connection_config
+        boolean is_active
+        boolean paused
+        text created_at
+        text updated_at
+    }
+
+    clefs {
+        text id PK
+        text stave_id FK
+        text name
+        text description
+        text check_type
+        text config
+        text warn
+        text fail
+        text retry_config
+        text schedule
+        boolean is_active
+        text created_at
+        text updated_at
+    }
+
+    checks {
+        text id PK
+        text stave_id FK
+        text clef_id FK
+        text check_type
+        text status
+        text message
+        text details
+        text timestamp
+        float execution_time
+        int anomalies_count
+        text severity
+    }
+
+    anomalies {
+        text id PK
+        text check_id FK
+        text table_name
+        text column_name
+        text anomaly_type
+        text description
+        text severity
+        text detected_at
+        text data_sample
+        text resolution_status
+    }
+
+    chat_messages {
+        text id PK
+        text conversation_id
+        text user_id FK
+        text role
+        text content
+        text tool_calls
+        text tool_results
+        text created_at
+    }
+
+    agent_traces {
+        text id PK
+        text conversation_id
+        text user_id
+        text user_message_preview
+        text intent
+        text model
+        text tool_calls
+        float duration_ms
+        text created_at
+    }
+
+    workflow_checkpoints {
+        text id PK
+        text conversation_id
+        text user_id
+        text workflow_name
+        text current_node
+        jsonb state_data
+        text status
+        text parent_checkpoint_id FK
+        text created_at
+        text updated_at
+    }
+
+    workflow_events {
+        text id PK
+        text checkpoint_id FK
+        text event_type
+        text node_name
+        jsonb event_data
+        text created_at
+    }
+
+    workflow_definitions {
+        text id PK
+        text name UK
+        text description
+        jsonb graph_data
+        boolean is_active
+        text created_at
+        text updated_at
+    }
+
+    scheduler_jobs {
+        text id PK
+        text clef_id FK
+        text schedule
+        boolean enabled
+        text last_run_time
+        text next_run_time
+        int execution_count
+        int failure_count
+        text created_at
+        text updated_at
+    }
+
+    job_executions {
+        text id PK
+        text job_id FK
+        text clef_id FK
+        text status
+        float execution_time
+        text error_message
+        text started_at
+        text completed_at
+    }
+
+    staves ||--o{ clefs : "has"
+    staves ||--o{ checks : "produces"
+    clefs ||--o{ checks : "generates"
+    checks ||--o{ anomalies : "detects"
+    users ||--o{ chat_messages : "sends"
+    workflow_checkpoints ||--o{ workflow_events : "logs"
+    workflow_checkpoints ||--o{ workflow_checkpoints : "parent"
+    clefs ||--o{ scheduler_jobs : "scheduled by"
+    scheduler_jobs ||--o{ job_executions : "tracks"
+```
+
+### Key Relationships
+
+- A **stave** (data source) has many **clefs** (quality check definitions)
+- A **clef** produces **checks** (execution results) each time it runs
+- A **check** may detect **anomalies** in the data
+- **Chat messages** belong to conversations and are linked to users
+- **Workflow checkpoints** track multi-agent orchestration state, with **events** as an audit trail
+- **Scheduler jobs** persist scheduling state, with **job executions** tracking each run
+- **Staves** can be **paused** by the circuit breaker after consecutive check failures
+
+---
+
+## Request Flow
+
+A typical authenticated API request follows this path:
+
+```mermaid
+sequenceDiagram
+    actor Client
+    participant MW as Middleware<br/>(Metrics + CORS + Rate Limit)
+    participant Router as Feature Router<br/>(e.g. staves/router.py)
+    participant Deps as deps.py<br/>get_current_user
+    participant Auth as JWT Verification<br/>(python-jose)
+    participant Repo as Feature Repo<br/>(e.g. staves/repo.py)
+    participant QE as QueryExecutor
+    participant QA as QueryAdapter
+    participant Pulse as PulseConnector
+    participant DB as Database
+
+    Client->>MW: GET /api/v1/staves<br/>Authorization: Bearer <token>
+    MW->>Router: forward request
+    Router->>Deps: get_current_user(token)
+    Deps->>Auth: jwt.decode(token, secret)
+    Auth-->>Deps: {sub: "admin"}
+    Deps->>QE: query("SELECT * FROM users WHERE username = ?", ["admin"])
+    QE->>QA: adapt(sql, params)
+    QA-->>QE: (adapted_sql, adapted_params)
+    QE->>Pulse: query_with_params(sql, params)
+    Pulse->>DB: execute
+    DB-->>Pulse: rows
+    Pulse-->>QE: list[dict]
+    QE-->>Deps: user dict
+    Deps-->>Router: current_user
+    Router->>Repo: StaveRepo.list(executor)
+    Repo->>QE: select("staves", ...)
+    QE->>QA: adapt
+    QA->>Pulse: query
+    Pulse->>DB: SELECT
+    DB-->>Pulse: rows
+    Pulse-->>QE: list[dict]
+    QE-->>Repo: stave dicts
+    Repo-->>Router: list[StaveResponse]
+    Router-->>MW: JSON response
+    MW-->>Client: 200 OK + JSON
+```
+
+---
+
+## Check Execution & Scheduling
+
+Checks are dispatched through the **CheckDispatcher protocol**, which decouples the API from execution. Three dispatch modes are supported:
+
+| Mode | Backend | Use Case |
+|------|---------|----------|
+| `inline` | No broker | Showcase, SQLite, development |
+| `celery` | RabbitMQ + Redis | Production, multi-worker |
+| `remote` | Local + HTTPS push | Hybrid deployment (future) |
+
+```mermaid
+flowchart TD
+    subgraph "Triggers"
+        UI["UI 'Run Now'"]
+        AGENT["AI Agent"]
+        BEAT["Celery Beat<br/>+ RedBeat"]
+    end
+
+    subgraph "Dispatch"
+        DF["get_dispatcher()"]
+        UI --> DF
+        AGENT --> DF
+    end
+
+    subgraph "Queues (Celery mode)"
+        HIGH["checks.high<br/>(user waiting)"]
+        DEFAULT["checks.default<br/>(scheduled)"]
+        BULK["checks.bulk<br/>(batch ops)"]
+    end
+
+    DF -->|"CeleryDispatcher"| HIGH
+    BEAT -->|"send_task()"| DEFAULT
+
+    subgraph "Worker"
+        TASK["execute_check(clef_id)<br/>asyncio.run() bridge"]
+        WDB["worker_db_session()<br/>per-task DB lifecycle"]
+        EXEC["ClefExecutor"]
+        CB["Circuit Breaker<br/>Redis counters"]
+    end
+
+    HIGH --> TASK
+    DEFAULT --> TASK
+    BULK --> TASK
+    TASK --> WDB --> EXEC
+    TASK --> CB
+
+    EXEC -->|result| PG["Postgres<br/>(checks table)"]
+    TASK -->|result| REDIS["Redis<br/>(result backend)"]
+```
+
+### Schedule Configuration
+
+Celery Beat with **celery-redbeat** handles scheduling. Schedules are stored in Redis and updated atomically when clefs are created/modified via the API. Beat runs as a single container — no duplicate execution across replicas.
+
+Clefs accept standard 5-field cron expressions or shorthands:
+
+| Shorthand | Cron Expression | Meaning |
+|-----------|----------------|---------|
+| `@hourly` | `0 * * * *` | Every hour at minute 0 |
+| `@daily` | `0 0 * * *` | Every day at midnight |
+| `@weekly` | `0 0 * * 0` | Every Sunday at midnight |
+| `@monthly` | `0 0 1 * *` | First of each month |
+| `*/5 * * * *` | (as-is) | Every 5 minutes |
+
+### Worker Settings
+
+```bash
+DATAMETRONOME_DISPATCH_MODE=inline          # inline | celery | remote
+DATAMETRONOME_CELERY_BROKER_URL=amqp://guest:guest@rabbitmq:5672//
+DATAMETRONOME_CELERY_RESULT_BACKEND=redis://redis:6379/0
+DATAMETRONOME_REDIS_URL=redis://redis:6379/0
+DATAMETRONOME_CELERY_CONCURRENCY=4
+```
+
+For detailed architecture, see [Worker Architecture](architecture/worker-architecture.md) and [ADR-0001](decisions/ADR-0001-decouple-check-execution-with-celery-workers.md).
+
+---
+
+## Authentication
+
+DataMetronome uses JWT (JSON Web Tokens) with bcrypt password hashing.
 
 ```mermaid
 sequenceDiagram
     actor User
-    participant UI as Web UI
-    participant API as Podium API
-    participant DB as Internal DB
-    participant Pulse as DataPulse
-    participant Target as Target Database
+    participant API as POST /api/v1/auth/login
+    participant Auth as Auth Module
+    participant DB as Database
 
-    User->>UI: Open Dashboard
-    UI->>API: GET /staves
-    API->>DB: Query staves
-    DB-->>API: Stave list
-    API-->>UI: JSON response
-    UI-->>User: Display staves
+    User->>API: {username, password}
+    API->>DB: SELECT * FROM users WHERE username = ?
+    DB-->>API: user record
+    API->>Auth: verify_password(password, hashed_password)
+    Auth-->>API: valid
 
-    User->>UI: Create new check
-    UI->>API: POST /clefs
-    API->>DB: Store clef config
-    DB-->>API: Clef created
-    API-->>UI: Confirmation
+    API->>Auth: create_access_token({sub: username}, expires)
+    Auth-->>API: JWT token (HS256)
+    API-->>User: {access_token, token_type: "bearer"}
 
-    User->>UI: Run check manually
-    UI->>API: POST /clefs/{id}/run
-    API->>Pulse: Execute check
-    Pulse->>Target: Query data
-    Target-->>Pulse: Results
-    Pulse->>Pulse: Analyze
-    Pulse-->>API: Anomalies found
-    API->>DB: Store run result
-    API-->>UI: Run complete
-    UI-->>User: Show results
+    Note over User,DB: Subsequent requests
+
+    User->>API: GET /api/v1/staves<br/>Authorization: Bearer <jwt>
+    API->>Auth: jwt.decode(token, SECRET_KEY, HS256)
+    Auth-->>API: {sub: "admin"}
+    API->>DB: SELECT * FROM users WHERE username = ?
+    DB-->>API: user record
+    API-->>User: 200 OK (authorized)
 ```
+
+### Security Configuration
+
+```bash
+DATAMETRONOME_SECRET_KEY=<random-32+-char-string>
+DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES=30
+```
+
+The secret key must be at least 32 characters. The default is only suitable for development.
 
 ---
 
 ## Technology Stack
 
-### Languages & Frameworks
-
-| Component | Technology | Version | Purpose |
-|-----------|-----------|---------|---------|
-| Backend | Python | 3.11+ | Core language |
-| API Framework | FastAPI | 0.104+ | REST API |
-| UI Framework | Web UI (SPA) | — | Dashboard |
-| Data Validation | Pydantic | 2.5+ | Schema validation |
-| ML | scikit-learn | 1.3+ | Anomaly detection |
-| Async Runtime | asyncio | Built-in | Async operations |
-
-### Databases
-
-| Type | Technology | Use Case |
-|------|-----------|----------|
-| Internal Storage | SQLite | Configuration & state |
-| Production Option | PostgreSQL | Scalable storage |
-| Monitored Databases | PostgreSQL | Data quality monitoring |
-| Coming Soon | MySQL, MongoDB | Multi-database support |
-
-### Infrastructure
-
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Containerization | Docker | Deployment |
-| Orchestration | Docker Compose | Local dev |
-| Orchestration (Prod) | Kubernetes | Production |
-| CI/CD | GitHub Actions | Automated testing |
-| Package Management | uv/pip | Dependencies |
-
-### Database Drivers
-
-| Driver | Performance | Use Case |
-|--------|------------|----------|
-| asyncpg | ⚡⚡⚡ Fastest | High-throughput PostgreSQL |
-| psycopg3 | ⚡⚡ Fast | Modern PostgreSQL |
-| SQLAlchemy | ⚡ Flexible | ORM, complex queries |
-| aiosqlite | ⚡ Lightweight | SQLite async |
+| Layer | Technology | Purpose |
+|-------|-----------|---------|
+| Frontend | Nuxt 3 (Vue 3) | SPA dashboard, chat interface |
+| API | FastAPI 0.104+ | REST endpoints, OpenAPI docs |
+| Validation | Pydantic v2 | Settings, schemas, domain models |
+| AI Framework | Pydantic AI | Multi-agent orchestration |
+| Auth | python-jose + passlib | JWT tokens, bcrypt hashing |
+| Task Queue | Celery 5.6 + RabbitMQ | Distributed check execution |
+| Scheduling | Celery Beat + celery-redbeat | Cron-based check scheduling (Redis-backed) |
+| Result Backend | Redis 7 | Task results + cache + RedBeat schedules |
+| Rate Limiting | slowapi | Per-endpoint rate limits |
+| Metrics | prometheus-client | /metrics endpoint |
+| Observability | Logfire (optional) | Distributed tracing |
+| Database (prod) | PostgreSQL + asyncpg | Primary data store |
+| Database (dev) | SQLite + aiosqlite | Zero-config development |
+| Containerization | Docker + docker-compose | Development and deployment |
 
 ---
 
-## Design Principles
+## Deployment
 
-### 1. **Async-First Architecture**
-
-All I/O operations use async/await for maximum throughput:
-
-```python
-# Good: Async operations
-async def process_checks():
-    tasks = [run_check(check) for check in checks]
-    results = await asyncio.gather(*tasks)
-    return results
-
-# Avoid: Synchronous blocking
-def process_checks_sync():
-    results = []
-    for check in checks:
-        result = run_check_sync(check)  # Blocks!
-        results.append(result)
-    return results
-```
-
-### 2. **Separation of Concerns**
-
-Each layer has a clear responsibility:
-
-- **Presentation**: UI/UX only
-- **API**: HTTP handling and validation
-- **Business Logic**: Core functionality
-- **Data Access**: Database operations
-- **Data**: Persistent storage
-
-### 3. **Dependency Injection**
-
-Services receive dependencies rather than creating them:
-
-```python
-# Good: Injected dependency
-class CheckService:
-    def __init__(self, pulse_connector: BasePulse):
-        self.pulse = pulse_connector
-
-# Avoid: Creating dependencies
-class CheckService:
-    def __init__(self):
-        self.pulse = PostgresPulse(...)  # Tightly coupled
-```
-
-### 4. **Interface-Based Design**
-
-DataPulse connectors implement consistent interfaces:
-
-```python
-class BasePulse(ABC):
-    @abstractmethod
-    async def connect(self) -> None: ...
-
-    @abstractmethod
-    async def disconnect(self) -> None: ...
-
-    @abstractmethod
-    async def execute(self, query: str) -> Any: ...
-```
-
-### 5. **Fail-Fast Validation**
-
-Use Pydantic for early validation:
-
-```python
-class ClefCreate(BaseModel):
-    name: str = Field(..., min_length=1, max_length=255)
-    type: str = Field(..., pattern="^(null_check|range_check|custom)$")
-    config: dict[str, Any]
-    schedule: str = Field(..., pattern="^(@(annually|yearly|monthly|weekly|daily|hourly)|(\d+\s+){4,5}\d+)$")
-```
-
-### 6. **Graceful Degradation**
-
-System continues operating even if components fail:
-
-- UI works without API (shows cached data)
-- Checks continue even if alerting fails
-- Individual check failures don't affect others
-
----
-
-## Deployment Architecture
-
-### Development Environment
+### Docker Compose (Development)
 
 ```mermaid
 graph LR
-    DEV[Developer Machine]
-    subgraph "Docker Compose"
-        UI[UI:3000]
-        API[Podium:8000]
-        DB[(PostgreSQL:5432)]
+    subgraph "docker-compose (default)"
+        UI["ui-nuxt<br/>:3000"]
+        API["podium<br/>:8001"]
+        DB[("PostgreSQL<br/>:5432")]
+        RMQ["RabbitMQ<br/>:5672 / :15672"]
+        REDIS["Redis<br/>:6379"]
     end
 
-    DEV --> UI
+    subgraph "docker-compose --profile worker"
+        WORKER["podium-worker<br/>Celery"]
+        BEAT["podium-beat<br/>Celery Beat"]
+    end
+
+    DEV["Developer"] --> UI
     DEV --> API
-    UI --> API
-    API --> DB
+    UI -->|HTTP| API
+    API -->|asyncpg| DB
+    API -->|dispatch| RMQ
+    RMQ --> WORKER
+    WORKER -->|result| REDIS
+    BEAT -->|schedule| RMQ
+    BEAT -.-> REDIS
 ```
 
-### Production Environment (Small Scale)
+### Application Lifecycle
 
 ```mermaid
-graph TB
-    subgraph "Frontend"
-        LB[Load Balancer]
-        UI1[UI Instance 1]
-        UI2[UI Instance 2]
-    end
+stateDiagram-v2
+    [*] --> Starting: uvicorn start
+    Starting --> DBInit: init_db()
+    DBInit --> Running: lifespan yield
+    Running --> ShuttingDown: SIGTERM
+    ShuttingDown --> DBClose: close_db()
+    DBClose --> [*]
 
-    subgraph "Backend"
-        API1[Podium API 1]
-        API2[Podium API 2]
-        API3[Podium API 3]
-    end
-
-    subgraph "Data Layer"
-        DB[(PostgreSQL Primary)]
-        DB_REPLICA[(PostgreSQL Replica)]
-        REDIS[(Redis Cache)]
-    end
-
-    LB --> UI1
-    LB --> UI2
-    UI1 --> API1
-    UI1 --> API2
-    UI2 --> API2
-    UI2 --> API3
-    API1 --> DB
-    API2 --> DB
-    API3 --> DB
-    DB --> DB_REPLICA
-    API1 --> REDIS
-    API2 --> REDIS
-    API3 --> REDIS
+    note right of Running: Scheduling handled by Celery Beat\n(separate container)
 ```
 
-### Production Environment (Enterprise Scale)
-
-```mermaid
-graph TB
-    USERS[Users] --> CDN[CDN]
-    CDN --> ALB[Application Load Balancer]
-
-    subgraph "Kubernetes Cluster"
-        subgraph "UI Namespace"
-            UI_POD1[UI Pod 1]
-            UI_POD2[UI Pod 2]
-            UI_POD3[UI Pod 3]
-        end
-
-        subgraph "API Namespace"
-            API_POD1[API Pod 1]
-            API_POD2[API Pod 2]
-            API_POD3[API Pod 3]
-            API_POD4[API Pod 4]
-        end
-
-        subgraph "Worker Namespace"
-            WORKER1[Worker Pod 1]
-            WORKER2[Worker Pod 2]
-        end
-    end
-
-    subgraph "Data Services"
-        DB_CLUSTER[(PostgreSQL Cluster)]
-        REDIS_CLUSTER[(Redis Cluster)]
-        S3[Object Storage]
-    end
-
-    subgraph "Monitoring"
-        PROMETHEUS[Prometheus]
-        GRAFANA[Grafana]
-    end
-
-    ALB --> UI_POD1
-    ALB --> UI_POD2
-    ALB --> UI_POD3
-
-    UI_POD1 --> API_POD1
-    UI_POD2 --> API_POD2
-    UI_POD3 --> API_POD3
-
-    API_POD1 --> DB_CLUSTER
-    API_POD2 --> DB_CLUSTER
-    API_POD3 --> DB_CLUSTER
-
-    API_POD1 --> REDIS_CLUSTER
-    API_POD2 --> REDIS_CLUSTER
-
-    WORKER1 --> DB_CLUSTER
-    WORKER2 --> DB_CLUSTER
-
-    API_POD1 --> PROMETHEUS
-    WORKER1 --> PROMETHEUS
-    PROMETHEUS --> GRAFANA
-```
+The `lifespan()` context manager in `main.py` handles startup (database init) and shutdown (database close). Scheduling is handled externally by Celery Beat — no scheduler lifecycle in the API process.
 
 ---
 
-## Security Architecture
-
-### Authentication & Authorization
-
-```mermaid
-sequenceDiagram
-    participant Client
-    participant API
-    participant Auth as Auth Service
-    participant DB
-
-    Client->>API: POST /login {credentials}
-    API->>Auth: Validate credentials
-    Auth->>DB: Query user
-    DB-->>Auth: User data
-    Auth->>Auth: Verify password
-    Auth->>Auth: Generate JWT
-    Auth-->>API: JWT token
-    API-->>Client: {access_token}
-
-    Client->>API: GET /staves (Bearer token)
-    API->>Auth: Verify JWT
-    Auth->>Auth: Check signature
-    Auth->>Auth: Validate expiry
-    Auth->>Auth: Extract user info
-    Auth-->>API: User authorized
-    API->>DB: Query staves
-    DB-->>API: Results
-    API-->>Client: Stave list
-```
-
-### Data Security Layers
-
-1. **Transport Security**: HTTPS/TLS for all connections
-2. **Authentication**: JWT tokens with expiry
-3. **Authorization**: Role-based access control (RBAC)
-4. **Data Encryption**: Encryption at rest (optional)
-5. **Secrets Management**: Environment variables, vault integration
-6. **Audit Logging**: All operations logged
-
----
-
-## Scalability Considerations
-
-### Horizontal Scaling
-
-| Component | Scaling Strategy | Considerations |
-|-----------|-----------------|----------------|
-| UI | Multiple instances behind LB | Session state in Redis |
-| Podium API | Multiple instances (stateless) | Easy to scale |
-| Database | Read replicas, sharding | Most critical bottleneck |
-| Workers | Thread pool executor (APScheduler) | For concurrent check execution |
-
-### Performance Optimization
-
-1. **Connection Pooling**: Reuse database connections
-2. **Query Optimization**: Indexes, query planning
-3. **Caching**: Redis for frequently accessed data
-4. **Async I/O**: Non-blocking operations
-5. **Batch Processing**: Group operations
-
----
-
-## Future Architecture Enhancements
-
-### Roadmap Items
-
-**Q4 2024:**
-- Prometheus metrics integration
-- Health check endpoints
-- Advanced reporting module
-
-**Q1 2025:**
-- Real-time streaming with WebSockets
-- In-process scheduler (APScheduler) - **Current implementation**
-- Distributed task queue (Celery) - **Not needed currently, future option if scaling requires it**
-- Alert service with multiple channels
-
-**Q2 2025:**
-- Plugin system architecture
-- Multi-database federation
-- Advanced caching layer
-
-**Q3 2025:**
-- Multi-tenancy support
-- Microservices decomposition
-- Event-driven architecture
-
----
-
-## Further Reading
-
-- [Quick Start Guide](quickstart.md)
-- [API Reference](api.md)
-- [Development Guide](development.md)
-- [Deployment Guide](../DEPLOYMENT.md)
-
----
-
-**Last Updated**: October 2024
-**Architecture Version**: 1.0
+**Last Updated**: March 2026

@@ -20,7 +20,7 @@ import pytest
 try:
     import asyncpg
 except ImportError:
-    pytest.skip("asyncpg not installed", allow_module_level=True)
+    pytest.skip("asyncpg not installed", allow_module_level=True)  # type: ignore[arg-type]
 
 
 # Test configuration

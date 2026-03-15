@@ -2,7 +2,9 @@
 Configuration management for DataMetronome Podium.
 """
 
-from pydantic import Field, field_validator
+from typing import Literal
+
+from pydantic import ConfigDict, Field, field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -14,86 +16,120 @@ class Settings(BaseSettings):
     version: str = "0.1.0"
     # Logging
     log_level: str = Field(default="INFO")
-    debug: bool = Field(default=False, env="DATAMETRONOME_DEBUG")
+    debug: bool = Field(default=False, validation_alias="DATAMETRONOME_DEBUG")
 
     # Server
-    host: str = Field(default="0.0.0.0", env="DATAMETRONOME_HOST")
-    port: int = Field(default=8001, env="DATAMETRONOME_PORT", ge=1, le=65535)
+    host: str = Field(default="0.0.0.0", validation_alias="DATAMETRONOME_HOST")
+    port: int = Field(default=8001, validation_alias="DATAMETRONOME_PORT", ge=1, le=65535)
 
     # Security
     secret_key: str = Field(
         default="test-secret-key-for-development-only-32-chars",
-        env="DATAMETRONOME_SECRET_KEY",
+        validation_alias="DATAMETRONOME_SECRET_KEY",
         min_length=32,
     )
     algorithm: str = "HS256"
     access_token_expire_minutes: int = Field(
         default=30,
-        env="DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES",
+        validation_alias="DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES",
         ge=1,
     )
 
     # Database
     database_url: str = Field(
-        default="sqlite:///./data/datametronome.db",
-        env="DATAMETRONOME_DATABASE_URL",
+        default="postgresql://testuser:testpass@localhost:5432/datametronome_test",
+        validation_alias="DATAMETRONOME_DATABASE_URL",
     )
 
     # CORS
     allowed_origins: list[str] | str = Field(
         default=["http://localhost:3000", "http://localhost:8501"],
-        env="DATAMETRONOME_ALLOWED_ORIGINS",
+        validation_alias="DATAMETRONOME_ALLOWED_ORIGINS",
     )
 
     # Scheduler
-    scheduler_enabled: bool = Field(default=True, env="DATAMETRONOME_SCHEDULER_ENABLED")
+    scheduler_enabled: bool = Field(default=True, validation_alias="DATAMETRONOME_SCHEDULER_ENABLED")
     scheduler_timezone: str = Field(
         default="UTC",
-        env="DATAMETRONOME_SCHEDULER_TIMEZONE",
+        validation_alias="DATAMETRONOME_SCHEDULER_TIMEZONE",
     )
     scheduler_max_instances: int = Field(
         default=3,
-        env="DATAMETRONOME_SCHEDULER_MAX_INSTANCES",
+        validation_alias="DATAMETRONOME_SCHEDULER_MAX_INSTANCES",
         ge=1,
     )
     scheduler_max_workers: int = Field(
         default=10,
-        env="DATAMETRONOME_SCHEDULER_MAX_WORKERS",
+        validation_alias="DATAMETRONOME_SCHEDULER_MAX_WORKERS",
         ge=1,
     )
 
     # Job Queue
-    job_queue_size: int = Field(default=1000, env="DATAMETRONOME_JOB_QUEUE_SIZE", ge=1)
-    worker_pool_size: int = Field(default=4, env="DATAMETRONOME_WORKER_POOL_SIZE", ge=1)
+    job_queue_size: int = Field(default=1000, validation_alias="DATAMETRONOME_JOB_QUEUE_SIZE", ge=1)
+    worker_pool_size: int = Field(default=4, validation_alias="DATAMETRONOME_WORKER_POOL_SIZE", ge=1)
 
-    # Metrics
-    metrics_enabled: bool = Field(default=True, env="DATAMETRONOME_METRICS_ENABLED")
-    metrics_retention_days: int = Field(
-        default=90,
-        env="DATAMETRONOME_METRICS_RETENTION_DAYS",
+    # Celery / Worker
+    dispatch_mode: Literal["inline", "celery", "remote"] = Field(
+        default="inline",
+        description="Check dispatch mode: inline | celery | remote",
+        validation_alias="DATAMETRONOME_DISPATCH_MODE",
+    )
+    celery_broker_url: str = Field(
+        default="amqp://guest:guest@rabbitmq:5672//",
+        validation_alias="DATAMETRONOME_CELERY_BROKER_URL",
+    )
+    celery_result_backend: str = Field(
+        default="redis://redis:6379/0",
+        validation_alias="DATAMETRONOME_CELERY_RESULT_BACKEND",
+    )
+    redis_url: str = Field(
+        default="redis://redis:6379/0",
+        validation_alias="DATAMETRONOME_REDIS_URL",
+    )
+    celery_concurrency: int = Field(
+        default=4,
+        validation_alias="DATAMETRONOME_CELERY_CONCURRENCY",
         ge=1,
     )
 
-    # AI Agent / ADK Configuration
-    adk_api_key: str = Field(
+    # Metrics
+    metrics_enabled: bool = Field(default=True, validation_alias="DATAMETRONOME_METRICS_ENABLED")
+    metrics_retention_days: int = Field(
+        default=90,
+        validation_alias="DATAMETRONOME_METRICS_RETENTION_DAYS",
+        ge=1,
+    )
+
+    # AI Agent Configuration
+    ai_provider: str = Field(
+        default="ollama",
+        description="AI provider: anthropic | openai | gemini | ollama",
+        validation_alias="DATAMETRONOME_AI_PROVIDER",
+    )
+    ai_model: str = Field(
+        default="qwen2.5",
+        description="Model name for the main agents (e.g. claude-sonnet-4-6, gpt-4o, qwen2.5)",
+        validation_alias="DATAMETRONOME_AI_MODEL",
+    )
+    ai_api_key: str = Field(
         default="",
-        env="DATAMETRONOME_ADK_API_KEY",
-        description="API key for ADK agent (not needed for Ollama)",
+        description="API key for the AI provider (not needed for Ollama)",
+        validation_alias="DATAMETRONOME_AI_API_KEY",
     )
-    adk_model: str = Field(
-        default="ollama_chat/qwen2.5",
-        env="DATAMETRONOME_ADK_MODEL",
-        description="ADK model identifier (e.g., 'ollama_chat/qwen2.5' for Ollama or 'gemini-2.0-flash-exp' for Gemini)",
+    ai_router_model: str | None = Field(
+        default=None,
+        description="Optional cheaper model for the router agent (e.g. claude-haiku-4-5). If unset, uses ai_model.",
+        validation_alias="DATAMETRONOME_AI_ROUTER_MODEL",
     )
-    adk_api_url: str = Field(
-        default="https://generativelanguage.googleapis.com/v1beta",
-        env="DATAMETRONOME_ADK_API_URL",
-        description="ADK API endpoint URL (not used for Ollama)",
+    ai_base_url: str | None = Field(
+        default=None,
+        description="Custom base URL (required for Ollama: http://localhost:11434/v1)",
+        validation_alias="DATAMETRONOME_AI_BASE_URL",
     )
     ollama_api_base: str = Field(
         default="http://localhost:11434",
-        env="OLLAMA_API_BASE",
-        description="Ollama API base URL (e.g., 'http://192.168.0.35:11434' for remote instance)",
+        description="Ollama API base URL (legacy compat). Used when ai_provider=ollama and ai_base_url is unset.",
+        validation_alias="OLLAMA_API_BASE",
     )
 
     @field_validator("log_level")
@@ -130,11 +166,12 @@ class Settings(BaseSettings):
             return ["http://localhost:3000"]
         return v
 
-    class Config:
-        env_file = ".env"
-        case_sensitive = False
-        env_prefix = "DATAMETRONOME_"
-        extra = "ignore"
+    model_config = ConfigDict(
+        env_file=".env",  # type: ignore[invalid-key]
+        case_sensitive=False,  # type: ignore[invalid-key]
+        env_prefix="DATAMETRONOME_",  # type: ignore[invalid-key]
+        extra="ignore",
+    )
 
 
 # Global settings instance

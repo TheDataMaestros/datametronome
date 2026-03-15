@@ -44,7 +44,57 @@ class PostgresWriteOnlyPulse(Pulse, Writable):
         self._password = password
         self._kwargs = kwargs
         self._pool = None
+        self._txn_conn = None
+        self._txn = None
         self._sql = PostgresSQLBuilder()
+
+    async def _get_conn(self):
+        """Get the active transaction connection, or acquire from pool."""
+        if self._txn_conn is not None:
+            return self._txn_conn, False
+        if not self._pool:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        conn = await self._pool.acquire()
+        return conn, True
+
+    async def _release_conn(self, conn, should_release):
+        """Release connection back to pool if not in a transaction."""
+        if should_release and self._pool:
+            await self._pool.release(conn)
+
+    async def begin_transaction(self) -> None:
+        """Begin a transaction. Acquires a dedicated connection from the pool."""
+        if not self._pool:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        if self._txn_conn is not None:
+            raise RuntimeError("Transaction already active.")
+        self._txn_conn = await self._pool.acquire()
+        self._txn = self._txn_conn.transaction()
+        await self._txn.start()
+
+    async def commit_transaction(self) -> None:
+        """Commit the current transaction and release the connection."""
+        if self._txn is None:
+            raise RuntimeError("No active transaction to commit.")
+        try:
+            await self._txn.commit()
+        finally:
+            if self._pool and self._txn_conn:
+                await self._pool.release(self._txn_conn)
+            self._txn = None
+            self._txn_conn = None
+
+    async def rollback_transaction(self) -> None:
+        """Roll back the current transaction and release the connection."""
+        if self._txn is None:
+            raise RuntimeError("No active transaction to rollback.")
+        try:
+            await self._txn.rollback()
+        finally:
+            if self._pool and self._txn_conn:
+                await self._pool.release(self._txn_conn)
+            self._txn = None
+            self._txn_conn = None
 
     async def connect(self):
         """Establish connection pool to PostgreSQL."""
@@ -169,45 +219,44 @@ class PostgresWriteOnlyPulse(Pulse, Writable):
                 columns=columns,
             )
 
-    async def execute(self, query: str, *args, **kwargs) -> str:
+    async def execute(self, sql: str, params: list | None = None) -> int:
+        """Execute a SQL statement. Returns rows affected."""
+        if not self._pool:
+            raise RuntimeError("Not connected to database. Call connect() first.")
+        conn, should_release = await self._get_conn()
+        try:
+            if params:
+                status = await conn.execute(sql, *params)
+            else:
+                status = await conn.execute(sql)
+            return self._parse_rows_affected(status)
+        finally:
+            await self._release_conn(conn, should_release)
+
+    @staticmethod
+    def _parse_rows_affected(status: str) -> int:
+        """Parse rows affected from asyncpg status string.
+
+        Examples: 'INSERT 0 1' -> 1, 'DELETE 3' -> 3, 'CREATE TABLE' -> 0
         """
-        Execute a SQL command that doesn't return results.
+        parts = status.split()
+        if len(parts) >= 2:
+            try:
+                return int(parts[-1])
+            except ValueError:
+                return 0
+        return 0
 
-        Args:
-            query: SQL command to execute
-            *args: Positional parameters
-            **kwargs: Named parameters
-
-        Returns:
-            Status message from the command
-
-        Raises:
-            RuntimeError: If not connected to the database
-            asyncpg.PostgresError: If the command fails
-        """
+    async def execute_many(self, sql: str, params_list: list[list]) -> None:
+        """Execute a SQL command multiple times with different parameters."""
         if not self._pool:
             raise RuntimeError("Not connected to database. Call connect() first.")
 
-        async with self._pool.acquire() as conn:
-            return await conn.execute(query, *args, **kwargs)
-
-    async def execute_many(self, query: str, args_list: list[tuple]) -> None:
-        """
-        Execute a SQL command multiple times with different parameters.
-
-        Args:
-            query: SQL command to execute
-            args_list: list of parameter tuples
-
-        Raises:
-            RuntimeError: If not connected to the database
-            asyncpg.PostgresError: If any command fails
-        """
-        if not self._pool:
-            raise RuntimeError("Not connected to database. Call connect() first.")
-
-        async with self._pool.acquire() as conn:
-            await conn.executemany(query, args_list)
+        conn, should_release = await self._get_conn()
+        try:
+            await conn.executemany(sql, params_list)
+        finally:
+            await self._release_conn(conn, should_release)
 
     async def create_table(self, table_name: str, columns: list[dict]) -> None:
         """

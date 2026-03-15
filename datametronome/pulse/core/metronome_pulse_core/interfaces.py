@@ -158,17 +158,17 @@ class Writable(ABC):
                 await self.write([param], "temp_table")
         return {"affected_rows": len(queries) if queries else 0}
 
-    async def begin_transaction(self) -> bool:
+    async def begin_transaction(self) -> None:
         """Begin a transaction (default implementation)."""
-        return True
+        pass
 
-    async def commit_transaction(self) -> bool:
+    async def commit_transaction(self) -> None:
         """Commit a transaction (default implementation)."""
-        return True
+        pass
 
-    async def rollback_transaction(self) -> bool:
+    async def rollback_transaction(self) -> None:
         """Rollback a transaction (default implementation)."""
-        return True
+        pass
 
 
 # Additional interface classes for backward compatibility

@@ -8,7 +8,6 @@ from pathlib import Path
 from unittest.mock import AsyncMock, patch
 
 import pytest
-from datametronome_podium.services.clef_scheduler import execute_scheduled_clef
 from datametronome_podium.services.env_interpolator import interpolate_yaml_data
 from datametronome_podium.services.scheduler_persistence import (
     create_scheduler_job,

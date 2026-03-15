@@ -49,6 +49,7 @@ Welcome to the DataMetronome documentation!
 - **[Deployment Guide](../DEPLOYMENT.md)** - Production deployment
 - **[Contributing Guidelines](../CONTRIBUTING.md)** - How to contribute
 - **[Roadmap](../ROADMAP.md)** - Future plans
+- **[Multi-Agent Architecture Plan](MULTI_AGENT_PLAN.md)** - Chat agent evolution to multi-agent routing and orchestration
 
 ## 🎯 Quick Links by Role
 
