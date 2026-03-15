@@ -28,11 +28,11 @@ async def import_demo():
     configure_paths()
     podium_db_path = configure_env()
 
-    from datametronome_podium.core.database import (  # type: ignore # noqa: E402
+    from datametronome_podium.core.database import (  # noqa: E402
         get_db,
         init_db,
     )
-    from datametronome_podium.services.stave_yaml_loader import (  # type: ignore # noqa: E402
+    from datametronome_podium.services.stave_yaml_loader import (  # noqa: E402
         import_staves_from_yaml,
         load_staves_from_yaml,
     )

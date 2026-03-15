@@ -21,7 +21,7 @@ async def verify_db():
     configure_paths()
     db_path = configure_env()
 
-    from datametronome_podium.core.database import (  # type: ignore # noqa: E402
+    from datametronome_podium.core.database import (  # noqa: E402
         get_db,
         init_db,
     )

@@ -73,7 +73,8 @@ class PostgresPulse(Pulse, Readable, Writable):
         try:
             await self._txn.commit()
         finally:
-            await self._pool.release(self._txn_conn)
+            if self._pool and self._txn_conn:
+                await self._pool.release(self._txn_conn)
             self._txn = None
             self._txn_conn = None
 
@@ -84,7 +85,8 @@ class PostgresPulse(Pulse, Readable, Writable):
         try:
             await self._txn.rollback()
         finally:
-            await self._pool.release(self._txn_conn)
+            if self._pool and self._txn_conn:
+                await self._pool.release(self._txn_conn)
             self._txn = None
             self._txn_conn = None
 

@@ -49,12 +49,14 @@ class PostgresReadOnlyPulse(Pulse, Readable):
         """Get the active transaction connection, or acquire from pool."""
         if self._txn_conn is not None:
             return self._txn_conn, False
+        if not self._pool:
+            raise RuntimeError("Not connected to database. Call connect() first.")
         conn = await self._pool.acquire()
         return conn, True
 
     async def _release_conn(self, conn, should_release):
         """Release connection back to pool if not in a transaction."""
-        if should_release:
+        if should_release and self._pool:
             await self._pool.release(conn)
 
     async def connect(self):
