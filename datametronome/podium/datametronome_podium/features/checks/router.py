@@ -135,6 +135,8 @@ async def update_check(check_id: str, check_in: CheckUpdate):
         update_data["details"] = json.dumps(update_data["details"])
     await repo.update(check_id, update_data)
     updated = await repo.get(check_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Check not found")
     data = updated.model_dump()
     if isinstance(data.get("details"), str):
         try:

@@ -55,9 +55,10 @@ Respond ONLY with the JSON object. No prose."""
 
 def build_router_agent(model: Model) -> Agent[None, RoutingDecision]:
     """Build a RouterAgent with the given model."""
-    return Agent(
+    agent: Agent[None, RoutingDecision] = Agent(  # type: ignore[assignment]
         model=model,
         output_type=RoutingDecision,
         system_prompt=_ROUTER_SYSTEM_PROMPT,
         retries=3,
     )
+    return agent

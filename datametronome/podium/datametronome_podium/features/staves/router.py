@@ -127,6 +127,8 @@ async def update_stave(stave_id: str, stave_in: StaveUpdate):
     update_data["updated_at"] = now
     await repo.update(stave_id, update_data)
     updated = await repo.get(stave_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Stave not found")
     data = updated.model_dump()
     if isinstance(data.get("connection_config"), str):
         try:

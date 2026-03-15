@@ -21,21 +21,21 @@ def test_routing_decision_invalid_intent():
     from datametronome_podium.services.agents.router import RoutingDecision
 
     with pytest.raises(ValidationError):
-        RoutingDecision(intent="unknown_intent", mode="single", agents=["report"], reasoning="")
+        RoutingDecision(intent="unknown_intent", mode="single", agents=["report"], reasoning="")  # type: ignore[arg-type]
 
 
 def test_routing_decision_invalid_mode():
     from datametronome_podium.services.agents.router import RoutingDecision
 
     with pytest.raises(ValidationError):
-        RoutingDecision(intent="quick", mode="broadcast", agents=["report"], reasoning="")
+        RoutingDecision(intent="quick", mode="broadcast", agents=["report"], reasoning="")  # type: ignore[arg-type]
 
 
 def test_routing_decision_invalid_agent():
     from datametronome_podium.services.agents.router import RoutingDecision
 
     with pytest.raises(ValidationError):
-        RoutingDecision(intent="quick", mode="single", agents=["hacker"], reasoning="")
+        RoutingDecision(intent="quick", mode="single", agents=["hacker"], reasoning="")  # type: ignore[arg-type]
 
 
 @pytest.mark.asyncio

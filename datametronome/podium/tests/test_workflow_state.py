@@ -65,6 +65,7 @@ async def test_load_checkpoint():
         return_value=[fake_row],
     ):
         result = await load_checkpoint("cp-1")
+        assert result is not None
         assert result["id"] == "cp-1"
         assert result["status"] == "running"
 

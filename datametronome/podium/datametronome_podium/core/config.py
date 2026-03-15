@@ -167,9 +167,9 @@ class Settings(BaseSettings):
         return v
 
     model_config = ConfigDict(
-        env_file=".env",
-        case_sensitive=False,
-        env_prefix="DATAMETRONOME_",
+        env_file=".env",  # type: ignore[invalid-key]
+        case_sensitive=False,  # type: ignore[invalid-key]
+        env_prefix="DATAMETRONOME_",  # type: ignore[invalid-key]
         extra="ignore",
     )
 

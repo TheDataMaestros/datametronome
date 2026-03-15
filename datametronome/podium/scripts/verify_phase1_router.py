@@ -56,7 +56,7 @@ def main():
     args = parser.parse_args()
 
     if args.dry_run:
-        from datametronome_podium.services.intent_router import (
+        from datametronome_podium.services.intent_router import (  # type: ignore[unresolved-import]
             classify_intent,
             evaluate_classifier_against_dataset,
         )
@@ -64,7 +64,7 @@ def main():
         print("Dry run: intent classifier + Phase 2 agent resolution\n")
         result = evaluate_classifier_against_dataset()
         print(f"Dataset accuracy: {result.get('accuracy', 0):.1%} ({result.get('correct')}/{result.get('total')})")
-        from datametronome_podium.services.orchestrator import plan_orchestration
+        from datametronome_podium.services.orchestrator import plan_orchestration  # type: ignore[unresolved-import]
 
         print("\nIntent → Agent mapping:")
         for msg, exp_intent, exp_agent in [

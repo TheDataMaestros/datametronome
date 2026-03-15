@@ -8,7 +8,7 @@ class CheckRepo:
     def __init__(self, executor: QueryExecutor) -> None:
         self.db = executor
 
-    async def list(self, limit: int = 100, offset: int = 0) -> list[Check]:
+    async def list(self, limit: int = 100, offset: int = 0) -> list[Check]:  # type: ignore[invalid-type-form]
         rows = await self.db.select(
             "checks", order_by="timestamp DESC", limit=limit, offset=offset
         )
@@ -27,14 +27,14 @@ class CheckRepo:
     async def delete(self, check_id: str) -> int:
         return await self.db.delete("checks", where={"id": check_id})
 
-    async def list_by_clef(self, clef_id: str, limit: int = 10, offset: int = 0) -> list[Check]:
+    async def list_by_clef(self, clef_id: str, limit: int = 10, offset: int = 0) -> list[Check]:  # type: ignore[invalid-type-form]
         rows = await self.db.query(
             "SELECT * FROM checks WHERE clef_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
             [clef_id, limit, offset]
         )
         return [Check(**row) for row in rows]
 
-    async def list_by_stave(self, stave_id: str, limit: int = 10, offset: int = 0) -> list[Check]:
+    async def list_by_stave(self, stave_id: str, limit: int = 10, offset: int = 0) -> list[Check]:  # type: ignore[invalid-type-form]
         rows = await self.db.query(
             "SELECT * FROM checks WHERE stave_id = ? ORDER BY timestamp DESC LIMIT ? OFFSET ?",
             [stave_id, limit, offset]

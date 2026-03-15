@@ -64,7 +64,7 @@ class ConnectionTester:
                 }
 
             connection_time = time.time() - start_time
-            result["connection_time"] = connection_time
+            result["connection_time"] = connection_time  # type: ignore[assignment]
 
             return result
 
@@ -235,13 +235,16 @@ class ConnectionTester:
             # Get basic info
             cursor = conn.cursor()
             cursor.execute("SELECT VERSION();")
-            version = cursor.fetchone()[0]
+            row = cursor.fetchone()
+            version = row[0] if row else None  # type: ignore[index]
 
             cursor.execute("SELECT COUNT(*) FROM information_schema.schemata;")
-            schema_count = cursor.fetchone()[0]
+            row = cursor.fetchone()
+            schema_count = row[0] if row else None  # type: ignore[index]
 
             cursor.execute("SELECT COUNT(*) FROM information_schema.tables;")
-            table_count = cursor.fetchone()[0]
+            row = cursor.fetchone()
+            table_count = row[0] if row else None  # type: ignore[index]
 
             cursor.close()
             conn.close()

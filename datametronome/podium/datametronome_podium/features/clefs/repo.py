@@ -8,7 +8,7 @@ class ClefRepo:
     def __init__(self, executor: QueryExecutor) -> None:
         self.db = executor
 
-    async def list(self, limit: int = 50, offset: int = 0) -> list[Clef]:
+    async def list(self, limit: int = 50, offset: int = 0) -> list[Clef]:  # type: ignore[invalid-type-form]
         rows = await self.db.select(
             "clefs", order_by="created_at DESC", limit=limit, offset=offset
         )
@@ -27,6 +27,6 @@ class ClefRepo:
     async def delete(self, clef_id: str) -> int:
         return await self.db.delete("clefs", where={"id": clef_id})
 
-    async def list_by_stave(self, stave_id: str) -> list[Clef]:
+    async def list_by_stave(self, stave_id: str) -> list[Clef]:  # type: ignore[invalid-type-form]
         rows = await self.db.select("clefs", where={"stave_id": stave_id})
         return [Clef(**row) for row in rows]

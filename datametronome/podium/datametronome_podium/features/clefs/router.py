@@ -51,7 +51,7 @@ async def get_check_types():
     for name, meta in CHECK_TYPE_METADATA.items():
         entry = {"name": name, **meta}
         check_types.append(entry)
-        by_tier[meta["tier"]].append(entry)
+        by_tier[int(meta["tier"])].append(entry)
     return {"check_types": check_types, "by_tier": by_tier}
 
 
@@ -105,6 +105,8 @@ async def update_clef(clef_id: str, clef_in: ClefUpdate):
         update_data["config"] = json.dumps(update_data["config"])
     await repo.update(clef_id, update_data)
     updated = await repo.get(clef_id)
+    if not updated:
+        raise HTTPException(status_code=404, detail="Clef not found")
     data = updated.model_dump()
     if isinstance(data.get("config"), str):
         try:

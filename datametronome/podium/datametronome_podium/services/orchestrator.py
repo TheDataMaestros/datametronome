@@ -296,7 +296,7 @@ async def _run_parallel(
             if checkpoint_id:
                 await log_event(checkpoint_id, "error", None, {"error": str(r)})
         else:
-            agent_type, text = r
+            agent_type, text = r  # type: ignore[not-iterable]
             if text:
                 parts.append(f"**{agent_type.title()}:**\n{text}")
             if checkpoint_id:

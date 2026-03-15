@@ -70,7 +70,7 @@ def create_demo_sqlite_database():
     )
 
     # Insert sample users
-    users_data = [
+    users_data: list[tuple[str | None, str, int, str]] = [
         ("john.doe@example.com", "John Doe", 25, "active"),
         ("jane.smith@example.com", "Jane Smith", 30, "active"),
         ("bob.wilson@example.com", "Bob Wilson", 35, "active"),
