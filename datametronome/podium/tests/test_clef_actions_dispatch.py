@@ -14,11 +14,14 @@ def _make_app():
 
 
 def test_run_now_returns_202_with_job_id():
+    from datametronome_podium.core.check_dispatcher import JobStatus
+
     app = _make_app()
     client = TestClient(app)
 
     mock_dispatcher = AsyncMock()
     mock_dispatcher.dispatch = AsyncMock(return_value="job-uuid-123")
+    mock_dispatcher.get_status = AsyncMock(return_value=JobStatus.PENDING)
 
     with patch("datametronome_podium.api.v1.endpoints.clef_actions.get_dispatcher", return_value=mock_dispatcher):
         response = client.post("/clef-actions/clef-1/run-now")
@@ -29,6 +32,7 @@ def test_run_now_returns_202_with_job_id():
     assert data["clef_id"] == "clef-1"
     assert data["status"] == "pending"
     mock_dispatcher.dispatch.assert_awaited_once_with("clef-1")
+    mock_dispatcher.get_status.assert_awaited_once_with("job-uuid-123")
 
 
 def test_run_now_dispatch_failure_returns_500():

@@ -2,7 +2,6 @@
 Clef action endpoints - Run now and view results functionality.
 """
 
-import json
 import logging
 from typing import Any, Dict
 
@@ -22,11 +21,12 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
     try:
         dispatcher = get_dispatcher()
         job_id = await dispatcher.dispatch(clef_id)
+        job_status = await dispatcher.get_status(job_id)
         logger.info("Dispatched clef %s, job_id=%s", clef_id, job_id)
         return {
             "job_id": job_id,
             "clef_id": clef_id,
-            "status": "pending",
+            "status": job_status.value,
         }
     except Exception as e:
         logger.error("Failed to dispatch clef %s: %s", clef_id, e)

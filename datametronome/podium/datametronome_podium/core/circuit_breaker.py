@@ -47,7 +47,9 @@ class StaveCircuitBreaker:
 
     async def record_failure(self, stave_id: str) -> bool:
         """Increment failure counter. Returns True if circuit just tripped."""
-        count = await self._redis.incr(self._key(stave_id))
+        key = self._key(stave_id)
+        count = await self._redis.incr(key)
+        await self._redis.expire(key, 86400)  # 24h TTL prevents unbounded key growth
 
         if count >= self._threshold:
             logger.warning(
