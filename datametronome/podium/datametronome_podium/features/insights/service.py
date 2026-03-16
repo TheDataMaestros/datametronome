@@ -263,29 +263,30 @@ class InsightPipelineService:
             )
             return None
 
-        stave_rows = await self.executor.query(
-            "SELECT * FROM staves WHERE id = ?", [stave_id]
-        )
-        if not stave_rows:
-            return None
-        stave = deserialize_stave(stave_rows[0])
-        tester = ConnectionTester()
-        connector = await tester.get_connector(stave, read_only=True)
-
-        config = stave.connection_config or {}
-        ds_type = (stave.data_source_type or "").lower()
-        schema_prefix = ""
-        if ds_type in ("postgres", "postgresql"):
-            pg_schema = config.get("schema", "public")
-            schema_prefix = f'"{pg_schema}".'
-
-        deps = BIQueryDeps(
-            connector=connector,
-            schema_prefix=schema_prefix,
-            archetype=archetype,
-        )
-
+        connector = None
         try:
+            stave_rows = await self.executor.query(
+                "SELECT * FROM staves WHERE id = ?", [stave_id]
+            )
+            if not stave_rows:
+                return None
+            stave = deserialize_stave(stave_rows[0])
+            tester = ConnectionTester()
+            connector = await tester.get_connector(stave, read_only=True)
+
+            config = stave.connection_config or {}
+            ds_type = (stave.data_source_type or "").lower()
+            schema_prefix = ""
+            if ds_type in ("postgres", "postgresql"):
+                pg_schema = config.get("schema", "public")
+                schema_prefix = f'"{pg_schema}".'
+
+            deps = BIQueryDeps(
+                connector=connector,
+                schema_prefix=schema_prefix,
+                archetype=archetype,
+            )
+
             model = build_heavy_model_from_settings()
             agent = build_bi_agent(model)
             prompt = (
@@ -303,10 +304,11 @@ class InsightPipelineService:
             )
             return None
         finally:
-            try:
-                await connector.close()
-            except Exception:
-                pass
+            if connector is not None:
+                try:
+                    await connector.close()
+                except Exception:
+                    pass
 
     async def _run_both_tracks(
         self,
@@ -314,28 +316,29 @@ class InsightPipelineService:
         snapshot: BaselineSnapshot,
         profile: DataProfile | None,
     ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-        """Run Track 1 (data quality) and Track 2 (BI) concurrently."""
-        import asyncio as _asyncio
+        """Run Track 1 (data quality) then Track 2 (BI) sequentially.
 
-        quality_task = self.analyze_business(stave_id, snapshot, profile)
-        bi_task = self._analyze_business_intelligence(stave_id, snapshot, profile)
-        results = await _asyncio.gather(
-            quality_task, bi_task, return_exceptions=True
-        )
-        quality = results[0] if not isinstance(results[0], Exception) else None
-        bi = results[1] if not isinstance(results[1], Exception) else None
+        Sequential execution avoids Celery prefork event loop issues where
+        concurrent asyncio tasks can fail if a pydantic-ai / httpx client
+        retains a reference to the previous task's closed event loop.
+        """
+        quality: dict[str, Any] | None = None
+        bi: dict[str, Any] | None = None
 
-        if isinstance(results[0], Exception):
+        try:
+            quality = await self.analyze_business(stave_id, snapshot, profile)
+        except Exception as exc:
             logger.warning(
-                "Track 1 (data quality) failed for stave %s: %s",
-                stave_id,
-                results[0],
+                "Track 1 (data quality) failed for stave %s: %s", stave_id, exc
             )
-        if isinstance(results[1], Exception):
+
+        try:
+            bi = await self._analyze_business_intelligence(
+                stave_id, snapshot, profile
+            )
+        except Exception as exc:
             logger.warning(
-                "Track 2 (BI) failed for stave %s: %s",
-                stave_id,
-                results[1],
+                "Track 2 (BI) failed for stave %s: %s", stave_id, exc
             )
 
         return quality, bi
