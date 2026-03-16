@@ -71,12 +71,6 @@ Be precise. Your output is used to generate SQL — wrong column role mappings p
 """
 
 
-class Phase1Deps:
-    def __init__(self, discovery: dict, archetype: dict) -> None:
-        self.discovery = discovery
-        self.archetype = archetype
-
-
 def build_phase1_agent(model: Any) -> Agent:
     """Agent that reasons over schema data and produces SchemaInterpretation. No tools."""
     return Agent(
@@ -297,6 +291,8 @@ def build_phase3_agent(model: Any) -> Agent:
             return json.dumps(
                 {"error": f"No rank_query for entity: {entity_type}"},
             )
+        # Fetch 2x the requested limit so the agent can see both top and bottom performers
+        # without a second query (the agent slices the result itself).
         if "{limit}" in sql:
             sql = sql.replace("{limit}", str(limit * 2))
         rows = await _execute_sql(ctx.deps.connector, sql)

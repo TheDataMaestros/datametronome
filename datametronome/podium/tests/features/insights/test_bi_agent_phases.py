@@ -11,9 +11,8 @@ from datametronome_podium.services.agents.bi_models import (
 
 # ── run_raw_query enforcement ─────────────────────────────────────────────────
 
-@pytest.mark.asyncio
-async def test_run_raw_query_appends_limit():
-    """run_raw_query appends LIMIT 1000 when not present."""
+def test_enforce_limit_appends_when_missing():
+    """_enforce_limit appends LIMIT 1000 when not present."""
     from datametronome_podium.services.agents.business_intelligence import _enforce_limit
 
     sql = "SELECT * FROM orders"
@@ -21,9 +20,8 @@ async def test_run_raw_query_appends_limit():
     assert "LIMIT 1000" in result.upper()
 
 
-@pytest.mark.asyncio
-async def test_run_raw_query_preserves_existing_limit():
-    """run_raw_query does not add a second LIMIT when one already exists."""
+def test_enforce_limit_preserves_existing():
+    """_enforce_limit does not add a second LIMIT when one already exists."""
     from datametronome_podium.services.agents.business_intelligence import _enforce_limit
 
     sql = "SELECT * FROM orders LIMIT 50"
