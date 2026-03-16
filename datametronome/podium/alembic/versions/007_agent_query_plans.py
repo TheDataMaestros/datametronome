@@ -5,11 +5,14 @@ Revises: 006
 Create Date: 2026-03-16
 """
 
+import logging
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 from dialect_ops import DialectAwareOps as dao
+
+logger = logging.getLogger(__name__)
 
 revision = "007"
 down_revision = "006"
@@ -51,10 +54,10 @@ def upgrade() -> None:
 def downgrade() -> None:
     # Use dao.execute throughout (not op.execute) for dialect-safe execution
     dao.execute("DROP TABLE IF EXISTS stave_query_plans")
-    # SQLite does not support DROP COLUMN IF EXISTS before 3.35 -- wrap defensively
+    # DROP COLUMN is best-effort: SQLite < 3.35 cannot do it at all; wrap for safety.
     try:
         dao.execute(
-            "ALTER TABLE data_profiles DROP COLUMN IF EXISTS schema_interpretation"
+            "ALTER TABLE data_profiles DROP COLUMN schema_interpretation"
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        logger.warning("Could not drop schema_interpretation column (safe to ignore on SQLite): %s", exc)
