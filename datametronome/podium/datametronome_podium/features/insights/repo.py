@@ -45,6 +45,7 @@ _SNAPSHOT_JSON_FIELDS = ("table_metrics", "column_stats")
 _BUSINESS_REPORT_JSON_FIELDS = (
     "kpis", "top_performers", "bottom_performers", "trends", "opportunities", "risks"
 )
+_PLAN_JSON_FIELDS = ("kpi_queries", "performer_queries")
 
 
 def _deserialize_plan(row: dict) -> StaveQueryPlan:
@@ -342,20 +343,10 @@ class InsightsRepo:
         return _deserialize_plan(rows[0])
 
     async def create_plan(self, plan: StaveQueryPlan) -> int:
-        return await self.db.insert(
-            "stave_query_plans",
-            {
-                "id": plan.id,
-                "stave_id": plan.stave_id,
-                "tenant_id": plan.tenant_id,
-                "schema_fingerprint": plan.schema_fingerprint,
-                "kpi_queries": json.dumps(plan.kpi_queries),
-                "performer_queries": json.dumps(plan.performer_queries),
-                "generated_by_model": plan.generated_by_model,
-                "generated_at": plan.generated_at,
-                "invalidated_at": plan.invalidated_at,
-            },
-        )
+        data = plan.model_dump()
+        for field in _PLAN_JSON_FIELDS:
+            data[field] = _json_field(data[field])
+        return await self.db.insert("stave_query_plans", data)
 
     async def invalidate_plan(self, stave_id: str, now: str) -> int:
         """Set invalidated_at on the current valid plan for a stave."""

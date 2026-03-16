@@ -78,7 +78,12 @@ async def test_create_plan(repo, mock_executor):
     mock_executor.insert.assert_called_once()
     call_args = mock_executor.insert.call_args
     assert call_args[0][0] == "stave_query_plans"
-    assert "kpi_queries" in call_args[0][1]
+    row = call_args[0][1]
+    assert "kpi_queries" in row
+    # kpi_queries must be JSON-serialized (a string), not a raw dict
+    assert isinstance(row["kpi_queries"], str)
+    import json
+    assert json.loads(row["kpi_queries"]) == {"monthly_revenue": "SELECT 1 as value"}
 
 
 @pytest.mark.asyncio
