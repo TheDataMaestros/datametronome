@@ -1,0 +1,173 @@
+<h2>Integration: How InsightAgent Fits</h2>
+<p class="subtitle">Wiring into the orchestrator, router, and Celery workers</p>
+
+<div style="background: #1a1a2e; border-radius: 12px; padding: 32px; font-family: system-ui, -apple-system, sans-serif; color: #e0e0e0;">
+
+  <!-- Flow 1: Auto-scan -->
+  <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #7eb8f7; margin-bottom: 12px;">Flow 1: Auto-Scan on Stave Creation</div>
+
+  <div style="background: #2a2a4a; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px;">
+      <div style="background: #3a3a5a; border-radius: 6px; padding: 8px 12px;">
+        User creates stave
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: #3a3a5a; border-radius: 6px; padding: 8px 12px;">
+        <span style="color: #7eb8f7;">POST /staves/</span>
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: #3a3a5a; border-radius: 6px; padding: 8px 12px;">
+        Connection tested OK
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: rgba(90,122,247,0.2); border: 1px solid #5a7af7; border-radius: 6px; padding: 8px 12px; color: #b8d4f8;">
+        Dispatch Celery task<br>
+        <code style="font-size: 11px; color: #7eb8f7;">run_auto_scan(stave_id)</code>
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: rgba(90,122,247,0.2); border: 1px solid #5a7af7; border-radius: 6px; padding: 8px 12px; color: #b8d4f8;">
+        InsightAgent runs<br>
+        stages 1-3 + 5
+      </div>
+    </div>
+    <div style="margin-top: 12px; font-size: 12px; color: #888;">
+      Non-blocking &mdash; user gets immediate "stave created" response. Scan runs in background via <code style="color:#7eb8f7">checks.default</code> queue.
+      On completion: data_profile created, baseline_snapshot stored, initial insight_report generated, suggested checks auto-created.
+    </div>
+  </div>
+
+  <!-- Flow 2: Chat on-demand -->
+  <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #f7c87e; margin-bottom: 12px;">Flow 2: On-Demand via Chat</div>
+
+  <div style="background: #2a2a4a; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px;">
+      <div style="background: #3a3a5a; border-radius: 6px; padding: 8px 12px;">
+        "What's going on<br>with my sales data?"
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: #3a3a5a; border-radius: 6px; padding: 8px 12px;">
+        <span style="color: #f7c87e;">RouterAgent</span><br>
+        <span style="font-size: 11px; color: #888;">intent: insight</span>
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: rgba(90,122,247,0.2); border: 1px solid #5a7af7; border-radius: 6px; padding: 8px 12px; color: #b8d4f8;">
+        <span style="color: #7eb8f7;">InsightAgent</span><br>
+        <span style="font-size: 11px;">loads profile + history</span>
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: rgba(90,122,247,0.2); border: 1px solid #5a7af7; border-radius: 6px; padding: 8px 12px; color: #b8d4f8;">
+        Runs stages 3-5<br>
+        <span style="font-size: 11px;">(fresh snapshot + analysis)</span>
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: #3a3a5a; border-radius: 6px; padding: 8px 12px;">
+        Natural language<br>response in chat
+      </div>
+    </div>
+    <div style="margin-top: 12px; font-size: 12px; color: #888;">
+      Synchronous in the chat flow. RouterAgent detects "insight" intent and routes to InsightAgent.
+      InsightAgent loads the existing data_profile (no need to re-discover schema) and focuses on fresh analysis.
+      Can also be chained: <code style="color:#f7c87e">InsightAgent &rarr; ConfigAgent</code> if user wants to act on suggestions.
+    </div>
+  </div>
+
+  <!-- Flow 3: Scheduled daily -->
+  <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #7ef7a8; margin-bottom: 12px;">Flow 3: Scheduled Daily Intelligence</div>
+
+  <div style="background: #2a2a4a; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+    <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 13px;">
+      <div style="background: #3a3a5a; border-radius: 6px; padding: 8px 12px;">
+        Celery Beat<br>
+        <span style="font-size: 11px; color: #888;">cron: 0 6 * * *</span>
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: #3a3a5a; border-radius: 6px; padding: 8px 12px;">
+        For each active stave:<br>
+        <code style="font-size: 11px; color: #7ef7a8;">run_daily_intelligence(stave_id)</code>
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: rgba(90,122,247,0.2); border: 1px solid #5a7af7; border-radius: 6px; padding: 8px 12px; color: #b8d4f8;">
+        InsightAgent runs<br>
+        full pipeline (1-5)
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: rgba(90,122,247,0.2); border: 1px solid #5a7af7; border-radius: 6px; padding: 8px 12px; color: #b8d4f8;">
+        Compare vs previous<br>snapshots &amp; reports
+      </div>
+      <div style="color: #555;">&rarr;</div>
+      <div style="background: #3a3a5a; border-radius: 6px; padding: 8px 12px;">
+        Dashboard updated<br>
+        Alerts if critical
+      </div>
+    </div>
+    <div style="margin-top: 12px; font-size: 12px; color: #888;">
+      Runs on <code style="color:#7ef7a8">checks.default</code> queue alongside regular quality checks.
+      Produces a new baseline_snapshot + insight_report. Compares against last 7/30/90 day windows.
+      If anomalies found with severity &ge; high, can trigger notification (future: email/webhook).
+    </div>
+  </div>
+
+</div>
+
+<!-- Router changes -->
+<h3 style="margin-top: 32px;">Router Changes</h3>
+<p class="subtitle">New intent type + agent registration</p>
+
+<div style="background: #1a1a2e; border-radius: 12px; padding: 24px; font-family: system-ui, -apple-system, sans-serif; color: #e0e0e0;">
+  <div style="display: flex; gap: 16px;">
+    <div style="flex: 1;">
+      <div style="font-size: 12px; color: #888; margin-bottom: 8px;">RouterAgent intent additions</div>
+      <pre style="background: #0d0d1a; border-radius: 6px; padding: 16px; font-size: 12px; color: #ccc; line-height: 1.7; margin: 0;">
+<span style="color: #888;"># Existing intents</span>
+<span style="color: #7eb8f7;">configure</span>  &rarr; ConfigAgent
+<span style="color: #f78e7e;">investigate</span> &rarr; InvestigationAgent
+<span style="color: #f7c87e;">report</span>      &rarr; ReportAgent
+
+<span style="color: #888;"># New intents</span>
+<span style="color: #d87ef7;">insight</span>     &rarr; InsightAgent
+  <span style="color: #888;">"explore my data"</span>
+  <span style="color: #888;">"what's happening with sales?"</span>
+  <span style="color: #888;">"give me business insights"</span>
+  <span style="color: #888;">"analyze my database"</span>
+
+<span style="color: #d87ef7;">insight</span> + <span style="color: #7eb8f7;">configure</span> &rarr; chain mode
+  <span style="color: #888;">"explore and set up monitoring"</span></pre>
+    </div>
+    <div style="flex: 1;">
+      <div style="font-size: 12px; color: #888; margin-bottom: 8px;">InsightAgent tools (extends existing)</div>
+      <pre style="background: #0d0d1a; border-radius: 6px; padding: 16px; font-size: 12px; color: #ccc; line-height: 1.7; margin: 0;">
+<span style="color: #888;"># Reuses existing tools</span>
+list_stave_tables
+get_table_sample
+suggest_quality_checks
+list_clefs
+list_checks
+
+<span style="color: #888;"># New tools</span>
+<span style="color: #d87ef7;">get_data_profile</span>(stave_id)
+<span style="color: #d87ef7;">get_baseline_history</span>(stave_id, days)
+<span style="color: #d87ef7;">get_latest_insight</span>(stave_id)
+<span style="color: #d87ef7;">create_insight_report</span>(stave_id, report)
+<span style="color: #d87ef7;">load_archetype</span>(domain_type)
+<span style="color: #d87ef7;">save_data_profile</span>(stave_id, profile)
+<span style="color: #d87ef7;">create_checks_batch</span>(checks[])</pre>
+    </div>
+  </div>
+</div>
+
+<!-- API endpoints -->
+<h3 style="margin-top: 32px;">New API Endpoints</h3>
+<p class="subtitle">Dashboard and insight delivery</p>
+
+<div style="background: #1a1a2e; border-radius: 12px; padding: 24px; font-family: system-ui, -apple-system, sans-serif; color: #e0e0e0;">
+  <pre style="background: #0d0d1a; border-radius: 6px; padding: 16px; font-size: 12px; color: #ccc; line-height: 2; margin: 0;">
+<span style="color: #7ef7a8;">GET</span>  <span style="color: #7eb8f7;">/insights/{stave_id}/profile</span>       <span style="color: #888;"># Current data profile (domain, schema map)</span>
+<span style="color: #7ef7a8;">GET</span>  <span style="color: #7eb8f7;">/insights/{stave_id}/latest</span>        <span style="color: #888;"># Most recent insight report</span>
+<span style="color: #7ef7a8;">GET</span>  <span style="color: #7eb8f7;">/insights/{stave_id}/history</span>       <span style="color: #888;"># Historical reports (paginated)</span>
+<span style="color: #7ef7a8;">GET</span>  <span style="color: #7eb8f7;">/insights/{stave_id}/dashboard</span>     <span style="color: #888;"># Aggregated dashboard view (scores, trends, alerts)</span>
+<span style="color: #f7c87e;">POST</span> <span style="color: #7eb8f7;">/insights/{stave_id}/analyze</span>      <span style="color: #888;"># Trigger on-demand analysis</span>
+<span style="color: #7ef7a8;">GET</span>  <span style="color: #7eb8f7;">/insights/overview</span>                <span style="color: #888;"># Cross-stave summary (all data sources at a glance)</span>
+<span style="color: #7ef7a8;">GET</span>  <span style="color: #7eb8f7;">/insights/{stave_id}/suggestions</span>   <span style="color: #888;"># Pending AI suggestions (accept/dismiss)</span>
+<span style="color: #f7c87e;">POST</span> <span style="color: #7eb8f7;">/insights/{stave_id}/suggestions/{id}/accept</span>   <span style="color: #888;"># Accept a suggestion</span>
+<span style="color: #f78e7e;">POST</span> <span style="color: #7eb8f7;">/insights/{stave_id}/suggestions/{id}/dismiss</span>  <span style="color: #888;"># Dismiss a suggestion</span></pre>
+</div>

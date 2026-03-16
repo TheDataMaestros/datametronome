@@ -85,7 +85,7 @@
 
     <!-- Intelligence Pulse Section -->
     <div v-if="intelligence && intelligence.totalReports > 0" class="space-y-3">
-      <div class="flex items-center justify-between">
+      <div class="flex items-center justify-between flex-wrap gap-3">
         <div class="flex items-center gap-3">
           <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
             Intelligence Pulse
@@ -95,15 +95,31 @@
             AI Active
           </span>
         </div>
-        <UButton
-          color="gray"
-          variant="ghost"
-          size="sm"
-          icon="i-heroicons-chat-bubble-left-right"
-          @click="navigateTo('/chat')"
-        >
-          Ask AI
-        </UButton>
+        <div class="flex items-center gap-3 flex-wrap">
+          <DatasourceSelector
+            v-model="selectedStaveId"
+            :staves="staves"
+            :stave-health-scores="staveHealthScores"
+          />
+          <UButton
+            color="gray"
+            variant="ghost"
+            size="sm"
+            icon="i-heroicons-chat-bubble-left-right"
+            @click="navigateTo('/chat')"
+          >
+            Ask AI
+          </UButton>
+        </div>
+      </div>
+
+      <!-- Context banner when a source is selected -->
+      <div v-if="selectedStaveId" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
+        <Icon name="i-heroicons-funnel" class="w-3 h-3" />
+        Viewing: <strong>{{ staves.find(s => s.id === selectedStaveId)?.name }}</strong>
+        <span v-if="scopedProfile?.domain_type">· {{ scopedProfile.domain_type }}</span>
+        <span v-if="scopedDashboard?.health_score">· {{ scopedDashboard.health_score }}/100</span>
+        <button class="ml-auto text-blue-400 hover:text-blue-200" @click="selectedStaveId = null">✕ Clear</button>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -134,11 +150,11 @@
                 cy="50"
                 r="42"
                 fill="none"
-                :stroke="intelligence.arcColor"
+                :stroke="activeArcColor"
                 stroke-width="7"
                 stroke-linecap="round"
                 stroke-dasharray="198 264"
-                :stroke-dashoffset="198 - intelligence.arcLength"
+                :stroke-dashoffset="198 - activeArcLength"
                 transform="rotate(-135 50 50)"
                 class="health-arc-fill"
               />
@@ -151,7 +167,7 @@
                 font-weight="700"
                 font-family="ui-monospace, monospace"
               >
-                {{ Math.round(intelligence.avgHealthScore) }}
+                {{ Math.round(activeHealthScore) }}
               </text>
               <text
                 x="50"
@@ -168,16 +184,16 @@
             <p
               class="text-sm font-semibold"
               :class="{
-                'text-emerald-400': intelligence.avgHealthScore >= 80,
+                'text-emerald-400': activeHealthScore >= 80,
                 'text-amber-400':
-                  intelligence.avgHealthScore >= 50 && intelligence.avgHealthScore < 80,
-                'text-red-400': intelligence.avgHealthScore < 50,
+                  activeHealthScore >= 50 && activeHealthScore < 80,
+                'text-red-400': activeHealthScore < 50,
               }"
             >
               {{
-                intelligence.avgHealthScore >= 80
+                activeHealthScore >= 80
                   ? 'Strong'
-                  : intelligence.avgHealthScore >= 50
+                  : activeHealthScore >= 50
                     ? 'Moderate'
                     : 'Needs Attention'
               }}
@@ -255,9 +271,9 @@
           </div>
 
           <!-- Suggestions -->
-          <template v-if="intelligence.topSuggestions.length > 0">
+          <template v-if="activeSuggestions.length > 0">
             <div
-              v-for="(sug, i) in intelligence.topSuggestions"
+              v-for="(sug, i) in activeSuggestions"
               :key="'sug-' + i"
               class="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-2"
             >
@@ -266,10 +282,13 @@
                   class="flex-shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded mt-0.5"
                   :class="sug.priority === 'high' ? 'bg-red-500/30 text-red-300' : 'bg-amber-500/20 text-amber-400'"
                 >{{ sug.priority }}</span>
+                <span v-if="sug.stave_name" class="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-400 font-mono">
+                  {{ sug.stave_name }}
+                </span>
                 <p class="text-xs font-medium text-amber-200 leading-snug line-clamp-2">{{ sug.action }}</p>
               </div>
               <div class="flex gap-2 pt-1">
-                <UButton size="xs" color="amber" variant="soft" icon="i-heroicons-magnifying-glass" @click.stop="navigateTo('/investigation')">
+                <UButton size="xs" color="amber" variant="soft" icon="i-heroicons-magnifying-glass" @click.stop="navigateTo('/insights')">
                   Investigate
                 </UButton>
                 <UButton size="xs" color="gray" variant="ghost" icon="i-heroicons-arrow-right" @click.stop="navigateTo('/insights')">
@@ -291,15 +310,18 @@
           </button>
 
           <!-- Anomalies -->
-          <template v-if="intelligence.topAnomalies.length > 0">
+          <template v-if="activeAnomalies.length > 0">
             <div
-              v-for="(ano, i) in intelligence.topAnomalies"
+              v-for="(ano, i) in activeAnomalies"
               :key="'ano-' + i"
               class="p-3 rounded-lg bg-red-500/10 border border-red-500/20 space-y-2"
             >
               <div class="flex items-start gap-2">
                 <span class="flex-shrink-0 text-[10px] font-bold uppercase px-1.5 py-0.5 rounded bg-red-500/30 text-red-300 mt-0.5">
                   {{ ano.severity }}
+                </span>
+                <span v-if="ano.stave_name" class="flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-slate-700/60 text-slate-400 font-mono mt-0.5">
+                  {{ ano.stave_name }}
                 </span>
                 <div class="min-w-0 flex-1">
                   <p class="text-xs font-medium text-red-200 leading-snug line-clamp-2">{{ ano.description }}</p>
@@ -318,7 +340,7 @@
                 </div>
               </div>
               <div class="flex gap-2 pt-1">
-                <UButton size="xs" color="red" variant="soft" icon="i-heroicons-magnifying-glass" @click.stop="navigateTo('/investigation')">
+                <UButton size="xs" color="red" variant="soft" icon="i-heroicons-magnifying-glass" @click.stop="navigateTo('/insights')">
                   Investigate
                 </UButton>
                 <UButton size="xs" color="gray" variant="ghost" icon="i-heroicons-arrow-path" @click.stop="triggerReanalyze">
@@ -571,6 +593,16 @@ const { staves, isLoading: stavesLoading, fetchStaves } = useStaves()
 const { checks, fetchLatest } = useChecks()
 const { metrics: dashboardMetrics, fetchMetrics } = useDashboard()
 
+const { loadPrefs } = useDashboardPrefs()
+
+// Selected stave ID: null = "All", string = specific stave
+const selectedStaveId = ref<string | null>(null)
+
+// Per-stave scoped data (loaded when a specific stave is selected)
+const scopedDashboard = ref<any>(null)
+const scopedProfile = ref<any>(null)
+const isScopedLoading = ref(false)
+
 const isRunningChecks = ref(false)
 
 // System metrics computed from real data
@@ -635,6 +667,62 @@ const topTableMetrics = computed(() => {
     .sort(([, a], [, b]) => (b as number) - (a as number))
     .slice(0, 4)
   return Object.fromEntries(entries)
+})
+
+// Stave health scores from intelligence data
+const staveHealthScores = computed<Record<string, number>>(
+  () => dashboardMetrics.value?.intelligence?.stave_health_scores ?? {}
+)
+
+// Watcher: load per-stave scoped data when a source is selected
+watch(selectedStaveId, async (staveId) => {
+  if (!staveId) {
+    scopedDashboard.value = null
+    scopedProfile.value = null
+    return
+  }
+  isScopedLoading.value = true
+  try {
+    const { insightsService } = await import('~/services/insights')
+    const [dashboard, profile] = await Promise.allSettled([
+      insightsService.getDashboard(staveId),
+      insightsService.getProfile(staveId),
+    ])
+    scopedDashboard.value = dashboard.status === 'fulfilled' ? dashboard.value : null
+    scopedProfile.value = profile.status === 'fulfilled' ? profile.value : null
+  } finally {
+    isScopedLoading.value = false
+  }
+})
+
+// Active data: scoped when a source is selected, otherwise global
+const activeHealthScore = computed(() =>
+  selectedStaveId.value && scopedDashboard.value
+    ? scopedDashboard.value.health_score
+    : intelligence.value?.avgHealthScore ?? 0
+)
+
+const activeSuggestions = computed(() =>
+  selectedStaveId.value && scopedDashboard.value
+    ? (scopedDashboard.value.pending_suggestions ?? []).slice(0, 3)
+    : intelligence.value?.topSuggestions ?? []
+)
+
+const activeAnomalies = computed(() =>
+  selectedStaveId.value && scopedDashboard.value
+    ? (scopedDashboard.value.active_anomalies ?? []).slice(0, 3)
+    : intelligence.value?.topAnomalies ?? []
+)
+
+// Arc gauge computeds (responsive to scoped selection)
+const activeArcLength = computed(() => {
+  const maxArc = 198
+  return maxArc * Math.min(Math.max(activeHealthScore.value, 0), 100) / 100
+})
+
+const activeArcColor = computed(() => {
+  const score = activeHealthScore.value
+  return score >= 80 ? '#2ed573' : score >= 50 ? '#ffa502' : '#ff4757'
 })
 
 // Recent activity from latest checks
@@ -843,5 +931,6 @@ onMounted(() => {
   fetchStaves()
   fetchLatest(20)
   fetchMetrics()
+  loadPrefs()
 })
 </script>

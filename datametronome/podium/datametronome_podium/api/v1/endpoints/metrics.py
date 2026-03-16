@@ -457,6 +457,25 @@ async def _fetch_intelligence_metrics(db: Any) -> Dict[str, Any]:
             profiles_result[0]["count"] if profiles_result else 0
         )
 
+        # Health score for each stave — only staves with at least one report
+        stave_scores_result = await db.query(
+            {
+                "sql": (
+                    "SELECT ir.stave_id, MAX(ir.health_score) AS health_score "
+                    "FROM insight_reports ir "
+                    "JOIN staves st ON ir.stave_id = st.id "
+                    "WHERE st.is_active = TRUE "
+                    "GROUP BY ir.stave_id"
+                ),
+                "params": [],
+            }
+        )
+        intelligence["stave_health_scores"] = {
+            row["stave_id"]: int(row["health_score"])
+            for row in (stave_scores_result or [])
+            if row.get("stave_id") and row.get("health_score") is not None
+        }
+
         # Pending suggestions — count + top items
         suggestions_result = await db.query(
             {

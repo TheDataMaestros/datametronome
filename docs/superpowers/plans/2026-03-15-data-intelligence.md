@@ -3644,3 +3644,73 @@ Issues from spec review that are addressed in this plan:
 - Baseline: 406 passed -> Final: 409 passed (3 new LLM error handling tests), 1 skipped, no regressions.
 - All modules import cleanly: InsightPipelineService, build_insight_agent, intelligence_tasks, intelligence_scheduler, archetypes.
 - Data Intelligence Layer implementation is complete across all 8 chunks (23 tasks).
+
+## Management Insights Layer -- Task Checklist
+
+- [x] Task 4: Create bi_models.py (LLM output models)
+  Files: datametronome_podium/services/agents/bi_models.py (new), tests/features/insights/test_bi_models.py (new)
+
+- [x] Task 2: StaveQueryPlan model + schema_interpretation on DataProfile
+  Files: datametronome_podium/features/insights/model.py:18,142-152, datametronome_podium/features/insights/repo.py:41, tests/features/insights/test_stave_query_plan_repo.py (new)
+
+- [x] Task 3: StaveQueryPlan repo CRUD
+  Files: datametronome_podium/features/insights/repo.py:49-62,327-365, tests/features/insights/test_stave_query_plan_repo.py:67-130
+
+- [x] Task 4: Archetype YAML cleanup — remove hardcoded SQL, replace with kpi_definitions
+  Files: datametronome_podium/archetypes/ecommerce.yaml, datametronome_podium/archetypes/saas.yaml, datametronome_podium/archetypes/crm.yaml, datametronome_podium/archetypes/generic.yaml, tests/features/insights/test_archetype_bi_config.py
+
+- [x] Task 6: Restructure business_intelligence.py -- three-phase architecture
+  Files: datametronome_podium/services/agents/business_intelligence.py (rewritten), tests/features/insights/test_bi_agent_phases.py (new), tests/features/insights/test_bi_agent_tools.py (updated)
+
+- [x] Task 8: Extend _prune_snapshots_async to also prune stave_query_plans
+  Files: datametronome_podium/tasks/intelligence_tasks.py:131-136, tests/features/insights/test_bi_pipeline_service.py:65-86
+
+## Implementation Log -- BI Query Plans Task 2
+
+### Task 2: StaveQueryPlan model + schema_interpretation on DataProfile
+- **Approach:** Added `StaveQueryPlan` Pydantic model to the existing insights model.py after `BusinessReport`. Added `schema_interpretation: dict = {}` field to `DataProfile`. Added `schema_interpretation` to `_PROFILE_JSON_FIELDS` tuple in repo.py so it gets auto-serialized/deserialized via the existing `_parse_json` loop.
+- **TDD cycles:** 1 cycle -- wrote 3 tests (model defaults, DataProfile field, get_profile deserialization), confirmed ImportError (RED), added model + field + repo change (GREEN), no refactoring needed.
+- **Discoveries:** The `_PROFILE_JSON_FIELDS` tuple pattern in repo.py handles both serialization (create/update) and deserialization (get_profile) automatically when a field is added to it.
+- **Files:** `datametronome_podium/features/insights/model.py`, `datametronome_podium/features/insights/repo.py`, `tests/features/insights/test_stave_query_plan_repo.py`
+
+## Implementation Log -- Management Insights Task 4
+
+### Task 4: Create bi_models.py (LLM output models)
+- **Approach:** Created Pydantic AI structured output models following the existing `insight_models.py` pattern. Four models: LLMKPIResult, LLMPerformerInsight, LLMTrendInsight, LLMBusinessReport. The LLMBusinessReport aggregates the other three as typed lists with empty-list defaults.
+- **TDD cycles:** 1 cycle -- wrote 4 tests (one per model class), confirmed ImportError (RED), created module (GREEN), no refactoring needed.
+- **Discoveries:** Pre-existing 3 test failures in test_archetype_bi_config.py (Task 3 not yet implemented). Not a regression.
+- **Files:** `datametronome_podium/services/agents/bi_models.py`, `tests/features/insights/test_bi_models.py`
+
+## Implementation Log -- BI Query Plans Task 3
+
+### Task 3: StaveQueryPlan repo CRUD
+- **Approach:** Added 4 async methods to InsightsRepo (get_valid_plan, create_plan, invalidate_plan, prune_old_plans) plus a module-level _deserialize_plan helper following the existing _row_to_* pattern. Added StaveQueryPlan to the import list in repo.py.
+- **TDD cycles:** 1 cycle -- wrote 5 tests (create, get_none, get_deserialize, invalidate, prune), confirmed AttributeError (RED), added methods (GREEN), no refactoring needed.
+- **Discoveries:** json was already imported in repo.py. The _parse_json helper handles both string and dict inputs, making deserialization robust for mock and real DB rows.
+- **Files:** `datametronome_podium/features/insights/repo.py`, `tests/features/insights/test_stave_query_plan_repo.py`
+
+## Implementation Log -- BI Query Plans Task 4
+
+### Task 4: Archetype YAML cleanup -- remove hardcoded SQL, replace with kpi_definitions
+- **Approach:** Replaced all hardcoded SQL (`kpi_queries` with raw SQL strings, `rank_query`/`drill_query` in performer_dimensions, `query_hint` in metrics) with pure business semantics (`kpi_definitions` with name+description pairs, performer_dimensions with entity+description). This enables the AI agent to generate SQL dynamically based on actual schema rather than brittle template queries.
+- **TDD cycles:** 1 cycle -- wrote 14 tests across 6 test functions (RED: 12 failed as expected), replaced 4 YAML files (GREEN: 14 pass), no refactoring needed.
+- **Discoveries:** The generic archetype previously had `kpi_queries: {}` and `performer_dimensions: []` keys; both were removed since the BI track is skipped for generic domains in service.py. The IoT archetype was intentionally left unchanged (no BI KPIs). The module-level `_cache` dict in archetypes/__init__.py means test isolation requires separate pytest sessions or cache clearing, but since all tests run in a fresh session this was not an issue.
+- **Files:** `datametronome_podium/archetypes/ecommerce.yaml`, `datametronome_podium/archetypes/saas.yaml`, `datametronome_podium/archetypes/crm.yaml`, `datametronome_podium/archetypes/generic.yaml`, `tests/features/insights/test_archetype_bi_config.py`
+- **Note:** service.py and business_intelligence.py still reference `kpi_queries` -- those will be updated in Tasks 6 and 7.
+
+## Implementation Log -- BI Query Plans Task 6
+
+### Task 6: Restructure business_intelligence.py -- three-phase architecture
+- **Approach:** Rewrote `business_intelligence.py` from a single-agent architecture (BIQueryDeps + build_bi_agent) to a three-phase architecture: Phase 1 (schema overview, no DB tools), Phase 2 (SQL generation + validation via run_raw_query tool), Phase 3 (execute stored SQL + produce LLMBusinessReport). Added helper functions: `compute_schema_fingerprint` (SHA-256 of sorted table.column pairs), `_enforce_limit` (append LIMIT 1000 to SELECTs), `_should_abort` (abort if <50% queries succeed). Changed `_execute_sql` to propagate exceptions instead of swallowing them (Phase 2 agent needs error feedback).
+- **TDD cycles:** 1 cycle -- wrote 9 tests (RED: all failed with ImportError/wrong behavior), rewrote module (GREEN: 9 pass), no refactoring needed.
+- **Decisions:** Removed `_apply_schema` and `BIQueryDeps` (replaced by Phase1Deps, Phase2Deps, Phase3Deps). The abort threshold uses strict "fewer than half" (succeeded < total/2), so exactly 50% does NOT abort. Updated `test_bi_agent_tools.py` to a placeholder since all its tests relied on removed symbols.
+- **Discoveries:** `service.py` still imports `BIQueryDeps` and `build_bi_agent` -- this will break at runtime until Task 7 updates it. Test suite shows 402 passed (up from 401), 1 pre-existing timeout failure in test_sub_agents.py.
+
+## Implementation Log -- BI Query Plans Task 8
+
+### Task 8: Extend _prune_snapshots_async to also prune stave_query_plans
+- **Approach:** Added two lines to `_prune_snapshots_async` in `intelligence_tasks.py`: instantiate `InsightsRepo(executor)` and call `await repo.prune_old_plans(cutoff)` using the same cutoff timestamp already computed for baseline_snapshots pruning. Import is inside the function body matching the existing lazy-import pattern.
+- **TDD cycles:** 1 cycle -- RED (mock_prune.assert_called_once() fails because _prune_snapshots_async doesn't call prune_old_plans yet), GREEN (added repo instantiation + prune_old_plans call).
+- **Refactoring:** None needed -- the change is 4 lines.
+- **Decisions:** Patched `datametronome_podium.core.worker_db.worker_db_session` (at definition site) rather than at import site since `_prune_snapshots_async` imports it lazily inside the function body.
+- **Results:** 492 passed, 1 skipped, 0 failures (excluding pre-existing timeout in test_sub_agents.py).

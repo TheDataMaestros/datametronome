@@ -202,6 +202,7 @@ const pageTitle = computed(() => {
     investigation: 'Investigation',
     insights: 'AI Insights',
     notifications: 'Notifications',
+    profile: 'Profile',
     settings: 'Settings',
   }
   return titles[route.name as string] || 'DataMetronome'

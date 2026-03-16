@@ -212,11 +212,11 @@ cd datametronome/podium && git add datametronome_podium/features/insights/model.
 
 ---
 
-### Task 2: Alembic migration 006
+### Task 2: Alembic migration 006 -- DONE
 
 > **No unit test for the migration itself** — the project has no migration-specific tests and the pattern is to verify by running `alembic upgrade head`. Migration correctness is confirmed by the Docker run step below.
 
-- [ ] **Step 1: Create migration file**
+- [x] **Step 1: Create migration file**
 
 Create `datametronome/podium/alembic/versions/006_business_intelligence.py`.
 
@@ -285,14 +285,14 @@ def downgrade() -> None:
         pass
 ```
 
-- [ ] **Step 2: Run migration via Docker**
+- [x] **Step 2: Run migration via Docker**
 
 ```bash
 cd datametronome && docker compose run --rm api alembic upgrade head
 ```
 Expected: `Running upgrade 005 -> 006`.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 cd datametronome/podium && git add alembic/versions/006_business_intelligence.py && git commit --no-verify -m "feat(migration): 006 business_reports table + check_spec on suggestions"
@@ -653,7 +653,7 @@ cd datametronome/podium && git add datametronome_podium/services/agents/bi_model
 
 ### Task 5: BI query tools + agent builder
 
-- [ ] **Step 1: Write failing tests for BI helper functions**
+- [x] **Step 1: Write failing tests for BI helper functions**
 
 Create `datametronome/podium/tests/features/insights/test_bi_agent_tools.py` first (tests will fail because the module doesn't exist yet):
 
@@ -692,14 +692,14 @@ async def test_execute_sql_handles_failure():
     assert rows == []
 ```
 
-- [ ] **Step 2: Run to verify failure**
+- [x] **Step 2: Run to verify failure**
 
 ```bash
 cd datametronome/podium && .venv/bin/python -m pytest tests/features/insights/test_bi_agent_tools.py -v --timeout=10
 ```
 Expected: `ERROR collecting ... ImportError` — module doesn't exist yet.
 
-- [ ] **Step 3: Create `business_intelligence.py`**
+- [x] **Step 3: Create `business_intelligence.py`**
 
 ```python
 # datametronome_podium/services/agents/business_intelligence.py
@@ -852,20 +852,21 @@ def build_bi_agent(model: Any) -> Agent:
     return agent
 ```
 
-- [ ] **Step 4: Commit the test file first (before implementation)**
+- [x] **Step 4: Commit the test file first (before implementation)**
 
 ```bash
 cd datametronome/podium && git add tests/features/insights/test_bi_agent_tools.py && git commit --no-verify -m "test(agents): failing BI agent tool tests"
 ```
 
-- [ ] **Step 5: Run tests to verify they now pass**
+- [x] **Step 5: Run tests to verify they now pass**
 
 ```bash
 cd datametronome/podium && .venv/bin/python -m pytest tests/features/insights/test_bi_agent_tools.py -v --timeout=10
 ```
 Expected: 4 tests PASS.
 
-- [ ] **Step 6: Commit implementation**
+- [x] **Step 6: Commit implementation**
+  Files: `datametronome_podium/services/agents/business_intelligence.py`, `tests/features/insights/test_bi_agent_tools.py`
 
 ```bash
 cd datametronome/podium && git add datametronome_podium/services/agents/business_intelligence.py && git commit --no-verify -m "feat(agents): BusinessIntelligenceAgent with KPI and performer query tools"
@@ -1193,9 +1194,12 @@ cd datametronome/podium && git add datametronome_podium/features/insights/schema
 - Modify: `datametronome/podium/datametronome_podium/features/insights/service.py`
 - Modify: `datametronome/podium/datametronome_podium/features/insights/router.py`
 
-### Task 9: Add BI track to pipeline service
+### Task 9: Add BI track to pipeline service -- DONE
 
-- [ ] **Step 1: Write failing service tests**
+- [x] **Step 1: Write failing service tests**
+  Files: tests/features/insights/test_bi_pipeline_service.py (new)
+- [x] **Steps 2-10: Implement parallel BI track**
+  Files: datametronome_podium/features/insights/service.py (modified — added _analyze_business_intelligence, _run_both_tracks, _persist_business_report; updated persist_results, run_daily, run_on_demand, run_auto_scan, _persist_suggestions)
 
 Create `datametronome/podium/tests/features/insights/test_bi_pipeline_service.py`:
 
@@ -2080,3 +2084,23 @@ cd datametronome && docker compose up -d
 ```bash
 git add -A && git commit --no-verify -m "feat(insights): management insights layer — complete"
 ```
+
+## Implementation Log
+
+### Task 2: Alembic migration 006
+- **Approach:** Created migration file following the exact pattern from 005 (dao.execute for DDL, downgrade with op.execute and try/except for SQLite compat). Migration creates `business_reports` table with indexes and adds `check_spec` column to `insight_suggestions`.
+- **Discoveries:** Docker environment issue — `alembic` in the container reads `DATABASE_URL` env var (not `DATAMETRONOME_DATABASE_URL`), so without explicit `-e DATABASE_URL=...` it falls back to SQLite from alembic.ini. The Postgres DB was already at 006 (head) from a prior run. The source mount (`./datametronome/podium:/app/datametronome/podium`) means no Docker rebuild is needed for migration file changes.
+- **Decisions:** Verified against Postgres (the actual runtime DB) rather than SQLite. Confirmed `business_reports` table and `check_spec` column exist via `psql`.
+
+### Task 5: BI query tools + agent builder
+- **Approach:** Created `business_intelligence.py` with `BIQueryDeps`, `_execute_sql`, `_apply_schema`, and `build_bi_agent` factory. The agent gets 5 tools: `run_kpi_query`, `list_available_kpis`, `list_performer_dimensions`, `query_top_performers`, `drill_down`. All tools use the archetype dict from deps to find SQL templates, apply schema prefix, and execute via the connector.
+- **TDD cycles:** 1 cycle — 4 tests (2 sync for `_apply_schema`, 2 async for `_execute_sql`) written first, confirmed RED (ImportError), then implementation made them GREEN.
+- **Refactoring:** None needed — functions are small and focused.
+- **Decisions:** `_execute_sql` passes `{"sql": sql}` dict to `connector.query()` matching the real connector interface. Test mocks accept any arg so both work. Entity name sanitization uses single-quote escaping to prevent SQL injection in drill-down queries.
+
+### Task 9: Add parallel BI track to pipeline service
+- **Approach:** Added three new methods to `InsightPipelineService`: `_analyze_business_intelligence` (runs BI agent against live data source), `_run_both_tracks` (runs quality + BI concurrently via `asyncio.gather` with `return_exceptions=True`), and `_persist_business_report` (saves BI output as `BusinessReport`). Updated `persist_results` to accept `bi_analysis` kwarg, and wired `run_daily`/`run_on_demand` to use `_run_both_tracks`. `run_auto_scan` passes `bi_analysis=None` explicitly (skips BI on first scan). Also added `check_spec` passthrough in `_persist_suggestions`.
+- **TDD cycles:** 1 cycle with 2 tests — `test_run_both_tracks_graceful_degradation` (BI failure returns None, quality still works) and `test_persist_business_report_called_when_bi_present` (persist_results dispatches to _persist_business_report when bi_analysis provided).
+- **Refactoring:** None needed — all new methods are under 40 lines.
+- **Discoveries:** `check_spec` field already existed on `InsightSuggestion` model but was not being populated in `_persist_suggestions` — fixed as part of this task.
+- **Decisions:** `_analyze_business_intelligence` uses lazy imports to avoid circular dependencies (same pattern as `analyze_business`). `_run_both_tracks` uses local `import asyncio as _asyncio` to avoid top-level import since it's only needed in this one method.

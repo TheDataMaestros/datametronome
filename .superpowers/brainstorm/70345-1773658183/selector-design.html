@@ -1,0 +1,277 @@
+<h2>Datasource Selector — Refined Design</h2>
+<p class="subtitle">Option A with favourites (up to 3), inline ★ toggle, and "Others" overflow. Four states shown below.</p>
+
+<style>
+  .state-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: #64748b;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .ds-bar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    background: #0f1117;
+    padding: 12px 14px;
+    border-radius: 10px;
+    border: 1px solid #1e293b;
+  }
+  .pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    position: relative;
+    white-space: nowrap;
+  }
+  .pill-all {
+    background: #3b82f6;
+    color: white;
+  }
+  .pill-active {
+    background: #1d4ed8;
+    color: white;
+    border: 1px solid #3b82f6;
+  }
+  .pill-fav {
+    background: #1e293b;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+  }
+  .pill-fav-selected {
+    background: #1e3a5f;
+    color: white;
+    border: 1px solid #3b82f6;
+  }
+  .pill-others {
+    background: #1e293b;
+    color: #64748b;
+    border: 1px solid #334155;
+  }
+  .health-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .star { font-size: 11px; }
+  .star-filled { color: #f59e0b; }
+  .star-empty { color: #475569; }
+  .star-hover { color: #f59e0b; opacity: 0.5; }
+
+  .dropdown-menu {
+    background: #1e293b;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 6px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 220px;
+  }
+  .dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #94a3b8;
+  }
+  .dropdown-item:hover { background: #263347; color: #e2e8f0; }
+  .dropdown-item .ds-name { flex: 1; }
+  .dropdown-item .ds-score { font-family: monospace; font-size: 11px; }
+  .dropdown-item .star-btn { font-size: 12px; color: #475569; cursor: pointer; }
+  .dropdown-item .star-btn:hover { color: #f59e0b; }
+
+  .settings-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: #1e293b;
+    border-radius: 8px;
+    font-size: 12px;
+    color: #94a3b8;
+  }
+  .settings-row .drag-handle { color: #334155; cursor: grab; font-size: 14px; }
+  .settings-row .ds-name { flex: 1; color: #e2e8f0; font-weight: 500; }
+  .settings-row .fav-toggle {
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    border: 1px solid #334155;
+    color: #64748b;
+    cursor: pointer;
+  }
+  .settings-row .fav-toggle.active {
+    background: rgba(245,158,11,0.15);
+    border-color: rgba(245,158,11,0.4);
+    color: #f59e0b;
+  }
+</style>
+
+<!-- State 1: Default, "All" selected -->
+<div class="section">
+  <div class="state-label">① Default — "All" selected, 3 favourited sources visible</div>
+  <div class="ds-bar">
+    <span style="font-size: 10px; color: #475569; margin-right: 2px;">View:</span>
+    <div class="pill pill-all">All</div>
+    <div class="pill pill-fav">
+      <span class="health-dot" style="background:#2ed573"></span>
+      olist_prod
+      <span class="star star-filled">★</span>
+    </div>
+    <div class="pill pill-fav">
+      <span class="health-dot" style="background:#ffa502"></span>
+      analytics_db
+      <span class="star star-filled">★</span>
+    </div>
+    <div class="pill pill-fav">
+      <span class="health-dot" style="background:#ff4757"></span>
+      crm_staging
+      <span class="star star-filled">★</span>
+    </div>
+    <div class="pill pill-others">Others (4) ▾</div>
+  </div>
+</div>
+
+<!-- State 2: A favourite selected -->
+<div class="section">
+  <div class="state-label">② A favourite selected — pulse scoped to that source</div>
+  <div class="ds-bar">
+    <span style="font-size: 10px; color: #475569; margin-right: 2px;">View:</span>
+    <div class="pill pill-fav">All</div>
+    <div class="pill pill-fav">
+      <span class="health-dot" style="background:#2ed573"></span>
+      olist_prod
+      <span class="star star-filled">★</span>
+    </div>
+    <div class="pill pill-fav-selected">
+      <span class="health-dot" style="background:#ffa502"></span>
+      analytics_db
+      <span class="star star-filled">★</span>
+    </div>
+    <div class="pill pill-fav">
+      <span class="health-dot" style="background:#ff4757"></span>
+      crm_staging
+      <span class="star star-filled">★</span>
+    </div>
+    <div class="pill pill-others">Others (4) ▾</div>
+  </div>
+  <div style="margin-top: 8px; padding: 10px 14px; background: #0f1117; border-radius: 8px; border: 1px solid #1e3a5f; display: flex; align-items: center; gap: 10px;">
+    <span style="font-size: 10px; color: #64748b;">Intelligence Pulse scoped to:</span>
+    <span style="font-size: 12px; font-weight: 600; color: #93c5fd;">analytics_db</span>
+    <span style="font-size: 10px; color: #64748b; background: rgba(255,165,2,0.1); border: 1px solid rgba(255,165,2,0.2); padding: 2px 8px; border-radius: 10px; color: #fbbf24;">analytics · 67/100</span>
+  </div>
+</div>
+
+<!-- State 3: Hover on unfavourited pill — star appears -->
+<div class="section">
+  <div class="state-label">③ Hover on non-favourite pill — star appears as ghost, click to favourite</div>
+  <div class="ds-bar">
+    <span style="font-size: 10px; color: #475569; margin-right: 2px;">View:</span>
+    <div class="pill pill-all">All</div>
+    <div class="pill pill-fav">
+      <span class="health-dot" style="background:#2ed573"></span>
+      olist_prod
+      <span class="star star-filled">★</span>
+    </div>
+    <div class="pill pill-fav" style="border-color: #f59e0b44;">
+      <span class="health-dot" style="background:#6366f1"></span>
+      warehouse_v2
+      <span class="star star-hover">★</span>
+      <span style="font-size: 9px; color: #64748b; position: absolute; top: -18px; left: 50%; transform: translateX(-50%); background: #1e293b; border: 1px solid #334155; padding: 2px 6px; border-radius: 4px; white-space: nowrap;">Pin to bar</span>
+    </div>
+    <div class="pill pill-others">Others (5) ▾</div>
+    <span style="font-size: 10px; color: #475569; margin-left: 4px; font-style: italic;">← warehouse_v2 hovered from Others dropdown</span>
+  </div>
+  <div style="margin-top: 8px; padding: 10px; background: #0f1117; border-radius: 8px; border: 1px solid #1e293b; display: inline-flex; flex-direction: column;">
+    <div style="font-size: 10px; color: #64748b; padding: 4px 8px 6px; text-transform: uppercase; letter-spacing: 0.06em;">Others</div>
+    <div class="dropdown-menu">
+      <div class="dropdown-item">
+        <span class="health-dot" style="background:#6366f1; width:7px; height:7px;"></span>
+        <span class="ds-name">warehouse_v2</span>
+        <span class="ds-score" style="color:#6366f1;">78</span>
+        <span class="star-btn">☆</span>
+      </div>
+      <div class="dropdown-item">
+        <span class="health-dot" style="background:#2ed573; width:7px; height:7px;"></span>
+        <span class="ds-name">reporting_prod</span>
+        <span class="ds-score" style="color:#2ed573;">88</span>
+        <span class="star-btn">☆</span>
+      </div>
+      <div class="dropdown-item">
+        <span class="health-dot" style="background:#ff4757; width:7px; height:7px;"></span>
+        <span class="ds-name">legacy_mysql</span>
+        <span class="ds-score" style="color:#ff4757;">33</span>
+        <span class="star-btn">☆</span>
+      </div>
+      <div class="dropdown-item" style="border-top: 1px solid #334155; margin-top: 4px; padding-top: 8px; color: #475569; font-size: 11px;">
+        + 2 more sources
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- State 4: Settings page -->
+<div class="section">
+  <div class="state-label">④ Profile / Settings — manage favourites, drag to reorder</div>
+  <div style="background: #0f1117; border-radius: 10px; border: 1px solid #1e293b; overflow: hidden;">
+    <div style="padding: 12px 16px; border-bottom: 1px solid #1e293b; display: flex; align-items: center; justify-content: space-between;">
+      <span style="font-size: 12px; font-weight: 600; color: #e2e8f0;">Dashboard Favourites</span>
+      <span style="font-size: 11px; color: #475569;">Up to 3 pinned · drag to reorder</span>
+    </div>
+    <div style="padding: 10px 12px; display: flex; flex-direction: column; gap: 6px;">
+      <div class="settings-row">
+        <span class="drag-handle">⠿</span>
+        <span class="health-dot" style="background:#2ed573; width:7px; height:7px;"></span>
+        <span class="ds-name">olist_prod</span>
+        <span style="font-size: 10px; color: #64748b; background: #334155; padding: 2px 6px; border-radius: 8px;">e-commerce</span>
+        <span class="fav-toggle active">★ Pinned</span>
+      </div>
+      <div class="settings-row">
+        <span class="drag-handle">⠿</span>
+        <span class="health-dot" style="background:#ffa502; width:7px; height:7px;"></span>
+        <span class="ds-name">analytics_db</span>
+        <span style="font-size: 10px; color: #64748b; background: #334155; padding: 2px 6px; border-radius: 8px;">analytics</span>
+        <span class="fav-toggle active">★ Pinned</span>
+      </div>
+      <div class="settings-row">
+        <span class="drag-handle">⠿</span>
+        <span class="health-dot" style="background:#ff4757; width:7px; height:7px;"></span>
+        <span class="ds-name">crm_staging</span>
+        <span style="font-size: 10px; color: #64748b; background: #334155; padding: 2px 6px; border-radius: 8px;">crm</span>
+        <span class="fav-toggle active">★ Pinned</span>
+      </div>
+      <div style="border-top: 1px solid #1e293b; padding-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+        <div class="settings-row" style="opacity: 0.6;">
+          <span class="drag-handle" style="opacity:0">⠿</span>
+          <span class="health-dot" style="background:#6366f1; width:7px; height:7px;"></span>
+          <span class="ds-name">warehouse_v2</span>
+          <span style="font-size: 10px; color: #64748b; background: #334155; padding: 2px 6px; border-radius: 8px;">warehouse</span>
+          <span class="fav-toggle" style="color:#475569;">☆ Pin  <span style="color:#334155;">(max reached)</span></span>
+        </div>
+        <div class="settings-row" style="opacity: 0.6;">
+          <span class="drag-handle" style="opacity:0">⠿</span>
+          <span class="health-dot" style="background:#2ed573; width:7px; height:7px;"></span>
+          <span class="ds-name">reporting_prod</span>
+          <span style="font-size: 10px; color: #64748b; background: #334155; padding: 2px 6px; border-radius: 8px;">reporting</span>
+          <span class="fav-toggle" style="color:#475569;">☆ Pin  <span style="color:#334155;">(max reached)</span></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div style="margin-top: 4px; padding: 12px 16px; background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); border-radius: 8px;">
+  <p style="font-size: 12px; color: #93c5fd; margin: 0;"><strong>Key behaviours:</strong> Health dot color (green/amber/red) gives instant status at a glance even without clicking. "Others" dropdown also shows health scores + inline ★. Settings page shows max-reached state clearly to prevent confusion. Favourites stored per user in the DB.</p>
+</div>

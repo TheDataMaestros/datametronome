@@ -1,0 +1,267 @@
+<h2>InsightReport Structure & Dashboard</h2>
+<p class="subtitle">What the AI produces and how the frontend consumes it</p>
+
+<div style="background: #1a1a2e; border-radius: 12px; padding: 32px; font-family: system-ui, -apple-system, sans-serif; color: #e0e0e0;">
+
+  <!-- Pydantic model -->
+  <div style="font-size: 11px; text-transform: uppercase; letter-spacing: 2px; color: #888; margin-bottom: 16px;">InsightReport Pydantic Model</div>
+
+  <div style="display: flex; gap: 16px; margin-bottom: 32px;">
+    <div style="flex: 1.2;">
+      <pre style="background: #0d0d1a; border-radius: 6px; padding: 16px; font-size: 12px; color: #ccc; line-height: 1.7; margin: 0; overflow-x: auto;">
+<span style="color: #d87ef7;">class</span> <span style="color: #7eb8f7;">InsightReport</span>(BaseModel):
+    health_score: <span style="color: #7ef7a8;">int</span>  <span style="color: #888;"># 0-100</span>
+    report_type: <span style="color: #7ef7a8;">Literal</span>[
+        "initial", "daily", "on_demand"
+    ]
+
+    <span style="color: #888;"># Scored business dimensions</span>
+    dimensions: list[<span style="color: #f7c87e;">Dimension</span>]
+
+    <span style="color: #888;"># Things that look wrong</span>
+    anomalies: list[<span style="color: #f78e7e;">Anomaly</span>]
+
+    <span style="color: #888;"># What the business should consider</span>
+    suggestions: list[<span style="color: #d87ef7;">Suggestion</span>]
+
+    <span style="color: #888;"># Natural language for chat</span>
+    summary: <span style="color: #7ef7a8;">str</span>
+    key_findings: list[<span style="color: #7ef7a8;">str</span>]
+
+    <span style="color: #888;"># Checks to auto-create</span>
+    checks_to_create: list[<span style="color: #7eb8f7;">CheckSpec</span>]
+
+<span style="color: #d87ef7;">class</span> <span style="color: #f7c87e;">Dimension</span>(BaseModel):
+    name: <span style="color: #7ef7a8;">str</span>  <span style="color: #888;"># "data_freshness"</span>
+    label: <span style="color: #7ef7a8;">str</span>  <span style="color: #888;"># "Data Freshness"</span>
+    score: <span style="color: #7ef7a8;">int</span>  <span style="color: #888;"># 0-100</span>
+    trend: <span style="color: #7ef7a8;">Literal</span>[
+        "improving", "stable", "declining"
+    ]
+    delta: <span style="color: #7ef7a8;">float | None</span>  <span style="color: #888;"># vs last run</span>
+    details: <span style="color: #7ef7a8;">str</span>  <span style="color: #888;"># explanation</span>
+
+<span style="color: #d87ef7;">class</span> <span style="color: #f78e7e;">Anomaly</span>(BaseModel):
+    severity: <span style="color: #7ef7a8;">Literal</span>[
+        "low", "medium", "high", "critical"
+    ]
+    category: <span style="color: #7ef7a8;">str</span>  <span style="color: #888;"># "volume", "quality", etc</span>
+    table: <span style="color: #7ef7a8;">str</span>
+    description: <span style="color: #7ef7a8;">str</span>
+    evidence: <span style="color: #7ef7a8;">str</span>  <span style="color: #888;"># supporting data</span>
+    compared_to: <span style="color: #7ef7a8;">str | None</span>  <span style="color: #888;"># "7-day avg"</span>
+
+<span style="color: #d87ef7;">class</span> <span style="color: #d87ef7;">Suggestion</span>(BaseModel):
+    priority: <span style="color: #7ef7a8;">Literal</span>[
+        "low", "medium", "high"
+    ]
+    category: <span style="color: #7ef7a8;">str</span>  <span style="color: #888;"># "growth", "retention"</span>
+    action: <span style="color: #7ef7a8;">str</span>  <span style="color: #888;"># what to do</span>
+    reasoning: <span style="color: #7ef7a8;">str</span>  <span style="color: #888;"># why</span>
+    based_on: <span style="color: #7ef7a8;">str</span>  <span style="color: #888;"># evidence</span></pre>
+    </div>
+
+    <div style="flex: 0.8;">
+      <div style="background: #2a2a4a; border-radius: 8px; padding: 16px; margin-bottom: 12px;">
+        <div style="font-weight: 600; color: #7eb8f7; margin-bottom: 8px;">Design Rationale</div>
+        <div style="font-size: 13px; color: #ccc; line-height: 1.7;">
+          <strong style="color: #f7c87e;">Structured + Natural language</strong><br>
+          Dimensions/anomalies/suggestions are structured for the dashboard. Summary + key_findings are natural language for chat.<br><br>
+          <strong style="color: #f7c87e;">Evidence-based</strong><br>
+          Every anomaly has <code>evidence</code>, every suggestion has <code>based_on</code>. The AI must show its work, not just assert.<br><br>
+          <strong style="color: #f7c87e;">Actionable</strong><br>
+          Suggestions have priority + category. checks_to_create are ready-to-persist ClefCreate specs.<br><br>
+          <strong style="color: #f7c87e;">Comparable</strong><br>
+          Dimensions have trend + delta so the dashboard can show direction arrows and sparklines.
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Dashboard mockup -->
+<h3 style="margin-top: 32px;">Dashboard Wireframe</h3>
+<p class="subtitle">How the frontend renders InsightReports</p>
+
+<div style="background: #1a1a2e; border-radius: 12px; padding: 24px; font-family: system-ui, -apple-system, sans-serif; color: #e0e0e0;">
+
+  <!-- Top bar: health score + overview -->
+  <div style="display: flex; gap: 16px; margin-bottom: 20px;">
+    <div style="width: 140px; background: #2a2a4a; border-radius: 10px; padding: 20px; text-align: center;">
+      <div style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 8px;">Health Score</div>
+      <div style="font-size: 48px; font-weight: 700; color: #7ef7a8;">78</div>
+      <div style="font-size: 12px; color: #7ef7a8; margin-top: 4px;">&#x25B2; +3 vs yesterday</div>
+    </div>
+    <div style="flex: 1; background: #2a2a4a; border-radius: 10px; padding: 20px;">
+      <div style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 12px;">Key Findings</div>
+      <div style="font-size: 13px; color: #ccc; line-height: 1.8;">
+        &bull; Order volume recovered to normal levels after Monday dip<br>
+        &bull; New customer signups up 12% week-over-week — marketing campaign working<br>
+        &bull; Payment failure rate elevated at 4.8% (normal: 2-3%) — investigate gateway
+      </div>
+    </div>
+  </div>
+
+  <!-- Dimension cards -->
+  <div style="font-size: 11px; color: #888; text-transform: uppercase; margin-bottom: 10px;">Dimensions</div>
+  <div style="display: flex; gap: 12px; margin-bottom: 20px;">
+    <div style="flex: 1; background: #2a2a4a; border-radius: 8px; padding: 14px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <span style="font-weight: 600; font-size: 13px;">Data Freshness</span>
+        <span style="color: #7ef7a8; font-size: 12px;">&#x25B2; improving</span>
+      </div>
+      <div style="font-size: 28px; font-weight: 700; color: #7ef7a8;">92</div>
+      <div style="height: 4px; background: #1a1a2e; border-radius: 2px; margin-top: 8px;">
+        <div style="height: 4px; background: #7ef7a8; border-radius: 2px; width: 92%;"></div>
+      </div>
+    </div>
+    <div style="flex: 1; background: #2a2a4a; border-radius: 8px; padding: 14px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <span style="font-weight: 600; font-size: 13px;">Completeness</span>
+        <span style="color: #f7c87e; font-size: 12px;">&#x25CF; stable</span>
+      </div>
+      <div style="font-size: 28px; font-weight: 700; color: #f7c87e;">71</div>
+      <div style="height: 4px; background: #1a1a2e; border-radius: 2px; margin-top: 8px;">
+        <div style="height: 4px; background: #f7c87e; border-radius: 2px; width: 71%;"></div>
+      </div>
+    </div>
+    <div style="flex: 1; background: #2a2a4a; border-radius: 8px; padding: 14px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <span style="font-weight: 600; font-size: 13px;">Volume Health</span>
+        <span style="color: #7ef7a8; font-size: 12px;">&#x25B2; improving</span>
+      </div>
+      <div style="font-size: 28px; font-weight: 700; color: #7eb8f7;">85</div>
+      <div style="height: 4px; background: #1a1a2e; border-radius: 2px; margin-top: 8px;">
+        <div style="height: 4px; background: #7eb8f7; border-radius: 2px; width: 85%;"></div>
+      </div>
+    </div>
+    <div style="flex: 1; background: #2a2a4a; border-radius: 8px; padding: 14px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+        <span style="font-weight: 600; font-size: 13px;">Business KPIs</span>
+        <span style="color: #f78e7e; font-size: 12px;">&#x25BC; declining</span>
+      </div>
+      <div style="font-size: 28px; font-weight: 700; color: #f78e7e;">58</div>
+      <div style="height: 4px; background: #1a1a2e; border-radius: 2px; margin-top: 8px;">
+        <div style="height: 4px; background: #f78e7e; border-radius: 2px; width: 58%;"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Anomalies + Suggestions side by side -->
+  <div style="display: flex; gap: 16px;">
+    <div style="flex: 1; background: #2a2a4a; border-radius: 10px; padding: 16px;">
+      <div style="font-size: 11px; color: #f78e7e; text-transform: uppercase; margin-bottom: 12px;">Anomalies (2)</div>
+
+      <div style="background: #1a1a2e; border-left: 3px solid #f78e7e; border-radius: 4px; padding: 12px; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span style="font-weight: 600; font-size: 13px; color: #f78e7e;">HIGH</span>
+          <span style="font-size: 11px; color: #888;">payments table</span>
+        </div>
+        <div style="font-size: 13px; color: #ccc;">Payment failure rate 4.8% — 2x normal baseline</div>
+        <div style="font-size: 11px; color: #888; margin-top: 4px;">Evidence: 7-day avg was 2.3%, spiked since Tuesday</div>
+      </div>
+
+      <div style="background: #1a1a2e; border-left: 3px solid #f7c87e; border-radius: 4px; padding: 12px;">
+        <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+          <span style="font-weight: 600; font-size: 13px; color: #f7c87e;">MEDIUM</span>
+          <span style="font-size: 11px; color: #888;">customers table</span>
+        </div>
+        <div style="font-size: 13px; color: #ccc;">Email column null rate increased to 15%</div>
+        <div style="font-size: 11px; color: #888; margin-top: 4px;">Evidence: was stable at 8% for 3 weeks</div>
+      </div>
+    </div>
+
+    <div style="flex: 1; background: #2a2a4a; border-radius: 10px; padding: 16px;">
+      <div style="font-size: 11px; color: #d87ef7; text-transform: uppercase; margin-bottom: 12px;">Business Suggestions (3)</div>
+
+      <div style="background: #1a1a2e; border-left: 3px solid #d87ef7; border-radius: 4px; padding: 12px; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-weight: 600; font-size: 13px; color: #d87ef7;">Investigate payment gateway</span>
+          <div style="display: flex; gap: 4px;">
+            <span style="background: #2a4a2a; color: #7ef7a8; font-size: 10px; padding: 2px 8px; border-radius: 10px; cursor: pointer;">Accept</span>
+            <span style="background: #4a2a2a; color: #f78e7e; font-size: 10px; padding: 2px 8px; border-radius: 10px; cursor: pointer;">Dismiss</span>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: #aaa;">Payment failures doubled — could be losing ~$12K/day in revenue</div>
+      </div>
+
+      <div style="background: #1a1a2e; border-left: 3px solid #d87ef7; border-radius: 4px; padding: 12px; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-weight: 600; font-size: 13px; color: #d87ef7;">Fix email collection flow</span>
+          <div style="display: flex; gap: 4px;">
+            <span style="background: #2a4a2a; color: #7ef7a8; font-size: 10px; padding: 2px 8px; border-radius: 10px; cursor: pointer;">Accept</span>
+            <span style="background: #4a2a2a; color: #f78e7e; font-size: 10px; padding: 2px 8px; border-radius: 10px; cursor: pointer;">Dismiss</span>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: #aaa;">Rising null emails hurt marketing reach — check signup form validation</div>
+      </div>
+
+      <div style="background: #1a1a2e; border-left: 3px solid #d87ef7; border-radius: 4px; padding: 12px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+          <span style="font-weight: 600; font-size: 13px; color: #d87ef7;">Double down on acquisition</span>
+          <div style="display: flex; gap: 4px;">
+            <span style="background: #2a4a2a; color: #7ef7a8; font-size: 10px; padding: 2px 8px; border-radius: 10px; cursor: pointer;">Accept</span>
+            <span style="background: #4a2a2a; color: #f78e7e; font-size: 10px; padding: 2px 8px; border-radius: 10px; cursor: pointer;">Dismiss</span>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: #aaa;">New signups up 12% — whatever campaign is running, consider increasing budget</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI-created checks -->
+  <div style="margin-top: 20px; background: #2a2a4a; border-radius: 10px; padding: 16px;">
+    <div style="font-size: 11px; color: #7eb8f7; text-transform: uppercase; margin-bottom: 12px;">AI-Created Checks (auto-generated)</div>
+    <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+      <div style="background: #1a1a2e; border: 1px solid #3a3a5a; border-radius: 6px; padding: 8px 14px; font-size: 12px;">
+        <span style="color: #7eb8f7;">&#x2713;</span> orders freshness (hourly)
+      </div>
+      <div style="background: #1a1a2e; border: 1px solid #3a3a5a; border-radius: 6px; padding: 8px 14px; font-size: 12px;">
+        <span style="color: #7eb8f7;">&#x2713;</span> orders volume anomaly (daily)
+      </div>
+      <div style="background: #1a1a2e; border: 1px solid #3a3a5a; border-radius: 6px; padding: 8px 14px; font-size: 12px;">
+        <span style="color: #7eb8f7;">&#x2713;</span> payments failure rate (hourly)
+      </div>
+      <div style="background: #1a1a2e; border: 1px solid #3a3a5a; border-radius: 6px; padding: 8px 14px; font-size: 12px;">
+        <span style="color: #7eb8f7;">&#x2713;</span> customers email completeness (daily)
+      </div>
+      <div style="background: #1a1a2e; border: 1px solid #3a3a5a; border-radius: 6px; padding: 8px 14px; font-size: 12px;">
+        <span style="color: #7eb8f7;">&#x2713;</span> revenue trend monitor (daily)
+      </div>
+    </div>
+    <div style="font-size: 11px; color: #888; margin-top: 8px;">All tagged <code style="background:#1a1a2e; padding: 1px 4px; border-radius: 2px;">source: ai-generated</code> &mdash; visible, editable, deletable by user</div>
+  </div>
+
+</div>
+
+<!-- Chat example -->
+<h3 style="margin-top: 32px;">Chat Interface Example</h3>
+<p class="subtitle">Same InsightReport, different rendering</p>
+
+<div style="background: #1a1a2e; border-radius: 12px; padding: 24px; font-family: system-ui, -apple-system, sans-serif; color: #e0e0e0; max-width: 600px;">
+
+  <!-- User message -->
+  <div style="display: flex; justify-content: flex-end; margin-bottom: 12px;">
+    <div style="background: #3a3a7a; border-radius: 12px 12px 4px 12px; padding: 12px 16px; max-width: 70%; font-size: 13px;">
+      What's going on with my e-commerce data this week?
+    </div>
+  </div>
+
+  <!-- AI response -->
+  <div style="display: flex; justify-content: flex-start; margin-bottom: 12px;">
+    <div style="background: #2a2a4a; border-radius: 12px 12px 12px 4px; padding: 16px; max-width: 85%; font-size: 13px; line-height: 1.7;">
+      <div style="font-weight: 600; color: #7eb8f7; margin-bottom: 8px;">Your data health is at 78/100 &#x25B2;</div>
+
+      Here's what I'm seeing this week:<br><br>
+
+      <strong style="color: #7ef7a8;">Good news:</strong> Order volume has recovered from Monday's dip and new customer signups are up 12% week-over-week. Whatever marketing campaign you're running is working.<br><br>
+
+      <strong style="color: #f78e7e;">Needs attention:</strong> Payment failure rate has doubled to 4.8% since Tuesday (normally 2-3%). This could be costing you roughly $12K/day in lost revenue. I'd recommend investigating your payment gateway.<br><br>
+
+      <strong style="color: #f7c87e;">Also noticed:</strong> Email null rates in the customers table jumped from 8% to 15%. Might be a signup form issue — worth checking if a recent deploy changed the form validation.<br><br>
+
+      I've auto-created 5 monitoring checks to keep an eye on these patterns. Want me to walk you through them?
+    </div>
+  </div>
+</div>
