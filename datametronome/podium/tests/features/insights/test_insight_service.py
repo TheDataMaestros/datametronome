@@ -1,4 +1,7 @@
 """Tests for intelligence pipeline service."""
+import json
+from typing import Any
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -348,3 +351,220 @@ async def test_persist_results_extracts_schema_interpretation(service):
     assert "schema_interpretation" in call_args[0][1]
     # _schema_interpretation should have been removed from bi_analysis
     assert "_schema_interpretation" not in bi_analysis
+
+
+# ------------------------------------------------------------------
+# BI plan management path tests
+# ------------------------------------------------------------------
+
+
+def _stave_row(**overrides: Any) -> dict[str, Any]:
+    """Build a minimal stave row dict accepted by deserialize_stave."""
+    row: dict[str, Any] = {
+        "id": "stave-1",
+        "name": "Test",
+        "data_source_type": "postgres",
+        "connection_config": json.dumps({"schema": "public"}),
+        "is_active": True,
+        "paused": False,
+        "created_at": "2026-03-16T00:00:00Z",
+        "updated_at": "2026-03-16T00:00:00Z",
+    }
+    row.update(overrides)
+    return row
+
+
+@pytest.mark.asyncio
+async def test_bi_invalidates_plan_on_fingerprint_mismatch():
+    """When schema fingerprint changes, existing plan is invalidated and regenerated."""
+    from datametronome_podium.features.insights.model import DataProfile, StaveQueryPlan
+    from datametronome_podium.features.insights.repo import InsightsRepo
+
+    mock_executor = AsyncMock()
+    mock_executor.query = AsyncMock(return_value=[_stave_row()])
+
+    mock_repo = AsyncMock(spec=InsightsRepo)
+    # existing plan has OLD fingerprint
+    mock_repo.get_valid_plan = AsyncMock(return_value=StaveQueryPlan(
+        id="old-plan",
+        stave_id="stave-1",
+        schema_fingerprint="old-fp",
+        kpi_queries={"monthly_revenue": "SELECT 1"},
+        generated_at="2026-03-16T00:00:00Z",
+    ))
+    mock_repo.invalidate_plan = AsyncMock(return_value=1)
+    mock_repo.create_plan = AsyncMock(return_value=1)
+
+    profile = DataProfile(
+        id="dp-1", stave_id="stave-1", tenant_id="default",
+        domain_type="e-commerce", domain_confidence=0.9,
+        created_at="2026-03-16T00:00:00Z", updated_at="2026-03-16T00:00:00Z",
+    )
+
+    archetype_with_kpis = {
+        "name": "e-commerce",
+        "kpi_definitions": [{"name": "monthly_revenue", "description": "Total revenue"}],
+        "performer_dimensions": [],
+    }
+
+    schema_interp = MagicMock()
+    schema_interp.model_dump = lambda: {"table_roles": {}, "column_roles": {}, "key_observations": []}
+
+    generated_plan = MagicMock()
+    generated_plan.kpi_queries = {"monthly_revenue": "SELECT SUM(amount) as value FROM orders"}
+    generated_plan.performer_queries = {}
+    generated_plan.skipped = []
+
+    bi_report = MagicMock()
+    bi_report.model_dump = lambda: {
+        "business_health_score": 80,
+        "executive_summary": "Good.",
+        "kpis": [], "top_performers": [], "bottom_performers": [],
+        "trends": [], "opportunities": [], "risks": [], "skipped_kpis": [],
+    }
+
+    with patch("datametronome_podium.features.insights.service.load_archetype", return_value=archetype_with_kpis), \
+         patch("datametronome_podium.services.agent_factory.build_heavy_model_from_settings", return_value=MagicMock()), \
+         patch("datametronome_podium.services.agents.business_intelligence.run_phase1_schema_overview", new_callable=AsyncMock, return_value=schema_interp), \
+         patch("datametronome_podium.services.agents.business_intelligence.run_phase2_generate_and_validate", new_callable=AsyncMock, return_value=generated_plan), \
+         patch("datametronome_podium.services.agents.business_intelligence.run_phase3_execute_and_analyze", new_callable=AsyncMock, return_value=bi_report), \
+         patch("datametronome_podium.services.connection_tester.ConnectionTester") as mock_tester_cls:
+        mock_connector = AsyncMock()
+        mock_connector.close = AsyncMock()
+        mock_tester_cls.return_value.get_connector = AsyncMock(return_value=mock_connector)
+
+        service = InsightPipelineService.__new__(InsightPipelineService)
+        service.executor = mock_executor
+        service.repo = mock_repo
+
+        result = await service._analyze_business_intelligence(
+            stave_id="stave-1",
+            snapshot=MagicMock(),
+            profile=profile,
+            discovery={"schema": {"orders": {"amount": {}}}, "samples": {}},
+            fingerprint="new-fp",
+        )
+
+    # invalidate_plan must be called (old plan had "old-fp", new is "new-fp")
+    mock_repo.invalidate_plan.assert_called_once()
+    # create_plan must be called with the new fingerprint
+    mock_repo.create_plan.assert_called_once()
+    call_plan = mock_repo.create_plan.call_args[0][0]
+    assert call_plan.schema_fingerprint == "new-fp"
+    assert result is not None
+
+
+@pytest.mark.asyncio
+async def test_bi_reuses_existing_plan_when_fingerprint_matches():
+    """When schema fingerprint is unchanged, existing plan is reused without regeneration."""
+    from datametronome_podium.features.insights.model import DataProfile, StaveQueryPlan
+    from datametronome_podium.features.insights.repo import InsightsRepo
+
+    mock_executor = AsyncMock()
+    mock_executor.query = AsyncMock(return_value=[_stave_row()])
+
+    mock_repo = AsyncMock(spec=InsightsRepo)
+    existing_plan = StaveQueryPlan(
+        id="plan-1",
+        stave_id="stave-1",
+        schema_fingerprint="current-fp",
+        kpi_queries={"monthly_revenue": "SELECT SUM(amount) as value FROM orders"},
+        generated_at="2026-03-16T00:00:00Z",
+    )
+    mock_repo.get_valid_plan = AsyncMock(return_value=existing_plan)
+    mock_repo.invalidate_plan = AsyncMock(return_value=1)
+    mock_repo.create_plan = AsyncMock(return_value=1)
+
+    profile = DataProfile(
+        id="dp-1", stave_id="stave-1", tenant_id="default",
+        domain_type="e-commerce", domain_confidence=0.9,
+        created_at="2026-03-16T00:00:00Z", updated_at="2026-03-16T00:00:00Z",
+    )
+
+    archetype_with_kpis = {
+        "name": "e-commerce",
+        "kpi_definitions": [{"name": "monthly_revenue", "description": "Total revenue"}],
+        "performer_dimensions": [],
+    }
+
+    bi_report = MagicMock()
+    bi_report.model_dump = lambda: {
+        "business_health_score": 80, "executive_summary": "Good.",
+        "kpis": [], "top_performers": [], "bottom_performers": [],
+        "trends": [], "opportunities": [], "risks": [], "skipped_kpis": [],
+    }
+
+    with patch("datametronome_podium.features.insights.service.load_archetype", return_value=archetype_with_kpis), \
+         patch("datametronome_podium.services.agent_factory.build_heavy_model_from_settings", return_value=MagicMock()), \
+         patch("datametronome_podium.services.agents.business_intelligence.run_phase1_schema_overview", new_callable=AsyncMock) as mock_p1, \
+         patch("datametronome_podium.services.agents.business_intelligence.run_phase2_generate_and_validate", new_callable=AsyncMock) as mock_p2, \
+         patch("datametronome_podium.services.agents.business_intelligence.run_phase3_execute_and_analyze", new_callable=AsyncMock, return_value=bi_report), \
+         patch("datametronome_podium.services.connection_tester.ConnectionTester") as mock_tester_cls:
+        mock_connector = AsyncMock()
+        mock_connector.close = AsyncMock()
+        mock_tester_cls.return_value.get_connector = AsyncMock(return_value=mock_connector)
+
+        service = InsightPipelineService.__new__(InsightPipelineService)
+        service.executor = mock_executor
+        service.repo = mock_repo
+
+        result = await service._analyze_business_intelligence(
+            stave_id="stave-1",
+            snapshot=MagicMock(),
+            profile=profile,
+            discovery={"schema": {"orders": {"amount": {}}}, "samples": {}},
+            fingerprint="current-fp",
+        )
+
+    # Phase 1 and 2 must NOT have been called
+    mock_p1.assert_not_called()
+    mock_p2.assert_not_called()
+    # invalidate and create must NOT have been called
+    mock_repo.invalidate_plan.assert_not_called()
+    mock_repo.create_plan.assert_not_called()
+    assert result is not None
+
+
+@pytest.mark.asyncio
+async def test_bi_returns_none_on_demand_with_no_existing_plan():
+    """On-demand call (no discovery/fingerprint) with no cached plan returns None."""
+    from datametronome_podium.features.insights.model import DataProfile
+    from datametronome_podium.features.insights.repo import InsightsRepo
+
+    mock_executor = AsyncMock()
+    mock_executor.query = AsyncMock(return_value=[_stave_row()])
+
+    mock_repo = AsyncMock(spec=InsightsRepo)
+    mock_repo.get_valid_plan = AsyncMock(return_value=None)
+
+    profile = DataProfile(
+        id="dp-1", stave_id="stave-1", tenant_id="default",
+        domain_type="e-commerce", domain_confidence=0.9,
+        created_at="2026-03-16T00:00:00Z", updated_at="2026-03-16T00:00:00Z",
+    )
+
+    archetype_with_kpis = {
+        "name": "e-commerce",
+        "kpi_definitions": [{"name": "monthly_revenue", "description": "Total revenue"}],
+        "performer_dimensions": [],
+    }
+
+    with patch("datametronome_podium.features.insights.service.load_archetype", return_value=archetype_with_kpis), \
+         patch("datametronome_podium.services.agent_factory.build_heavy_model_from_settings", return_value=MagicMock()), \
+         patch("datametronome_podium.services.connection_tester.ConnectionTester") as mock_tester_cls:
+        mock_connector = AsyncMock()
+        mock_connector.close = AsyncMock()
+        mock_tester_cls.return_value.get_connector = AsyncMock(return_value=mock_connector)
+
+        service = InsightPipelineService.__new__(InsightPipelineService)
+        service.executor = mock_executor
+        service.repo = mock_repo
+
+        result = await service._analyze_business_intelligence(
+            stave_id="stave-1",
+            snapshot=MagicMock(),
+            profile=profile,
+            # No discovery, no fingerprint = on-demand
+        )
+
+    assert result is None
