@@ -1,5 +1,23 @@
 <template>
   <div class="space-y-6">
+    <!-- Persistent Datasource Bar -->
+    <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-sm">
+      <DatasourceSelector
+        v-model="selectedStaveId"
+        :staves="staves"
+        :stave-health-scores="staveHealthScores"
+      />
+      <div v-if="selectedStaveId" class="ml-auto flex items-center gap-2 text-xs text-blue-300">
+        <Icon name="i-heroicons-funnel" class="w-3 h-3" />
+        <span>
+          <strong>{{ staves.find(s => s.id === selectedStaveId)?.name }}</strong>
+          <span v-if="scopedProfile?.domain_type"> · {{ scopedProfile.domain_type }}</span>
+          <span v-if="scopedDashboard?.health_score"> · {{ scopedDashboard.health_score }}/100</span>
+        </span>
+        <button class="ml-1 text-blue-400 hover:text-blue-200 transition-colors" @click="selectedStaveId = null">✕</button>
+      </div>
+    </div>
+
     <!-- Welcome Header -->
     <div class="flex items-center justify-between">
       <div>
@@ -85,41 +103,24 @@
 
     <!-- Intelligence Pulse Section -->
     <div v-if="intelligence && intelligence.totalReports > 0" class="space-y-3">
-      <div class="flex items-center justify-between flex-wrap gap-3">
-        <div class="flex items-center gap-3">
-          <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
-            Intelligence Pulse
-          </h2>
-          <span class="intelligence-domain-badge">
-            <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            AI Active
-          </span>
-        </div>
-        <div class="flex items-center gap-3 flex-wrap">
-          <DatasourceSelector
-            v-model="selectedStaveId"
-            :staves="staves"
-            :stave-health-scores="staveHealthScores"
-          />
-          <UButton
-            color="gray"
-            variant="ghost"
-            size="sm"
-            icon="i-heroicons-chat-bubble-left-right"
-            @click="navigateTo('/chat')"
-          >
-            Ask AI
-          </UButton>
-        </div>
-      </div>
-
-      <!-- Context banner when a source is selected -->
-      <div v-if="selectedStaveId" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20 text-xs text-blue-300">
-        <Icon name="i-heroicons-funnel" class="w-3 h-3" />
-        Viewing: <strong>{{ staves.find(s => s.id === selectedStaveId)?.name }}</strong>
-        <span v-if="scopedProfile?.domain_type">· {{ scopedProfile.domain_type }}</span>
-        <span v-if="scopedDashboard?.health_score">· {{ scopedDashboard.health_score }}/100</span>
-        <button class="ml-auto text-blue-400 hover:text-blue-200" @click="selectedStaveId = null">✕ Clear</button>
+      <div class="flex items-center gap-3">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
+          Intelligence Pulse
+        </h2>
+        <span class="intelligence-domain-badge">
+          <span class="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          AI Active
+        </span>
+        <UButton
+          color="gray"
+          variant="ghost"
+          size="sm"
+          icon="i-heroicons-chat-bubble-left-right"
+          class="ml-auto"
+          @click="navigateTo('/chat')"
+        >
+          Ask AI
+        </UButton>
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
