@@ -471,9 +471,12 @@ async def _fetch_intelligence_metrics(db: Any) -> Dict[str, Any]:
         top_suggestions_result = await db.query(
             {
                 "sql": (
-                    "SELECT priority, category, action, reasoning "
-                    "FROM insight_suggestions WHERE status = 'pending' "
-                    "ORDER BY CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END "
+                    "SELECT s.priority, s.category, s.action, s.reasoning, "
+                    "s.stave_id, st.name AS stave_name "
+                    "FROM insight_suggestions s "
+                    "LEFT JOIN staves st ON s.stave_id = st.id "
+                    "WHERE s.status = 'pending' "
+                    "ORDER BY CASE s.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END "
                     "LIMIT 3"
                 ),
                 "params": [],
@@ -485,6 +488,8 @@ async def _fetch_intelligence_metrics(db: Any) -> Dict[str, Any]:
                 "category": row.get("category", "general"),
                 "action": row.get("action", ""),
                 "reasoning": row.get("reasoning", ""),
+                "stave_id": row.get("stave_id", ""),
+                "stave_name": row.get("stave_name") or row.get("stave_id", ""),
             }
             for row in (top_suggestions_result or [])
         ]
@@ -494,10 +499,11 @@ async def _fetch_intelligence_metrics(db: Any) -> Dict[str, Any]:
         anomaly_reports = await db.query(
             {
                 "sql": (
-                    "SELECT r.anomalies, r.created_at AS report_at, "
-                    "s.captured_at AS snapshot_at "
+                    "SELECT r.anomalies, r.stave_id, st.name AS stave_name, "
+                    "r.created_at AS report_at, s.captured_at AS snapshot_at "
                     "FROM insight_reports r "
                     "LEFT JOIN baseline_snapshots s ON r.snapshot_id = s.id "
+                    "LEFT JOIN staves st ON r.stave_id = st.id "
                     "ORDER BY r.created_at DESC LIMIT 5"
                 ),
                 "params": [],
@@ -529,6 +535,8 @@ async def _fetch_intelligence_metrics(db: Any) -> Dict[str, Any]:
                                     "evidence": a.get("evidence", ""),
                                     "detected_at": row.get("report_at"),
                                     "snapshot_at": row.get("snapshot_at"),
+                                    "stave_id": row.get("stave_id", ""),
+                                    "stave_name": row.get("stave_name") or row.get("stave_id", ""),
                                 })
             except (ValueError, TypeError):
                 pass
