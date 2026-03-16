@@ -3,9 +3,10 @@
     <!-- Persistent Datasource Bar -->
     <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-sm">
       <DatasourceSelector
-        v-model="selectedStaveId"
+        :model-value="selectedStaveId"
         :staves="staves"
         :stave-health-scores="staveHealthScores"
+        @update:model-value="selectStave"
       />
       <div v-if="selectedStaveId" class="ml-auto flex items-center gap-2 text-xs text-blue-300">
         <Icon name="i-heroicons-funnel" class="w-3 h-3" />
@@ -14,7 +15,7 @@
           <span v-if="scopedProfile?.domain_type"> · {{ scopedProfile.domain_type }}</span>
           <span v-if="scopedDashboard?.health_score"> · {{ scopedDashboard.health_score }}/100</span>
         </span>
-        <button class="ml-1 text-blue-400 hover:text-blue-200 transition-colors" @click="selectedStaveId = null">✕</button>
+        <button class="ml-1 text-blue-400 hover:text-blue-200 transition-colors" @click="selectStave(null)">✕</button>
       </div>
     </div>
 
@@ -595,14 +596,7 @@ const { checks, fetchLatest } = useChecks()
 const { metrics: dashboardMetrics, fetchMetrics } = useDashboard()
 
 const { loadPrefs } = useDashboardPrefs()
-
-// Selected stave ID: null = "All", string = specific stave
-const selectedStaveId = ref<string | null>(null)
-
-// Per-stave scoped data (loaded when a specific stave is selected)
-const scopedDashboard = ref<any>(null)
-const scopedProfile = ref<any>(null)
-const isScopedLoading = ref(false)
+const { selectedStaveId, scopedDashboard, scopedProfile, isScopedLoading, selectStave } = useSelectedStave()
 
 const isRunningChecks = ref(false)
 
@@ -675,26 +669,6 @@ const staveHealthScores = computed<Record<string, number>>(
   () => dashboardMetrics.value?.intelligence?.stave_health_scores ?? {}
 )
 
-// Watcher: load per-stave scoped data when a source is selected
-watch(selectedStaveId, async (staveId) => {
-  if (!staveId) {
-    scopedDashboard.value = null
-    scopedProfile.value = null
-    return
-  }
-  isScopedLoading.value = true
-  try {
-    const { insightsService } = await import('~/services/insights')
-    const [dashboard, profile] = await Promise.allSettled([
-      insightsService.getDashboard(staveId),
-      insightsService.getProfile(staveId),
-    ])
-    scopedDashboard.value = dashboard.status === 'fulfilled' ? dashboard.value : null
-    scopedProfile.value = profile.status === 'fulfilled' ? profile.value : null
-  } finally {
-    isScopedLoading.value = false
-  }
-})
 
 // Active data: scoped when a source is selected, otherwise global
 const activeHealthScore = computed(() =>

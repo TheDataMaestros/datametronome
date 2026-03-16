@@ -53,6 +53,58 @@
         </NuxtLink>
       </nav>
 
+      <!-- Stave Selector -->
+      <div class="dm-stave-section" v-if="!collapsed">
+        <span class="dm-nav__section-label">Datasource</span>
+        <div class="dm-stave-picker" ref="stavePicker">
+          <button class="dm-stave-trigger" @click="staveOpen = !staveOpen">
+            <template v-if="selectedStaveId">
+              <span
+                class="dm-stave-dot"
+                :style="{ background: selectedStaveHealthColor }"
+              />
+              <span class="dm-stave-name">{{ selectedSlaveName }}</span>
+            </template>
+            <template v-else>
+              <Icon name="i-heroicons-circle-stack" class="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+              <span class="dm-stave-placeholder">Select Stave</span>
+            </template>
+            <Icon name="i-heroicons-chevron-up-down" class="w-3.5 h-3.5 text-slate-500 ml-auto flex-shrink-0" />
+          </button>
+          <div v-if="staveOpen" class="dm-stave-dropdown">
+            <button
+              class="dm-stave-option"
+              :class="{ 'is-active': selectedStaveId === null }"
+              @click="pickStave(null)"
+            >
+              <span class="dm-stave-dot" style="background: #475569" />
+              <span>All sources</span>
+            </button>
+            <button
+              v-for="stave in sidebarStaves"
+              :key="stave.id"
+              class="dm-stave-option"
+              :class="{ 'is-active': selectedStaveId === stave.id }"
+              @click="pickStave(stave.id)"
+            >
+              <span class="dm-stave-dot" :style="{ background: staveColor(stave.id) }" />
+              <span class="truncate">{{ stave.name }}</span>
+              <span class="ml-auto text-[10px] font-mono" :style="{ color: staveColor(stave.id) }">
+                {{ sidebarHealthScores[stave.id] ?? '' }}
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- Collapsed stave dot indicator -->
+      <div v-else-if="selectedStaveId" class="flex justify-center py-2">
+        <span
+          class="w-2 h-2 rounded-full"
+          :style="{ background: selectedStaveHealthColor }"
+          :title="selectedSlaveName"
+        />
+      </div>
+
       <!-- User Footer -->
       <div class="dm-sidebar__footer">
         <div class="dm-user" :title="collapsed ? (user?.name || 'Admin User') : undefined">
@@ -162,6 +214,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '~/stores/auth'
 import { useNotifications } from '~/composables/useNotifications'
+import { healthColor } from '~/utils/healthColor'
 
 const authStore = useAuthStore()
 const route = useRoute()
@@ -262,6 +315,42 @@ const userMenuItems = [
   [{ label: 'Sign out', icon: 'i-heroicons-arrow-right-on-rectangle', click: () => authStore.logout() }],
 ]
 
+// ── Stave picker ─────────────────────────────────────────────────────────────
+const { selectedStaveId, selectStave } = useSelectedStave()
+const { staves, fetchStaves } = useStaves()
+const { metrics: dashboardMetrics, fetchMetrics } = useDashboard()
+
+const staveOpen = ref(false)
+const stavePicker = ref<HTMLElement | null>(null)
+onClickOutside(stavePicker, () => { staveOpen.value = false })
+
+const sidebarStaves = computed(() => staves.value ?? [])
+const sidebarHealthScores = computed<Record<string, number>>(
+  () => (dashboardMetrics.value as any)?.intelligence?.stave_health_scores ?? {}
+)
+
+function staveColor(id: string) { return healthColor(sidebarHealthScores.value[id]) }
+
+const selectedSlaveName = computed(() => {
+  if (!selectedStaveId.value) return null
+  return sidebarStaves.value.find((s: any) => s.id === selectedStaveId.value)?.name ?? selectedStaveId.value
+})
+
+const selectedStaveHealthColor = computed(() =>
+  healthColor(selectedStaveId.value ? sidebarHealthScores.value[selectedStaveId.value] : undefined)
+)
+
+function pickStave(id: string | null) {
+  selectStave(id)
+  staveOpen.value = false
+  if (route.path !== '/') navigateTo('/')
+}
+
+onMounted(() => {
+  fetchStaves()
+  fetchMetrics()
+})
+
 async function refreshData() {
   isRefreshing.value = true
   try {
@@ -272,3 +361,60 @@ async function refreshData() {
   }
 }
 </script>
+
+<style scoped>
+.dm-stave-section {
+  padding: 0 10px 8px;
+}
+.dm-stave-picker {
+  position: relative;
+}
+.dm-stave-trigger {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: #0f1117;
+  border: 1px solid #1e293b;
+  color: #94a3b8;
+  font-size: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.dm-stave-trigger:hover { border-color: #334155; }
+.dm-stave-name { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e2e8f0; font-weight: 500; }
+.dm-stave-placeholder { flex: 1; text-align: left; color: #475569; font-style: italic; }
+.dm-stave-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.dm-stave-dropdown {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0; right: 0;
+  z-index: 100;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 4px;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.dm-stave-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #94a3b8;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  transition: background 0.1s;
+}
+.dm-stave-option:hover { background: #263347; color: #e2e8f0; }
+.dm-stave-option.is-active { background: #1e3a5f; color: white; }
+</style>
