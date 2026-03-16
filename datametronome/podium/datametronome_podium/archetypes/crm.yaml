@@ -32,37 +32,16 @@ suggested_checks:
       check: not_null_percentage
       threshold: 0.85
 
-kpi_queries:
-  total_open_opportunities: |
-    SELECT COUNT(*) as value
-    FROM {schema}."opportunities"
-    WHERE status = 'open'
-  pipeline_value: |
-    SELECT COALESCE(SUM(amount), 0) as value
-    FROM {schema}."opportunities"
-    WHERE status = 'open'
-  won_this_month: |
-    SELECT COUNT(*) as value
-    FROM {schema}."opportunities"
-    WHERE status = 'won'
-      AND date_trunc('month', closed_at) = date_trunc('month', NOW())
+kpi_definitions:
+  - name: total_open_opportunities
+    description: Count of open opportunities/deals currently in the pipeline
+  - name: pipeline_value
+    description: Total monetary value of all open opportunities
+  - name: won_this_month
+    description: Count of opportunities marked as won in the current calendar month
 
 performer_dimensions:
   - entity: salesperson
-    rank_query: |
-      SELECT owner_name as name,
-             COALESCE(SUM(amount), 0) as value,
-             '$' as unit
-      FROM {schema}."opportunities"
-      WHERE status = 'won'
-        AND date_trunc('month', closed_at) = date_trunc('month', NOW())
-      GROUP BY owner_name
-      ORDER BY value DESC
-      LIMIT {limit}
-    drill_query: |
-      SELECT date_trunc('month', closed_at)::date as period,
-             COUNT(*) as deals_won,
-             COALESCE(SUM(amount), 0) as revenue
-      FROM {schema}."opportunities"
-      WHERE owner_name = '{entity_name}' AND status = 'won'
-      GROUP BY period ORDER BY period DESC LIMIT 6
+    description: >
+      Which salespeople closed the most revenue this month, and how has each
+      top/bottom performer trended over recent months

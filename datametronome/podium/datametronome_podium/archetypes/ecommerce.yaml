@@ -7,7 +7,6 @@ signatures:
 
 metrics:
   - name: average_order_value
-    query_hint: "AVG(total) FROM orders"
     typical_range: [20, 200]
   - name: cart_abandonment_rate
     typical_range: [0.60, 0.80]
@@ -41,60 +40,21 @@ suggested_checks:
       check: not_null_percentage
       threshold: 0.90
 
-kpi_queries:
-  average_order_value: |
-    SELECT AVG(total_amount) as value
-    FROM {schema}."orders"
-    WHERE status = 'completed'
-  monthly_revenue: |
-    SELECT COALESCE(SUM(total_amount), 0) as value
-    FROM {schema}."orders"
-    WHERE date_trunc('month', created_at) = date_trunc('month', NOW())
-  total_orders_this_month: |
-    SELECT COUNT(*) as value
-    FROM {schema}."orders"
-    WHERE date_trunc('month', created_at) = date_trunc('month', NOW())
-  new_customers_this_month: |
-    SELECT COUNT(*) as value
-    FROM {schema}."customers"
-    WHERE date_trunc('month', created_at) = date_trunc('month', NOW())
+kpi_definitions:
+  - name: average_order_value
+    description: Mean revenue per completed transaction
+  - name: monthly_revenue
+    description: Total revenue generated in the current calendar month
+  - name: total_orders_this_month
+    description: Number of orders placed in the current calendar month
+  - name: new_customers_this_month
+    description: Distinct customers who transacted for the first time this month
 
 performer_dimensions:
   - entity: product
-    rank_query: |
-      SELECT p.product_name as name,
-             COALESCE(SUM(oi.price * oi.quantity), 0) as value,
-             '$' as unit
-      FROM {schema}."products" p
-      JOIN {schema}."order_items" oi ON oi.product_id = p.id
-      GROUP BY p.product_name
-      ORDER BY value DESC
-      LIMIT {limit}
-    drill_query: |
-      SELECT date_trunc('week', o.created_at)::date as period,
-             COALESCE(SUM(oi.price * oi.quantity), 0) as revenue
-      FROM {schema}."order_items" oi
-      JOIN {schema}."orders" o ON o.id = oi.order_id
-      JOIN {schema}."products" p ON p.id = oi.product_id
-      WHERE p.product_name = '{entity_name}'
-      GROUP BY period ORDER BY period DESC LIMIT 8
+    description: >
+      Which products generate the most revenue, and how has each top/bottom
+      product trended week over week
   - entity: category
-    rank_query: |
-      SELECT c.category_name as name,
-             COALESCE(SUM(oi.price * oi.quantity), 0) as value,
-             '$' as unit
-      FROM {schema}."categories" c
-      JOIN {schema}."products" p ON p.category_id = c.id
-      JOIN {schema}."order_items" oi ON oi.product_id = p.id
-      GROUP BY c.category_name
-      ORDER BY value DESC
-      LIMIT {limit}
-    drill_query: |
-      SELECT date_trunc('week', o.created_at)::date as period,
-             COALESCE(SUM(oi.price * oi.quantity), 0) as revenue
-      FROM {schema}."order_items" oi
-      JOIN {schema}."orders" o ON o.id = oi.order_id
-      JOIN {schema}."products" p ON p.id = oi.product_id
-      JOIN {schema}."categories" c ON c.id = p.category_id
-      WHERE c.category_name = '{entity_name}'
-      GROUP BY period ORDER BY period DESC LIMIT 8
+    description: >
+      Which product categories drive the most revenue, with weekly trend breakdown
