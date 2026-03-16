@@ -151,5 +151,6 @@ class StaveQueryPlan(BaseModel):
     kpi_queries: dict[str, str] = {}
     performer_queries: dict[str, dict[str, str]] = {}
     generated_by_model: str = ""
+    skipped: list[dict[str, str]] = []
     generated_at: str
     invalidated_at: str | None = None

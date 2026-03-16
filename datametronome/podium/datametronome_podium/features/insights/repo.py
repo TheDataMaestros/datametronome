@@ -45,7 +45,7 @@ _SNAPSHOT_JSON_FIELDS = ("table_metrics", "column_stats")
 _BUSINESS_REPORT_JSON_FIELDS = (
     "kpis", "top_performers", "bottom_performers", "trends", "opportunities", "risks"
 )
-_PLAN_JSON_FIELDS = ("kpi_queries", "performer_queries")
+_PLAN_JSON_FIELDS = ("kpi_queries", "performer_queries", "skipped")
 
 
 def _deserialize_plan(row: dict) -> StaveQueryPlan:
@@ -57,6 +57,7 @@ def _deserialize_plan(row: dict) -> StaveQueryPlan:
         schema_fingerprint=row["schema_fingerprint"],
         kpi_queries=_parse_json(row.get("kpi_queries", "{}")),
         performer_queries=_parse_json(row.get("performer_queries", "{}")),
+        skipped=_parse_json(row.get("skipped", "[]")),
         generated_by_model=row.get("generated_by_model", ""),
         generated_at=row["generated_at"],
         invalidated_at=row.get("invalidated_at"),

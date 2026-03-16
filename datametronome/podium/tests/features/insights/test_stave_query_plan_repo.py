@@ -33,6 +33,7 @@ def test_stave_query_plan_model_defaults():
     )
     assert plan.kpi_queries == {}
     assert plan.performer_queries == {}
+    assert plan.skipped == []
     assert plan.invalidated_at is None
     assert plan.tenant_id == "default"
     assert isinstance(plan.generated_at, str)
@@ -84,6 +85,42 @@ async def test_create_plan(repo, mock_executor):
     assert isinstance(row["kpi_queries"], str)
     import json
     assert json.loads(row["kpi_queries"]) == {"monthly_revenue": "SELECT 1 as value"}
+
+
+@pytest.mark.asyncio
+async def test_create_plan_serializes_skipped(repo, mock_executor):
+    plan = StaveQueryPlan(
+        id="plan-2",
+        stave_id="stave-1",
+        schema_fingerprint="fp1",
+        kpi_queries={"rev": "SELECT 1"},
+        skipped=[{"name": "churn_rate", "reason": "no column found"}],
+        generated_at="2026-03-16T00:00:00Z",
+    )
+    await repo.create_plan(plan)
+    call_args = mock_executor.insert.call_args
+    row = call_args[0][1]
+    assert isinstance(row["skipped"], str)
+    assert json.loads(row["skipped"]) == [{"name": "churn_rate", "reason": "no column found"}]
+
+
+@pytest.mark.asyncio
+async def test_get_valid_plan_deserializes_skipped(repo, mock_executor):
+    mock_executor.query.return_value = [{
+        "id": "plan-1",
+        "stave_id": "stave-1",
+        "tenant_id": "default",
+        "schema_fingerprint": "fp1",
+        "kpi_queries": json.dumps({}),
+        "performer_queries": json.dumps({}),
+        "skipped": json.dumps([{"name": "churn_rate", "reason": "missing"}]),
+        "generated_by_model": "claude-sonnet-4-6",
+        "generated_at": "2026-03-16T00:00:00Z",
+        "invalidated_at": None,
+    }]
+    result = await repo.get_valid_plan("stave-1")
+    assert result is not None
+    assert result.skipped == [{"name": "churn_rate", "reason": "missing"}]
 
 
 @pytest.mark.asyncio

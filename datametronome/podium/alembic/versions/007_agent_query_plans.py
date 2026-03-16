@@ -31,6 +31,7 @@ def upgrade() -> None:
         performer_queries TEXT NOT NULL DEFAULT '{}',
         generated_by_model TEXT NOT NULL DEFAULT '',
         generated_at TEXT NOT NULL,
+        skipped TEXT NOT NULL DEFAULT '[]',
         invalidated_at TEXT,
         FOREIGN KEY (stave_id) REFERENCES staves (id) ON DELETE CASCADE
     )

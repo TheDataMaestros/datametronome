@@ -338,6 +338,7 @@ class InsightPipelineService:
                     schema_fingerprint=fingerprint,
                     kpi_queries=generated.kpi_queries,
                     performer_queries=generated.performer_queries,
+                    skipped=generated.skipped,
                     generated_by_model=str(model),
                     generated_at=now_iso,
                 )
@@ -346,6 +347,7 @@ class InsightPipelineService:
                 plan_skipped = generated.skipped
             elif existing_plan is not None:
                 active_plan = existing_plan
+                plan_skipped = existing_plan.skipped
             else:
                 # On-demand with no existing plan — skip BI track
                 logger.info(
@@ -355,15 +357,24 @@ class InsightPipelineService:
 
             # Phase 3: execute + analyze
             logger.info("Phase 3: BI analysis for stave %s", stave_id)
-            bi_report = await run_phase3_execute_and_analyze(
-                kpi_queries=active_plan.kpi_queries,
-                performer_queries=active_plan.performer_queries,
-                skipped=plan_skipped,
-                connector=connector,
-                schema_prefix=schema_prefix,
-                domain_type=profile.domain_type,
-                model=model,
-            )
+            try:
+                bi_report = await run_phase3_execute_and_analyze(
+                    kpi_queries=active_plan.kpi_queries,
+                    performer_queries=active_plan.performer_queries,
+                    skipped=plan_skipped,
+                    connector=connector,
+                    schema_prefix=schema_prefix,
+                    domain_type=profile.domain_type,
+                    model=model,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Phase 3 execution failed for stave %s — invalidating plan: %s",
+                    stave_id,
+                    exc,
+                )
+                await self.repo.invalidate_plan(stave_id, now_iso)
+                return None
             result = bi_report.model_dump()
             if schema_interpretation is not None:
                 result["_schema_interpretation"] = schema_interpretation.model_dump()
