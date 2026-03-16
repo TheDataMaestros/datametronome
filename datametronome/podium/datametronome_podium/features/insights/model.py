@@ -15,6 +15,7 @@ class DataProfile(BaseModel):
     schema_map: dict = {}
     entity_roles: dict = {}
     learned_patterns: dict = {}
+    schema_interpretation: dict = {}
     profile_version: int = 1
     previous_classification: dict | None = None
     created_at: str
@@ -138,3 +139,17 @@ class BusinessReport(BaseModel):
     opportunities: list[str] = []
     risks: list[str] = []
     generated_at: str
+
+
+class StaveQueryPlan(BaseModel):
+    """Agent-generated SQL query plan for a stave, cached for reuse."""
+
+    id: str
+    stave_id: str
+    tenant_id: str = "default"
+    schema_fingerprint: str
+    kpi_queries: dict[str, str] = {}
+    performer_queries: dict[str, dict[str, str]] = {}
+    generated_by_model: str = ""
+    generated_at: str
+    invalidated_at: str | None = None

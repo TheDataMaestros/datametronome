@@ -37,6 +37,7 @@ def _parse_json(value: str | dict | list | None) -> dict | list:
 
 _PROFILE_JSON_FIELDS = (
     "domain_context", "schema_map", "entity_roles", "learned_patterns",
+    "schema_interpretation",
 )
 _REPORT_JSON_FIELDS = ("dimensions", "anomalies", "suggestions", "key_findings")
 _SNAPSHOT_JSON_FIELDS = ("table_metrics", "column_stats")
