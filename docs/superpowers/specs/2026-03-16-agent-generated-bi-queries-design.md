@@ -108,7 +108,7 @@ The agent produces an internal schema interpretation before generating any SQL.
 
 ### Phase 2 — Query Generation + Validation *(skipped if valid plan exists)*
 
-Armed with its schema understanding, the agent generates SQL for each KPI and performer dimension defined in the archetype. Phase 2 opens a single read-only connection to the user's database (same pattern as the existing `_analyze_business_intelligence`), reused across all validation queries, and closed in a `finally` block — even if Phase 2 aborts at the threshold check midway through.
+Armed with its schema understanding, the agent generates SQL for each KPI and performer dimension defined in the archetype. A single read-only connection to the user's database is opened before Phase 2 begins and shared through Phase 3 if it runs. It is closed in a single `finally` block wrapping both phases — so the connection is always released whether Phase 2 aborts midway, Phase 3 is skipped, or both phases complete normally.
 
 For each query:
 
