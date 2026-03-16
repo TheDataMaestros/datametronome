@@ -276,7 +276,12 @@ async def patch_current_user(
     Accepts: { "dashboard_prefs": { "pinned_staves": ["id1", "id2", "id3"] } }
     Replaces dashboard_prefs fully (not a merge).
     """
-    new_prefs = body.get("dashboard_prefs", {})
+    if "dashboard_prefs" not in body:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="dashboard_prefs is required",
+        )
+    new_prefs = body["dashboard_prefs"]
     pinned = new_prefs.get("pinned_staves", [])
 
     if not isinstance(pinned, list):

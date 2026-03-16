@@ -72,6 +72,32 @@ async def test_patch_me_saves_pinned_staves():
 
 
 @pytest.mark.asyncio
+async def test_patch_me_accepts_exactly_3_pinned():
+    """PATCH /auth/me accepts exactly 3 pinned_staves (boundary)."""
+    from datametronome_podium.api.v1.endpoints.auth import patch_current_user
+
+    mock_user = {
+        "username": "admin",
+        "email": "admin@datametronome.dev",
+        "is_active": True,
+        "is_superuser": True,
+        "dashboard_prefs": "{}",
+    }
+
+    with patch(
+        "datametronome_podium.api.v1.endpoints.auth.execute_write",
+        new_callable=AsyncMock,
+        return_value=True,
+    ):
+        result = await patch_current_user(
+            body={"dashboard_prefs": {"pinned_staves": ["s1", "s2", "s3"]}},
+            current_user=mock_user,
+        )
+
+    assert len(result["dashboard_prefs"]["pinned_staves"]) == 3
+
+
+@pytest.mark.asyncio
 async def test_patch_me_rejects_more_than_3_pinned():
     """PATCH /auth/me returns 400 when more than 3 staves are pinned."""
     from fastapi import HTTPException
