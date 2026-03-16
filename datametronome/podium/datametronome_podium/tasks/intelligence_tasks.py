@@ -132,6 +132,13 @@ async def _prune_snapshots_async() -> dict[str, Any]:
             [cutoff, "weekly_aggregate"],
         )
         logger.info("Pruned old snapshots before %s", cutoff)
+
+        from datametronome_podium.features.insights.repo import InsightsRepo
+
+        repo = InsightsRepo(executor)
+        await repo.prune_old_plans(cutoff)
+        logger.info("Pruned old query plans before %s", cutoff)
+
         return {"status": "completed", "cutoff": cutoff}
 
 

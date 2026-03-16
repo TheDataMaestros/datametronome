@@ -59,3 +59,27 @@ async def test_persist_business_report_called_when_bi_present():
     mock_br.assert_called_once()
     call_args = mock_br.call_args
     assert call_args[0][0] == "stave-1"
+
+
+@pytest.mark.asyncio
+async def test_prune_old_snapshots_also_prunes_query_plans():
+    """prune_old_snapshots must call repo.prune_old_plans to delete stave_query_plans rows."""
+    from datametronome_podium.tasks.intelligence_tasks import _prune_snapshots_async
+
+    mock_executor = AsyncMock()
+    mock_executor.execute = AsyncMock(return_value=1)
+
+    with patch(
+        "datametronome_podium.core.worker_db.worker_db_session"
+    ) as mock_session, patch(
+        "datametronome_podium.features.insights.repo.InsightsRepo.prune_old_plans",
+        new_callable=AsyncMock,
+    ) as mock_prune:
+        mock_session.return_value.__aenter__ = AsyncMock(return_value=(None, mock_executor))
+        mock_session.return_value.__aexit__ = AsyncMock(return_value=False)
+        await _prune_snapshots_async()
+
+    # repo.prune_old_plans must have been called with a cutoff timestamp
+    mock_prune.assert_called_once()
+    cutoff_arg = mock_prune.call_args[0][0]
+    assert "2025" in cutoff_arg or "2026" in cutoff_arg
