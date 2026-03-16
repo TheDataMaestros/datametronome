@@ -13,6 +13,7 @@ from datametronome_podium.features.insights.model import (
     InsightSuggestion,
     InsightCreatedCheck,
     Notification,
+    StaveQueryPlan,
 )
 
 
@@ -44,6 +45,21 @@ _SNAPSHOT_JSON_FIELDS = ("table_metrics", "column_stats")
 _BUSINESS_REPORT_JSON_FIELDS = (
     "kpis", "top_performers", "bottom_performers", "trends", "opportunities", "risks"
 )
+
+
+def _deserialize_plan(row: dict) -> StaveQueryPlan:
+    """Deserialize a stave_query_plans row into a StaveQueryPlan model."""
+    return StaveQueryPlan(
+        id=row["id"],
+        stave_id=row["stave_id"],
+        tenant_id=row.get("tenant_id", "default"),
+        schema_fingerprint=row["schema_fingerprint"],
+        kpi_queries=_parse_json(row.get("kpi_queries", "{}")),
+        performer_queries=_parse_json(row.get("performer_queries", "{}")),
+        generated_by_model=row.get("generated_by_model", ""),
+        generated_at=row["generated_at"],
+        invalidated_at=row.get("invalidated_at"),
+    )
 
 
 class InsightsRepo:
@@ -311,3 +327,48 @@ class InsightsRepo:
         for field in _BUSINESS_REPORT_JSON_FIELDS:
             r[field] = _parse_json(r.get(field))
         return BusinessReport(**r)
+
+    # --- StaveQueryPlan ---
+
+    async def get_valid_plan(self, stave_id: str) -> StaveQueryPlan | None:
+        """Return the currently valid (non-invalidated) query plan for a stave."""
+        rows = await self.db.query(
+            "SELECT * FROM stave_query_plans "
+            "WHERE stave_id = ? AND invalidated_at IS NULL LIMIT 1",
+            [stave_id],
+        )
+        if not rows:
+            return None
+        return _deserialize_plan(rows[0])
+
+    async def create_plan(self, plan: StaveQueryPlan) -> int:
+        return await self.db.insert(
+            "stave_query_plans",
+            {
+                "id": plan.id,
+                "stave_id": plan.stave_id,
+                "tenant_id": plan.tenant_id,
+                "schema_fingerprint": plan.schema_fingerprint,
+                "kpi_queries": json.dumps(plan.kpi_queries),
+                "performer_queries": json.dumps(plan.performer_queries),
+                "generated_by_model": plan.generated_by_model,
+                "generated_at": plan.generated_at,
+                "invalidated_at": plan.invalidated_at,
+            },
+        )
+
+    async def invalidate_plan(self, stave_id: str, now: str) -> int:
+        """Set invalidated_at on the current valid plan for a stave."""
+        return await self.db.execute(
+            "UPDATE stave_query_plans SET invalidated_at = ? "
+            "WHERE stave_id = ? AND invalidated_at IS NULL",
+            [now, stave_id],
+        )
+
+    async def prune_old_plans(self, cutoff: str) -> int:
+        """Delete invalidated plan rows older than the cutoff timestamp."""
+        return await self.db.execute(
+            "DELETE FROM stave_query_plans "
+            "WHERE invalidated_at IS NOT NULL AND invalidated_at < ?",
+            [cutoff],
+        )
