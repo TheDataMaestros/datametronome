@@ -1421,7 +1421,11 @@ async def run_phase3_execute_and_analyze(
     return result.output
 ```
 
-- [ ] **Step 4: Run tests**
+- [ ] **Step 4: Fix test_bi_agent_tools.py**
+
+The rewrite removes `_apply_schema` and `BIQueryDeps` (replaced by phase-specific deps). Any test in `tests/features/insights/test_bi_agent_tools.py` that imports these will fail. Update that file to remove tests for removed symbols, and add any Phase3Deps-based tests if needed. At minimum, remove `test_apply_schema_*` tests and any `BIQueryDeps` constructor tests.
+
+- [ ] **Step 5: Run the full BI agent test suite**
 
 ```bash
 .venv/bin/python -m pytest tests/features/insights/test_bi_agent_phases.py \
@@ -1429,13 +1433,14 @@ async def run_phase3_execute_and_analyze(
     tests/features/insights/test_bi_agent_tools.py -v --timeout=10
 ```
 
-Expected: all PASS. Fix any existing `test_bi_agent_tools.py` failures caused by removed `BIQueryDeps` — update those tests to use the new `Phase3Deps`.
+Expected: all PASS.
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add datametronome/podium/datametronome_podium/services/agents/business_intelligence.py \
-        datametronome/podium/tests/features/insights/test_bi_agent_phases.py
+        datametronome/podium/tests/features/insights/test_bi_agent_phases.py \
+        datametronome/podium/tests/features/insights/test_bi_agent_tools.py
 git commit --no-verify -m "feat(bi-agent): three-phase restructure — schema overview, SQL generation, analysis"
 ```
 
@@ -1531,7 +1536,7 @@ async def _analyze_business_intelligence(
     schema_interpretation = None
 
     try:
-        stave_rows = await self.db.query("SELECT * FROM staves WHERE id = ?", [stave_id])
+        stave_rows = await self.executor.query("SELECT * FROM staves WHERE id = ?", [stave_id])
         if not stave_rows:
             return None
         stave = deserialize_stave(stave_rows[0])
