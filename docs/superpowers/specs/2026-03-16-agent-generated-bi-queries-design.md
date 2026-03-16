@@ -104,7 +104,7 @@ Stage 1 (discovery) already collects the full schema and samples. The BI agent r
 - How tables relate to each other, inferred from column name patterns and sample values
 - Which columns have useful cardinality (non-null, non-zero, meaningful distribution)
 
-The agent produces an internal schema interpretation before generating any SQL.
+The agent produces a schema interpretation — a structured mapping of tables to their inferred roles and columns to their semantic roles (e.g., `order_purchase_timestamp → transaction_time`, `price → revenue_amount`). This interpretation is stored in `DataProfile.schema_interpretation` (new JSONB field) for observability: it lets operators understand why the agent generated a particular query and diagnose mistakes without re-running the pipeline.
 
 ### Phase 2 — Query Generation + Validation *(skipped if valid plan exists)*
 
@@ -122,7 +122,7 @@ For each query:
 
 **Abort threshold:** If fewer than half of all generated queries (KPI queries + performer rank queries + performer drill queries combined) succeed after retries, abort plan creation. No `stave_query_plans` row is written. Phase 3 is also skipped for this run. The BI track is retried at the next scheduled execution.
 
-Individual query failures below that threshold are noted in the business report as skipped KPIs/dimensions; they do not abort the plan.
+Individual query failures below that threshold are included in the business report as explicitly skipped KPIs/dimensions — surfaced to the user with the KPI name and the reason (e.g., "could not generate valid SQL after 2 retries"). They do not abort the plan.
 
 ### Phase 3 — Execution + Analysis *(skipped only if no valid plan exists)*
 
@@ -190,9 +190,9 @@ This fingerprint is passed from `service.py` into the BI agent along with the fu
 | All other archetype YAMLs | Same transformation |
 | `archetypes/__init__.py` | No change to loader; archetype dict just has different keys |
 | `services/agents/business_intelligence.py` | Restructure into three phases; Phase 1 reads from `discovery` dict (no new connection); Phase 2+3 share one read-only connection (opened/closed by the agent runner); add `run_raw_query` tool; add plan load/store/invalidate logic |
-| `features/insights/service.py` | Compute fingerprint from `discovery["schema"]` after Stage 1; pass `discovery` + fingerprint into BI agent; handle plan invalidation |
+| `features/insights/service.py` | Compute fingerprint from `discovery["schema"]` after Stage 1; pass `discovery` + fingerprint into BI agent; handle plan invalidation; persist `schema_interpretation` to `DataProfile` |
 | `tasks/intelligence_tasks.py` | Extend `prune_old_snapshots` to also delete `stave_query_plans` rows with `invalidated_at` older than 90 days |
-| DB migration | New `stave_query_plans` table with partial unique index |
+| DB migration | New `stave_query_plans` table with partial unique index; add `schema_interpretation` JSONB column to `data_profiles` |
 | `features/insights/repo.py` | Add `StaveQueryPlan` model + CRUD (`get_valid_plan`, `create_plan`, `invalidate_plan`) |
 
 ### What Does NOT Change
@@ -205,7 +205,9 @@ This fingerprint is passed from `service.py` into the BI agent along with the fu
 
 ---
 
-## 7. Open Questions
+## 7. Decisions
 
-- Should skipped KPIs (failed validation) be surfaced to the user in the business report or silently omitted?
-- Should the agent's schema interpretation from Phase 1 be stored (e.g., in `DataProfile`) for observability, or kept internal to the agent run?
+| Question | Decision |
+|---|---|
+| Skipped KPIs surfaced or silently omitted? | Surfaced — included in the business report with KPI name and reason for failure |
+| Schema interpretation stored or internal? | Stored in `DataProfile.schema_interpretation` (JSONB) for observability |
