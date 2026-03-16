@@ -224,3 +224,127 @@ async def test_collect_schema_and_samples_row_count_fallback_on_error():
 
     schema, samples = await _collect_schema_and_samples(mock_connector, ["secret_table"])
     assert samples["secret_table"]["row_count"] == 0
+
+
+# ------------------------------------------------------------------
+# Fingerprint computation tests
+# ------------------------------------------------------------------
+
+
+def test_fingerprint_computed_from_discovery_schema():
+    """compute_schema_fingerprint returns a 64-char hex SHA-256."""
+    from datametronome_podium.services.agents.business_intelligence import (
+        compute_schema_fingerprint,
+    )
+
+    discovery = {
+        "schema": {
+            "orders": {"order_id": {}, "customer_id": {}, "order_purchase_timestamp": {}},
+            "products": {"product_id": {}, "product_category_name": {}},
+        },
+        "samples": {},
+    }
+    fp = compute_schema_fingerprint(discovery["schema"])
+    assert isinstance(fp, str)
+    assert len(fp) == 64
+
+
+def test_fingerprint_order_independent():
+    """Fingerprint is the same regardless of dict ordering."""
+    from datametronome_podium.services.agents.business_intelligence import (
+        compute_schema_fingerprint,
+    )
+
+    schema_a = {"orders": {"order_id": {}, "status": {}}, "products": {"id": {}}}
+    schema_b = {"products": {"id": {}}, "orders": {"status": {}, "order_id": {}}}
+    assert compute_schema_fingerprint(schema_a) == compute_schema_fingerprint(schema_b)
+
+
+# ------------------------------------------------------------------
+# BI track wiring tests
+# ------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_bi_skips_when_no_profile(service):
+    """BI track should return None when profile is None."""
+    snapshot = MagicMock()
+    result = await service._analyze_business_intelligence(
+        "stave-1", snapshot, profile=None
+    )
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_bi_skips_generic_domain(service):
+    """BI track should return None for generic domain."""
+    from datametronome_podium.features.insights.model import DataProfile
+
+    profile = DataProfile(
+        id="dp-1", stave_id="stave-1", tenant_id="default",
+        domain_type="generic", domain_confidence=0.5,
+        created_at="2026-01-01T00:00:00Z", updated_at="2026-01-01T00:00:00Z",
+    )
+    snapshot = MagicMock()
+    result = await service._analyze_business_intelligence(
+        "stave-1", snapshot, profile=profile
+    )
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_bi_skips_when_no_kpi_definitions(service):
+    """BI track should return None when archetype has no kpi_definitions."""
+    from datametronome_podium.features.insights.model import DataProfile
+
+    profile = DataProfile(
+        id="dp-1", stave_id="stave-1", tenant_id="default",
+        domain_type="e-commerce", domain_confidence=0.9,
+        created_at="2026-01-01T00:00:00Z", updated_at="2026-01-01T00:00:00Z",
+    )
+    snapshot = MagicMock()
+    with patch(
+        "datametronome_podium.features.insights.service.load_archetype",
+        return_value={"name": "e-commerce"},
+    ):
+        result = await service._analyze_business_intelligence(
+            "stave-1", snapshot, profile=profile
+        )
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_persist_results_extracts_schema_interpretation(service):
+    """persist_results should pop _schema_interpretation and save to profile."""
+    from datametronome_podium.features.insights.model import BaselineSnapshot
+
+    service.repo.get_profile = AsyncMock(return_value=None)
+    service.repo.create_report = AsyncMock(return_value=1)
+    service.repo.update_profile = AsyncMock(return_value=1)
+    service.repo.create_business_report = AsyncMock(return_value=1)
+
+    snapshot = BaselineSnapshot(
+        id="snap-1", stave_id="stave-1", tenant_id="default",
+        snapshot_type="daily", table_metrics={}, column_stats={},
+        captured_at="2026-03-15T06:00:00Z",
+    )
+    bi_analysis = {
+        "business_health_score": 72,
+        "executive_summary": "Good",
+        "kpis": [], "top_performers": [], "bottom_performers": [],
+        "trends": [], "opportunities": [], "risks": [],
+        "_schema_interpretation": {
+            "table_roles": {"orders": "fact_table"},
+            "column_roles": {},
+            "key_observations": [],
+        },
+    }
+    await service.persist_results(
+        "stave-1", snapshot, analysis=None, bi_analysis=bi_analysis,
+    )
+    # Schema interpretation should have been popped and saved
+    service.repo.update_profile.assert_awaited()
+    call_args = service.repo.update_profile.call_args
+    assert "schema_interpretation" in call_args[0][1]
+    # _schema_interpretation should have been removed from bi_analysis
+    assert "_schema_interpretation" not in bi_analysis

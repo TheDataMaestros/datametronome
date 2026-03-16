@@ -16,6 +16,7 @@ from datametronome_podium.features.insights.model import (
     InsightCreatedCheck,
     InsightReport,
     InsightSuggestion,
+    StaveQueryPlan,
 )
 from datametronome_podium.features.insights.repo import InsightsRepo
 
@@ -236,8 +237,14 @@ class InsightPipelineService:
         stave_id: str,
         snapshot: BaselineSnapshot,
         profile: DataProfile | None,
+        discovery: dict | None = None,
+        fingerprint: str | None = None,
     ) -> dict[str, Any] | None:
-        """Run the BusinessIntelligenceAgent against the live data source."""
+        """Run the three-phase BusinessIntelligenceAgent.
+
+        discovery + fingerprint are provided for full pipeline runs (auto-scan, daily).
+        Both are None for on-demand runs, which skip Phases 1+2 and use the existing plan.
+        """
         if not profile or profile.domain_type == "generic":
             logger.info(
                 "Skipping BI analysis for stave %s — no domain profile",
@@ -245,25 +252,27 @@ class InsightPipelineService:
             )
             return None
 
-        from datametronome_podium.archetypes import load_archetype
         from datametronome_podium.services.agent_factory import (
             build_heavy_model_from_settings,
         )
         from datametronome_podium.services.agents.business_intelligence import (
-            BIQueryDeps,
-            build_bi_agent,
+            run_phase1_schema_overview,
+            run_phase2_generate_and_validate,
+            run_phase3_execute_and_analyze,
         )
         from datametronome_podium.services.connection_tester import ConnectionTester
         from datametronome_podium.services.stave_service import deserialize_stave
 
         archetype = load_archetype(profile.domain_type)
-        if not archetype or not archetype.get("kpi_queries"):
+        if not archetype or not archetype.get("kpi_definitions"):
             logger.info(
-                "No BI archetype config for domain %s", profile.domain_type
+                "No BI kpi_definitions for domain %s", profile.domain_type
             )
             return None
 
         connector = None
+        schema_interpretation = None
+
         try:
             stave_rows = await self.executor.query(
                 "SELECT * FROM staves WHERE id = ?", [stave_id]
@@ -271,8 +280,6 @@ class InsightPipelineService:
             if not stave_rows:
                 return None
             stave = deserialize_stave(stave_rows[0])
-            tester = ConnectionTester()
-            connector = await tester.get_connector(stave, read_only=True)
 
             config = stave.connection_config or {}
             ds_type = (stave.data_source_type or "").lower()
@@ -281,23 +288,87 @@ class InsightPipelineService:
                 pg_schema = config.get("schema", "public")
                 schema_prefix = f'"{pg_schema}".'
 
-            deps = BIQueryDeps(
-                connector=connector,
-                schema_prefix=schema_prefix,
-                archetype=archetype,
-            )
+            # Determine whether we need to regenerate the query plan
+            existing_plan = await self.repo.get_valid_plan(stave_id)
+            now_iso = _utc_now_iso()
+
+            needs_generation = False
+            if discovery is not None and fingerprint is not None:
+                # Full pipeline run: check fingerprint
+                if existing_plan is None:
+                    needs_generation = True
+                elif existing_plan.schema_fingerprint != fingerprint:
+                    logger.info(
+                        "Schema fingerprint changed for stave %s — invalidating plan",
+                        stave_id,
+                    )
+                    await self.repo.invalidate_plan(stave_id, now_iso)
+                    needs_generation = True
+            # On-demand (discovery=None): always use existing plan; no generation
 
             model = build_heavy_model_from_settings()
-            agent = build_bi_agent(model)
-            prompt = (
-                f"Analyze this {profile.domain_type} business. "
-                f"Available KPIs: {list(archetype.get('kpi_queries', {}).keys())}. "
-                f"Available performer dimensions: "
-                f"{[d.get('entity') for d in archetype.get('performer_dimensions', [])]}. "
-                "Call all available tools, then produce the full business report."
+            tester = ConnectionTester()
+            connector = await tester.get_connector(stave, read_only=True)
+
+            plan_skipped: list[dict[str, str]] = []
+
+            if needs_generation:
+                # Phase 1: schema overview (no DB connection)
+                logger.info("Phase 1: schema overview for stave %s", stave_id)
+                schema_interpretation = await run_phase1_schema_overview(
+                    discovery, archetype, model
+                )
+
+                # Phase 2: generate + validate SQL
+                logger.info("Phase 2: query generation for stave %s", stave_id)
+                generated = await run_phase2_generate_and_validate(
+                    schema_interpretation, archetype, connector, schema_prefix, model
+                )
+                if generated is None:
+                    logger.warning(
+                        "Phase 2 aborted for stave %s — abort threshold hit",
+                        stave_id,
+                    )
+                    return None
+
+                new_plan = StaveQueryPlan(
+                    id=str(uuid.uuid4()),
+                    stave_id=stave_id,
+                    tenant_id=profile.tenant_id,
+                    schema_fingerprint=fingerprint,
+                    kpi_queries=generated.kpi_queries,
+                    performer_queries=generated.performer_queries,
+                    generated_by_model=str(model),
+                    generated_at=now_iso,
+                )
+                await self.repo.create_plan(new_plan)
+                active_plan = new_plan
+                plan_skipped = generated.skipped
+            elif existing_plan is not None:
+                active_plan = existing_plan
+            else:
+                # On-demand with no existing plan — skip BI track
+                logger.info(
+                    "No query plan for stave %s, skipping BI track", stave_id
+                )
+                return None
+
+            # Phase 3: execute + analyze
+            logger.info("Phase 3: BI analysis for stave %s", stave_id)
+            bi_report = await run_phase3_execute_and_analyze(
+                kpi_queries=active_plan.kpi_queries,
+                performer_queries=active_plan.performer_queries,
+                skipped=plan_skipped,
+                connector=connector,
+                schema_prefix=schema_prefix,
+                domain_type=profile.domain_type,
+                model=model,
             )
-            result = await agent.run(prompt, deps=deps)
-            return result.output.model_dump()
+            result = bi_report.model_dump()
+            if schema_interpretation is not None:
+                result["_schema_interpretation"] = schema_interpretation.model_dump()
+            return result
+
         except Exception as exc:
             logger.warning(
                 "BI analysis failed for stave %s: %s", stave_id, exc
@@ -315,6 +386,8 @@ class InsightPipelineService:
         stave_id: str,
         snapshot: BaselineSnapshot,
         profile: DataProfile | None,
+        discovery: dict | None = None,
+        fingerprint: str | None = None,
     ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
         """Run Track 1 (data quality) then Track 2 (BI) sequentially.
 
@@ -334,7 +407,8 @@ class InsightPipelineService:
 
         try:
             bi = await self._analyze_business_intelligence(
-                stave_id, snapshot, profile
+                stave_id, snapshot, profile,
+                discovery=discovery, fingerprint=fingerprint,
             )
         except Exception as exc:
             logger.warning(
@@ -371,6 +445,11 @@ class InsightPipelineService:
 
         # Track 2: persist BI report if available
         if bi_analysis:
+            if "_schema_interpretation" in bi_analysis:
+                interp = bi_analysis.pop("_schema_interpretation")
+                await self.repo.update_profile(stave_id, {
+                    "schema_interpretation": json.dumps(interp),
+                })
             await self._persist_business_report(
                 stave_id, snapshot.id, bi_analysis, now
             )
@@ -561,6 +640,10 @@ class InsightPipelineService:
         Includes business analysis so the first scan immediately produces
         a real health score, anomalies, and suggestions.
         """
+        from datametronome_podium.services.agents.business_intelligence import (
+            compute_schema_fingerprint,
+        )
+
         discovery = await self._discover_schema(stave_id)
         classification = await self.classify_domain(
             discovery["tables"], discovery["schema"], discovery["samples"],
@@ -570,22 +653,23 @@ class InsightPipelineService:
         )
         # Fetch existing profile (None on first run — analysis still works)
         profile = await self.repo.get_profile(stave_id)
-        try:
-            analysis = await self.analyze_business(stave_id, snapshot, profile)
-        except Exception as exc:
-            logger.warning(
-                "Business analysis failed in auto_scan for stave %s: %s — persisting without analysis",
-                stave_id, exc,
-            )
-            analysis = None
+        fingerprint = compute_schema_fingerprint(discovery.get("schema", {}))
+        quality_analysis, bi_analysis = await self._run_both_tracks(
+            stave_id, snapshot, profile,
+            discovery=discovery, fingerprint=fingerprint,
+        )
         return await self.persist_results(
-            stave_id, snapshot, analysis,
+            stave_id, snapshot, quality_analysis,
             classification=classification, discovery=discovery,
-            bi_analysis=None,
+            bi_analysis=bi_analysis,
         )
 
     async def run_daily(self, stave_id: str) -> InsightReport:
         """Full pipeline 1 -> 2 -> 3 -> 4 -> 5 (with parallel BI track)."""
+        from datametronome_podium.services.agents.business_intelligence import (
+            compute_schema_fingerprint,
+        )
+
         discovery = await self._discover_schema(stave_id)
         classification = await self.classify_domain(
             discovery["tables"], discovery["schema"], discovery["samples"],
@@ -594,8 +678,10 @@ class InsightPipelineService:
             stave_id, discovery, snapshot_type="daily",
         )
         profile = await self.repo.get_profile(stave_id)
+        fingerprint = compute_schema_fingerprint(discovery.get("schema", {}))
         quality_analysis, bi_analysis = await self._run_both_tracks(
-            stave_id, snapshot, profile
+            stave_id, snapshot, profile,
+            discovery=discovery, fingerprint=fingerprint,
         )
         return await self.persist_results(
             stave_id, snapshot, quality_analysis,
