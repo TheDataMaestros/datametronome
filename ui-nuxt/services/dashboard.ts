@@ -5,6 +5,8 @@ export interface IntelligenceSuggestion {
   category: string
   action: string
   reasoning: string
+  stave_id: string
+  stave_name: string
 }
 
 export interface IntelligenceAnomaly {
@@ -15,6 +17,8 @@ export interface IntelligenceAnomaly {
   evidence: string
   detected_at: string | null
   snapshot_at: string | null
+  stave_id: string
+  stave_name: string
 }
 
 export interface IntelligenceMetrics {
@@ -28,6 +32,7 @@ export interface IntelligenceMetrics {
   top_anomalies: IntelligenceAnomaly[]
   last_analyzed_at: string | null
   table_metrics: Record<string, number>
+  stave_health_scores: Record<string, number>
 }
 
 export interface DashboardMetrics {
