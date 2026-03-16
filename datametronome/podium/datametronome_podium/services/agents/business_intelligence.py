@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+from decimal import Decimal
 from typing import Any
 
 from pydantic_ai import Agent, RunContext
@@ -15,6 +16,11 @@ from datametronome_podium.services.agents.bi_models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _json(obj: Any) -> str:
+    """JSON serialize with Decimal → float fallback."""
+    return json.dumps(obj, default=lambda v: float(v) if isinstance(v, Decimal) else str(v))
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -95,7 +101,7 @@ async def run_phase1_schema_overview(
         for table, cols in discovery.get("schema", {}).items()
     }
     samples_summary = {
-        table: rows[:3]
+        table: (rows.get("rows", []) if isinstance(rows, dict) else rows)[:3]
         for table, rows in discovery.get("samples", {}).items()
     }
     prompt = (
@@ -153,10 +159,13 @@ def build_phase2_agent(model: Any, schema_prefix: str) -> Agent:
 
     @agent.tool
     async def run_raw_query(ctx: RunContext[Phase2Deps], sql: str) -> str:
-        """Execute SQL to validate it. Returns JSON rows. Raises on database error."""
-        enforced = _enforce_limit(sql)
-        rows = await _execute_sql(ctx.deps.connector, enforced)
-        return json.dumps(rows[:20])  # return sample for agent inspection
+        """Execute SQL to validate it. Returns JSON rows on success, or ERROR: <message> on failure."""
+        try:
+            enforced = _enforce_limit(sql)
+            rows = await _execute_sql(ctx.deps.connector, enforced)
+            return _json(rows[:20])
+        except Exception as exc:
+            return f"ERROR: {exc}"
 
     return agent
 
@@ -261,24 +270,20 @@ def build_phase3_agent(model: Any) -> Agent:
         sql = ctx.deps.kpi_queries.get(kpi_name)
         if not sql:
             available = list(ctx.deps.kpi_queries.keys())
-            return json.dumps(
-                {"error": f"Unknown KPI: {kpi_name}. Available: {available}"},
-            )
+            return _json({"error": f"Unknown KPI: {kpi_name}. Available: {available}"})
         rows = await _execute_sql(ctx.deps.connector, sql)
         value = rows[0].get("value") if rows else None
-        return json.dumps({"kpi": kpi_name, "value": value})
+        return _json({"kpi": kpi_name, "value": value})
 
     @agent.tool
     async def list_available_kpis(ctx: RunContext[Phase3Deps]) -> str:
         """List all KPI names available in the stored plan."""
-        return json.dumps({"available_kpis": list(ctx.deps.kpi_queries.keys())})
+        return _json({"available_kpis": list(ctx.deps.kpi_queries.keys())})
 
     @agent.tool
     async def list_performer_dimensions(ctx: RunContext[Phase3Deps]) -> str:
         """List all performer entity types in the stored plan."""
-        return json.dumps(
-            {"dimensions": list(ctx.deps.performer_queries.keys())},
-        )
+        return _json({"dimensions": list(ctx.deps.performer_queries.keys())})
 
     @agent.tool
     async def query_top_performers(
@@ -288,9 +293,7 @@ def build_phase3_agent(model: Any) -> Agent:
         dim = ctx.deps.performer_queries.get(entity_type, {})
         sql = dim.get("rank_query", "")
         if not sql:
-            return json.dumps(
-                {"error": f"No rank_query for entity: {entity_type}"},
-            )
+            return _json({"error": f"No rank_query for entity: {entity_type}"})
         # Fetch 2x the requested limit so the agent can see both top and bottom performers
         # without a second query (the agent slices the result itself).
         if "{limit}" in sql:
@@ -310,13 +313,7 @@ def build_phase3_agent(model: Any) -> Agent:
             }
             for r in rows[: limit * 2]
         ]
-        return json.dumps(
-            {
-                "entity_type": entity_type,
-                "average": round(avg, 2),
-                "performers": performers,
-            },
-        )
+        return _json({"entity_type": entity_type, "average": round(avg, 2), "performers": performers})
 
     @agent.tool
     async def drill_down(
@@ -326,14 +323,12 @@ def build_phase3_agent(model: Any) -> Agent:
         dim = ctx.deps.performer_queries.get(entity_type, {})
         sql = dim.get("drill_query", "")
         if not sql:
-            return json.dumps(
-                {"note": "No drill_query for this entity type"},
-            )
+            return _json({"note": "No drill_query for this entity type"})
         safe_name = entity_name.replace("'", "''")
         if "{entity_name}" in sql:
             sql = sql.replace("{entity_name}", safe_name)
         rows = await _execute_sql(ctx.deps.connector, sql)
-        return json.dumps({"entity": entity_name, "breakdown": rows[:8]})
+        return _json({"entity": entity_name, "breakdown": rows[:8]})
 
     return agent
 

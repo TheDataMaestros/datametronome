@@ -702,13 +702,18 @@ class InsightPipelineService:
 
     async def run_on_demand(self, stave_id: str) -> InsightReport:
         """Stages 3 -> 4 -> 5 (reuse existing profile, fresh snapshot + BI)."""
+        from datametronome_podium.services.agents.business_intelligence import (
+            compute_schema_fingerprint,
+        )
         discovery = await self._discover_schema(stave_id)
+        fingerprint = compute_schema_fingerprint(discovery.get("schema", {}))
         snapshot = await self.capture_baseline(
             stave_id, discovery, snapshot_type="on_demand",
         )
         profile = await self.repo.get_profile(stave_id)
         quality_analysis, bi_analysis = await self._run_both_tracks(
-            stave_id, snapshot, profile
+            stave_id, snapshot, profile,
+            discovery=discovery, fingerprint=fingerprint,
         )
         return await self.persist_results(
             stave_id, snapshot, quality_analysis,
