@@ -23,10 +23,13 @@ history. Never ask them to repeat info already provided.
 Be analytical and thorough."""
 
 
-def build_investigation_agent(model: Model) -> Agent:
+def build_investigation_agent(model: Model, *, user_profile: str | None = None) -> Agent:
     """Build the investigation agent with the given model."""
+    prompt = _SYSTEM_PROMPT
+    if user_profile:
+        prompt = f"{_SYSTEM_PROMPT}\n\n{user_profile}"
     return Agent(
         model=model,
-        system_prompt=_SYSTEM_PROMPT,
+        system_prompt=prompt,
         tools=ALL_TOOLS,
     )

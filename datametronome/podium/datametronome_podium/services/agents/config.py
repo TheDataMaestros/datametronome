@@ -21,10 +21,13 @@ history. Never ask them to repeat info already provided.
 Be concise and action-oriented."""
 
 
-def build_config_agent(model: Model) -> Agent:
+def build_config_agent(model: Model, *, user_profile: str | None = None) -> Agent:
     """Build the config agent with the given model."""
+    prompt = _SYSTEM_PROMPT
+    if user_profile:
+        prompt = f"{_SYSTEM_PROMPT}\n\n{user_profile}"
     return Agent(
         model=model,
-        system_prompt=_SYSTEM_PROMPT,
+        system_prompt=prompt,
         tools=ALL_TOOLS,
     )

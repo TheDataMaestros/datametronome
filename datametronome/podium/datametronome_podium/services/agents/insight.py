@@ -81,6 +81,7 @@ def build_insight_agent(
     archetype_context: dict | None = None,
     profile_context: dict | None = None,
     historical_context: str | None = None,
+    user_profile: str | None = None,
 ) -> Agent:
     """Build the InsightAgent with dynamic context for chat interactions."""
     system_prompt = _build_system_prompt(
@@ -88,6 +89,8 @@ def build_insight_agent(
         profile_context=profile_context,
         historical_context=historical_context,
     )
+    if user_profile:
+        system_prompt = f"{system_prompt}\n\n{user_profile}"
 
     return Agent(
         model=model,
