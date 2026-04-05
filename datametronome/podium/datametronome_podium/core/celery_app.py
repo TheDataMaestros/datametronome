@@ -49,6 +49,9 @@ celery_app.conf.update(
         "datametronome.prune_old_snapshots": {"queue": QUEUE_DEFAULT},
         "datametronome.olist_simulate_ingestion": {"queue": QUEUE_INTELLIGENCE},
         "datametronome.run_daily_intelligence_all_staves": {"queue": QUEUE_INTELLIGENCE},
+        "datametronome.poll_conversations_for_extraction": {"queue": QUEUE_INTELLIGENCE},
+        "datametronome.extract_user_memories": {"queue": QUEUE_INTELLIGENCE},
+        "datametronome.rebuild_user_profile": {"queue": QUEUE_INTELLIGENCE},
     },
 
     # Retry defaults
@@ -76,6 +79,7 @@ celery_app.conf.include = [
     "datametronome_podium.tasks.check_tasks",
     "datametronome_podium.tasks.intelligence_tasks",
     "datametronome_podium.tasks.olist_simulation",
+    "datametronome_podium.tasks.user_memory_tasks",
 ]
 
 # ── Periodic schedules (celery-redbeat reads these from conf on startup) ────
@@ -97,5 +101,11 @@ celery_app.conf.beat_schedule = {
         "task": "datametronome.prune_old_snapshots",
         "schedule": crontab(minute=0, hour=3, day_of_week=0),
         "options": {"queue": "checks.default"},
+    },
+    # Poll for conversations ready for memory extraction every 10 minutes
+    "poll-conversations-for-memory-extraction": {
+        "task": "datametronome.poll_conversations_for_extraction",
+        "schedule": crontab(minute="*/10"),
+        "options": {"queue": "intelligence.default"},
     },
 }
