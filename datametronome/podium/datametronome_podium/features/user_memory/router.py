@@ -5,9 +5,10 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
+from datametronome_podium.api.deps import get_current_user
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.features.user_memory.repo import UserMemoryRepo
 from datametronome_podium.features.user_memory.schemas import (
@@ -27,12 +28,9 @@ def _repo() -> UserMemoryRepo:
     return UserMemoryRepo(get_executor())
 
 
-def _get_user_id(request: Request) -> str:
-    """Extract user identifier from request state (set by auth middleware)."""
-    user = getattr(request.state, "user", None)
-    if user and isinstance(user, dict):
-        return user.get("id") or user.get("username") or "anonymous"
-    return "anonymous"
+def _get_user_id(current_user: dict) -> str:
+    """Extract user_id from the authenticated user dict."""
+    return current_user.get("id") or current_user.get("username") or "anonymous"
 
 
 def _dispatch_rebuild(user_id: str) -> None:
@@ -61,9 +59,9 @@ def _gen_memory_id() -> str:
 
 
 @router.get("/profile", response_model=UserMemoryProfileResponse)
-async def get_profile(request: Request):
+async def get_profile(current_user: dict = Depends(get_current_user)):
     """Get the precomputed memory profile for the current user."""
-    user_id = _get_user_id(request)
+    user_id = _get_user_id(current_user)
     profile = await _repo().get_profile(user_id)
     if not profile:
         raise HTTPException(status_code=404, detail="No memory profile found for this user")
@@ -75,17 +73,17 @@ async def get_profile(request: Request):
 
 @router.get("/", response_model=list[UserMemoryResponse])
 async def list_memories(
-    request: Request,
     category: str | None = None,
     active: bool | None = None,
     q: str | None = None,
+    current_user: dict = Depends(get_current_user),
 ):
     """List or search memories for the current user.
 
     When `active` is omitted the search defaults to active-only (consistent
     with the repo's default). Pass `active=false` to include inactive memories.
     """
-    user_id = _get_user_id(request)
+    user_id = _get_user_id(current_user)
     # active=None → default active_only=True; active=False → include all
     active_only = active if active is not None else True
     rows = await _repo().search_memories(
@@ -98,9 +96,9 @@ async def list_memories(
 
 
 @router.get("/{memory_id}", response_model=UserMemoryResponse)
-async def get_memory(memory_id: str, request: Request):
+async def get_memory(memory_id: str, current_user: dict = Depends(get_current_user)):
     """Get a single memory. Fails with 404 if it doesn't exist or belongs to another user."""
-    user_id = _get_user_id(request)
+    user_id = _get_user_id(current_user)
     memory = await _repo().get_memory(memory_id)
     if not memory or memory.get("user_id") != user_id:
         raise HTTPException(status_code=404, detail="Memory not found")
@@ -111,9 +109,9 @@ async def get_memory(memory_id: str, request: Request):
 
 
 @router.post("/", response_model=UserMemoryResponse, status_code=201)
-async def create_memory(body: UserMemoryCreate, request: Request):
+async def create_memory(body: UserMemoryCreate, current_user: dict = Depends(get_current_user)):
     """Manually create a memory for the current user."""
-    user_id = _get_user_id(request)
+    user_id = _get_user_id(current_user)
     now = _now_utc()
     memory_id = _gen_memory_id()
 
@@ -138,9 +136,9 @@ async def create_memory(body: UserMemoryCreate, request: Request):
 
 
 @router.patch("/{memory_id}", response_model=UserMemoryResponse)
-async def update_memory(memory_id: str, body: UserMemoryUpdate, request: Request):
+async def update_memory(memory_id: str, body: UserMemoryUpdate, current_user: dict = Depends(get_current_user)):
     """Partially update a memory. Only `content` and `active` are patchable."""
-    user_id = _get_user_id(request)
+    user_id = _get_user_id(current_user)
     repo = _repo()
 
     existing = await repo.get_memory(memory_id)
@@ -166,9 +164,9 @@ async def update_memory(memory_id: str, body: UserMemoryUpdate, request: Request
 
 
 @router.delete("/{memory_id}", status_code=204)
-async def delete_memory(memory_id: str, request: Request):
+async def delete_memory(memory_id: str, current_user: dict = Depends(get_current_user)):
     """Hard-delete a memory. Returns 404 if it doesn't exist or belongs to another user."""
-    user_id = _get_user_id(request)
+    user_id = _get_user_id(current_user)
     repo = _repo()
 
     existing = await repo.get_memory(memory_id)
@@ -184,8 +182,8 @@ async def delete_memory(memory_id: str, request: Request):
 
 
 @router.post("/rebuild", status_code=202)
-async def rebuild_profile(request: Request):
+async def rebuild_profile(current_user: dict = Depends(get_current_user)):
     """Force an async profile rebuild for the current user. Returns 202 Accepted."""
-    user_id = _get_user_id(request)
+    user_id = _get_user_id(current_user)
     _dispatch_rebuild(user_id)
     return {"status": "queued", "user_id": user_id}
