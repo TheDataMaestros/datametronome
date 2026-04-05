@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.config import settings
-from datametronome_podium.core.database import execute_query, get_db
+from datametronome_podium.core.database import execute_query, execute_write, get_db
 from datametronome_podium.core.metrics import record_chat_request
 from datametronome_podium.services.agent_tracing import (
     record_agent_trace,
@@ -283,6 +283,17 @@ async def send_chat_message(
         except Exception as e:
             logger.error(f"❌ Failed to save user message: {e}", exc_info=True)
             raise
+
+        # Track conversation for memory extraction — non-critical, extraction
+        # falls back to polling all recent conversations if this upsert fails.
+        try:
+            await execute_write(
+                "INSERT INTO conversation_extraction_status (conversation_id, user_id, status) "
+                "VALUES (?, ?, 'idle') ON CONFLICT (conversation_id) DO NOTHING",
+                [conversation_id, user_id],
+            )
+        except Exception:
+            pass  # Non-critical — extraction will still work, just with delayed discovery
 
         # Save assistant response to database
         assistant_message_id = f"msg-{uuid.uuid4().hex[:12]}"
