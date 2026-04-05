@@ -1,7 +1,7 @@
 # User Memory Layer — Design Spec
 
 **Date:** 2026-04-06
-**Status:** Draft (in-progress brainstorming)
+**Status:** Approved
 **Branch:** TBD (extends feat/data-intelligence)
 
 ## Overview
