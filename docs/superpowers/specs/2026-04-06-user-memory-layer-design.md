@@ -43,7 +43,7 @@ Individual facts extracted from conversations. One row = one discrete piece of k
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | PK |
-| user_id | VARCHAR | The user this memory belongs to |
+| user_id | VARCHAR | FK → users(id) ON DELETE CASCADE |
 | category | ENUM | `domain_focus`, `expertise`, `investigation` |
 | content | TEXT | The fact: "User frequently investigates the orders and payments tables" |
 | source_conversation_id | VARCHAR | Which conversation this was extracted from |
@@ -60,7 +60,7 @@ Precomputed summary per user. This is what gets injected into agent system promp
 | Column | Type | Description |
 |--------|------|-------------|
 | id | UUID | PK |
-| user_id | VARCHAR | Unique constraint |
+| user_id | VARCHAR | FK → users(id) ON DELETE CASCADE, unique constraint |
 | domain_summary | TEXT | "Focuses on orders, payments, customers tables. Primarily e-commerce domain." |
 | expertise_summary | TEXT | "Strong SQL skills. Familiar with data modeling. New to data quality monitoring concepts." |
 | investigation_summary | TEXT | "Investigated NULL spike in customers.email (2026-03-20, concluded: migration issue). Tracked order volume drop (2026-04-01, ongoing)." |
@@ -72,8 +72,20 @@ Precomputed summary per user. This is what gets injected into agent system promp
 
 - **Granular memories** — one fact per row, individually supersedable, deactivatable, searchable
 - **Denormalized profile** — cheap to inject into prompts, rebuilt after each extraction
-- **`superseded_by` chain** — handles contradictions without deleting history (old fact stays for audit)
+- **`superseded_by` chain** — handles contradictions without deleting history (old fact stays for audit). Only active memories can be superseded — the service layer enforces this to prevent cycles.
 - **No `tenant_id` yet** — `user_id` is the isolation boundary; tenant_id added when multi-tenancy lands
+
+### Indexes
+
+- `user_memories(user_id, active)` — primary query pattern: load active memories for a user
+- `user_memories(source_conversation_id)` — extraction dedup: "already extracted this conversation?"
+- `user_memory_profiles(user_id)` — unique, used on every chat request
+
+### Memory Count Scaling
+
+When a user accumulates > 100 active memories, the extraction prompt receives only the 50 most recent memories plus a category-count summary of the rest (e.g., "Additionally: 30 domain_focus, 25 expertise, 12 investigation memories not shown"). This keeps extraction within token limits.
+
+Profile rebuild always reads all active memories — the summarization LLM call handles the full set since summaries compress well.
 
 ### Relationships
 
@@ -159,9 +171,14 @@ After extraction, a second (cheap, fast) LLM call summarizes all active memories
 run_chat(message, history, user_id)
   → Load user_memory_profiles for user_id (single DB query)
   → Route message via RouterAgent (unchanged)
-  → Dispatch to agent, passing user_profile as new kwarg
-    → Agent builder appends profile to system prompt
+  → If decision.intent == "memory":
+      → Early return: call recall logic directly (no agent dispatch)
+      → Query user_memories, format response from template
+  → Else: dispatch to agent, passing user_profile as new kwarg
+      → Agent builder appends profile to system prompt
 ```
+
+If no `user_memory_profiles` row exists (new user, first conversation), the USER CONTEXT block is omitted entirely from the system prompt — no placeholder text.
 
 ### What Agents See (appended to system prompt)
 
@@ -185,11 +202,13 @@ All of them — config, investigation, report, insight. The profile is short (~3
 
 ### Code Changes
 
-- `orchestrator.run_chat()` — one DB call to load profile, pass to agent builders
-- Each `build_*_agent()` — accept optional `user_profile: str` kwarg, append to system prompt
-- The Insight agent already has `_build_system_prompt()` with dynamic context injection — same pattern extends to all agents
+- `orchestrator.run_chat()` — one DB call to load profile, pass to agent builders. Add early-return branch for `decision.intent == "memory"`.
+- `router.py` — add `"memory"` to `VALID_INTENTS` Literal. No corresponding agent in `_get_agent_builder`.
+- `_fallback_route()` — add memory trigger keywords: "what do you know about me", "what did we find", "my memory", "forget", "remember that".
+- Each `build_*_agent()` — accept optional `user_profile: str` kwarg, append to system prompt.
+- The Insight agent already has `_build_system_prompt()` with dynamic context injection — same pattern extends to all agents.
 
-Minimal blast radius — no changes to routing, tools, or conversation persistence.
+Minimal blast radius — no changes to tools or conversation persistence.
 
 ## User Control API
 
@@ -221,7 +240,9 @@ Users can view, edit, and deactivate their memories. All endpoints scoped to `cu
 **Direct recall** — user explicitly asks about memory:
 > "What do you know about me?" / "What did we investigate last week?"
 
-The Router agent classifies this as a `memory` intent. The orchestrator queries `user_memories` filtered by category/keyword/date, returns a formatted summary. No LLM needed — DB query + template.
+The Router agent classifies this as a `memory` intent. The orchestrator queries `user_memories` filtered by category and keyword, returns a formatted summary. No LLM needed — DB query + template.
+
+**Scope for v1:** Direct recall supports category filtering and keyword search (`ILIKE`). Temporal queries like "last week" are not supported in v1 — the response shows all matching memories with their dates, and the user can scan visually. Temporal parsing (extracting date ranges from natural language) is a future enhancement that could use the router's structured output to extract a date range alongside the intent.
 
 **Contextual recall** — user asks a question that benefits from memory but isn't explicitly about it:
 > "Can you check the orders table again?"
@@ -299,9 +320,35 @@ def poll_conversations_for_extraction() -> None:
 
 ### Extraction Tracking
 
-To know which conversations have been processed, add a column to the extraction tracking:
+A lightweight `conversation_extraction_status` table tracks which conversations have been processed:
 
-- **Option:** Add `last_extracted_at` to a lightweight `conversation_extraction_status` table (`conversation_id`, `user_id`, `last_extracted_at`, `last_message_at`). The poll task compares `last_message_at > last_extracted_at` to find conversations needing extraction.
+| Column | Type | Description |
+|--------|------|-------------|
+| conversation_id | VARCHAR | PK |
+| user_id | VARCHAR | FK → users(id) |
+| last_extracted_at | TIMESTAMP (nullable) | When extraction last ran for this conversation |
+
+**Population strategy: eager.** The chat message persistence code (in `chat.py` endpoint) upserts a row into `conversation_extraction_status` on every message save — just `INSERT ... ON CONFLICT (conversation_id) DO NOTHING`. This is cheap (one upsert per message) and ensures the poll task has a complete index of conversations without scanning `chat_messages`.
+
+**Poll task query:**
+
+```sql
+SELECT ces.conversation_id, ces.user_id
+FROM conversation_extraction_status ces
+WHERE ces.last_extracted_at IS NULL
+   OR ces.last_extracted_at < (
+       SELECT MAX(created_at) FROM chat_messages cm
+       WHERE cm.conversation_id = ces.conversation_id
+   )
+```
+
+Then for each result, check user message count >= 3 before dispatching extraction. After extraction completes, update `last_extracted_at = NOW()`.
+
+**Note on `chat_messages.created_at`:** The existing schema stores `created_at` as TEXT in ISO 8601 format. String comparison works correctly for ISO 8601 (`"2026-04-06T..." > "2026-04-05T..."`). If format consistency becomes an issue, a future migration can add a proper TIMESTAMP column.
+
+### Profile Rebuild Concurrency
+
+Profile rebuilds are idempotent — they always read the current set of active memories and recompute summaries from scratch. If two rebuilds race (e.g., manual edit + poll extraction), the last writer wins with correct data since both read the same source of truth. No lock needed.
 
 ## LLM Error Handling
 
