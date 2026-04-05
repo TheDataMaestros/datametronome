@@ -80,12 +80,13 @@ Precomputed summary per user. This is what gets injected into agent system promp
 - `user_memories(user_id, active)` — primary query pattern: load active memories for a user
 - `user_memories(source_conversation_id)` — extraction dedup: "already extracted this conversation?"
 - `user_memory_profiles(user_id)` — unique, used on every chat request
+- `chat_messages(conversation_id, created_at DESC)` — new composite index to support the poll task's correlated subquery efficiently (existing single-column indexes don't cover this)
 
 ### Memory Count Scaling
 
 When a user accumulates > 100 active memories, the extraction prompt receives only the 50 most recent memories plus a category-count summary of the rest (e.g., "Additionally: 30 domain_focus, 25 expertise, 12 investigation memories not shown"). This keeps extraction within token limits.
 
-Profile rebuild always reads all active memories — the summarization LLM call handles the full set since summaries compress well.
+Profile rebuild reads all active memories, but summarizes per-category in batches if the count exceeds 200 (summarize each category separately, then merge into the final profile). In practice, supersession and deactivation keep the active count well below this — most facts get refined rather than accumulated indefinitely.
 
 ### Relationships
 
@@ -204,7 +205,7 @@ All of them — config, investigation, report, insight. The profile is short (~3
 
 - `orchestrator.run_chat()` — one DB call to load profile, pass to agent builders. Add early-return branch for `decision.intent == "memory"`.
 - `router.py` — add `"memory"` to `VALID_INTENTS` Literal. No corresponding agent in `_get_agent_builder`.
-- `_fallback_route()` — add memory trigger keywords: "what do you know about me", "what did we find", "my memory", "forget", "remember that".
+- `_fallback_route()` — add memory trigger keywords: "what do you know about me", "what did we find", "my memory", "show my profile".
 - Each `build_*_agent()` — accept optional `user_profile: str` kwarg, append to system prompt.
 - The Insight agent already has `_build_system_prompt()` with dynamic context injection — same pattern extends to all agents.
 
@@ -263,7 +264,9 @@ The Router agent gets a new intent added:
 "memory"        → Direct recall (no agent, orchestrator handles)
 ```
 
-**Trigger phrases:** "what do you know about me", "what did we find", "what have we investigated", "my memory", "forget that", "remember that"
+**Trigger phrases (read-only in v1):** "what do you know about me", "what did we find", "what have we investigated", "my memory", "show my profile"
+
+**Note:** Write operations ("forget that", "remember that") are handled through the User Control API endpoints, not through chat. The recall intent is read-only in v1. A future enhancement could route "forget X" and "remember X" through chat by having the orchestrator call the CRUD service directly.
 
 ### Direct Recall Response Format
 
@@ -326,7 +329,8 @@ A lightweight `conversation_extraction_status` table tracks which conversations 
 |--------|------|-------------|
 | conversation_id | VARCHAR | PK |
 | user_id | VARCHAR | FK → users(id) |
-| last_extracted_at | TIMESTAMP (nullable) | When extraction last ran for this conversation |
+| status | VARCHAR | `idle`, `processing`. Default: `idle` |
+| last_extracted_at | TEXT (nullable) | ISO 8601 timestamp of last extraction. TEXT to match `chat_messages.created_at` format. |
 
 **Population strategy: eager.** The chat message persistence code (in `chat.py` endpoint) upserts a row into `conversation_extraction_status` on every message save — just `INSERT ... ON CONFLICT (conversation_id) DO NOTHING`. This is cheap (one upsert per message) and ensures the poll task has a complete index of conversations without scanning `chat_messages`.
 
@@ -335,20 +339,31 @@ A lightweight `conversation_extraction_status` table tracks which conversations 
 ```sql
 SELECT ces.conversation_id, ces.user_id
 FROM conversation_extraction_status ces
-WHERE ces.last_extracted_at IS NULL
-   OR ces.last_extracted_at < (
-       SELECT MAX(created_at) FROM chat_messages cm
-       WHERE cm.conversation_id = ces.conversation_id
-   )
+WHERE ces.status = 'idle'
+  AND (
+    ces.last_extracted_at IS NULL
+    OR ces.last_extracted_at < (
+        SELECT MAX(created_at) FROM chat_messages cm
+        WHERE cm.conversation_id = ces.conversation_id
+    )
+  )
+LIMIT 50
 ```
 
-Then for each result, check user message count >= 3 before dispatching extraction. After extraction completes, update `last_extracted_at = NOW()`.
+The `LIMIT 50` caps dispatch per poll cycle to prevent queue spikes. The `status = 'idle'` guard prevents double-dispatch if extraction takes > 10 minutes (the poll interval).
 
-**Note on `chat_messages.created_at`:** The existing schema stores `created_at` as TEXT in ISO 8601 format. String comparison works correctly for ISO 8601 (`"2026-04-06T..." > "2026-04-05T..."`). If format consistency becomes an issue, a future migration can add a proper TIMESTAMP column.
+**Dispatch flow:**
+1. Poll task sets `status = 'processing'` for selected rows (atomic UPDATE)
+2. Dispatches `extract_user_memories.delay(conversation_id, user_id)` for each
+3. Extraction task: on completion, sets `status = 'idle'` and `last_extracted_at = NOW()`; on failure, sets `status = 'idle'` (will be retried next poll)
+
+Then for each result, check user message count >= 3 before dispatching extraction.
+
+**Note on timestamps:** Both `last_extracted_at` and `chat_messages.created_at` use TEXT in ISO 8601 format. String comparison works correctly for ISO 8601 (`"2026-04-06T..." > "2026-04-05T..."`). Using the same type avoids implicit type coercion in the comparison. If format consistency becomes an issue, a future migration can add proper TIMESTAMP columns to both tables.
 
 ### Profile Rebuild Concurrency
 
-Profile rebuilds are idempotent — they always read the current set of active memories and recompute summaries from scratch. If two rebuilds race (e.g., manual edit + poll extraction), the last writer wins with correct data since both read the same source of truth. No lock needed.
+Profile rebuilds are idempotent — they always read the current set of active memories and recompute summaries from scratch. If two rebuilds race (e.g., manual edit + poll extraction), there's a small window where one rebuild reads before the other's memory writes are committed, producing a slightly stale profile. This is an acceptable trade-off: the window is narrow (seconds), the impact is a temporarily stale summary, and the next extraction or manual edit triggers another rebuild that corrects it. No lock needed for v1; if this proves problematic, a `SELECT ... FOR UPDATE` on the profile row can serialize rebuilds.
 
 ## LLM Error Handling
 
