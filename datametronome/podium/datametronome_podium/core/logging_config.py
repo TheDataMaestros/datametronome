@@ -26,7 +26,7 @@ class CustomJsonFormatter(jsonlogger.JsonFormatter):
     - service: Service name
     """
 
-    def add_fields(self, log_data: Any, record: Any, message_dict: Any) -> None:  # type: ignore[override]
+    def add_fields(self, log_data: Any, record: Any, message_dict: Any) -> None:  # ty: ignore[override]  # ty:ignore[ignore-comment-unknown-rule, invalid-method-override]
         """Add custom fields to log record."""
         super().add_fields(log_data, record, message_dict)
 

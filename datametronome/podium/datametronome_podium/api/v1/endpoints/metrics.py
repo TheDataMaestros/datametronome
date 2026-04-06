@@ -1,10 +1,14 @@
 """Metrics endpoints for DataMetronome Podium using DataPulse connectors."""
 
+import json as _json
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List
 
 from datametronome_podium.core.database import get_db
 from fastapi import APIRouter, HTTPException, status
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -204,7 +208,7 @@ async def get_dashboard_metrics() -> Dict[str, Any]:
 
         active_staves_result = await db.query(
             {
-                "sql": "SELECT COUNT(*) as count FROM staves WHERE is_active = 1",
+                "sql": "SELECT COUNT(*) as count FROM staves WHERE is_active = TRUE",
                 "params": [],
             }
         )
@@ -218,7 +222,7 @@ async def get_dashboard_metrics() -> Dict[str, Any]:
 
         active_clefs_result = await db.query(
             {
-                "sql": "SELECT COUNT(*) as count FROM clefs WHERE is_active = 1",
+                "sql": "SELECT COUNT(*) as count FROM clefs WHERE is_active = TRUE",
                 "params": [],
             }
         )
@@ -357,6 +361,9 @@ async def get_dashboard_metrics() -> Dict[str, Any]:
                 ),
             }
 
+        # --- Intelligence metrics ---
+        intelligence = await _fetch_intelligence_metrics(db)
+
         return {
             "success_rate": round(success_rate, 1),
             "success_rate_change": round(success_rate_change, 1),
@@ -368,6 +375,7 @@ async def get_dashboard_metrics() -> Dict[str, Any]:
             "distribution": distribution_percentages,
             "total_checks": all_checks_count,
             "checks_24h": checks_24h,
+            "intelligence": intelligence,
         }
 
     except Exception as e:
@@ -375,3 +383,188 @@ async def get_dashboard_metrics() -> Dict[str, Any]:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch dashboard metrics: {str(e)}",
         )
+
+
+async def _fetch_intelligence_metrics(db: Any) -> Dict[str, Any]:
+    """Fetch intelligence-layer metrics (health, profiles, suggestions).
+
+    Returns an empty dict if the intelligence tables do not exist yet.
+    """
+    intelligence: Dict[str, Any] = {}
+    try:
+        # Average health score across all reports
+        health_result = await db.query(
+            {
+                "sql": (
+                    "SELECT AVG(health_score) as avg_health, COUNT(*) as report_count "
+                    "FROM insight_reports"
+                ),
+                "params": [],
+            }
+        )
+        if health_result:
+            raw_avg = health_result[0].get("avg_health")
+            intelligence["avg_health_score"] = float(round(raw_avg, 1)) if raw_avg is not None else 0
+            intelligence["total_reports"] = health_result[0].get("report_count") or 0
+        else:
+            intelligence["avg_health_score"] = 0
+            intelligence["total_reports"] = 0
+
+        # Timestamp of the most recent report
+        latest_report_result = await db.query(
+            {
+                "sql": "SELECT created_at, snapshot_id FROM insight_reports ORDER BY created_at DESC LIMIT 1",
+                "params": [],
+            }
+        )
+        intelligence["last_analyzed_at"] = (
+            latest_report_result[0].get("created_at") if latest_report_result else None
+        )
+
+        # Latest snapshot table metrics for business KPIs
+        if latest_report_result and latest_report_result[0].get("snapshot_id"):
+            snap_result = await db.query(
+                {
+                    "sql": "SELECT table_metrics FROM baseline_snapshots WHERE id = ?",
+                    "params": [latest_report_result[0]["snapshot_id"]],
+                }
+            )
+            if snap_result:
+                raw_metrics = snap_result[0].get("table_metrics", "{}")
+                try:
+                    table_metrics = (
+                        _json.loads(raw_metrics)
+                        if isinstance(raw_metrics, str)
+                        else raw_metrics
+                    )
+                    intelligence["table_metrics"] = {
+                        tbl: data.get("row_count", 0)
+                        for tbl, data in table_metrics.items()
+                        if isinstance(data, dict)
+                    }
+                except (ValueError, TypeError):
+                    intelligence["table_metrics"] = {}
+            else:
+                intelligence["table_metrics"] = {}
+        else:
+            intelligence["table_metrics"] = {}
+
+        # Profiled data sources
+        profiles_result = await db.query(
+            {"sql": "SELECT COUNT(*) as count FROM data_profiles", "params": []}
+        )
+        intelligence["profiled_sources"] = (
+            profiles_result[0]["count"] if profiles_result else 0
+        )
+
+        # Health score for each stave — only staves with at least one report
+        stave_scores_result = await db.query(
+            {
+                "sql": (
+                    "SELECT ir.stave_id, MAX(ir.health_score) AS health_score "
+                    "FROM insight_reports ir "
+                    "JOIN staves st ON ir.stave_id = st.id "
+                    "WHERE st.is_active = TRUE "
+                    "GROUP BY ir.stave_id"
+                ),
+                "params": [],
+            }
+        )
+        intelligence["stave_health_scores"] = {
+            row["stave_id"]: int(row["health_score"])
+            for row in (stave_scores_result or [])
+            if row.get("stave_id") and row.get("health_score") is not None
+        }
+
+        # Pending suggestions — count + top items
+        suggestions_result = await db.query(
+            {
+                "sql": "SELECT COUNT(*) as count FROM insight_suggestions WHERE status = 'pending'",
+                "params": [],
+            }
+        )
+        intelligence["pending_suggestions"] = (
+            suggestions_result[0]["count"] if suggestions_result else 0
+        )
+
+        top_suggestions_result = await db.query(
+            {
+                "sql": (
+                    "SELECT s.priority, s.category, s.action, s.reasoning, "
+                    "s.stave_id, st.name AS stave_name "
+                    "FROM insight_suggestions s "
+                    "LEFT JOIN staves st ON s.stave_id = st.id "
+                    "WHERE s.status = 'pending' "
+                    "ORDER BY CASE s.priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END "
+                    "LIMIT 3"
+                ),
+                "params": [],
+            }
+        )
+        intelligence["top_suggestions"] = [
+            {
+                "priority": row.get("priority", "medium"),
+                "category": row.get("category", "general"),
+                "action": row.get("action", ""),
+                "reasoning": row.get("reasoning", ""),
+                "stave_id": row.get("stave_id", ""),
+                "stave_name": row.get("stave_name") or row.get("stave_id", ""),
+            }
+            for row in (top_suggestions_result or [])
+        ]
+
+        # Anomalies from most recent reports — count + top critical items
+        # Include created_at + snapshot's captured_at so UI can show "detected at / last snapshot"
+        anomaly_reports = await db.query(
+            {
+                "sql": (
+                    "SELECT r.anomalies, r.stave_id, st.name AS stave_name, "
+                    "r.created_at AS report_at, s.captured_at AS snapshot_at "
+                    "FROM insight_reports r "
+                    "LEFT JOIN baseline_snapshots s ON r.snapshot_id = s.id "
+                    "LEFT JOIN staves st ON r.stave_id = st.id "
+                    "ORDER BY r.created_at DESC LIMIT 5"
+                ),
+                "params": [],
+            }
+        )
+        total_anomalies = 0
+        critical_anomalies = 0
+        top_anomalies: List[Dict[str, Any]] = []
+        for row in anomaly_reports or []:
+            try:
+                raw = row.get("anomalies", "[]")
+                anomalies_list = (
+                    _json.loads(raw) if isinstance(raw, str) else raw
+                )
+                if isinstance(anomalies_list, list):
+                    total_anomalies += len(anomalies_list)
+                    for a in anomalies_list:
+                        if not isinstance(a, dict):
+                            continue
+                        severity = a.get("severity", "")
+                        if severity in ("high", "critical"):
+                            critical_anomalies += 1
+                            if len(top_anomalies) < 3:
+                                top_anomalies.append({
+                                    "severity": severity,
+                                    "category": a.get("category", ""),
+                                    "description": a.get("description", a.get("title", "")),
+                                    "table": a.get("table", ""),
+                                    "evidence": a.get("evidence", ""),
+                                    "detected_at": row.get("report_at"),
+                                    "snapshot_at": row.get("snapshot_at"),
+                                    "stave_id": row.get("stave_id", ""),
+                                    "stave_name": row.get("stave_name") or row.get("stave_id", ""),
+                                })
+            except (ValueError, TypeError):
+                pass
+        intelligence["insight_anomalies"] = total_anomalies
+        intelligence["critical_anomalies"] = critical_anomalies
+        intelligence["top_anomalies"] = top_anomalies
+
+    except Exception as exc:
+        logger.warning("Failed to fetch intelligence metrics: %s", exc)
+        intelligence = {}
+
+    return intelligence

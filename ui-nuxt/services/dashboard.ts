@@ -1,5 +1,40 @@
 import { apiService } from './api'
 
+export interface IntelligenceSuggestion {
+  priority: string
+  category: string
+  action: string
+  reasoning: string
+  stave_id: string
+  stave_name: string
+}
+
+export interface IntelligenceAnomaly {
+  severity: string
+  category: string
+  description: string
+  table: string
+  evidence: string
+  detected_at: string | null
+  snapshot_at: string | null
+  stave_id: string
+  stave_name: string
+}
+
+export interface IntelligenceMetrics {
+  avg_health_score: number
+  total_reports: number
+  profiled_sources: number
+  pending_suggestions: number
+  insight_anomalies: number
+  critical_anomalies: number
+  top_suggestions: IntelligenceSuggestion[]
+  top_anomalies: IntelligenceAnomaly[]
+  last_analyzed_at: string | null
+  table_metrics: Record<string, number>
+  stave_health_scores: Record<string, number>
+}
+
 export interface DashboardMetrics {
   success_rate: number
   success_rate_change: number
@@ -15,6 +50,7 @@ export interface DashboardMetrics {
   }
   total_checks: number
   checks_24h: number
+  intelligence?: IntelligenceMetrics
 }
 
 class DashboardService {

@@ -87,6 +87,11 @@ async def test_list_checks_returns_list(mock_db):
         assert isinstance(result, (list, dict))
 
 
-def test_all_tools_list_has_11_entries():
+def test_all_tools_list_has_13_entries():
     from datametronome_podium.services.agent_tools import ALL_TOOLS
-    assert len(ALL_TOOLS) == 11
+    assert len(ALL_TOOLS) == 13
+
+
+def test_insight_tools_list_has_9_entries():
+    from datametronome_podium.services.agent_tools import INSIGHT_TOOLS
+    assert len(INSIGHT_TOOLS) == 9

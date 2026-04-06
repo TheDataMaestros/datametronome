@@ -273,10 +273,12 @@ async def get_table_sample(
         tester = ConnectionTester()
         connector = await tester.get_connector(stave, read_only=True)
 
+        config = stave.connection_config if isinstance(stave.connection_config, dict) else {}
         if stave.data_source_type == "bigquery":
             query = f"SELECT * FROM `{table_name}` LIMIT {limit}"
         elif stave.data_source_type in ["postgres", "postgresql"]:
-            query = f'SELECT * FROM "{table_name}" LIMIT {limit}'
+            pg_schema = config.get("schema", "public")
+            query = f'SELECT * FROM "{pg_schema}"."{table_name}" LIMIT {limit}'
         else:
             query = f"SELECT * FROM {table_name} LIMIT {limit}"
 
@@ -1174,7 +1176,96 @@ def _enhance_suggestions_with_data(
 
 
 # ---------------------------------------------------------------------------
-# Exported tool list (used by sub-agents to register tools)
+# Intelligence-specific tools
+# ---------------------------------------------------------------------------
+
+
+async def get_stave_intelligence(stave_id: str) -> dict[str, object]:
+    """Get the intelligence profile and latest report for a data source.
+
+    Returns the domain classification, health score, anomalies, suggestions,
+    and accumulated knowledge for a stave.
+    """
+    try:
+        from datametronome_podium.core.database import get_executor
+        from datametronome_podium.features.insights.repo import InsightsRepo
+
+        repo = InsightsRepo(get_executor())
+
+        profile = await repo.get_profile(stave_id)
+        report = await repo.get_latest_report(stave_id)
+        suggestions = await repo.list_suggestions(stave_id, status="pending")
+
+        logger.info(
+            "get_stave_intelligence(%s): profile=%s, report=%s, suggestions=%d",
+            stave_id,
+            profile.domain_type if profile else None,
+            report.health_score if report else None,
+            len(suggestions) if suggestions else 0,
+        )
+
+        result: dict[str, object] = {"stave_id": stave_id}
+
+        if profile:
+            result["domain_type"] = profile.domain_type
+            result["domain_confidence"] = profile.domain_confidence
+            result["domain_context"] = profile.domain_context
+            result["entity_roles"] = profile.entity_roles
+            result["learned_patterns"] = profile.learned_patterns
+        else:
+            result["profile"] = None
+            result["message"] = "No intelligence profile yet. Trigger an analysis first."
+
+        if report:
+            result["health_score"] = report.health_score
+            result["report_type"] = report.report_type
+            result["summary"] = report.summary
+            result["key_findings"] = report.key_findings
+            result["anomalies"] = report.anomalies
+            result["dimensions"] = report.dimensions
+            result["last_analyzed"] = report.created_at
+
+        if suggestions:
+            result["pending_suggestions"] = [
+                {"action": s.action, "priority": s.priority, "reasoning": s.reasoning}
+                for s in suggestions
+            ]
+
+        return result
+    except Exception as e:
+        return {"error": str(e), "stave_id": stave_id}
+
+
+async def trigger_stave_analysis(stave_id: str) -> dict[str, object]:
+    """Trigger an on-demand intelligence analysis for a data source.
+
+    Dispatches a background analysis that discovers schema, classifies
+    the business domain, captures metrics, and generates an AI insight report.
+    Returns immediately with a task ID for status polling.
+    """
+    try:
+        from datametronome_podium.tasks.intelligence_tasks import run_on_demand_analysis
+
+        task = run_on_demand_analysis.delay(stave_id)
+        return {
+            "status": "queued",
+            "task_id": task.id,
+            "stave_id": stave_id,
+            "message": (
+                f"Analysis queued for stave {stave_id}. "
+                "Results will be available via get_stave_intelligence once complete."
+            ),
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "Could not dispatch analysis. The Celery worker may not be running.",
+        }
+
+
+# ---------------------------------------------------------------------------
+# Exported tool lists (used by sub-agents to register tools)
 # ---------------------------------------------------------------------------
 
 ALL_TOOLS = [
@@ -1189,4 +1280,18 @@ ALL_TOOLS = [
     list_checks,
     get_summary_report,
     get_quality_report,
+    get_stave_intelligence,
+    trigger_stave_analysis,
+]
+
+INSIGHT_TOOLS = [
+    list_staves,
+    get_stave,
+    list_stave_tables,
+    get_table_sample,
+    suggest_quality_checks,
+    list_clefs,
+    list_checks,
+    get_stave_intelligence,
+    trigger_stave_analysis,
 ]

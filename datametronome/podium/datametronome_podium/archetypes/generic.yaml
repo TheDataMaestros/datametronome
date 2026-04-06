@@ -1,0 +1,12 @@
+name: generic
+description: Fallback — no domain-specific assumptions
+
+signatures:
+  required: []
+  optional: []
+
+metrics: []
+
+patterns: []
+
+suggested_checks: []

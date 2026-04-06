@@ -13,7 +13,7 @@ from datametronome_podium.api.schemas.auth import (
     UserLogin,
 )
 from datametronome_podium.core.config import settings
-from datametronome_podium.core.database import execute_query, get_db, insert_data
+from datametronome_podium.core.database import execute_query, execute_write, get_db, insert_data
 from datametronome_podium.core.exceptions import AuthenticationError
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -248,9 +248,65 @@ async def get_current_user_info(
     Returns:
         Current user information.
     """
+    # Parse dashboard_prefs — stored as JSON text in DB, default to empty prefs
+    raw_prefs = current_user.get("dashboard_prefs") or "{}"
+    try:
+        prefs = json.loads(raw_prefs) if isinstance(raw_prefs, str) else raw_prefs
+    except (ValueError, TypeError):
+        prefs = {}
+    if "pinned_staves" not in prefs:
+        prefs["pinned_staves"] = []
+
     return {
         "username": current_user["username"],
         "email": current_user["email"],
         "is_active": current_user["is_active"],
         "is_superuser": current_user["is_superuser"],
+        "dashboard_prefs": prefs,
+    }
+
+
+@router.patch("/me", response_model=dict[str, Any])
+async def patch_current_user(
+    body: dict[str, Any],
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Update current user preferences.
+
+    Accepts: { "dashboard_prefs": { "pinned_staves": ["id1", "id2", "id3"] } }
+    Replaces dashboard_prefs fully (not a merge).
+    """
+    if "dashboard_prefs" not in body:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="dashboard_prefs is required",
+        )
+    new_prefs = body["dashboard_prefs"]
+    pinned = new_prefs.get("pinned_staves", [])
+
+    if not isinstance(pinned, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="pinned_staves must be a list",
+        )
+    if len(pinned) > 3:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="pinned_staves cannot exceed 3 entries",
+        )
+
+    prefs_to_save = {"pinned_staves": [str(s) for s in pinned]}
+    prefs_json = json.dumps(prefs_to_save)
+
+    await execute_write(
+        "UPDATE users SET dashboard_prefs = ? WHERE username = ?",
+        [prefs_json, current_user["username"]],
+    )
+
+    return {
+        "username": current_user["username"],
+        "email": current_user["email"],
+        "is_active": current_user["is_active"],
+        "is_superuser": current_user["is_superuser"],
+        "dashboard_prefs": prefs_to_save,
     }

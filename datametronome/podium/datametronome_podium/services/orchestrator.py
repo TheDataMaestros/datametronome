@@ -15,11 +15,13 @@ from typing import Any
 from pydantic_ai.messages import ModelMessage, ModelRequest, ModelResponse, TextPart, UserPromptPart
 
 from datametronome_podium.core.config import settings
+from datametronome_podium.core.database import get_executor
 
 from datametronome_podium.services.agents.router import RoutingDecision, build_router_agent
 from datametronome_podium.services.agents.config import build_config_agent
 from datametronome_podium.services.agents.investigation import build_investigation_agent
 from datametronome_podium.services.agents.report import build_report_agent
+from datametronome_podium.services.agents.insight import build_insight_agent
 from datametronome_podium.services.agent_factory import (
     build_model_from_settings,
     build_router_model_from_settings,
@@ -41,6 +43,11 @@ def _fallback_route(message: str) -> RoutingDecision:
     """
     msg = message.lower()
 
+    if any(w in msg for w in ["what do you know about me", "what did we find", "my memory", "show my profile"]):
+        return RoutingDecision(
+            intent="memory", mode="single", agents=["report"],
+            reasoning="Fallback: detected memory keywords",
+        )
     if any(w in msg for w in ["create", "add", "configure", "set up", "connect"]):
         return RoutingDecision(
             intent="config", mode="single", agents=["config"],
@@ -55,6 +62,11 @@ def _fallback_route(message: str) -> RoutingDecision:
         return RoutingDecision(
             intent="report", mode="single", agents=["report"],
             reasoning="Fallback: detected report keywords",
+        )
+    if any(w in msg for w in ["explore", "insight", "analyze", "what's happening", "how's my data", "business"]):
+        return RoutingDecision(
+            intent="insight", mode="single", agents=["insight"],
+            reasoning="Fallback: detected insight keywords",
         )
     # Default: report agent handles general questions
     return RoutingDecision(
@@ -82,14 +94,78 @@ def _get_report_agent():
     return build_report_agent(build_model_from_settings())
 
 
-def _get_agent_builder(agent_type: str):
-    """Resolve agent builder by name — indirects through module globals so patches work."""
-    builders = {
-        "config": _get_config_agent,
-        "investigation": _get_investigation_agent,
-        "report": _get_report_agent,
+def _get_insight_agent():
+    from datametronome_podium.services.agent_factory import build_heavy_model_from_settings
+    return build_insight_agent(build_heavy_model_from_settings())
+
+
+def _get_agent_builder(agent_type: str, user_profile: str | None = None):
+    """Resolve agent builder by name — indirects through module globals so patches work.
+
+    When user_profile is None we delegate to the bare _get_*_agent helpers so that
+    monkeypatching in tests remains effective. When a profile is provided we use
+    closures that forward the profile kwarg to the underlying build functions.
+    """
+    if user_profile is None:
+        builders = {
+            "config": _get_config_agent,
+            "investigation": _get_investigation_agent,
+            "report": _get_report_agent,
+            "insight": _get_insight_agent,
+        }
+        return builders.get(agent_type, _get_report_agent)
+
+    # Profile-aware closures — bypasses the bare helpers intentionally because
+    # the profile kwarg cannot be forwarded through the no-arg helper wrappers.
+    def _config():
+        return build_config_agent(build_model_from_settings(), user_profile=user_profile)
+
+    def _investigation():
+        return build_investigation_agent(build_model_from_settings(), user_profile=user_profile)
+
+    def _report():
+        return build_report_agent(build_model_from_settings(), user_profile=user_profile)
+
+    def _insight():
+        from datametronome_podium.services.agent_factory import build_heavy_model_from_settings
+        return build_insight_agent(build_heavy_model_from_settings(), user_profile=user_profile)
+
+    builders_with_profile = {
+        "config": _config,
+        "investigation": _investigation,
+        "report": _report,
+        "insight": _insight,
     }
-    return builders.get(agent_type, _get_report_agent)
+    return builders_with_profile.get(agent_type, _report)
+
+
+async def _load_user_profile(user_id: str | None) -> str | None:
+    """Load and format the user's memory profile for system prompt injection."""
+    if not user_id:
+        return None
+    try:
+        from datametronome_podium.features.user_memory.repo import UserMemoryRepo
+        from datametronome_podium.features.user_memory.service import UserMemoryService
+        repo = UserMemoryRepo(get_executor())
+        service = UserMemoryService(repo=repo)
+        profile = await repo.get_profile(user_id)
+        return service.format_profile_for_prompt(profile)
+    except Exception as e:
+        logger.warning("Failed to load user memory profile: %s", e)
+        return None
+
+
+async def _handle_memory_recall(user_id: str) -> str:
+    """Handle a 'memory' intent — return formatted recall response as an early return."""
+    try:
+        from datametronome_podium.features.user_memory.repo import UserMemoryRepo
+        from datametronome_podium.features.user_memory.service import UserMemoryService
+        repo = UserMemoryRepo(get_executor())
+        service = UserMemoryService(repo=repo)
+        return await service.format_recall(user_id)
+    except Exception as e:
+        logger.warning("Failed to handle memory recall: %s", e)
+        return "Sorry, I couldn't retrieve your memory profile right now."
 
 
 def convert_history_to_messages(history: list[dict]) -> list[ModelMessage]:
@@ -133,6 +209,8 @@ async def run_chat(
     all_history = convert_history_to_messages(history)
     router_history = all_history[-router_history_window:] if all_history else []
 
+    user_profile_text = await _load_user_profile(user_id)
+
     # Skip LLM routing for Ollama — too slow and unreliable for structured output.
     # Use instant keyword-based routing instead, save the LLM call for the actual agent.
     if settings.ai_provider == "ollama":
@@ -151,6 +229,18 @@ async def run_chat(
         "Router decision: intent=%s mode=%s agents=%s reasoning=%r",
         decision.intent, decision.mode, decision.agents, decision.reasoning,
     )
+
+    # Memory recall is a read-only operation — return early without agent dispatch
+    # or checkpoint creation to keep it fast and side-effect-free.
+    if decision.intent == "memory":
+        response_message = await _handle_memory_recall(user_id or "")
+        return {
+            "message": response_message,
+            "intent": decision.intent,
+            "mode": "single",
+            "agents": [],
+            "model": "pydantic-ai",
+        }
 
     # Check for paused checkpoint to resume, or create a new one
     checkpoint_id = None
@@ -175,11 +265,11 @@ async def run_chat(
 
     try:
         if decision.mode == "parallel" and len(decision.agents) >= 2:
-            response_message = await _run_parallel(message, decision, all_history, checkpoint_id)
+            response_message = await _run_parallel(message, decision, all_history, checkpoint_id, user_profile_text)
         elif decision.mode == "chain" and len(decision.agents) >= 2:
-            response_message = await _run_chain(message, decision, all_history, checkpoint_id)
+            response_message = await _run_chain(message, decision, all_history, checkpoint_id, user_profile_text)
         else:
-            response_message = await _run_single(message, decision, all_history, checkpoint_id)
+            response_message = await _run_single(message, decision, all_history, checkpoint_id, user_profile_text)
 
         if checkpoint_id:
             await update_checkpoint(checkpoint_id, status="completed")
@@ -204,6 +294,7 @@ async def _run_single(
     decision: RoutingDecision,
     history: list[ModelMessage],
     checkpoint_id: str | None = None,
+    user_profile: str | None = None,
 ) -> str:
     agent_type = decision.agents[0] if decision.agents else "report"
 
@@ -211,7 +302,7 @@ async def _run_single(
         await log_event(checkpoint_id, "node_entered", agent_type)
         await update_checkpoint(checkpoint_id, current_node=agent_type)
 
-    agent = _get_agent_builder(agent_type)()
+    agent = _get_agent_builder(agent_type, user_profile=user_profile)()
     result = await agent.run(message, message_history=history)
     output = str(result.output)
 
@@ -228,6 +319,7 @@ async def _run_chain(
     decision: RoutingDecision,
     history: list[ModelMessage],
     checkpoint_id: str | None = None,
+    user_profile: str | None = None,
 ) -> str:
     """Run agents in sequence. Each agent after the first receives the previous output."""
     previous_output = ""
@@ -238,7 +330,7 @@ async def _run_chain(
             await log_event(checkpoint_id, "node_entered", agent_type, {"step": i})
             await update_checkpoint(checkpoint_id, current_node=agent_type)
 
-        agent = _get_agent_builder(agent_type)()
+        agent = _get_agent_builder(agent_type, user_profile=user_profile)()
 
         if i == 0:
             msg_to_send = message
@@ -272,6 +364,7 @@ async def _run_parallel(
     decision: RoutingDecision,
     history: list[ModelMessage],
     checkpoint_id: str | None = None,
+    user_profile: str | None = None,
 ) -> str:
     """Run agents concurrently, combine their outputs."""
     if checkpoint_id:
@@ -280,7 +373,7 @@ async def _run_parallel(
         await update_checkpoint(checkpoint_id, current_node=",".join(decision.agents))
 
     async def run_agent(agent_type: str) -> tuple[str, str]:
-        agent = _get_agent_builder(agent_type)()
+        agent = _get_agent_builder(agent_type, user_profile=user_profile)()
         result = await agent.run(message, message_history=history)
         return agent_type, str(result.output)
 
@@ -296,7 +389,7 @@ async def _run_parallel(
             if checkpoint_id:
                 await log_event(checkpoint_id, "error", None, {"error": str(r)})
         else:
-            agent_type, text = r  # type: ignore[not-iterable]
+            agent_type, text = r  # ty: ignore[not-iterable]
             if text:
                 parts.append(f"**{agent_type.title()}:**\n{text}")
             if checkpoint_id:

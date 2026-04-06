@@ -64,7 +64,7 @@ class ConnectionTester:
                 }
 
             connection_time = time.time() - start_time
-            result["connection_time"] = connection_time  # type: ignore[assignment]
+            result["connection_time"] = connection_time  # ty: ignore[assignment]  # ty:ignore[ignore-comment-unknown-rule, invalid-assignment]
 
             return result
 
@@ -236,15 +236,15 @@ class ConnectionTester:
             cursor = conn.cursor()
             cursor.execute("SELECT VERSION();")
             row = cursor.fetchone()
-            version = row[0] if row else None  # type: ignore[index]
+            version = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
 
             cursor.execute("SELECT COUNT(*) FROM information_schema.schemata;")
             row = cursor.fetchone()
-            schema_count = row[0] if row else None  # type: ignore[index]
+            schema_count = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
 
             cursor.execute("SELECT COUNT(*) FROM information_schema.tables;")
             row = cursor.fetchone()
-            table_count = row[0] if row else None  # type: ignore[index]
+            table_count = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
 
             cursor.close()
             conn.close()

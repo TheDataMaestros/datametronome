@@ -38,3 +38,10 @@ def test_celery_app_queue_definitions():
     assert QUEUE_DEFAULT == "checks.default"
     assert QUEUE_BULK == "checks.bulk"
     assert QUEUE_DLQ == "checks.dlq"
+
+
+def test_intelligence_queue_configured():
+    from datametronome_podium.core.celery_app import QUEUE_INTELLIGENCE, celery_app
+    assert QUEUE_INTELLIGENCE == "intelligence.default"
+    queue_names = [q.name for q in celery_app.conf.task_queues]
+    assert "intelligence.default" in queue_names

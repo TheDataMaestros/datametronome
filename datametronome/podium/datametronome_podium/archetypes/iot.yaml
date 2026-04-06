@@ -1,0 +1,31 @@
+name: iot
+description: IoT / sensor platforms — devices, readings, events
+
+signatures:
+  required: [devices, readings]
+  optional: [sensors, events, alerts, locations, firmware, telemetry]
+
+metrics:
+  - name: device_uptime_percentage
+    typical_range: [0.95, 0.999]
+  - name: reading_frequency_per_hour
+    typical_range: [1, 3600]
+  - name: alert_rate_per_day
+    typical_range: [0, 50]
+
+patterns:
+  - continuous_data_flow
+  - gap_equals_device_failure
+  - seasonal_sensor_drift
+
+suggested_checks:
+  - type: freshness
+    table: readings
+    schedule: "*/15 * * * *"
+    config:
+      max_age_hours: 1
+  - type: row_count_anomaly
+    table: readings
+    schedule: "0 * * * *"
+    config:
+      threshold_std_devs: 2

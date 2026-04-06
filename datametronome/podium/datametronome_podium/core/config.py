@@ -121,6 +121,11 @@ class Settings(BaseSettings):
         description="Optional cheaper model for the router agent (e.g. claude-haiku-4-5). If unset, uses ai_model.",
         validation_alias="DATAMETRONOME_AI_ROUTER_MODEL",
     )
+    ai_heavy_model: str | None = Field(
+        default=None,
+        description="Optional more capable model for complex analysis (e.g. gemini-2.5-pro). If unset, uses ai_model.",
+        validation_alias="DATAMETRONOME_AI_HEAVY_MODEL",
+    )
     ai_base_url: str | None = Field(
         default=None,
         description="Custom base URL (required for Ollama: http://localhost:11434/v1)",
@@ -167,9 +172,9 @@ class Settings(BaseSettings):
         return v
 
     model_config = ConfigDict(
-        env_file=".env",  # type: ignore[invalid-key]
-        case_sensitive=False,  # type: ignore[invalid-key]
-        env_prefix="DATAMETRONOME_",  # type: ignore[invalid-key]
+        env_file=".env",  # ty: ignore[invalid-key]
+        case_sensitive=False,  # ty: ignore[invalid-key]
+        env_prefix="DATAMETRONOME_",  # ty: ignore[invalid-key]
         extra="ignore",
     )
 

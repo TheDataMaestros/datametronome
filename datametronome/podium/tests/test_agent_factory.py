@@ -4,10 +4,10 @@ import pytest
 
 def test_build_model_ollama():
     from datametronome_podium.services.agent_factory import build_model
-    from pydantic_ai.models.openai import OpenAIModel
+    from pydantic_ai.models.openai import OpenAIModel  # ty:ignore[deprecated]
 
     model = build_model("ollama", "qwen2.5", api_key=None, base_url="http://localhost:11434/v1")
-    assert isinstance(model, OpenAIModel)
+    assert isinstance(model, OpenAIModel)  # ty:ignore[deprecated]
 
 
 def test_build_model_anthropic():
@@ -20,10 +20,10 @@ def test_build_model_anthropic():
 
 def test_build_model_openai():
     from datametronome_podium.services.agent_factory import build_model
-    from pydantic_ai.models.openai import OpenAIModel
+    from pydantic_ai.models.openai import OpenAIModel  # ty:ignore[deprecated]
 
     model = build_model("openai", "gpt-4o-mini", api_key="sk-test")
-    assert isinstance(model, OpenAIModel)
+    assert isinstance(model, OpenAIModel)  # ty:ignore[deprecated]
 
 
 def test_build_model_gemini():
@@ -58,3 +58,15 @@ def test_build_router_model_falls_back_to_ai_model():
     router = build_router_model_from_settings()
     # Both should be the same type when no router model is configured
     assert type(main) == type(router)
+
+
+def test_build_heavy_model_from_settings_defaults_to_ai_model(monkeypatch):
+    from datametronome_podium.services.agent_factory import build_heavy_model_from_settings
+
+    monkeypatch.setenv("DATAMETRONOME_AI_PROVIDER", "gemini")
+    monkeypatch.setenv("DATAMETRONOME_AI_MODEL", "gemini-2.0-flash")
+    monkeypatch.setenv("DATAMETRONOME_AI_API_KEY", "test-key")
+    # No DATAMETRONOME_AI_HEAVY_MODEL set — should fall back to ai_model
+    # Just verify it doesn't crash
+    model = build_heavy_model_from_settings()
+    assert model is not None

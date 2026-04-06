@@ -31,6 +31,44 @@ def _get_or_create_redis_client():
     return _redis_client
 
 
+def _dispatch_auto_scan(stave_id: str) -> None:
+    """Fire-and-forget: dispatch auto-scan + register daily schedule.
+
+    Retries once after 2 seconds if the first attempt fails (e.g., Celery not ready).
+    """
+    import logging
+    import threading
+
+    log = logging.getLogger(__name__)
+
+    def _dispatch():
+        try:
+            from datametronome_podium.tasks.intelligence_tasks import run_auto_scan
+            run_auto_scan.delay(stave_id)
+            log.info("Auto-scan dispatched for stave %s", stave_id)
+        except Exception as e:
+            log.warning("Auto-scan dispatch failed for %s: %s. Retrying in 2s...", stave_id, e)
+            import time
+            time.sleep(2)
+            try:
+                from datametronome_podium.tasks.intelligence_tasks import run_auto_scan
+                run_auto_scan.delay(stave_id)
+                log.info("Auto-scan dispatched for stave %s (retry)", stave_id)
+            except Exception as e2:
+                log.error("Auto-scan dispatch failed permanently for %s: %s", stave_id, e2)
+
+    def _register_schedule():
+        try:
+            from datametronome_podium.services.intelligence_scheduler import register_daily_intelligence
+            register_daily_intelligence(stave_id)
+        except Exception:
+            pass
+
+    # Run in background threads to not block the API response
+    threading.Thread(target=_dispatch, daemon=True).start()
+    threading.Thread(target=_register_schedule, daemon=True).start()
+
+
 def _repo() -> StaveRepo:
     return StaveRepo(get_executor())
 
@@ -111,6 +149,8 @@ async def create_stave(stave_in: StaveCreate):
     await repo.create(stave)
     data = stave.model_dump()
     data["connection_config"] = stave_in.connection_config
+    # Trigger background intelligence scan
+    _dispatch_auto_scan(stave.id)
     return data
 
 
@@ -151,6 +191,13 @@ async def unpause_stave(stave_id: str):
     else:
         await repo.update(stave_id, {"paused": False})
 
+    # Re-register intelligence schedule
+    try:
+        from datametronome_podium.services.intelligence_scheduler import register_daily_intelligence
+        register_daily_intelligence(stave_id)
+    except Exception:
+        pass
+
     return {"message": "Stave unpaused", "stave_id": stave_id}
 
 
@@ -160,5 +207,13 @@ async def delete_stave(stave_id: str, force: bool = False):
     existing = await repo.get(stave_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Stave not found")
+
+    # Remove intelligence schedule before deleting
+    try:
+        from datametronome_podium.services.intelligence_scheduler import remove_daily_intelligence
+        remove_daily_intelligence(stave_id)
+    except Exception:
+        pass
+
     deleted = await repo.delete(stave_id)
     return {"message": "Stave deleted successfully", "deleted": {"stave_id": stave_id}}

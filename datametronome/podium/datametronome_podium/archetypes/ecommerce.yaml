@@ -1,0 +1,60 @@
+name: e-commerce
+description: Online retail — orders, products, customers, payments
+
+signatures:
+  required: [orders, products, customers]
+  optional: [carts, payments, categories, reviews, shipping, inventory, discounts]
+
+metrics:
+  - name: average_order_value
+    typical_range: [20, 200]
+  - name: cart_abandonment_rate
+    typical_range: [0.60, 0.80]
+  - name: customer_churn_rate_monthly
+    typical_range: [0.03, 0.07]
+  - name: payment_failure_rate
+    typical_range: [0.02, 0.05]
+
+patterns:
+  - weekend_order_spike
+  - holiday_seasonality
+  - payment_failure_baseline
+  - new_customer_acquisition_trend
+
+suggested_checks:
+  - type: freshness
+    table: orders
+    schedule: "0 * * * *"
+    config:
+      max_age_hours: 2
+  - type: row_count_anomaly
+    table: orders
+    schedule: "0 0 * * *"
+    config:
+      threshold_std_devs: 3
+  - type: column_values
+    table: customers
+    schedule: "0 6 * * *"
+    config:
+      column: email
+      check: not_null_percentage
+      threshold: 0.90
+
+kpi_definitions:
+  - name: average_order_value
+    description: Mean revenue per completed transaction
+  - name: monthly_revenue
+    description: Total revenue generated in the current calendar month
+  - name: total_orders_this_month
+    description: Number of orders placed in the current calendar month
+  - name: new_customers_this_month
+    description: Distinct customers who transacted for the first time this month
+
+performer_dimensions:
+  - entity: product
+    description: >
+      Which products generate the most revenue, and how has each top/bottom
+      product trended week over week
+  - entity: category
+    description: >
+      Which product categories drive the most revenue, with weekly trend breakdown

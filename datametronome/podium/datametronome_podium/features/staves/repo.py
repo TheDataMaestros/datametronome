@@ -9,7 +9,7 @@ class StaveRepo:
     def __init__(self, executor: QueryExecutor) -> None:
         self.db = executor
 
-    async def list(self, limit: int = 50, offset: int = 0) -> list[Stave]:  # type: ignore[invalid-type-form]
+    async def list(self, limit: int = 50, offset: int = 0) -> list[Stave]:  # ty: ignore[invalid-type-form]
         rows = await self.db.select(
             "staves", order_by="created_at DESC", limit=limit, offset=offset
         )
@@ -28,7 +28,7 @@ class StaveRepo:
     async def delete(self, stave_id: str) -> int:
         return await self.db.delete("staves", where={"id": stave_id})
 
-    async def find_clef_ids(self, stave_id: str) -> list[str]:  # type: ignore[invalid-type-form]
+    async def find_clef_ids(self, stave_id: str) -> list[str]:  # ty: ignore[invalid-type-form]
         rows = await self.db.query(
             "SELECT id FROM clefs WHERE stave_id = ?", [stave_id]
         )

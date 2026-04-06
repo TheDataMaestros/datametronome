@@ -209,7 +209,7 @@ async def update_system_metrics():
             users_total.labels(status=status).set(user_group.get("count", 0))
 
         # Update scheduler jobs count
-        from .scheduler import get_scheduler_status  # type: ignore[unresolved-import]
+        from .scheduler import get_scheduler_status  # ty: ignore[unresolved-import]
 
         scheduler_status = get_scheduler_status()
         if scheduler_status and scheduler_status.get("status") == "running":
