@@ -326,7 +326,7 @@ async def send_chat_message(
         # Convert tool calls to response format
         response_tool_calls: list[ToolCall] | None = None
         if tool_calls and isinstance(tool_calls, list) and len(tool_calls) > 0:
-            tool_calls_list = [dict(tc) for tc in tool_calls]  # ty: ignore[call-overload]
+            tool_calls_list = [dict(tc) for tc in tool_calls]  # ty: ignore[call-overload]  # ty:ignore[ignore-comment-unknown-rule]
             response_tool_calls = [
                 ToolCall(
                     id=str(tc.get("id", f"call-{i}")),

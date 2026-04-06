@@ -50,10 +50,10 @@ def get_bigquery_config():
         try:
             credentials_json = json.loads(credentials_json_str)
         except json.JSONDecodeError:
-            pytest.skip("Invalid BIGQUERY_TEST_CREDENTIALS_JSON format")  # ty: ignore[too-many-positional-arguments]
+            pytest.skip("Invalid BIGQUERY_TEST_CREDENTIALS_JSON format")  # ty: ignore[too-many-positional-arguments, invalid-argument-type]
 
     if not project_id:
-        pytest.skip("BIGQUERY_TEST_PROJECT_ID environment variable not set")  # ty: ignore[too-many-positional-arguments]
+        pytest.skip("BIGQUERY_TEST_PROJECT_ID environment variable not set")  # ty: ignore[too-many-positional-arguments, invalid-argument-type]
 
     return {
         "project_id": project_id,
@@ -135,7 +135,7 @@ def test_dataset_id(bigquery_config, test_client):
         except Exception:
             continue
 
-    pytest.skip("No accessible datasets found (neither in project nor public datasets)")  # ty: ignore[too-many-positional-arguments]
+    pytest.skip("No accessible datasets found (neither in project nor public datasets)")  # ty: ignore[too-many-positional-arguments, invalid-argument-type]
 
 
 @pytest.fixture(scope="function")
@@ -161,4 +161,4 @@ def test_dataset(bigquery_config, test_client, test_dataset_id):
             yield dataset
             # Don't delete the dataset - it's shared and we're just using it
         except Exception as e:
-            pytest.skip(f"Could not access dataset {test_dataset_id}: {e}")  # ty: ignore[too-many-positional-arguments]
+            pytest.skip(f"Could not access dataset {test_dataset_id}: {e}")  # ty: ignore[too-many-positional-arguments, invalid-argument-type]

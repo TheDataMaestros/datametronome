@@ -219,11 +219,11 @@ class UserMemoryService:
         try:
             from datametronome_podium.services.agent_factory import build_model_from_settings
 
-            agent: Agent[None, ExtractionResult] = Agent(  # ty: ignore[assignment]
+            agent: Agent[None, ExtractionResult] = Agent(  # ty: ignore[assignment]  # ty:ignore[ignore-comment-unknown-rule]
                 model=build_model_from_settings(),
                 system_prompt=_EXTRACTION_SYSTEM,
                 output_type=ExtractionResult,
-            )
+            )  # ty:ignore[invalid-assignment]
             result = await agent.run(prompt)
             return result.output.extractions
         except Exception:
@@ -240,11 +240,11 @@ class UserMemoryService:
         try:
             from datametronome_podium.services.agent_factory import build_model_from_settings
 
-            agent: Agent[None, ProfileSummary] = Agent(  # ty: ignore[assignment]
+            agent: Agent[None, ProfileSummary] = Agent(  # ty: ignore[assignment]  # ty:ignore[ignore-comment-unknown-rule]
                 model=build_model_from_settings(),
                 system_prompt=_REBUILD_SYSTEM,
                 output_type=ProfileSummary,
-            )
+            )  # ty:ignore[invalid-assignment]
             result = await agent.run(prompt)
             return result.output
         except Exception:
