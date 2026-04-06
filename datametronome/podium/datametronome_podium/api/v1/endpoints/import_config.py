@@ -119,7 +119,8 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
                     await db.execute("DELETE FROM clefs WHERE id = ?", [clef_id])
                     clefs_deleted += 1
                 except Exception as e:
-                    warnings.append(f"Failed to delete clef {clef_id}: {str(e)}")
+                    logger.warning("Failed to delete clef %s: %s", clef_id, e)
+                    warnings.append(f"Failed to delete clef {clef_id}")
 
             # Delete staves
             for stave_id in stave_ids:
@@ -131,7 +132,8 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
                     await db.execute("DELETE FROM staves WHERE id = ?", [stave_id])
                     staves_deleted += 1
                 except Exception as e:
-                    warnings.append(f"Failed to delete stave {stave_id}: {str(e)}")
+                    logger.warning("Failed to delete stave %s: %s", stave_id, e)
+                    warnings.append(f"Failed to delete stave {stave_id}")
 
         # Create staves
         for stave_data in config.staves:
@@ -160,9 +162,8 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
 
                 staves_created += 1
             except Exception as e:
-                errors.append(
-                    f"Failed to create stave '{stave_data.get('name')}': {str(e)}"
-                )
+                logger.error("Failed to create stave '%s': %s", stave_data.get("name"), e)
+                errors.append(f"Failed to create stave '{stave_data.get('name')}'")
 
         # Create clefs
         for clef_data in config.clefs:
@@ -193,9 +194,8 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
 
                 clefs_created += 1
             except Exception as e:
-                errors.append(
-                    f"Failed to create clef '{clef_data.get('name')}': {str(e)}"
-                )
+                logger.error("Failed to create clef '%s': %s", clef_data.get("name"), e)
+                errors.append(f"Failed to create clef '{clef_data.get('name')}'")
 
         return ImportResult(
             success=len(errors) == 0,
@@ -208,9 +208,10 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
         )
 
     except Exception as e:
+        logger.error("Configuration import failed: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Import failed: {str(e)}",
+            detail="Import failed",
         )
 
 
@@ -245,14 +246,16 @@ async def import_yaml_file(
         return await import_configuration(import_config)
 
     except yaml.YAMLError as e:
+        logger.warning("Invalid YAML file uploaded: %s", e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid YAML file: {str(e)}",
+            detail="Invalid YAML file",
         )
     except Exception as e:
+        logger.error("YAML file import failed: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Import failed: {str(e)}",
+            detail="Import failed",
         )
 
 
@@ -287,14 +290,16 @@ async def import_json_file(
         return await import_configuration(import_config)
 
     except json.JSONDecodeError as e:
+        logger.warning("Invalid JSON file uploaded: %s", e)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Invalid JSON file: {str(e)}",
+            detail="Invalid JSON file",
         )
     except Exception as e:
+        logger.error("JSON file import failed: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Import failed: {str(e)}",
+            detail="Import failed",
         )
 
 
@@ -351,19 +356,20 @@ async def import_yaml_advanced(request: YAMLImportRequest) -> ImportResult:
                 )
             except InterpolationError as e:
                 if request.strict_validation:
+                    logger.warning("Environment variable interpolation failed: %s", e)
                     raise HTTPException(
                         status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Environment variable interpolation failed: {str(e)}",
+                        detail="Environment variable interpolation failed",
                     )
                 else:
-                    logger.warning(f"Interpolation warnings: {str(e)}")
+                    logger.warning("Interpolation warnings: %s", e)
 
         # Validate structure
         validation = validate_yaml_structure(yaml_data)
         if not validation.is_valid:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"YAML validation failed: {', '.join(validation.errors)}",
+                detail="YAML validation failed",
             )
 
         # Parse staves and clefs using the new loader
@@ -419,8 +425,9 @@ async def import_yaml_advanced(request: YAMLImportRequest) -> ImportResult:
         return await import_configuration(import_config)
 
     except YAMLLoadError as e:
+        logger.warning("YAML load error during advanced import: %s", e)
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail=f"YAML load error: {str(e)}"
+            status_code=status.HTTP_400_BAD_REQUEST, detail="YAML load error"
         )
     except HTTPException:
         raise
@@ -428,7 +435,7 @@ async def import_yaml_advanced(request: YAMLImportRequest) -> ImportResult:
         logger.exception("Error importing YAML config")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to import YAML config: {str(e)}",
+            detail="Failed to import YAML config",
         )
 
 
@@ -486,7 +493,7 @@ async def validate_yaml_config(
         logger.exception("Error validating YAML")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to validate YAML: {str(e)}",
+            detail="Failed to validate YAML",
         )
 
 
@@ -523,7 +530,7 @@ async def reload_config() -> Dict[str, Any]:
         logger.exception("Error reloading config")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to reload config: {str(e)}",
+            detail="Failed to reload config",
         )
 
 
@@ -560,7 +567,7 @@ async def get_watched_files() -> Dict[str, Any]:
         logger.exception("Error getting watched files")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get watched files: {str(e)}",
+            detail="Failed to get watched files",
         )
 
 
@@ -602,5 +609,5 @@ async def watch_directory(path: str) -> Dict[str, Any]:
         logger.exception("Error adding watch path")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to add watch path: {str(e)}",
+            detail="Failed to add watch path",
         )

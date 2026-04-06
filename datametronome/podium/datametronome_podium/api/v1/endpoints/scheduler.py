@@ -54,9 +54,10 @@ async def reload_scheduler_clefs() -> Dict[str, Any]:
             "is_running": True,  # Beat is always running in Docker
         }
     except Exception as e:
+        logger.error("Failed to reload scheduler: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to reload scheduler: {str(e)}",
+            detail="Failed to reload scheduler",
         )
 
 
@@ -77,9 +78,10 @@ async def get_scheduler_status_endpoint() -> Dict[str, Any]:
             "scheduled_clefs_count": enabled_count,
         }
     except Exception as e:
+        logger.error("Failed to get scheduler status: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get scheduler status: {str(e)}",
+            detail="Failed to get scheduler status",
         )
 
 
@@ -110,9 +112,10 @@ async def get_scheduled_clefs_endpoint() -> Dict[str, Any]:
             },
         }
     except Exception as e:
+        logger.error("Failed to get scheduled clefs: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get scheduled clefs: {str(e)}",
+            detail="Failed to get scheduled clefs",
         )
 
 
@@ -129,9 +132,10 @@ async def unschedule_clef_endpoint(clef_id: str) -> Dict[str, Any]:
             "clef_id": clef_id,
         }
     except Exception as e:
+        logger.error("Failed to unschedule clef %s: %s", clef_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to unschedule clef: {str(e)}",
+            detail="Failed to unschedule clef",
         )
 
 
@@ -159,9 +163,10 @@ async def execute_clef_now_endpoint(clef_id: str) -> Dict[str, Any]:
             "message": f"Clef {clef_id} dispatched for execution",
         }
     except Exception as e:
+        logger.error("Failed to execute clef %s: %s", clef_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to execute clef: {str(e)}",
+            detail="Failed to execute clef",
         )
 
 
@@ -197,9 +202,10 @@ async def get_scheduler_jobs() -> Dict[str, Any]:
         }
 
     except Exception as e:
+        logger.error("Failed to get scheduler jobs: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get scheduler jobs: {str(e)}",
+            detail="Failed to get scheduler jobs",
         )
 
 
@@ -235,9 +241,10 @@ async def get_job_history(
         }
 
     except Exception as e:
+        logger.error("Failed to get job history for %s: %s", job_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get job history: {str(e)}",
+            detail="Failed to get job history",
         )
 
 
@@ -262,9 +269,10 @@ async def get_job_health(
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Failed to get job health for %s: %s", job_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get job health: {str(e)}",
+            detail="Failed to get job health",
         )
 
 
@@ -293,9 +301,10 @@ async def retry_job(job_id: str) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Failed to retry job %s: %s", job_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retry job: {str(e)}",
+            detail="Failed to retry job",
         )
 
 
@@ -332,9 +341,10 @@ async def get_scheduler_stats() -> Dict[str, Any]:
         }
 
     except Exception as e:
+        logger.error("Failed to get scheduler stats: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get scheduler stats: {str(e)}",
+            detail="Failed to get scheduler stats",
         )
 
 
@@ -362,9 +372,10 @@ async def pause_job(job_id: str) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Failed to pause job %s: %s", job_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to pause job: {str(e)}",
+            detail="Failed to pause job",
         )
 
 
@@ -392,7 +403,8 @@ async def resume_job(job_id: str) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception as e:
+        logger.error("Failed to resume job %s: %s", job_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to resume job: {str(e)}",
+            detail="Failed to resume job",
         )

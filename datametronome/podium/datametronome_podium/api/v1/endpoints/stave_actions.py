@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict
 
 from datametronome_podium.core.database import get_db
+from datametronome_podium.core.query import quote_identifier
 from datametronome_podium.services import data_generator
 from datametronome_podium.services.connection_tester import ConnectionTester
 from datametronome_podium.services.stave_service import deserialize_stave
@@ -66,17 +67,17 @@ async def test_stave_connection(stave_id: str) -> Dict[str, Any]:
         result = await tester.test_connection(stave)
 
         # Log the test result
-        logger.info(f"Connection test for stave {stave_id}: {result['success']}")
+        logger.info("Connection test for stave %s: %s", stave_id, result["success"])
 
         return result
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Connection test failed for stave {stave_id}: {e}")
+        logger.error("Connection test failed for stave %s: %s", stave_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Connection test failed: {str(e)}",
+            detail="Connection test failed",
         )
 
 
@@ -111,7 +112,8 @@ async def generate_sample_data(
         table_name = request.table_name
         count = request.count
         logger.info(
-            f"🔄 Starting data generation for stave {stave_id}, table {table_name}, count {count}"
+            "🔄 Starting data generation for stave %s, table %s, count %d",
+            stave_id, table_name, count,
         )
 
         # Generate the data
@@ -132,25 +134,23 @@ async def generate_sample_data(
                     )
                     if existing_products:
                         products = existing_products
-                        logger.info(
-                            f"Found {len(products)} existing products for order generation"
-                        )
+                        logger.info("Found %d existing products for order generation", len(products))
                     else:
                         # Generate some products first
                         products = data_generator.generate_products_data(10)
                         logger.info(
-                            f"No existing products found, generated {len(products)} products for orders"
+                            "No existing products found, generated %d products for orders",
+                            len(products),
                         )
                 except Exception as e:
-                    logger.warning(
-                        f"Could not fetch existing products: {e}. Generating sample products."
-                    )
+                    logger.warning("Could not fetch existing products: %s. Generating sample products.", e)
                     products = data_generator.generate_products_data(10)
 
                 data = data_generator.generate_orders_data(products, count)
             except Exception as e:
                 logger.warning(
-                    f"Could not connect to stave database for products: {e}. Generating orders without product validation."
+                    "Could not connect to stave database for products: %s. Generating orders without product validation.",
+                    e,
                 )
                 # Generate fake products for order generation
                 fake_products = data_generator.generate_products_data(10)
@@ -163,7 +163,7 @@ async def generate_sample_data(
                 detail=f"Unsupported table '{table_name}' for data generation. Supported: users, products, orders, clicks",
             )
 
-        logger.info(f"📊 Generated {len(data)} {table_name} records")
+        logger.info("📊 Generated %d %s records", len(data), table_name)
 
         # Try to insert the data into the stave's database
         inserted_count = 0
@@ -185,9 +185,7 @@ async def generate_sample_data(
                 success = await connector.write(data, table_name)
                 inserted_count = len(data) if success else 0
                 await connector.close()
-                logger.info(
-                    f"✅ Successfully inserted {inserted_count} records into {table_name}"
-                )
+                logger.info("✅ Successfully inserted %d records into %s", inserted_count, table_name)
             elif stave.data_source_type == "bigquery":
                 from metronome_pulse_bigquery import BigQueryPulse  # type: ignore
 
@@ -205,16 +203,15 @@ async def generate_sample_data(
                 await connector.write(data, table_name)
                 inserted_count = len(data)
                 await connector.close()
-                logger.info(
-                    f"✅ Successfully inserted {inserted_count} records into {table_name}"
-                )
+                logger.info("✅ Successfully inserted %d records into %s", inserted_count, table_name)
             else:
                 logger.info(
-                    f"⏭️  Skipping data insertion for {stave.data_source_type} (not implemented yet)"
+                    "⏭️  Skipping data insertion for %s (not implemented yet)",
+                    stave.data_source_type,
                 )
 
         except Exception as e:
-            logger.warning(f"⚠️ Could not insert data into stave database: {e}")
+            logger.warning("⚠️ Could not insert data into stave database: %s", e)
             logger.info(
                 "📝 Data was generated but not inserted (this is expected for some stave types)"
             )
@@ -224,7 +221,8 @@ async def generate_sample_data(
         execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
 
         logger.info(
-            f"🎉 Data generation completed for {table_name}: {len(data)} generated, {inserted_count} inserted, {execution_time:.2f}s"
+            "🎉 Data generation completed for %s: %d generated, %d inserted, %.2fs",
+            table_name, len(data), inserted_count, execution_time,
         )
 
         return {
@@ -252,11 +250,12 @@ async def generate_sample_data(
     except Exception as e:
         execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
         logger.error(
-            f"❌ Data generation failed for stave {stave_id}, table {table_name}: {e}"
+            "❌ Data generation failed for stave %s, table %s: %s",
+            stave_id, table_name, e, exc_info=True,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Data generation failed: {str(e)}",
+            detail="Data generation failed",
         )
 
 
@@ -285,9 +284,7 @@ async def preview_stave_data(
         table_name = request.table_name
         limit = request.count  # Using count as limit for preview
 
-        logger.info(
-            f"🔍 Previewing data from stave {stave_id}, table {table_name}, limit {limit}"
-        )
+        logger.info("🔍 Previewing data from stave %s, table %s, limit %d", stave_id, table_name, limit)
 
         # Try to fetch data from the stave's database
         try:
@@ -303,7 +300,7 @@ async def preview_stave_data(
 
                 # Query for sample data
                 data = await connector.query(
-                    {"sql": f"SELECT * FROM {table_name} LIMIT ?", "params": [limit]}
+                    {"sql": f"SELECT * FROM {quote_identifier(table_name)} LIMIT ?", "params": [limit]}
                 )
                 await connector.close()
             elif stave.data_source_type == "bigquery":
@@ -323,7 +320,7 @@ async def preview_stave_data(
 
                 # Query for sample data
                 data = await connector.query(
-                    f"SELECT * FROM {table_name} LIMIT {limit}"
+                    f"SELECT * FROM {quote_identifier(table_name)} LIMIT {limit}"
                 )
                 await connector.close()
             elif stave.data_source_type in ["postgres", "postgresql"]:
@@ -341,7 +338,7 @@ async def preview_stave_data(
 
                 # Query for sample data
                 data = await connector.query(
-                    f"SELECT * FROM {table_name} LIMIT {limit}"
+                    f"SELECT * FROM {quote_identifier(table_name)} LIMIT {limit}"
                 )
                 await connector.close()
             else:
@@ -350,9 +347,7 @@ async def preview_stave_data(
                     detail=f"Preview not implemented for {stave.data_source_type} yet",
                 )
 
-            logger.info(
-                f"📊 Retrieved {len(data) if data else 0} records from {table_name}"
-            )
+            logger.info("📊 Retrieved %d records from %s", len(data) if data else 0, table_name)
 
             return {
                 "success": True,
@@ -367,7 +362,7 @@ async def preview_stave_data(
             }
 
         except Exception as e:
-            logger.warning(f"⚠️ Could not fetch data from table {table_name}: {e}")
+            logger.warning("⚠️ Could not fetch data from table %s: %s", table_name, e)
 
             # If table doesn't exist or query fails, return helpful message
             if "no such table" in str(e).lower():
@@ -386,11 +381,12 @@ async def preview_stave_data(
         raise
     except Exception as e:
         logger.error(
-            f"❌ Data preview failed for stave {stave_id}, table {table_name}: {e}"
+            "❌ Data preview failed for stave %s, table %s: %s",
+            stave_id, table_name, e, exc_info=True,
         )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Data preview failed: {str(e)}",
+            detail="Data preview failed",
         )
 
 
@@ -444,14 +440,14 @@ async def _ensure_table_exists(connector, table_name: str):
             )
             """
         else:
-            logger.warning(f"No schema defined for table {table_name}")
+            logger.warning("No schema defined for table %s", table_name)
             return
 
         await connector.execute(create_sql, [])
-        logger.info(f"✅ Ensured table {table_name} exists")
+        logger.info("✅ Ensured table %s exists", table_name)
 
     except Exception as e:
-        logger.warning(f"Could not ensure table {table_name} exists: {e}")
+        logger.warning("Could not ensure table %s exists: %s", table_name, e)
         # Don't raise - this is not critical for data generation
 
 
@@ -513,7 +509,7 @@ async def list_stave_tables(
 
         stave = deserialize_stave(staves[0])
 
-        logger.info(f"🔍 Listing tables for stave {stave_id} ({stave.data_source_type})")
+        logger.info("🔍 Listing tables for stave %s (%s)", stave_id, stave.data_source_type)
 
         # Get connector based on stave type
         tester = ConnectionTester()
@@ -552,19 +548,17 @@ async def list_stave_tables(
                         table_info["structure"] = structure
                     else:
                         logger.warning(
-                            f"get_table_info not available for {stave.data_source_type}"
+                            "get_table_info not available for %s", stave.data_source_type
                         )
                         table_info["structure"] = None
                 except Exception as e:
-                    logger.warning(
-                        f"Failed to get structure for table {table_name}: {e}"
-                    )
+                    logger.warning("Failed to get structure for table %s: %s", table_name, e)
                     table_info["structure"] = None
                     table_info["structure_error"] = str(e)
 
             tables.append(table_info)
 
-        logger.info(f"📊 Found {len(tables)} tables in stave {stave_id}")
+        logger.info("📊 Found %d tables in stave %s", len(tables), stave_id)
 
         return {
             "success": True,
@@ -578,10 +572,10 @@ async def list_stave_tables(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"❌ Failed to list tables for stave {stave_id}: {e}")
+        logger.error("❌ Failed to list tables for stave %s: %s", stave_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list tables: {str(e)}",
+            detail="Failed to list tables",
         )
     finally:
         # Always close the connector
@@ -589,4 +583,4 @@ async def list_stave_tables(
             try:
                 await connector.close()
             except Exception as e:
-                logger.warning(f"Failed to close connector: {e}")
+                logger.warning("Failed to close connector: %s", e)

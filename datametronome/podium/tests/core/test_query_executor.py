@@ -90,7 +90,7 @@ class TestCRUDHelpers:
         await sqlite_executor.select("staves", order_by="created_at DESC", limit=10, offset=5)
         call_args = mock_connector.query_with_params.call_args
         sql = call_args[0][0]
-        assert "ORDER BY created_at DESC" in sql
+        assert 'ORDER BY "created_at" DESC' in sql
         assert "LIMIT" in sql
         assert "OFFSET" in sql
 

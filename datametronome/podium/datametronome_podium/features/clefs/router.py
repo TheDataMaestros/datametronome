@@ -21,7 +21,6 @@ CHECK_TYPE_METADATA = {
     "forecast": {"tier": 3, "display_name": "Forecast", "description": "ML-based anomaly detection"},
     "data_profile_drift": {"tier": 3, "display_name": "Data Profile Drift", "description": "Detects schema/distribution drift"},
     "lookup_validation": {"tier": 2, "display_name": "Lookup Validation", "description": "Cross-table reference checks"},
-    "python": {"tier": 4, "display_name": "Python", "description": "Custom Python check scripts"},
 }
 
 

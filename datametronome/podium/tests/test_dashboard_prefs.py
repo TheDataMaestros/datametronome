@@ -1,7 +1,7 @@
 """Tests for dashboard_prefs on /auth/me endpoints."""
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -58,10 +58,11 @@ async def test_patch_me_saves_pinned_staves():
         "dashboard_prefs": "{}",
     }
 
+    mock_executor = MagicMock()
+    mock_executor.execute = AsyncMock(return_value=1)
     with patch(
-        "datametronome_podium.api.v1.endpoints.auth.execute_write",
-        new_callable=AsyncMock,
-        return_value=True,
+        "datametronome_podium.api.v1.endpoints.auth.get_executor",
+        return_value=mock_executor,
     ):
         result = await patch_current_user(
             body={"dashboard_prefs": {"pinned_staves": ["s1", "s2"]}},
@@ -84,10 +85,11 @@ async def test_patch_me_accepts_exactly_3_pinned():
         "dashboard_prefs": "{}",
     }
 
+    mock_executor = MagicMock()
+    mock_executor.execute = AsyncMock(return_value=1)
     with patch(
-        "datametronome_podium.api.v1.endpoints.auth.execute_write",
-        new_callable=AsyncMock,
-        return_value=True,
+        "datametronome_podium.api.v1.endpoints.auth.get_executor",
+        return_value=mock_executor,
     ):
         result = await patch_current_user(
             body={"dashboard_prefs": {"pinned_staves": ["s1", "s2", "s3"]}},

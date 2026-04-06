@@ -1,5 +1,6 @@
 """Trends endpoints for DataMetronome Podium using DataPulse connectors."""
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
@@ -7,6 +8,7 @@ from datametronome_podium.core.database import get_db
 from fastapi import APIRouter, HTTPException, Query, status
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/stave/{stave_id}")
@@ -155,9 +157,10 @@ async def get_stave_trends(
         }
 
     except Exception as e:
+        logger.error("Failed to fetch trends data for stave %s: %s", stave_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch trends data: {str(e)}",
+            detail="Failed to fetch trends data",
         )
 
 
@@ -263,9 +266,10 @@ async def get_trends_overview(
         }
 
     except Exception as e:
+        logger.error("Failed to fetch trends overview: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch trends overview: {str(e)}",
+            detail="Failed to fetch trends overview",
         )
 
 
@@ -329,7 +333,8 @@ async def _calculate_distribution_changes(
         }
 
     except Exception as e:
-        return {"error": f"Failed to calculate distribution changes: {str(e)}"}
+        logger.warning("Failed to calculate distribution changes for stave %s: %s", stave_id, e)
+        return {"error": "Failed to calculate distribution changes"}
 
 
 async def _calculate_trend_summary(
@@ -374,10 +379,10 @@ async def _calculate_trend_summary(
         }
 
     except Exception as e:
+        logger.warning("Failed to calculate trend summary: %s", e)
         return {
             "success_rate": 0.0,
             "row_count_trend": "unknown",
             "total_data_points": 0,
             "overall_status": "error",
-            "error": str(e),
         }

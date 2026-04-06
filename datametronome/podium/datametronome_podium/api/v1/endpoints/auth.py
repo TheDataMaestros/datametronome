@@ -13,43 +13,15 @@ from datametronome_podium.api.schemas.auth import (
     UserLogin,
 )
 from datametronome_podium.core.config import settings
-from datametronome_podium.core.database import execute_query, execute_write
+from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.exceptions import AuthenticationError
+from datametronome_podium.core.security import get_password_hash, verify_password
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import ExpiredSignatureError, JWTError, jwt
-from passlib.context import CryptContext
 
 router = APIRouter()
 security = HTTPBearer()
-
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against its hash.
-
-    Args:
-        plain_password: Plain text password.
-        hashed_password: Hashed password.
-
-    Returns:
-        True if password matches, False otherwise.
-    """
-    return pwd_context.verify(plain_password, hashed_password)
-
-
-def get_password_hash(password: str) -> str:
-    """Hash a password.
-
-    Args:
-        password: Plain text password.
-
-    Returns:
-        Hashed password.
-    """
-    return pwd_context.hash(password)
 
 
 def create_access_token(
@@ -115,12 +87,14 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # Query user from database using DataPulse (execute_query adapts ? to $1 for Postgres)
-    users = await execute_query("SELECT * FROM users WHERE username = ?", [username])
+    # Query user from database — exclude hashed_password from default return
+    users = await get_executor().query("SELECT * FROM users WHERE username = ?", [username])
     if not users:
         raise AuthenticationError("User not found")
 
-    user = users[0]
+    user = dict(users[0])
+    # Store password hash separately for verify_password, strip from returned dict
+    user["_hashed_password"] = user.pop("hashed_password", "")
     return user
 
 
@@ -137,8 +111,8 @@ async def login(user_credentials: UserLogin) -> dict[str, str]:
     Raises:
         HTTPException: If authentication fails.
     """
-    # Check if user exists (execute_query adapts ? to $1 for Postgres)
-    users = await execute_query(
+    # get_executor().query adapts ? to $1 for Postgres via QueryAdapter
+    users = await get_executor().query(
         "SELECT * FROM users WHERE username = ?", [user_credentials.username]
     )
     user = users[0] if users else None
@@ -170,8 +144,7 @@ async def register(user_data: UserCreate) -> dict[str, str]:
     Raises:
         HTTPException: If registration fails.
     """
-    # Check if user already exists (execute_query adapts ? to $1 for Postgres)
-    existing_users = await execute_query(
+    existing_users = await get_executor().query(
         "SELECT * FROM users WHERE username = ?", [user_data.username]
     )
     if existing_users:
@@ -181,8 +154,6 @@ async def register(user_data: UserCreate) -> dict[str, str]:
         )
 
     # Create new user
-    from datametronome_podium.core.database import get_executor
-
     hashed_password = get_password_hash(user_data.password)
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
@@ -276,7 +247,7 @@ async def patch_current_user(
     prefs_to_save = {"pinned_staves": [str(s) for s in pinned]}
     prefs_json = json.dumps(prefs_to_save)
 
-    await execute_write(
+    await get_executor().execute(
         "UPDATE users SET dashboard_prefs = ? WHERE username = ?",
         [prefs_json, current_user["username"]],
     )

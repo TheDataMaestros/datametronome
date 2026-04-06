@@ -107,63 +107,6 @@ def get_executor() -> QueryExecutor:
     return _executor
 
 
-# --- Backward compatibility (deprecated, will be removed in feature slice migration) ---
-# These functions allow existing code to keep working during the transition.
-
-
-async def execute_query(sql: str, params: list[Any] | None = None) -> list[dict[str, Any]]:
-    """DEPRECATED: Use get_executor().query() instead."""
-    return await get_executor().query(sql, params)
-
-
-async def execute_write(sql: str, params: list[Any] | None = None) -> bool:
-    """DEPRECATED: Use get_executor().execute() instead."""
-    try:
-        await get_executor().execute(sql, params)
-        return True
-    except Exception:
-        logger.exception("execute_write failed")
-        return False
-
-
-async def insert_data(table: str, data: dict[str, Any]) -> bool:
-    """DEPRECATED: Use get_executor().insert() instead."""
-    try:
-        await get_executor().insert(table, data)
-        return True
-    except Exception:
-        logger.exception("insert_data failed for table=%s", table)
-        return False
-
-
-async def update_data(
-    table: str, data: dict[str, Any], where_clause: str, where_params: list[Any]
-) -> bool:
-    """DEPRECATED: Use get_executor().update() instead."""
-    set_clauses = [f"{k} = ?" for k in data.keys()]
-    set_values = list(data.values())
-    sql = f"UPDATE {table} SET {', '.join(set_clauses)} WHERE {where_clause}"
-    all_params = set_values + where_params
-    try:
-        await get_executor().execute(sql, all_params)
-        return True
-    except Exception:
-        logger.exception("update_data failed")
-        return False
-
-
-async def delete_data(table: str, where_clause: str, where_params: list[Any]) -> bool:
-    """DEPRECATED: Use get_executor().execute() instead."""
-    try:
-        await get_executor().execute(
-            f"DELETE FROM {table} WHERE {where_clause}", where_params
-        )
-        return True
-    except Exception:
-        logger.exception("delete_data failed")
-        return False
-
-
 async def get_db_connection_status() -> bool:
     """Check database connection health."""
     global connector

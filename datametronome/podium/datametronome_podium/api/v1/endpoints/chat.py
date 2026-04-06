@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Optional
 
 from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.config import settings
-from datametronome_podium.core.database import execute_query, execute_write, get_db
+from datametronome_podium.core.database import get_db, get_executor
 from datametronome_podium.core.metrics import record_chat_request
 from datametronome_podium.services.agent_tracing import (
     record_agent_trace,
@@ -143,16 +143,19 @@ async def send_chat_message(
         # Get user identifier - users table has 'id' field
         user_id = current_user.get("id") or current_user.get("username") or "anonymous"
         logger.debug(
-            f"Using user_id: {user_id} (user object keys: {list(current_user.keys()) if isinstance(current_user, dict) else 'not a dict'})"
+            "Using user_id: %s (user object keys: %s)",
+            user_id,
+            list(current_user.keys()) if isinstance(current_user, dict) else "not a dict",
         )
 
         history_messages = []
         if conversation_id:
             try:
                 logger.info(
-                    f"📚 Loading conversation history for conversation_id={conversation_id}, user_id={user_id}"
+                    "📚 Loading conversation history for conversation_id=%s, user_id=%s",
+                    conversation_id, user_id,
                 )
-                history = await execute_query(
+                history = await get_executor().query(
                     """
                     SELECT role, content, tool_calls, created_at
                     FROM chat_messages
@@ -163,7 +166,8 @@ async def send_chat_message(
                     [conversation_id, user_id],
                 )
                 logger.info(
-                    f"📚 Found {len(history)} messages in database for conversation {conversation_id}"
+                    "📚 Found %d messages in database for conversation %s",
+                    len(history), conversation_id,
                 )
                 history_messages = []
                 for msg in history:
@@ -181,15 +185,14 @@ async def send_chat_message(
                             pass
                     history_messages.append(msg_dict)
                     logger.debug(
-                        f"📚 Added message to history: role={msg_dict['role']}, content_preview={msg_dict['content'][:50]}..."
+                        "📚 Added message to history: role=%s, content_preview=%s...",
+                        msg_dict["role"], msg_dict["content"][:50],
                     )
                 logger.info(
-                    f"✅ Loaded {len(history_messages)} messages into conversation history"
+                    "✅ Loaded %d messages into conversation history", len(history_messages)
                 )
             except Exception as e:
-                logger.error(
-                    f"❌ Could not load conversation history: {e}", exc_info=True
-                )
+                logger.error("❌ Could not load conversation history: %s", e, exc_info=True)
 
         # Run the AI pipeline (router → sub-agents)
         agent_result = await run_chat(
@@ -259,7 +262,9 @@ async def send_chat_message(
         # Get user identifier - users table has 'id' field
         user_id = current_user.get("id") or current_user.get("username") or "anonymous"
         logger.info(
-            f"💾 Saving message - user_id: {user_id}, conversation_id: {conversation_id}, user_keys: {list(current_user.keys()) if isinstance(current_user, dict) else 'not a dict'}"
+            "💾 Saving message - user_id: %s, conversation_id: %s, user_keys: %s",
+            user_id, conversation_id,
+            list(current_user.keys()) if isinstance(current_user, dict) else "not a dict",
         )
 
         message_id = f"msg-{uuid.uuid4().hex[:12]}"
@@ -279,15 +284,15 @@ async def send_chat_message(
                 ],
                 "chat_messages",
             )
-            logger.info(f"✅ User message saved successfully - message_id: {message_id}")
+            logger.info("✅ User message saved successfully - message_id: %s", message_id)
         except Exception as e:
-            logger.error(f"❌ Failed to save user message: {e}", exc_info=True)
+            logger.error("❌ Failed to save user message: %s", e, exc_info=True)
             raise
 
         # Track conversation for memory extraction — non-critical, extraction
         # falls back to polling all recent conversations if this upsert fails.
         try:
-            await execute_write(
+            await get_executor().execute(
                 "INSERT INTO conversation_extraction_status (conversation_id, user_id, status) "
                 "VALUES (?, ?, 'idle') ON CONFLICT (conversation_id) DO NOTHING",
                 [conversation_id, user_id],
@@ -317,10 +322,10 @@ async def send_chat_message(
                 "chat_messages",
             )
             logger.info(
-                f"✅ Assistant message saved successfully - message_id: {assistant_message_id}"
+                "✅ Assistant message saved successfully - message_id: %s", assistant_message_id
             )
         except Exception as e:
-            logger.error(f"❌ Failed to save assistant message: {e}", exc_info=True)
+            logger.error("❌ Failed to save assistant message: %s", e, exc_info=True)
             raise
 
         # Convert tool calls to response format
@@ -368,8 +373,8 @@ async def send_chat_message(
             )
             record_chat_request(status="error", duration_seconds=duration_ms / 1000.0, intent="unknown")
         except Exception as trace_err:
-            logger.warning(f"Failed to record error trace: {trace_err}")
-        logger.error(f"Error processing chat message: {str(e)}", exc_info=True)
+            logger.warning("Failed to record error trace: %s", trace_err)
+        logger.error("Error processing chat message: %s", e, exc_info=True)
         detail = _user_friendly_error_detail(e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -397,10 +402,12 @@ async def get_conversation_history(
         # Get user identifier - users table has 'id' field
         user_id = current_user.get("id") or current_user.get("username") or "anonymous"
         logger.debug(
-            f"Using user_id: {user_id} (user object keys: {list(current_user.keys()) if isinstance(current_user, dict) else 'not a dict'})"
+            "Using user_id: %s (user object keys: %s)",
+            user_id,
+            list(current_user.keys()) if isinstance(current_user, dict) else "not a dict",
         )
 
-        logger.debug(f"Loading conversation {conversation_id} for user_id: {user_id}")
+        logger.debug("Loading conversation %s for user_id: %s", conversation_id, user_id)
 
         messages = await db.query(
             {
@@ -414,9 +421,7 @@ async def get_conversation_history(
             }
         )
 
-        logger.info(
-            f"📨 Found {len(messages)} messages in conversation {conversation_id}"
-        )
+        logger.info("📨 Found %d messages in conversation %s", len(messages), conversation_id)
 
         # Get model name from settings for assistant messages
         model_name = settings.ai_model or "unknown"
@@ -436,7 +441,8 @@ async def get_conversation_history(
             timestamp = None
             created_at = msg.get("created_at")
             logger.debug(
-                f"📅 Parsing timestamp for message {msg.get('id')}: created_at={created_at} (type: {type(created_at)})"
+                "📅 Parsing timestamp for message %s: created_at=%s (type: %s)",
+                msg.get("id"), created_at, type(created_at),
             )
 
             if created_at:
@@ -476,15 +482,13 @@ async def get_conversation_history(
                         # Ensure timezone-aware
                         if timestamp.tzinfo is None:
                             timestamp = timestamp.replace(tzinfo=timezone.utc)
-                        logger.debug(f"✅ Parsed timestamp: {timestamp.isoformat()}")
+                        logger.debug("✅ Parsed timestamp: %s", timestamp.isoformat())
                     elif isinstance(created_at, datetime):
                         timestamp = created_at
                         # Ensure timezone-aware
                         if timestamp.tzinfo is None:
                             timestamp = timestamp.replace(tzinfo=timezone.utc)
-                        logger.debug(
-                            f"✅ Using datetime object: {timestamp.isoformat()}"
-                        )
+                        logger.debug("✅ Using datetime object: %s", timestamp.isoformat())
                 except (ValueError, AttributeError) as e:
                     logger.error(
                         f"❌ Failed to parse timestamp '{created_at}': {e}",
@@ -507,7 +511,7 @@ async def get_conversation_history(
                     )
                 else:
                     timestamp = datetime.fromtimestamp(0, tz=timezone.utc)
-                    logger.warning(f"📅 No fallback available, using epoch timestamp")
+                    logger.warning("📅 No fallback available, using epoch timestamp")
 
             # Store first valid timestamp for fallback
             if first_message_timestamp is None and timestamp:
@@ -529,10 +533,10 @@ async def get_conversation_history(
         return result
 
     except Exception as e:
-        logger.error(f"Error fetching conversation history: {str(e)}", exc_info=True)
+        logger.error("Error fetching conversation history: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch conversation history: {str(e)}",
+            detail="Failed to fetch conversation history",
         )
 
 
@@ -564,14 +568,17 @@ async def delete_conversation(
             "DELETE FROM chat_messages WHERE conversation_id = ? AND user_id = ?",
             [conversation_id, user_id],
         )
-        logger.info(f"🗑️ Deleted conversation {conversation_id} for user {user_id} ({cnt} messages)")
+        logger.info(
+            "🗑️ Deleted conversation %s for user %s (%d messages)",
+            conversation_id, user_id, cnt,
+        )
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Error deleting conversation: {str(e)}", exc_info=True)
+        logger.error("Error deleting conversation: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to delete conversation: {str(e)}",
+            detail="Failed to delete conversation",
         )
 
 
@@ -593,10 +600,12 @@ async def list_conversations(
         # Get user identifier - users table has 'id' field
         user_id = current_user.get("id") or current_user.get("username") or "anonymous"
         logger.debug(
-            f"Using user_id: {user_id} (user object keys: {list(current_user.keys()) if isinstance(current_user, dict) else 'not a dict'})"
+            "Using user_id: %s (user object keys: %s)",
+            user_id,
+            list(current_user.keys()) if isinstance(current_user, dict) else "not a dict",
         )
 
-        logger.info(f"📋 Listing conversations for user_id: {user_id}")
+        logger.info("📋 Listing conversations for user_id: %s", user_id)
 
         # First, let's check what user_ids exist in the database
         all_users = await db.query(
@@ -605,9 +614,7 @@ async def list_conversations(
                 "params": [],
             }
         )
-        logger.info(
-            f"🔍 Found user_ids in database: {[u.get('user_id') for u in all_users]}"
-        )
+        logger.info("🔍 Found user_ids in database: %s", [u.get("user_id") for u in all_users])
 
         conversations = await db.query(
             {
@@ -631,12 +638,10 @@ async def list_conversations(
             }
         )
 
-        logger.info(
-            f"✅ Found {len(conversations)} conversations for user_id: {user_id}"
-        )
+        logger.info("✅ Found %d conversations for user_id: %s", len(conversations), user_id)
 
         # Log the raw conversations for debugging
-        logger.info(f"📋 Raw conversations: {conversations}")
+        logger.info("📋 Raw conversations: %s", conversations)
 
         result = []
         for conv in conversations:
@@ -830,12 +835,12 @@ async def list_conversations(
                 }
             )
 
-        logger.info(f"📤 Returning conversations: {result}")
+        logger.info("📤 Returning conversations: %s", result)
         return result
 
     except Exception as e:
-        logger.error(f"Error listing conversations: {str(e)}", exc_info=True)
+        logger.error("Error listing conversations: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list conversations: {str(e)}",
+            detail="Failed to list conversations",
         )

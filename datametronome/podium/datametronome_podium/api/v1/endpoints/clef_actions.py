@@ -29,10 +29,10 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
             "status": job_status.value,
         }
     except Exception as e:
-        logger.error("Failed to dispatch clef %s: %s", clef_id, e)
+        logger.error("Failed to dispatch clef %s: %s", clef_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to dispatch check: {str(e)}",
+            detail="Failed to dispatch check",
         )
 
 
@@ -50,10 +50,10 @@ async def get_job_status(job_id: str) -> Dict[str, Any]:
             "result": result,
         }
     except Exception as e:
-        logger.error("Failed to get job status %s: %s", job_id, e)
+        logger.error("Failed to get job status %s: %s", job_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get job status: {str(e)}",
+            detail="Failed to get job status",
         )
 
 
@@ -160,10 +160,10 @@ async def get_clef_results(
         return response_data
 
     except Exception as e:
-        logger.error(f"Failed to get results for clef {clef_id}: {e}")
+        logger.error("Failed to get results for clef %s: %s", clef_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get clef results: {str(e)}",
+            detail="Failed to get clef results",
         )
 
 
@@ -242,8 +242,8 @@ async def get_latest_results(limit: int = Query(20, ge=1, le=100)) -> Dict[str, 
         return {"results": formatted_results, "count": len(formatted_results)}
 
     except Exception as e:
-        logger.error(f"Failed to get latest results: {e}")
+        logger.error("Failed to get latest results: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to get latest results: {str(e)}",
+            detail="Failed to get latest results",
         )

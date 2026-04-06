@@ -1,5 +1,6 @@
 """Report endpoints for DataMetronome Podium using DataPulse connectors."""
 
+import logging
 from datetime import datetime, timedelta
 from typing import Any, Dict, List
 
@@ -7,6 +8,7 @@ from datametronome_podium.core.database import get_db
 from fastapi import APIRouter, HTTPException, status
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.get("/summary")
@@ -65,9 +67,10 @@ async def get_summary_report(days: int = 7) -> Dict[str, Any]:
         }
 
     except Exception as e:
+        logger.error("Failed to generate summary report: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate summary report: {str(e)}",
+            detail="Failed to generate summary report",
         )
 
 
@@ -128,9 +131,10 @@ async def get_quality_report(days: int = 7) -> Dict[str, Any]:
         }
 
     except Exception as e:
+        logger.error("Failed to generate quality report: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate quality report: {str(e)}",
+            detail="Failed to generate quality report",
         )
 
 
@@ -192,7 +196,8 @@ async def get_performance_report(days: int = 7) -> Dict[str, Any]:
         }
 
     except Exception as e:
+        logger.error("Failed to generate performance report: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate performance report: {str(e)}",
+            detail="Failed to generate performance report",
         )

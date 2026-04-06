@@ -27,6 +27,7 @@ from datametronome_podium.models.severity import (
     evaluate_severity,
 )
 from datametronome_podium.models.stave import Stave
+from datametronome_podium.core.query import quote_identifier
 from datametronome_podium.services.connection_tester import ConnectionTester
 
 try:
@@ -172,8 +173,6 @@ class ClefExecutor:
                 result = await self._execute_lookup_validation_check(
                     clef, stave, connector
                 )
-            elif clef.check_type == "python":
-                result = await self._execute_python_check(clef, stave, connector)
             # Legacy check types (for backward compatibility)
             elif clef.check_type == "null_check":
                 result = await self._execute_null_check(clef, stave, connector)
@@ -251,21 +250,23 @@ class ClefExecutor:
         threshold = config.get("threshold", 0.0)
 
         # Build SQL query to count NULLs
+        qt = quote_identifier(table)
+        qc = quote_identifier(column)
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT({column}) as non_null_rows,
-                COUNT(*) - COUNT({column}) as null_rows
-            FROM {table}
+                COUNT({qc}) as non_null_rows,
+                COUNT(*) - COUNT({qc}) as null_rows
+            FROM {qt}
             """
         elif stave.data_source_type == "sqlite":
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT({column}) as non_null_rows,
-                COUNT(*) - COUNT({column}) as null_rows
-            FROM {table}
+                COUNT({qc}) as non_null_rows,
+                COUNT(*) - COUNT({qc}) as null_rows
+            FROM {qt}
             """
         else:
             return CheckResult(
@@ -364,11 +365,13 @@ class ClefExecutor:
             )
 
         # Build SQL query to check values outside range
+        qt = quote_identifier(table)
+        qc = quote_identifier(column)
         conditions = []
         if min_val is not None:
-            conditions.append(f"{column} < {min_val}")
+            conditions.append(f"{qc} < {min_val}")
         if max_val is not None:
-            conditions.append(f"{column} > {max_val}")
+            conditions.append(f"{qc} > {max_val}")
 
         where_clause = " OR ".join(conditions)
 
@@ -377,20 +380,20 @@ class ClefExecutor:
             SELECT
                 COUNT(*) as total_rows,
                 COUNT(CASE WHEN {where_clause} THEN 1 END) as out_of_range_rows,
-                MIN({column}) as min_value,
-                MAX({column}) as max_value
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                MIN({qc}) as min_value,
+                MAX({qc}) as max_value
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "sqlite":
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
                 COUNT(CASE WHEN {where_clause} THEN 1 END) as out_of_range_rows,
-                MIN({column}) as min_value,
-                MAX({column}) as max_value
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                MIN({qc}) as min_value,
+                MAX({qc}) as max_value
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         else:
             return CheckResult(
@@ -484,7 +487,7 @@ class ClefExecutor:
 
         # Build SQL query to count rows
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "sqlite"]:
-            sql = f"SELECT COUNT(*) as row_count FROM {table}"
+            sql = f"SELECT COUNT(*) as row_count FROM {quote_identifier(table)}"
         else:
             return CheckResult(
                 clef_id=clef.id,
@@ -647,14 +650,16 @@ class ClefExecutor:
         column = config["column"]
 
         # Build SQL query to find duplicates
+        qt = quote_identifier(table)
+        qc = quote_identifier(column)
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT
-                {column},
+                {qc},
                 COUNT(*) as duplicate_count
-            FROM {table}
-            WHERE {column} IS NOT NULL
-            GROUP BY {column}
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
+            GROUP BY {qc}
             HAVING COUNT(*) > 1
             ORDER BY duplicate_count DESC
             LIMIT 10
@@ -662,11 +667,11 @@ class ClefExecutor:
         elif stave.data_source_type == "sqlite":
             sql = f"""
             SELECT
-                {column},
+                {qc},
                 COUNT(*) as duplicate_count
-            FROM {table}
-            WHERE {column} IS NOT NULL
-            GROUP BY {column}
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
+            GROUP BY {qc}
             HAVING COUNT(*) > 1
             ORDER BY duplicate_count DESC
             LIMIT 10
@@ -721,32 +726,34 @@ class ClefExecutor:
 
         # Build SQL query to find non-matching patterns
         # Note: SQL regex support varies by database
+        qt = quote_identifier(table)
+        qc = quote_identifier(column)
         if stave.data_source_type in ["postgres", "postgresql"]:
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} ~ '{pattern}' THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN {column} !~ '{pattern}' THEN 1 END) as non_matching_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN {qc} ~ '{pattern}' THEN 1 END) as matching_rows,
+                COUNT(CASE WHEN {qc} !~ '{pattern}' THEN 1 END) as non_matching_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "bigquery":
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN REGEXP_CONTAINS({column}, r'{pattern}') THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN NOT REGEXP_CONTAINS({column}, r'{pattern}') THEN 1 END) as non_matching_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN REGEXP_CONTAINS({qc}, r'{pattern}') THEN 1 END) as matching_rows,
+                COUNT(CASE WHEN NOT REGEXP_CONTAINS({qc}, r'{pattern}') THEN 1 END) as non_matching_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "mysql":
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} REGEXP '{pattern}' THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN {column} NOT REGEXP '{pattern}' THEN 1 END) as non_matching_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN {qc} REGEXP '{pattern}' THEN 1 END) as matching_rows,
+                COUNT(CASE WHEN {qc} NOT REGEXP '{pattern}' THEN 1 END) as non_matching_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "sqlite":
             # SQLite has limited regex support, use LIKE as fallback
@@ -1132,12 +1139,14 @@ class ClefExecutor:
         parsed: Dict[str, Any],
     ) -> CheckResult:
         """Execute if_null condition check."""
+        qt = quote_identifier(table)
+        qc = quote_identifier(column)
         sql = f"""
         SELECT
             COUNT(*) as total_rows,
-            COUNT({column}) as non_null_rows,
-            COUNT(*) - COUNT({column}) as null_rows
-        FROM {table}
+            COUNT({qc}) as non_null_rows,
+            COUNT(*) - COUNT({qc}) as null_rows
+        FROM {qt}
         """
 
         results = await db_connector.query({"sql": sql})
@@ -1232,23 +1241,25 @@ class ClefExecutor:
     ) -> CheckResult:
         """Execute if_not_unique condition check - finds duplicate values."""
         # Build SQL to find duplicates
+        qt = quote_identifier(table)
+        qc = quote_identifier(column)
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(DISTINCT {column}) as unique_values,
-                COUNT(*) - COUNT(DISTINCT {column}) as duplicate_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(DISTINCT {qc}) as unique_values,
+                COUNT(*) - COUNT(DISTINCT {qc}) as duplicate_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "sqlite":
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(DISTINCT {column}) as unique_values,
-                COUNT(*) - COUNT(DISTINCT {column}) as duplicate_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(DISTINCT {qc}) as unique_values,
+                COUNT(*) - COUNT(DISTINCT {qc}) as duplicate_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         else:
             return CheckResult(
@@ -1354,33 +1365,35 @@ class ClefExecutor:
 
         # Build SQL to count values not in allowed list
         # Escape values for SQL injection safety
+        qt = quote_identifier(table)
+        qc = quote_identifier(column)
         if stave.data_source_type in ["postgres", "postgresql"]:
             # Use array syntax for PostgreSQL
             values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "mysql":
             values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "sqlite":
             values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "bigquery":
             # BigQuery uses different syntax
@@ -1389,9 +1402,9 @@ class ClefExecutor:
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNTIF({column} NOT IN ({values_list})) as not_in_list_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNTIF({qc} NOT IN ({values_list})) as not_in_list_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         else:
             return CheckResult(
@@ -1502,7 +1515,7 @@ class ClefExecutor:
                     metadata={"error": "missing_table"},
                 )
 
-            sql = f"SELECT COUNT(*) as row_count FROM {table}"
+            sql = f"SELECT COUNT(*) as row_count FROM {quote_identifier(table)}"
             results = await db_connector.query({"sql": sql})
 
             if not results:
@@ -1763,35 +1776,6 @@ class ClefExecutor:
                 metadata={"error": str(e)},
             )
 
-    async def _execute_python_check(
-        self, clef: Clef, stave: Stave, db_connector: Any = None
-    ) -> CheckResult:
-        """Execute custom Python check (TDD Level 4: Custom Code)."""
-        try:
-            # For now, return a mock result since this would execute custom Python code
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="pass",
-                observed_value="custom_result",
-                message="Custom Python check passed: business logic validation successful",
-                metadata={
-                    "check_type": "python",
-                    "script_executed": True,
-                    "execution_time": 0.5,
-                    "note": "Mock implementation - would execute custom Python scripts",
-                },
-            )
-        except Exception as e:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Custom Python check failed: {str(e)}",
-                metadata={"error": str(e)},
-            )
-
     async def _execute_freshness_check(
         self, clef: Clef, stave: Stave, db_connector: Any = None
     ) -> CheckResult:
@@ -1866,7 +1850,7 @@ class ClefExecutor:
             max_age_input = config.get("max_age_hours", config.get("max_age", 24))
             max_age_hours = _parse_duration_to_hours(max_age_input) or 24.0
 
-            sql = f"SELECT MAX({column}) as latest_timestamp FROM {table}"
+            sql = f"SELECT MAX({quote_identifier(column)}) as latest_timestamp FROM {quote_identifier(table)}"
             # Try dict format first, fallback to string if needed
             try:
                 results = await db_connector.query({"sql": sql})
@@ -2206,12 +2190,15 @@ class ClefExecutor:
         try:
             # 1. Fetch Baseline Data
             # Limit to prevent memory explosions
-            baseline_sql = f"SELECT {column} as val FROM {table} WHERE {baseline_condition} LIMIT 10000"
+            # baseline_condition / current_condition are trusted config strings, not user input
+            qt = quote_identifier(table)
+            qc = quote_identifier(column)
+            baseline_sql = f"SELECT {qc} as val FROM {qt} WHERE {baseline_condition} LIMIT 10000"
             baseline_rows = await db_connector.query({"sql": baseline_sql})
             baseline_values = [r["val"] for r in baseline_rows if r["val"] is not None]
 
             # 2. Fetch Current Data
-            current_sql = f"SELECT {column} as val FROM {table} WHERE {current_condition} LIMIT 10000"
+            current_sql = f"SELECT {qc} as val FROM {qt} WHERE {current_condition} LIMIT 10000"
             current_rows = await db_connector.query({"sql": current_sql})
             current_values = [r["val"] for r in current_rows if r["val"] is not None]
 

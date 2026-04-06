@@ -15,7 +15,7 @@ async def create_default_admin(executor: QueryExecutor) -> None:
             logger.info("Admin user already exists")
             return
 
-        from datametronome_podium.api.v1.endpoints.auth import get_password_hash
+        from datametronome_podium.core.security import get_password_hash
 
         await executor.insert("users", {
             "id": "admin-001",

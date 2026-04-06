@@ -19,6 +19,25 @@ def quote_identifier(name: str) -> str:
     return '"' + name.replace('"', '""') + '"'
 
 
+_VALID_DIRECTIONS = {"ASC", "DESC"}
+
+
+def _safe_order_by(clause: str) -> str:
+    """Quote column names in an ORDER BY clause while preserving direction.
+
+    Accepts: "created_at DESC", "name", "created_at DESC, name ASC"
+    """
+    parts = []
+    for term in clause.split(","):
+        tokens = term.strip().split()
+        col = quote_identifier(tokens[0])
+        direction = tokens[1].upper() if len(tokens) > 1 else ""
+        if direction and direction not in _VALID_DIRECTIONS:
+            raise ValueError(f"Invalid ORDER BY direction: {direction}")
+        parts.append(f"{col} {direction}".strip())
+    return ", ".join(parts)
+
+
 class QueryExecutor:
     """Database-agnostic query executor.
 
@@ -71,7 +90,7 @@ class QueryExecutor:
             sql += " WHERE " + " AND ".join(clauses)
 
         if order_by:
-            sql += f" ORDER BY {order_by}"
+            sql += f" ORDER BY {_safe_order_by(order_by)}"
         if limit is not None:
             sql += " LIMIT ?"
             params.append(limit)

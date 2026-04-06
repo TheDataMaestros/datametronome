@@ -6,7 +6,7 @@ Each function calls the DB directly (no HTTP) and has no runtime deps on agent s
 """
 import logging
 
-from datametronome_podium.core.database import get_db
+from datametronome_podium.core.database import get_executor
 
 logger = logging.getLogger(__name__)
 
@@ -29,20 +29,16 @@ async def list_staves(
 
         from datametronome_podium.services.stave_service import deserialize_stave
 
-        db = await get_db()
+        executor = get_executor()
         if active_only:
-            staves = await db.query(
-                {
-                    "sql": "SELECT * FROM staves WHERE is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    "params": [limit, skip],
-                }
+            staves = await executor.query(
+                "SELECT * FROM staves WHERE is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                [limit, skip],
             )
         else:
-            staves = await db.query(
-                {
-                    "sql": "SELECT * FROM staves ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    "params": [limit, skip],
-                }
+            staves = await executor.query(
+                "SELECT * FROM staves ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                [limit, skip],
             )
 
         staves_list = []
@@ -56,12 +52,12 @@ async def list_staves(
                     stave_dict["updated_at"] = stave_dict["updated_at"].isoformat()
                 staves_list.append(stave_dict)
             except Exception as e:
-                logger.warning(f"Failed to deserialize stave {stave.get('id', 'unknown')}: {e}")
+                logger.warning("Failed to deserialize stave %s: %s", stave.get('id', 'unknown'), e)
                 continue
 
         return {"staves": staves_list, "count": len(staves_list)}
     except Exception as e:
-        logger.error(f"Error listing staves: {e}", exc_info=True)
+        logger.error("Error listing staves: %s", e, exc_info=True)
         return {"error": f"Failed to list staves: {str(e)}", "staves": []}
 
 
@@ -72,9 +68,9 @@ async def get_stave(stave_id: str) -> dict[str, object]:
 
         from datametronome_podium.services.stave_service import deserialize_stave
 
-        db = await get_db()
-        staves = await db.query(
-            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [stave_id]}
+        executor = get_executor()
+        staves = await executor.query(
+            "SELECT * FROM staves WHERE id = ?", [stave_id]
         )
 
         if not staves:
@@ -89,7 +85,7 @@ async def get_stave(stave_id: str) -> dict[str, object]:
 
         return stave_dict
     except Exception as e:
-        logger.error(f"Error getting stave {stave_id}: {e}", exc_info=True)
+        logger.error("Error getting stave %s: %s", stave_id, e, exc_info=True)
         return {"error": f"Failed to get stave: {str(e)}"}
 
 
@@ -119,33 +115,24 @@ async def create_stave(
 
         from datametronome_podium.services.stave_service import deserialize_stave
 
-        db = await get_db()
+        executor = get_executor()
 
         stave_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat() + "Z"
 
-        success = await db.write(
-            [
-                {
-                    "table": "staves",
-                    "id": stave_id,
-                    "name": name,
-                    "description": description,
-                    "data_source_type": data_source_type,
-                    "connection_config": json.dumps(connection_config),
-                    "is_active": is_active,
-                    "created_at": now,
-                    "updated_at": now,
-                }
-            ],
-            "staves",
-        )
+        await executor.insert("staves", {
+            "id": stave_id,
+            "name": name,
+            "description": description,
+            "data_source_type": data_source_type,
+            "connection_config": json.dumps(connection_config),
+            "is_active": is_active,
+            "created_at": now,
+            "updated_at": now,
+        })
 
-        if not success:
-            return {"error": "Failed to create stave in database"}
-
-        staves = await db.query(
-            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [stave_id]}
+        staves = await executor.query(
+            "SELECT * FROM staves WHERE id = ?", [stave_id]
         )
         if not staves:
             return {"error": "Stave created but could not be retrieved"}
@@ -159,7 +146,7 @@ async def create_stave(
 
         return stave_dict
     except Exception as e:
-        logger.error(f"Error creating stave: {e}", exc_info=True)
+        logger.error("Error creating stave: %s", e, exc_info=True)
         return {"error": f"Failed to create stave: {str(e)}"}
 
 
@@ -183,9 +170,9 @@ async def list_stave_tables(
         from datametronome_podium.services.connection_tester import ConnectionTester
         from datametronome_podium.services.stave_service import deserialize_stave
 
-        db = await get_db()
-        staves = await db.query(
-            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [stave_id]}
+        executor = get_executor()
+        staves = await executor.query(
+            "SELECT * FROM staves WHERE id = ?", [stave_id]
         )
 
         if not staves:
@@ -219,7 +206,7 @@ async def list_stave_tables(
                         structure = await connector.get_table_info(table_name)
                         table_info["structure"] = structure
                 except Exception as e:
-                    logger.warning(f"Could not get structure for table {table_name}: {e}")
+                    logger.warning("Could not get structure for table %s: %s", table_name, e)
                     table_info["structure"] = None
             tables.append(table_info)
 
@@ -232,7 +219,7 @@ async def list_stave_tables(
             "tables": tables,
         }
     except Exception as e:
-        logger.error(f"Error listing tables for stave {stave_id}: {e}", exc_info=True)
+        logger.error("Error listing tables for stave %s: %s", stave_id, e, exc_info=True)
         return {"error": f"Failed to list tables: {str(e)}"}
     finally:
         if connector:
@@ -263,9 +250,9 @@ async def get_table_sample(
         from datametronome_podium.services.connection_tester import ConnectionTester
         from datametronome_podium.services.stave_service import deserialize_stave
 
-        db = await get_db()
-        staves = await db.query(
-            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [stave_id]}
+        executor = get_executor()
+        staves = await executor.query(
+            "SELECT * FROM staves WHERE id = ?", [stave_id]
         )
 
         if not staves:
@@ -322,8 +309,8 @@ async def get_table_sample(
         }
     except Exception as e:
         logger.error(
-            f"Error getting sample data from table {table_name} in stave {stave_id}: {e}",
-            exc_info=True,
+            "Error getting sample data from table %s in stave %s: %s",
+            table_name, stave_id, e, exc_info=True,
         )
         return {"error": f"Failed to get sample data: {str(e)}"}
     finally:
@@ -363,9 +350,9 @@ async def suggest_quality_checks(
         from datametronome_podium.services.connection_tester import ConnectionTester
         from datametronome_podium.services.stave_service import deserialize_stave
 
-        db = await get_db()
-        staves = await db.query(
-            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [stave_id]}
+        executor = get_executor()
+        staves = await executor.query(
+            "SELECT * FROM staves WHERE id = ?", [stave_id]
         )
 
         if not staves:
@@ -438,7 +425,7 @@ async def suggest_quality_checks(
                         if sample_data:
                             sample_analysis = _analyze_sample_data(sample_data)
                     except Exception as e:
-                        logger.warning(f"Could not get sample data for table {tbl_name}: {e}")
+                        logger.warning("Could not get sample data for table %s: %s", tbl_name, e)
                         sample_analysis = None
 
                 table_suggestions = _analyze_table_structure(
@@ -468,7 +455,7 @@ async def suggest_quality_checks(
                         }
                     )
             except Exception as e:
-                logger.warning(f"Could not analyze table {tbl_name}: {e}")
+                logger.warning("Could not analyze table %s: %s", tbl_name, e)
                 continue
 
         return {
@@ -483,8 +470,8 @@ async def suggest_quality_checks(
         error_type = type(e).__name__
         error_msg = str(e)
         logger.error(
-            f"Error suggesting quality checks for stave {stave_id}: {error_type}: {error_msg}",
-            exc_info=True,
+            "Error suggesting quality checks for stave %s: %s: %s",
+            stave_id, error_type, error_msg, exc_info=True,
         )
         if "credentials" in error_msg.lower() or "authentication" in error_msg.lower():
             return {
@@ -519,35 +506,27 @@ async def list_clefs(
 
         from datametronome_podium.services.stave_service import deserialize_clef
 
-        db = await get_db()
+        executor = get_executor()
 
         if stave_id and active_only:
-            clefs = await db.query(
-                {
-                    "sql": "SELECT * FROM clefs WHERE stave_id = ? AND is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    "params": [stave_id, limit, skip],
-                }
+            clefs = await executor.query(
+                "SELECT * FROM clefs WHERE stave_id = ? AND is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                [stave_id, limit, skip],
             )
         elif stave_id:
-            clefs = await db.query(
-                {
-                    "sql": "SELECT * FROM clefs WHERE stave_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    "params": [stave_id, limit, skip],
-                }
+            clefs = await executor.query(
+                "SELECT * FROM clefs WHERE stave_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                [stave_id, limit, skip],
             )
         elif active_only:
-            clefs = await db.query(
-                {
-                    "sql": "SELECT * FROM clefs WHERE is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    "params": [limit, skip],
-                }
+            clefs = await executor.query(
+                "SELECT * FROM clefs WHERE is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                [limit, skip],
             )
         else:
-            clefs = await db.query(
-                {
-                    "sql": "SELECT * FROM clefs ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                    "params": [limit, skip],
-                }
+            clefs = await executor.query(
+                "SELECT * FROM clefs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                [limit, skip],
             )
 
         clefs_list = []
@@ -561,12 +540,12 @@ async def list_clefs(
                     clef_dict["updated_at"] = clef_dict["updated_at"].isoformat()
                 clefs_list.append(clef_dict)
             except Exception as e:
-                logger.warning(f"Failed to deserialize clef {clef.get('id', 'unknown')}: {e}")
+                logger.warning("Failed to deserialize clef %s: %s", clef.get('id', 'unknown'), e)
                 continue
 
         return {"clefs": clefs_list, "count": len(clefs_list)}
     except Exception as e:
-        logger.error(f"Error listing clefs: {e}", exc_info=True)
+        logger.error("Error listing clefs: %s", e, exc_info=True)
         return {"error": f"Failed to list clefs: {str(e)}", "clefs": []}
 
 
@@ -577,9 +556,9 @@ async def get_clef(clef_id: str) -> dict[str, object]:
 
         from datametronome_podium.services.stave_service import deserialize_clef
 
-        db = await get_db()
-        clefs = await db.query(
-            {"sql": "SELECT * FROM clefs WHERE id = ?", "params": [clef_id]}
+        executor = get_executor()
+        clefs = await executor.query(
+            "SELECT * FROM clefs WHERE id = ?", [clef_id]
         )
 
         if not clefs:
@@ -594,7 +573,7 @@ async def get_clef(clef_id: str) -> dict[str, object]:
 
         return clef_dict
     except Exception as e:
-        logger.error(f"Error getting clef {clef_id}: {e}", exc_info=True)
+        logger.error("Error getting clef %s: %s", clef_id, e, exc_info=True)
         return {"error": f"Failed to get clef: {str(e)}"}
 
 
@@ -607,7 +586,7 @@ async def list_checks(
     """List check execution results."""
     try:
 
-        db = await get_db()
+        executor = get_executor()
 
         conditions = []
         params = []
@@ -624,16 +603,14 @@ async def list_checks(
         where_clause = " AND ".join(conditions) if conditions else "1=1"
         params.extend([limit])
 
-        checks = await db.query(
-            {
-                "sql": f"SELECT * FROM checks WHERE {where_clause} ORDER BY timestamp DESC LIMIT ?",
-                "params": params,
-            }
+        checks = await executor.query(
+            f"SELECT * FROM checks WHERE {where_clause} ORDER BY timestamp DESC LIMIT ?",
+            params,
         )
 
         return checks
     except Exception as e:
-        logger.error(f"Error listing checks: {e}", exc_info=True)
+        logger.error("Error listing checks: %s", e, exc_info=True)
         return {"error": f"Failed to list checks: {str(e)}", "checks": []}
 
 
@@ -647,35 +624,27 @@ async def get_summary_report(days: int = 7) -> dict[str, object]:
         from datetime import datetime, timedelta
 
 
-        db = await get_db()
+        executor = get_executor()
 
-        staves_count = await db.query(
-            {
-                "sql": "SELECT COUNT(*) as count FROM staves WHERE is_active = TRUE",
-                "params": [],
-            }
+        staves_count = await executor.query(
+            "SELECT COUNT(*) as count FROM staves WHERE is_active = TRUE", []
         )
         total_staves = staves_count[0]["count"] if staves_count else 0
 
-        clefs_count = await db.query(
-            {
-                "sql": "SELECT COUNT(*) as count FROM clefs WHERE is_active = TRUE",
-                "params": [],
-            }
+        clefs_count = await executor.query(
+            "SELECT COUNT(*) as count FROM clefs WHERE is_active = TRUE", []
         )
         total_clefs = clefs_count[0]["count"] if clefs_count else 0
 
-        checks_count = await db.query(
-            {"sql": "SELECT COUNT(*) as count FROM checks", "params": []}
+        checks_count = await executor.query(
+            "SELECT COUNT(*) as count FROM checks", []
         )
         total_checks = checks_count[0]["count"] if checks_count else 0
 
         threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
-        recent_checks = await db.query(
-            {
-                "sql": "SELECT * FROM checks WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 5",
-                "params": [threshold_date],
-            }
+        recent_checks = await executor.query(
+            "SELECT * FROM checks WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 5",
+            [threshold_date],
         )
 
         return {
@@ -689,7 +658,7 @@ async def get_summary_report(days: int = 7) -> dict[str, object]:
             "recent_activity": recent_checks,
         }
     except Exception as e:
-        logger.error(f"Error generating summary report: {e}", exc_info=True)
+        logger.error("Error generating summary report: %s", e, exc_info=True)
         return {"error": f"Failed to generate summary report: {str(e)}"}
 
 
@@ -699,15 +668,13 @@ async def get_quality_report(days: int = 7) -> dict[str, object]:
         from datetime import datetime, timedelta
 
 
-        db = await get_db()
+        executor = get_executor()
 
         threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
 
-        period_checks = await db.query(
-            {
-                "sql": "SELECT * FROM checks WHERE timestamp >= ? ORDER BY timestamp DESC",
-                "params": [threshold_date],
-            }
+        period_checks = await executor.query(
+            "SELECT * FROM checks WHERE timestamp >= ? ORDER BY timestamp DESC",
+            [threshold_date],
         )
 
         total_checks = len(period_checks)
@@ -720,11 +687,9 @@ async def get_quality_report(days: int = 7) -> dict[str, object]:
             (passed_checks / total_checks * 100) if total_checks > 0 else 100.0
         )
 
-        anomalies = await db.query(
-            {
-                "sql": "SELECT * FROM anomalies WHERE detected_at >= ? ORDER BY detected_at DESC",
-                "params": [threshold_date],
-            }
+        anomalies = await executor.query(
+            "SELECT * FROM anomalies WHERE detected_at >= ? ORDER BY detected_at DESC",
+            [threshold_date],
         )
 
         return {
@@ -742,7 +707,7 @@ async def get_quality_report(days: int = 7) -> dict[str, object]:
             },
         }
     except Exception as e:
-        logger.error(f"Error generating quality report: {e}", exc_info=True)
+        logger.error("Error generating quality report: %s", e, exc_info=True)
         return {"error": f"Failed to generate quality report: {str(e)}"}
 
 

@@ -74,9 +74,10 @@ async def get_system_health() -> Dict[str, Any]:
         }
 
     except Exception as e:
+        logger.error("Failed to fetch system health: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch system health: {str(e)}",
+            detail="Failed to fetch system health",
         )
 
 
@@ -128,9 +129,10 @@ async def get_performance_metrics() -> Dict[str, Any]:
         }
 
     except Exception as e:
+        logger.error("Failed to fetch performance metrics: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch performance metrics: {str(e)}",
+            detail="Failed to fetch performance metrics",
         )
 
 
@@ -179,9 +181,10 @@ async def get_anomaly_metrics() -> Dict[str, Any]:
         }
 
     except Exception as e:
+        logger.error("Failed to fetch anomaly metrics: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch anomaly metrics: {str(e)}",
+            detail="Failed to fetch anomaly metrics",
         )
 
 
@@ -379,9 +382,10 @@ async def get_dashboard_metrics() -> Dict[str, Any]:
         }
 
     except Exception as e:
+        logger.error("Failed to fetch dashboard metrics: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch dashboard metrics: {str(e)}",
+            detail="Failed to fetch dashboard metrics",
         )
 
 

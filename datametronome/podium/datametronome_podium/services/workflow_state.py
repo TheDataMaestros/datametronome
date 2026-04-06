@@ -10,7 +10,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from datametronome_podium.core.database import execute_query, execute_write, insert_data
+from datametronome_podium.core.database import get_executor
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ async def create_checkpoint(
     checkpoint_id = f"wf-{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-    await insert_data("workflow_checkpoints", {
+    await get_executor().insert("workflow_checkpoints", {
         "id": checkpoint_id,
         "conversation_id": conversation_id,
         "user_id": user_id,
@@ -65,12 +65,12 @@ async def update_checkpoint(
 
     params.append(checkpoint_id)
     sql = f"UPDATE workflow_checkpoints SET {', '.join(set_parts)} WHERE id = ?"
-    await execute_write(sql, params)
+    await get_executor().execute(sql, params)
 
 
 async def load_checkpoint(checkpoint_id: str) -> dict | None:
     """Load a checkpoint by ID. Returns None if not found."""
-    rows = await execute_query(
+    rows = await get_executor().query(
         "SELECT * FROM workflow_checkpoints WHERE id = ?", [checkpoint_id]
     )
     return rows[0] if rows else None
@@ -78,7 +78,7 @@ async def load_checkpoint(checkpoint_id: str) -> dict | None:
 
 async def find_active_checkpoint(conversation_id: str) -> dict | None:
     """Find the latest running or paused checkpoint for a conversation."""
-    rows = await execute_query(
+    rows = await get_executor().query(
         "SELECT * FROM workflow_checkpoints "
         "WHERE conversation_id = ? AND status IN ('running', 'paused') "
         "ORDER BY created_at DESC LIMIT 1",
@@ -97,7 +97,7 @@ async def log_event(
     event_id = f"evt-{uuid.uuid4().hex[:12]}"
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-    await insert_data("workflow_events", {
+    await get_executor().insert("workflow_events", {
         "id": event_id,
         "checkpoint_id": checkpoint_id,
         "event_type": event_type,
