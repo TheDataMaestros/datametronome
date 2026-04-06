@@ -42,13 +42,13 @@ def build_model(
         )
 
     if provider == "openai":
-        from pydantic_ai.models.openai import OpenAIModel
+        from pydantic_ai.models.openai import OpenAIModel  # ty:ignore[deprecated]
         from pydantic_ai.providers.openai import OpenAIProvider
 
         kwargs: dict = {"api_key": api_key or ""}
         if base_url:
             kwargs["base_url"] = base_url
-        return OpenAIModel(model_name, provider=OpenAIProvider(**kwargs))
+        return OpenAIModel(model_name, provider=OpenAIProvider(**kwargs))  # ty:ignore[deprecated]
 
     if provider == "gemini":
         from pydantic_ai.models.google import GoogleModel
@@ -61,11 +61,11 @@ def build_model(
 
     if provider == "ollama":
         # Ollama exposes an OpenAI-compatible API
-        from pydantic_ai.models.openai import OpenAIModel
+        from pydantic_ai.models.openai import OpenAIModel  # ty:ignore[deprecated]
         from pydantic_ai.providers.openai import OpenAIProvider
 
         ollama_base = base_url or "http://localhost:11434/v1"
-        return OpenAIModel(
+        return OpenAIModel(  # ty:ignore[deprecated]
             model_name,
             provider=OpenAIProvider(base_url=ollama_base, api_key="ollama"),
         )

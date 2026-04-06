@@ -4,10 +4,10 @@ import pytest
 
 def test_build_model_ollama():
     from datametronome_podium.services.agent_factory import build_model
-    from pydantic_ai.models.openai import OpenAIModel
+    from pydantic_ai.models.openai import OpenAIModel  # ty:ignore[deprecated]
 
     model = build_model("ollama", "qwen2.5", api_key=None, base_url="http://localhost:11434/v1")
-    assert isinstance(model, OpenAIModel)
+    assert isinstance(model, OpenAIModel)  # ty:ignore[deprecated]
 
 
 def test_build_model_anthropic():
@@ -20,10 +20,10 @@ def test_build_model_anthropic():
 
 def test_build_model_openai():
     from datametronome_podium.services.agent_factory import build_model
-    from pydantic_ai.models.openai import OpenAIModel
+    from pydantic_ai.models.openai import OpenAIModel  # ty:ignore[deprecated]
 
     model = build_model("openai", "gpt-4o-mini", api_key="sk-test")
-    assert isinstance(model, OpenAIModel)
+    assert isinstance(model, OpenAIModel)  # ty:ignore[deprecated]
 
 
 def test_build_model_gemini():
