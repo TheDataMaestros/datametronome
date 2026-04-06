@@ -92,7 +92,7 @@ def build_insight_agent(
     if user_profile:
         system_prompt = f"{system_prompt}\n\n{user_profile}"
 
-    return Agent(
+    return Agent(  # ty: ignore[invalid-return-type,no-matching-overload]
         model=model,
         system_prompt=system_prompt,
         tools=INSIGHT_TOOLS,

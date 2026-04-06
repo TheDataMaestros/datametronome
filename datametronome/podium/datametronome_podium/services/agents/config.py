@@ -26,7 +26,7 @@ def build_config_agent(model: Model, *, user_profile: str | None = None) -> Agen
     prompt = _SYSTEM_PROMPT
     if user_profile:
         prompt = f"{_SYSTEM_PROMPT}\n\n{user_profile}"
-    return Agent(
+    return Agent(  # ty: ignore[invalid-return-type,no-matching-overload]
         model=model,
         system_prompt=prompt,
         tools=ALL_TOOLS,
