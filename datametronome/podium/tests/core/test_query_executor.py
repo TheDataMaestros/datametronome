@@ -118,6 +118,11 @@ class TestCRUDHelpers:
         assert 'DELETE FROM "staves"' in sql
         assert "WHERE" in sql
 
+    @pytest.mark.asyncio
+    async def test_delete_without_where_raises(self, sqlite_executor):
+        with pytest.raises(ValueError, match="requires a where clause"):
+            await sqlite_executor.delete("staves")
+
 
 class TestTransaction:
     @pytest.mark.asyncio

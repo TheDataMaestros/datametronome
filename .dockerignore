@@ -47,6 +47,4 @@ docs/superpowers/
 # Claude / AI config
 .claude/
 
-# Large lock files (deps already installed during build)
-uv.lock
-datametronome/podium/uv.lock
+# Note: uv.lock files are NOT excluded — they ensure reproducible builds

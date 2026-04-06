@@ -181,8 +181,10 @@ async def register(user_data: UserCreate) -> dict[str, str]:
         )
 
     # Create new user
+    from datametronome_podium.core.database import get_executor
+
     hashed_password = get_password_hash(user_data.password)
-    now = datetime.now().isoformat()
+    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
     new_user_data = {
         "id": user_data.username,  # Use username as ID for simplicity
@@ -195,8 +197,9 @@ async def register(user_data: UserCreate) -> dict[str, str]:
         "updated_at": now,
     }
 
-    success = await insert_data("users", new_user_data)
-    if not success:
+    try:
+        await get_executor().insert("users", new_user_data)
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create user",
