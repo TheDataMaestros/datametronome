@@ -66,7 +66,7 @@ def test_llm_check_spec_invalid_type():
     with pytest.raises(ValueError):
         LLMCheckSpec(
             table="orders",
-            check_type="python",  # type: ignore[invalid-argument-type]
+            check_type="python",  # ty: ignore[invalid-argument-type]
             schedule="0 * * * *",
             config={},
             rationale="Bad",

@@ -44,8 +44,8 @@ class TestSQLitePulse:
                 mock_connect.return_value = mock_connection
 
                 # Mock the readonly and writeonly connectors
-                pulse._readonly.connect = AsyncMock()  # type: ignore[invalid-assignment]
-                pulse._writeonly.connect = AsyncMock()  # type: ignore[invalid-assignment]
+                pulse._readonly.connect = AsyncMock()  # ty: ignore[invalid-assignment]
+                pulse._writeonly.connect = AsyncMock()  # ty: ignore[invalid-assignment]
 
                 await pulse.connect()
 
@@ -75,8 +75,8 @@ class TestSQLitePulse:
         pulse.connection = mock_connection
 
         # Mock the readonly and writeonly connectors
-        pulse._readonly.close = AsyncMock()  # type: ignore[invalid-assignment]
-        pulse._writeonly.close = AsyncMock()  # type: ignore[invalid-assignment]
+        pulse._readonly.close = AsyncMock()  # ty: ignore[invalid-assignment]
+        pulse._writeonly.close = AsyncMock()  # ty: ignore[invalid-assignment]
 
         await pulse.close()
 
@@ -92,8 +92,8 @@ class TestSQLitePulse:
         pulse.connection = None
 
         # Mock the readonly and writeonly connectors
-        pulse._readonly.close = AsyncMock()  # type: ignore[invalid-assignment]
-        pulse._writeonly.close = AsyncMock()  # type: ignore[invalid-assignment]
+        pulse._readonly.close = AsyncMock()  # ty: ignore[invalid-assignment]
+        pulse._writeonly.close = AsyncMock()  # ty: ignore[invalid-assignment]
 
         await pulse.close()
 
@@ -105,8 +105,8 @@ class TestSQLitePulse:
         """Test connection status when fully connected."""
         pulse = SQLitePulse()
         pulse.connection = Mock()
-        pulse._readonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
-        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
+        pulse._readonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
+        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
 
         result = await pulse.is_connected()
 
@@ -128,9 +128,9 @@ class TestSQLitePulse:
     async def test_query_delegation(self):
         """Test that query operations are delegated to readonly connector."""
         pulse = SQLitePulse()
-        pulse._readonly.query = AsyncMock(return_value=[{"id": 1}])  # type: ignore[invalid-assignment]
-        pulse._readonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
-        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
+        pulse._readonly.query = AsyncMock(return_value=[{"id": 1}])  # ty: ignore[invalid-assignment]
+        pulse._readonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
+        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
         pulse.connection = Mock()
 
         query_config = "SELECT * FROM users"
@@ -152,9 +152,9 @@ class TestSQLitePulse:
     async def test_write_delegation(self):
         """Test that write operations are delegated to writeonly connector."""
         pulse = SQLitePulse()
-        pulse._writeonly.write = AsyncMock()  # type: ignore[invalid-assignment]
-        pulse._readonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
-        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
+        pulse._writeonly.write = AsyncMock()  # ty: ignore[invalid-assignment]
+        pulse._readonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
+        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
         pulse.connection = Mock()
 
         data = [{"name": "Alice"}, {"name": "Bob"}]
@@ -173,9 +173,9 @@ class TestSQLitePulse:
     async def test_write_with_existing_table_field(self):
         """Test write when table field already exists in data."""
         pulse = SQLitePulse()
-        pulse._writeonly.write = AsyncMock()  # type: ignore[invalid-assignment]
-        pulse._readonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
-        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
+        pulse._writeonly.write = AsyncMock()  # ty: ignore[invalid-assignment]
+        pulse._readonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
+        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
         pulse.connection = Mock()
 
         data = [{"name": "Alice", "table": "custom_table"}]
@@ -190,9 +190,9 @@ class TestSQLitePulse:
     async def test_execute_delegation(self):
         """Test that execute operations are delegated to writeonly connector."""
         pulse = SQLitePulse()
-        pulse._writeonly.execute = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
-        pulse._readonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
-        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
+        pulse._writeonly.execute = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
+        pulse._readonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
+        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
         pulse.connection = Mock()
 
         sql = "INSERT INTO users (name) VALUES (?)"
@@ -207,9 +207,9 @@ class TestSQLitePulse:
     async def test_copy_records_delegation(self):
         """Test that copy_records operations are delegated to writeonly connector."""
         pulse = SQLitePulse()
-        pulse._writeonly.copy_records = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
-        pulse._readonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
-        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # type: ignore[invalid-assignment]
+        pulse._writeonly.copy_records = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
+        pulse._readonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
+        pulse._writeonly.is_connected = AsyncMock(return_value=True)  # ty: ignore[invalid-assignment]
         pulse.connection = Mock()
 
         table_name = "users"

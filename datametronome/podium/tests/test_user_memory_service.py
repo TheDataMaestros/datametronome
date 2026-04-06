@@ -46,7 +46,7 @@ def _make_extraction(**kwargs) -> MemoryExtraction:
         "action": "new",
         "existing_memory_id": None,
     }
-    return MemoryExtraction(**{**defaults, **kwargs})  # type: ignore[invalid-argument-type]
+    return MemoryExtraction(**{**defaults, **kwargs})  # ty: ignore[invalid-argument-type]
 
 
 def _make_profile_summary(**kwargs) -> ProfileSummary:

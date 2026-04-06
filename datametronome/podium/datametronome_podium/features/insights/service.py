@@ -125,7 +125,7 @@ class InsightPipelineService:
             "matched_archetype (if any)."
         )
 
-        agent: Agent[None, LLMDomainClassification] = Agent(  # type: ignore[invalid-assignment]
+        agent: Agent[None, LLMDomainClassification] = Agent(  # ty: ignore[invalid-assignment]
             model=model,
             output_type=LLMDomainClassification,
             retries=2,
@@ -151,7 +151,7 @@ class InsightPipelineService:
             id=f"snap-{uuid.uuid4()}",
             stave_id=stave_id,
             tenant_id="default",
-            snapshot_type=snapshot_type,  # type: ignore[invalid-argument-type]
+            snapshot_type=snapshot_type,  # ty: ignore[invalid-argument-type]
             table_metrics=table_metrics,
             column_stats={},
             captured_at=now,
@@ -193,7 +193,7 @@ class InsightPipelineService:
         )
 
         model = build_heavy_model_from_settings()
-        agent: Agent[None, LLMInsightReport] = Agent(  # type: ignore[invalid-assignment]
+        agent: Agent[None, LLMInsightReport] = Agent(  # ty: ignore[invalid-assignment]
             model=model,
             output_type=LLMInsightReport,
             system_prompt=system_prompt,
@@ -316,7 +316,7 @@ class InsightPipelineService:
                 # Phase 1: schema overview (no DB connection)
                 logger.info("Phase 1: schema overview for stave %s", stave_id)
                 schema_interpretation = await run_phase1_schema_overview(
-                    discovery, archetype, model  # type: ignore[invalid-argument-type]
+                    discovery, archetype, model  # ty: ignore[invalid-argument-type]
                 )
 
                 # Phase 2: generate + validate SQL
@@ -335,7 +335,7 @@ class InsightPipelineService:
                     id=str(uuid.uuid4()),
                     stave_id=stave_id,
                     tenant_id=profile.tenant_id,
-                    schema_fingerprint=fingerprint,  # type: ignore[invalid-argument-type]
+                    schema_fingerprint=fingerprint,  # ty: ignore[invalid-argument-type]
                     kpi_queries=generated.kpi_queries,
                     performer_queries=generated.performer_queries,
                     skipped=generated.skipped,

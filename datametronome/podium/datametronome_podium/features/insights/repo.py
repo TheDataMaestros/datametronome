@@ -55,9 +55,9 @@ def _deserialize_plan(row: dict) -> StaveQueryPlan:
         stave_id=row["stave_id"],
         tenant_id=row.get("tenant_id", "default"),
         schema_fingerprint=row["schema_fingerprint"],
-        kpi_queries=_parse_json(row.get("kpi_queries", "{}")),  # type: ignore[invalid-argument-type]
-        performer_queries=_parse_json(row.get("performer_queries", "{}")),  # type: ignore[invalid-argument-type]
-        skipped=_parse_json(row.get("skipped", "[]")),  # type: ignore[invalid-argument-type]
+        kpi_queries=_parse_json(row.get("kpi_queries", "{}")),  # ty: ignore[invalid-argument-type]
+        performer_queries=_parse_json(row.get("performer_queries", "{}")),  # ty: ignore[invalid-argument-type]
+        skipped=_parse_json(row.get("skipped", "[]")),  # ty: ignore[invalid-argument-type]
         generated_by_model=row.get("generated_by_model", ""),
         generated_at=row["generated_at"],
         invalidated_at=row.get("invalidated_at"),

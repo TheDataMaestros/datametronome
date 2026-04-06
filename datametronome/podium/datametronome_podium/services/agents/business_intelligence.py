@@ -112,7 +112,7 @@ async def run_phase1_schema_overview(
         f"Sample rows (up to 3 per table): {json.dumps(samples_summary, indent=2)}"
     )
     result = await agent.run(prompt)
-    return result.output  # type: ignore[invalid-return-type]
+    return result.output  # ty: ignore[invalid-return-type]
 
 
 # ── Phase 2 Deps + Agent ──────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ class Phase2Deps:
 
 def build_phase2_agent(model: Any, schema_prefix: str) -> Agent:
     """Agent that generates and validates SQL for KPIs and performer dimensions."""
-    agent: Agent[Phase2Deps, GeneratedQueryPlan] = Agent(  # type: ignore[invalid-assignment]
+    agent: Agent[Phase2Deps, GeneratedQueryPlan] = Agent(  # ty: ignore[invalid-assignment]
         model=model,
         system_prompt=_PHASE2_SYSTEM_PROMPT.format(
             schema_prefix=schema_prefix or "(no prefix)",
@@ -167,7 +167,7 @@ def build_phase2_agent(model: Any, schema_prefix: str) -> Agent:
         except Exception as exc:
             return f"ERROR: {exc}"
 
-    return agent  # type: ignore[invalid-return-type]
+    return agent  # ty: ignore[invalid-return-type]
 
 
 async def run_phase2_generate_and_validate(
@@ -198,7 +198,7 @@ async def run_phase2_generate_and_validate(
 
     try:
         deps = Phase2Deps(connector=connector, schema_prefix=schema_prefix)
-        result = await agent.run(prompt, deps=deps)  # type: ignore[invalid-argument-type]
+        result = await agent.run(prompt, deps=deps)  # ty: ignore[invalid-argument-type]
         plan = result.output
 
         succeeded = len(plan.kpi_queries) + sum(
@@ -257,7 +257,7 @@ class Phase3Deps:
 
 def build_phase3_agent(model: Any) -> Agent:
     """Agent that executes stored SQL and reasons over results."""
-    agent: Agent[Phase3Deps, LLMBusinessReport] = Agent(  # type: ignore[invalid-assignment]
+    agent: Agent[Phase3Deps, LLMBusinessReport] = Agent(  # ty: ignore[invalid-assignment]
         model=model,
         system_prompt=_PHASE3_SYSTEM_PROMPT,
         output_type=LLMBusinessReport,
@@ -330,7 +330,7 @@ def build_phase3_agent(model: Any) -> Agent:
         rows = await _execute_sql(ctx.deps.connector, sql)
         return _json({"entity": entity_name, "breakdown": rows[:8]})
 
-    return agent  # type: ignore[invalid-return-type]
+    return agent  # ty: ignore[invalid-return-type]
 
 
 async def run_phase3_execute_and_analyze(
@@ -358,5 +358,5 @@ async def run_phase3_execute_and_analyze(
         f"Skipped KPIs (include in report): {skipped}. "
         "Execute all available queries, then produce the full business report."
     )
-    result = await agent.run(prompt, deps=deps)  # type: ignore[invalid-argument-type]
+    result = await agent.run(prompt, deps=deps)  # ty: ignore[invalid-argument-type]
     return result.output

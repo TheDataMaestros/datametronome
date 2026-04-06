@@ -298,7 +298,7 @@ class TestRealExampleFiles:
         example_file = Path(__file__).parent.parent / "examples" / "staves.yaml"
 
         if not example_file.exists():
-            pytest.skip("Example file not found")  # type: ignore[too-many-positional-arguments]
+            pytest.skip("Example file not found")  # ty: ignore[too-many-positional-arguments]
 
         # Load the example
         staves, clefs = load_staves_from_yaml(example_file, resolve_env=False)
@@ -319,7 +319,7 @@ class TestRealExampleFiles:
         example_file = Path(__file__).parent.parent / "examples" / "production-db.yaml"
 
         if not example_file.exists():
-            pytest.skip("Example file not found")  # type: ignore[too-many-positional-arguments]
+            pytest.skip("Example file not found")  # ty: ignore[too-many-positional-arguments]
 
         # Load the example
         stave, clefs = load_single_stave_yaml(example_file, resolve_env=False)
