@@ -219,7 +219,7 @@ class UserMemoryService:
         try:
             from datametronome_podium.services.agent_factory import build_model_from_settings
 
-            agent: Agent[None, ExtractionResult] = Agent(
+            agent: Agent[None, ExtractionResult] = Agent(  # type: ignore[assignment]
                 model=build_model_from_settings(),
                 system_prompt=_EXTRACTION_SYSTEM,
                 output_type=ExtractionResult,
@@ -240,7 +240,7 @@ class UserMemoryService:
         try:
             from datametronome_podium.services.agent_factory import build_model_from_settings
 
-            agent: Agent[None, ProfileSummary] = Agent(
+            agent: Agent[None, ProfileSummary] = Agent(  # type: ignore[assignment]
                 model=build_model_from_settings(),
                 system_prompt=_REBUILD_SYSTEM,
                 output_type=ProfileSummary,
