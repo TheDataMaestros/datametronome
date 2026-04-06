@@ -5,10 +5,10 @@ from datametronome_podium.archetypes import load_archetype, load_all_archetypes,
 
 def test_load_ecommerce_archetype():
     arch = load_archetype("e-commerce")
-    assert arch["name"] == "e-commerce"
-    assert "orders" in arch["signatures"]["required"]
-    assert len(arch["metrics"]) > 0
-    assert len(arch["suggested_checks"]) > 0
+    assert arch["name"] == "e-commerce"  # type: ignore[not-subscriptable]
+    assert "orders" in arch["signatures"]["required"]  # type: ignore[not-subscriptable]
+    assert len(arch["metrics"]) > 0  # type: ignore[not-subscriptable]
+    assert len(arch["suggested_checks"]) > 0  # type: ignore[not-subscriptable]
 
 
 def test_load_all_archetypes():

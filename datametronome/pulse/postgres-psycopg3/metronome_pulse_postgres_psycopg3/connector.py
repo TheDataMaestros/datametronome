@@ -55,7 +55,7 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
 
     async def connect(self):
         """Establish connection pool to PostgreSQL using psycopg3."""
-        self._pool = await AsyncConnectionPool.connect(  # type: ignore[attr-defined]
+        self._pool = await AsyncConnectionPool.connect(  # type: ignore[unresolved-attribute]
             host=self._host,
             port=self._port,
             dbname=self._database,

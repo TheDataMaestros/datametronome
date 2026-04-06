@@ -17,8 +17,8 @@ def test_archetype_has_kpi_definitions(domain):
 @pytest.mark.parametrize("domain", ["e-commerce", "saas", "crm"])
 def test_archetype_has_no_sql(domain):
     arch = load_archetype(domain)
-    assert "kpi_queries" not in arch, f"{domain} still has legacy kpi_queries key"
-    for dim in arch.get("performer_dimensions", []):
+    assert "kpi_queries" not in arch, f"{domain} still has legacy kpi_queries key"  # type: ignore
+    for dim in arch.get("performer_dimensions", []):  # type: ignore
         assert "rank_query" not in dim, f"{domain} performer_dimensions still has rank_query SQL"
         assert "drill_query" not in dim, f"{domain} performer_dimensions still has drill_query SQL"
         assert "description" in dim, f"{domain} performer_dimension missing description"
@@ -27,7 +27,7 @@ def test_archetype_has_no_sql(domain):
 @pytest.mark.parametrize("domain", ["e-commerce", "saas", "crm"])
 def test_archetype_metrics_have_no_query_hint(domain):
     arch = load_archetype(domain)
-    for metric in arch.get("metrics", []):
+    for metric in arch.get("metrics", []):  # type: ignore
         assert "query_hint" not in metric, (
             f"{domain} metric '{metric.get('name')}' still has legacy query_hint"
         )
@@ -37,7 +37,7 @@ def test_archetype_metrics_have_no_query_hint(domain):
 def test_archetype_performer_dimensions_structure(domain):
     """Each performer dimension must have entity + description, no SQL."""
     arch = load_archetype(domain)
-    for dim in arch.get("performer_dimensions", []):
+    for dim in arch.get("performer_dimensions", []):  # type: ignore
         assert "entity" in dim, f"{domain} performer_dimension missing entity"
         assert "description" in dim, f"{domain} performer_dimension missing description"
         assert "rank_query" not in dim

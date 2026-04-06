@@ -39,7 +39,7 @@ def test_data_profile_full():
     )
     assert p.domain_type == "saas"
     assert p.profile_version == 3
-    assert p.previous_classification["domain_type"] == "generic"
+    assert p.previous_classification["domain_type"] == "generic"  # type: ignore[not-subscriptable]
 
 
 # --- Task 2: remaining models ---

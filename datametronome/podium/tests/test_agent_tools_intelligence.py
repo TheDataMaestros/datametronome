@@ -29,7 +29,7 @@ async def test_get_stave_intelligence_no_profile():
 
     assert result["stave_id"] == "stave-123"
     assert result.get("profile") is None
-    assert "No intelligence profile" in result.get("message", "")
+    assert "No intelligence profile" in result.get("message", "")  # type: ignore[unsupported-operator]
 
 
 @pytest.mark.asyncio

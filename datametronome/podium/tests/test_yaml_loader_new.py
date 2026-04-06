@@ -360,7 +360,7 @@ class TestYAMLLoaderIntegration:
         example_file = Path(__file__).parent.parent / "examples" / "staves.yaml"
 
         if not example_file.exists():
-            pytest.skip("Example file not found")  # type: ignore[arg-type]
+            pytest.skip("Example file not found")  # type: ignore[too-many-positional-arguments]
 
         staves, clefs = load_and_parse_yaml(str(example_file))
 
@@ -385,7 +385,7 @@ class TestYAMLLoaderIntegration:
         )
 
         if not example_file.exists():
-            pytest.skip("Example file not found")  # type: ignore[arg-type]
+            pytest.skip("Example file not found")  # type: ignore[too-many-positional-arguments]
 
         # The file has a syntax error (comment at start), so we'll skip if it fails to parse
         try:
@@ -405,4 +405,4 @@ class TestYAMLLoaderIntegration:
                 ]
         except YAMLLoadError:
             # File has syntax issues, skip this test
-            pytest.skip("Example file has YAML syntax errors")  # type: ignore[arg-type]
+            pytest.skip("Example file has YAML syntax errors")  # type: ignore[too-many-positional-arguments]
