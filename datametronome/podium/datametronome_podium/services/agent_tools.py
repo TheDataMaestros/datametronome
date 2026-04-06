@@ -11,15 +11,7 @@ from datametronome_podium.core.database import get_db
 logger = logging.getLogger(__name__)
 
 
-def _quote_identifier(name: str) -> str:
-    """Safely quote a SQL identifier to prevent injection.
-
-    Wraps the name in double-quotes (ANSI SQL standard) and escapes any
-    embedded double-quotes by doubling them. This is safe for PostgreSQL,
-    SQLite, and BigQuery backtick-style names when the caller substitutes
-    the result into f-string SQL.
-    """
-    return '"' + name.replace('"', '""') + '"'
+from datametronome_podium.core.query import quote_identifier as _quote_identifier
 
 
 async def list_staves(

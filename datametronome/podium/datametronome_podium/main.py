@@ -142,6 +142,10 @@ async def lifespan(app: FastAPI):
     # Startup
     logging.info("Starting DataMetronome Podium...")
 
+    # Validate configuration (blocks startup on critical errors like default secret key)
+    from .core.config import validate_and_report_config
+    validate_and_report_config()
+
     # Initialize database
     await init_db()
     logging.info("Database initialized")

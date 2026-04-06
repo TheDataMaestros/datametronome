@@ -4,11 +4,16 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 
 
+FAKE_USER = {"id": "user-1", "username": "testuser", "is_active": True, "is_superuser": False}
+
+
 def _make_app():
     from fastapi import FastAPI
     from datametronome_podium.features.staves.router import router
+    from datametronome_podium.api.v1.endpoints.auth import get_current_user
     app = FastAPI()
     app.include_router(router, prefix="/staves")
+    app.dependency_overrides[get_current_user] = lambda: FAKE_USER
     return app
 
 

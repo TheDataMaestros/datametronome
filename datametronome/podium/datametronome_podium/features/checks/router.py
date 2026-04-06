@@ -4,8 +4,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
+from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.features.checks.model import Check
 from datametronome_podium.features.checks.repo import CheckRepo
@@ -38,6 +39,7 @@ async def get_checks(
     clef_id: str | None = None,
     started_after: datetime | None = None,
     started_before: datetime | None = None,
+    _user: dict = Depends(get_current_user),
 ):
     executor = get_executor()
     # Build dynamic query with filters
@@ -86,7 +88,7 @@ async def get_checks(
 
 
 @router.get("/{check_id}", response_model=CheckResponse)
-async def get_check(check_id: str):
+async def get_check(check_id: str, _user: dict = Depends(get_current_user)):
     repo = _repo()
     check = await repo.get(check_id)
     if not check:
@@ -101,7 +103,7 @@ async def get_check(check_id: str):
 
 
 @router.post("/", response_model=CheckResponse, status_code=201)
-async def create_check(check_in: CheckCreate):
+async def create_check(check_in: CheckCreate, _user: dict = Depends(get_current_user)):
     repo = _repo()
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     check = Check(
@@ -125,7 +127,7 @@ async def create_check(check_in: CheckCreate):
 
 
 @router.put("/{check_id}", response_model=CheckResponse)
-async def update_check(check_id: str, check_in: CheckUpdate):
+async def update_check(check_id: str, check_in: CheckUpdate, _user: dict = Depends(get_current_user)):
     repo = _repo()
     existing = await repo.get(check_id)
     if not existing:
@@ -147,7 +149,7 @@ async def update_check(check_id: str, check_in: CheckUpdate):
 
 
 @router.delete("/{check_id}", status_code=204)
-async def delete_check(check_id: str):
+async def delete_check(check_id: str, _user: dict = Depends(get_current_user)):
     repo = _repo()
     existing = await repo.get(check_id)
     if not existing:

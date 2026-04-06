@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
-from datametronome_podium.api.deps import get_current_user
+from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.features.user_memory.repo import UserMemoryRepo
 from datametronome_podium.features.user_memory.schemas import (

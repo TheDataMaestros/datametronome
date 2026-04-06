@@ -4,8 +4,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.circuit_breaker import StaveCircuitBreaker
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.features.staves.model import Stave
@@ -76,7 +77,7 @@ def _get_circuit_breaker() -> StaveCircuitBreaker | None:
 
 
 @router.get("/", response_model=list[StaveResponse])
-async def get_staves(skip: int = 0, limit: int = 100):
+async def get_staves(skip: int = 0, limit: int = 100, _user: dict = Depends(get_current_user)):
     repo = _repo()
     staves = await repo.list(limit=limit, offset=skip)
     results = []
@@ -92,12 +93,12 @@ async def get_staves(skip: int = 0, limit: int = 100):
 
 
 @router.get("/types")
-async def get_stave_types():
+async def get_stave_types(_user: dict = Depends(get_current_user)):
     return VALID_DATA_SOURCE_TYPES
 
 
 @router.get("/{stave_id}", response_model=StaveResponse)
-async def get_stave(stave_id: str):
+async def get_stave(stave_id: str, _user: dict = Depends(get_current_user)):
     repo = _repo()
     stave = await repo.get(stave_id)
     if not stave:
@@ -112,7 +113,7 @@ async def get_stave(stave_id: str):
 
 
 @router.get("/{stave_id}/delete-info")
-async def get_stave_delete_info(stave_id: str):
+async def get_stave_delete_info(stave_id: str, _user: dict = Depends(get_current_user)):
     repo = _repo()
     stave = await repo.get(stave_id)
     if not stave:
@@ -126,7 +127,7 @@ async def get_stave_delete_info(stave_id: str):
 
 
 @router.post("/", response_model=StaveResponse, status_code=201)
-async def create_stave(stave_in: StaveCreate):
+async def create_stave(stave_in: StaveCreate, _user: dict = Depends(get_current_user)):
     repo = _repo()
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     stave = Stave(
@@ -148,7 +149,7 @@ async def create_stave(stave_in: StaveCreate):
 
 
 @router.put("/{stave_id}", response_model=StaveResponse)
-async def update_stave(stave_id: str, stave_in: StaveUpdate):
+async def update_stave(stave_id: str, stave_in: StaveUpdate, _user: dict = Depends(get_current_user)):
     repo = _repo()
     existing = await repo.get(stave_id)
     if not existing:
@@ -172,7 +173,7 @@ async def update_stave(stave_id: str, stave_in: StaveUpdate):
 
 
 @router.post("/{stave_id}/unpause")
-async def unpause_stave(stave_id: str):
+async def unpause_stave(stave_id: str, _user: dict = Depends(get_current_user)):
     repo = _repo()
     stave = await repo.get(stave_id)
     if not stave:
@@ -195,7 +196,7 @@ async def unpause_stave(stave_id: str):
 
 
 @router.delete("/{stave_id}")
-async def delete_stave(stave_id: str, force: bool = False):
+async def delete_stave(stave_id: str, force: bool = False, _user: dict = Depends(get_current_user)):
     repo = _repo()
     existing = await repo.get(stave_id)
     if not existing:

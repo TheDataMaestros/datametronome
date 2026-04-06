@@ -10,6 +10,15 @@ from typing import Any
 from datametronome_podium.core.query_adapter import QueryAdapter
 
 
+def quote_identifier(name: str) -> str:
+    """Safely quote a SQL identifier to prevent injection.
+
+    Wraps the name in double-quotes (ANSI SQL standard) and escapes any
+    embedded double-quotes by doubling them.
+    """
+    return '"' + name.replace('"', '""') + '"'
+
+
 class QueryExecutor:
     """Database-agnostic query executor.
 
@@ -50,14 +59,14 @@ class QueryExecutor:
         offset: int | None = None,
     ) -> list[dict]:
         """SELECT from a single table."""
-        cols = ", ".join(columns) if columns else "*"
-        sql = f"SELECT {cols} FROM {table}"
+        cols = ", ".join(quote_identifier(c) for c in columns) if columns else "*"
+        sql = f"SELECT {cols} FROM {quote_identifier(table)}"
         params: list[Any] = []
 
         if where:
             clauses = []
             for key, value in where.items():
-                clauses.append(f"{key} = ?")
+                clauses.append(f"{quote_identifier(key)} = ?")
                 params.append(value)
             sql += " WHERE " + " AND ".join(clauses)
 
@@ -76,34 +85,34 @@ class QueryExecutor:
         """INSERT a single row. Callers must generate IDs before calling."""
         columns = list(data.keys())
         placeholders = ", ".join("?" for _ in columns)
-        col_names = ", ".join(columns)
-        sql = f"INSERT INTO {table} ({col_names}) VALUES ({placeholders})"
+        col_names = ", ".join(quote_identifier(c) for c in columns)
+        sql = f"INSERT INTO {quote_identifier(table)} ({col_names}) VALUES ({placeholders})"
         return await self.execute(sql, list(data.values()))
 
     async def update(
         self, table: str, data: dict[str, Any], where: dict[str, Any] | None = None
     ) -> int:
         """UPDATE rows in a table."""
-        set_clauses = [f"{k} = ?" for k in data.keys()]
+        set_clauses = [f"{quote_identifier(k)} = ?" for k in data.keys()]
         params = list(data.values())
-        sql = f"UPDATE {table} SET {', '.join(set_clauses)}"
+        sql = f"UPDATE {quote_identifier(table)} SET {', '.join(set_clauses)}"
 
         if where:
-            where_clauses = [f"{k} = ?" for k in where.keys()]
+            where_clauses = [f"{quote_identifier(k)} = ?" for k in where.keys()]
             sql += " WHERE " + " AND ".join(where_clauses)
             params.extend(where.values())
 
         return await self.execute(sql, params)
 
     async def delete(self, table: str, where: dict[str, Any] | None = None) -> int:
-        """DELETE rows from a table."""
-        sql = f"DELETE FROM {table}"
+        """DELETE rows from a table. Requires a WHERE clause to prevent accidental full-table deletes."""
+        if not where:
+            raise ValueError("delete() requires a where clause. Use execute() for unconditional deletes.")
+        sql = f"DELETE FROM {quote_identifier(table)}"
         params: list[Any] = []
-
-        if where:
-            clauses = [f"{k} = ?" for k in where.keys()]
-            sql += " WHERE " + " AND ".join(clauses)
-            params.extend(where.values())
+        clauses = [f"{quote_identifier(k)} = ?" for k in where.keys()]
+        sql += " WHERE " + " AND ".join(clauses)
+        params.extend(where.values())
 
         return await self.execute(sql, params)
 

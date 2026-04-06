@@ -4,8 +4,9 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 
+from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.features.clefs.model import Clef
 from datametronome_podium.features.clefs.repo import ClefRepo
@@ -29,7 +30,7 @@ def _repo() -> ClefRepo:
 
 
 @router.get("/", response_model=list[ClefResponse])
-async def get_clefs(skip: int = 0, limit: int = 100):
+async def get_clefs(skip: int = 0, limit: int = 100, _user: dict = Depends(get_current_user)):
     repo = _repo()
     clefs = await repo.list(limit=limit, offset=skip)
     results = []
@@ -45,7 +46,7 @@ async def get_clefs(skip: int = 0, limit: int = 100):
 
 
 @router.get("/types")
-async def get_check_types():
+async def get_check_types(_user: dict = Depends(get_current_user)):
     by_tier: dict[int, list] = {1: [], 2: [], 3: [], 4: []}
     check_types = []
     for name, meta in CHECK_TYPE_METADATA.items():
@@ -56,7 +57,7 @@ async def get_check_types():
 
 
 @router.get("/{clef_id}", response_model=ClefResponse)
-async def get_clef(clef_id: str):
+async def get_clef(clef_id: str, _user: dict = Depends(get_current_user)):
     repo = _repo()
     clef = await repo.get(clef_id)
     if not clef:
@@ -71,7 +72,7 @@ async def get_clef(clef_id: str):
 
 
 @router.post("/", response_model=ClefResponse, status_code=201)
-async def create_clef(clef_in: ClefCreate):
+async def create_clef(clef_in: ClefCreate, _user: dict = Depends(get_current_user)):
     repo = _repo()
     now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
     clef = Clef(
@@ -95,7 +96,7 @@ async def create_clef(clef_in: ClefCreate):
 
 
 @router.put("/{clef_id}", response_model=ClefResponse)
-async def update_clef(clef_id: str, clef_in: ClefUpdate):
+async def update_clef(clef_id: str, clef_in: ClefUpdate, _user: dict = Depends(get_current_user)):
     repo = _repo()
     existing = await repo.get(clef_id)
     if not existing:
@@ -117,7 +118,7 @@ async def update_clef(clef_id: str, clef_in: ClefUpdate):
 
 
 @router.delete("/{clef_id}", status_code=204)
-async def delete_clef(clef_id: str):
+async def delete_clef(clef_id: str, _user: dict = Depends(get_current_user)):
     repo = _repo()
     existing = await repo.get(clef_id)
     if not existing:

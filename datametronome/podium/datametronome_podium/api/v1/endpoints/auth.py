@@ -13,7 +13,7 @@ from datametronome_podium.api.schemas.auth import (
     UserLogin,
 )
 from datametronome_podium.core.config import settings
-from datametronome_podium.core.database import execute_query, execute_write, get_db, insert_data
+from datametronome_podium.core.database import execute_query, execute_write
 from datametronome_podium.core.exceptions import AuthenticationError
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -143,32 +143,7 @@ async def login(user_credentials: UserLogin) -> dict[str, str]:
     )
     user = users[0] if users else None
 
-    if not user:
-        # Create default user for prototype
-        hashed_password = get_password_hash("admin")
-        now = datetime.now().isoformat()
-
-        user_data = {
-            "id": "admin",
-            "username": "admin",
-            "email": "admin@datametronome.dev",
-            "hashed_password": hashed_password,
-            "is_active": True,
-            "is_superuser": True,
-            "created_at": now,
-            "updated_at": now,
-        }
-
-        success = await insert_data("users", user_data)
-        if not success:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create default user",
-            )
-
-        user = user_data
-
-    if not verify_password(user_credentials.password, str(user["hashed_password"])):
+    if not user or not verify_password(user_credentials.password, str(user["hashed_password"])):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",

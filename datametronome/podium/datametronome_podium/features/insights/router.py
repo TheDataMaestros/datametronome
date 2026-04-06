@@ -5,7 +5,7 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from datametronome_podium.api.deps import get_current_user
+from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.features.insights.repo import InsightsRepo
 from datametronome_podium.features.insights.service import InsightPipelineService
