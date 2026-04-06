@@ -30,7 +30,11 @@ def _repo() -> UserMemoryRepo:
 
 def _get_user_id(current_user: dict) -> str:
     """Extract user_id from the authenticated user dict."""
-    return current_user.get("id") or current_user.get("username") or "anonymous"
+    user_id = current_user.get("id")
+    if not user_id:
+        # Refuse to proceed — falling back to a placeholder would violate FK constraints.
+        raise HTTPException(status_code=401, detail="User ID not found in authentication token")
+    return user_id
 
 
 def _dispatch_rebuild(user_id: str) -> None:

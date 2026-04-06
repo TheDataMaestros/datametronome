@@ -193,16 +193,17 @@ class UserMemoryRepo:
     async def find_conversations_needing_extraction(
         self, limit: int = 50
     ) -> list[dict]:
-        """Return idle conversations that have never been extracted or were extracted long ago.
+        """Return idle conversations where last_extracted_at is NULL or oldest.
 
-        Joins with chat_messages to only return conversations that actually have
-        user messages worth processing.
+        Reads only conversation_extraction_status — no join to chat_messages.
+        Returns at most `limit` rows, prioritizing never-extracted conversations
+        (NULL last_extracted_at comes first).
         """
         rows = await self.db.query(
             "SELECT ces.conversation_id, ces.user_id, ces.last_extracted_at "
             "FROM conversation_extraction_status ces "
             "WHERE ces.status = 'idle' "
-            "ORDER BY ces.last_extracted_at ASC NULLS FIRST "
+            "ORDER BY (ces.last_extracted_at IS NULL) DESC, ces.last_extracted_at ASC "
             "LIMIT ?",
             [limit],
         )

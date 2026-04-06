@@ -25,4 +25,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    dao.execute("ALTER TABLE users DROP COLUMN dashboard_prefs")
+    try:
+        dao.execute("ALTER TABLE users DROP COLUMN dashboard_prefs")
+    except Exception:
+        pass  # SQLite < 3.35 doesn't support DROP COLUMN

@@ -8,7 +8,7 @@ staves (data sources) and clefs (data quality checks).
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import yaml
 from datametronome_podium.models.clef import Clef
@@ -189,7 +189,7 @@ def parse_staves(yaml_data: Dict[str, Any]) -> List[Stave]:
         raise YAMLLoadError("'staves' must be a list")
 
     for i, stave_entry in enumerate(staves_data):
-        stave_data: dict[str, Any] = stave_entry  # ty: ignore[assignment]  # ty:ignore[ignore-comment-unknown-rule, invalid-assignment]
+        stave_data: dict[str, Any] = cast(dict[str, Any], stave_entry)
         try:
             # Ensure connection_config exists
             if "connection_config" not in stave_data:
@@ -240,7 +240,7 @@ def parse_clefs(
             raise YAMLLoadError("'clefs' must be a list")
 
         for i, clef_entry in enumerate(clefs_data):
-            clef_data: dict[str, Any] = clef_entry  # ty: ignore[assignment]  # ty:ignore[ignore-comment-unknown-rule, invalid-assignment]
+            clef_data: dict[str, Any] = cast(dict[str, Any], clef_entry)
             try:
                 clef = _parse_single_clef(clef_data, stave_id_map)
                 if clef:
@@ -279,7 +279,7 @@ def parse_clefs(
                 raise YAMLLoadError("'clef.checks' must be a list")
 
             for i, check_entry in enumerate(checks):
-                check_data: dict[str, Any] = check_entry  # ty: ignore[assignment]  # ty:ignore[ignore-comment-unknown-rule, invalid-assignment]
+                check_data: dict[str, Any] = cast(dict[str, Any], check_entry)
                 try:
                     # Convert nested format to flat format
                     nested_clef_data = _convert_nested_check_to_clef(
