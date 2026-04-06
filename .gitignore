@@ -328,3 +328,6 @@ ui-react/node_modules/
 
 # Internal development docs
 docs/superpowers/
+
+# Superpowers brainstorm artifacts
+.superpowers/

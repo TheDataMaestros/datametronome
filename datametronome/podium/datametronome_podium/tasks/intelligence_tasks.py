@@ -5,6 +5,7 @@ Each task acquires a per-stave Redis lock to prevent overlapping runs.
 """
 import asyncio
 import logging
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -32,16 +33,29 @@ LOCK_PREFIX = "intelligence:lock"
 LOCK_TTL = 1800  # 30 minutes
 
 
-async def _acquire_lock(redis_client, stave_id: str) -> bool:
-    """Acquire a per-stave distributed lock. Returns True if acquired."""
+async def _acquire_lock(redis_client, stave_id: str) -> str | None:
+    """Acquire a per-stave distributed lock.
+
+    Returns a unique token string on success, or None if the lock is already held.
+    The token is stored as the lock value so only the holder can release it,
+    preventing accidental releases across concurrent task retries.
+    """
     key = f"{LOCK_PREFIX}:{stave_id}"
-    return await redis_client.set(key, "1", nx=True, ex=LOCK_TTL)
+    token = uuid.uuid4().hex
+    acquired = await redis_client.set(key, token, nx=True, ex=LOCK_TTL)
+    return token if acquired else None
 
 
-async def _release_lock(redis_client, stave_id: str) -> None:
-    """Release the per-stave lock."""
+async def _release_lock(redis_client, stave_id: str, token: str) -> None:
+    """Release the per-stave lock only if the given token still matches.
+
+    This prevents a late-running task from releasing a lock that was already
+    acquired by a newer task after the TTL expired.
+    """
     key = f"{LOCK_PREFIX}:{stave_id}"
-    await redis_client.delete(key)
+    current = await redis_client.get(key)
+    if current and current.decode() == token:
+        await redis_client.delete(key)
 
 
 def _get_redis_client():
@@ -142,61 +156,14 @@ async def _prune_snapshots_async() -> dict[str, Any]:
         return {"status": "completed", "cutoff": cutoff}
 
 
-def _aggregate_weekly_snapshots(snapshots: list[dict]) -> list[dict]:
-    """Group snapshots by stave_id + ISO week, compute average metrics.
-
-    Returns list of weekly_aggregate snapshot dicts ready for insertion.
-    """
-    import json
-    from collections import defaultdict
-    from datetime import date
-
-    groups: dict[str, list[dict]] = defaultdict(list)
-    for snap in snapshots:
-        captured = snap["captured_at"][:10]  # YYYY-MM-DD
-        try:
-            d = date.fromisoformat(captured)
-            iso = d.isocalendar()
-            week_key = f"{snap['stave_id']}:{iso[0]}-W{iso[1]:02d}"
-        except (ValueError, IndexError):
-            continue
-        groups[week_key].append(snap)
-
-    aggregates: list[dict] = []
-    for key, group in groups.items():
-        stave_id = group[0]["stave_id"]
-        table_counts: dict[str, list[int]] = defaultdict(list)
-        for snap in group:
-            metrics = snap.get("table_metrics", "{}")
-            if isinstance(metrics, str):
-                metrics = json.loads(metrics)
-            for table, data in metrics.items():
-                if isinstance(data, dict):
-                    table_counts[table].append(data.get("row_count", 0))
-
-        avg_metrics = {
-            table: {"row_count": sum(counts) // len(counts), "null_rates": {}}
-            for table, counts in table_counts.items()
-        }
-
-        aggregates.append({
-            "id": f"snap-agg-{key}",
-            "stave_id": stave_id,
-            "tenant_id": "default",
-            "snapshot_type": "weekly_aggregate",
-            "table_metrics": json.dumps(avg_metrics),
-            "column_stats": "{}",
-            "captured_at": group[0]["captured_at"],
-        })
-
-    return aggregates
-
 
 async def _run_auto_scan_async(stave_id: str) -> dict[str, Any]:
     """Auto-scan implementation. Acquires lock, runs stages 1->2->3->5."""
     redis = _get_redis_client()
-    if not await _acquire_lock(redis, stave_id):
+    token = await _acquire_lock(redis, stave_id)
+    if not token:
         logger.info("Auto-scan skipped for stave %s -- lock held", stave_id)
+        await redis.aclose()
         return {"status": "skipped", "reason": "lock_held"}
     try:
         from datametronome_podium.core.worker_db import worker_db_session
@@ -221,17 +188,19 @@ async def _run_auto_scan_async(stave_id: str) -> dict[str, Any]:
         logger.error("Auto-scan pipeline failed for stave %s: %s", stave_id, exc)
         return {"status": "failed", "error": str(exc)}
     finally:
-        await _release_lock(redis, stave_id)
+        await _release_lock(redis, stave_id, token)
         await redis.aclose()
 
 
 async def _run_daily_async(stave_id: str) -> dict[str, Any]:
     """Daily intelligence implementation. Acquires lock, runs full pipeline."""
     redis = _get_redis_client()
-    if not await _acquire_lock(redis, stave_id):
+    token = await _acquire_lock(redis, stave_id)
+    if not token:
         logger.info(
             "Daily intelligence skipped for stave %s -- lock held", stave_id
         )
+        await redis.aclose()
         return {"status": "skipped", "reason": "lock_held"}
     try:
         from datametronome_podium.core.worker_db import worker_db_session
@@ -260,7 +229,7 @@ async def _run_daily_async(stave_id: str) -> dict[str, Any]:
         )
         return {"status": "failed", "error": str(exc)}
     finally:
-        await _release_lock(redis, stave_id)
+        await _release_lock(redis, stave_id, token)
         await redis.aclose()
 
 
@@ -269,7 +238,9 @@ async def _run_on_demand_async(
 ) -> dict[str, Any]:
     """On-demand analysis implementation. Acquires lock, runs stages 3->4->5."""
     redis = _get_redis_client()
-    if not await _acquire_lock(redis, stave_id):
+    token = await _acquire_lock(redis, stave_id)
+    if not token:
+        await redis.aclose()
         return {
             "status": "in_progress",
             "message": "An analysis is already running for this data source.",
@@ -301,5 +272,5 @@ async def _run_on_demand_async(
         )
         return {"status": "failed", "error": str(exc)}
     finally:
-        await _release_lock(redis, stave_id)
+        await _release_lock(redis, stave_id, token)
         await redis.aclose()

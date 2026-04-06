@@ -15,29 +15,18 @@ def test_prune_task_exists():
     assert prune_old_snapshots.name == "datametronome.prune_old_snapshots"
 
 
-def test_aggregate_weekly_snapshots():
-    """Pruning should create weekly aggregates before deleting old snapshots."""
-    from datametronome_podium.tasks.intelligence_tasks import _aggregate_weekly_snapshots
-    import json
-
-    snapshots = [
-        {"id": "s1", "stave_id": "stave-1", "table_metrics": json.dumps({"t1": {"row_count": 100}}), "captured_at": "2026-01-01T00:00:00Z"},
-        {"id": "s2", "stave_id": "stave-1", "table_metrics": json.dumps({"t1": {"row_count": 200}}), "captured_at": "2026-01-02T00:00:00Z"},
-    ]
-    result = _aggregate_weekly_snapshots(snapshots)
-    assert len(result) >= 1
-    assert result[0]["snapshot_type"] == "weekly_aggregate"
-
-
 @pytest.mark.asyncio
 async def test_acquire_lock_success():
     mock_redis = AsyncMock()
     mock_redis.set = AsyncMock(return_value=True)
-    result = await _acquire_lock(mock_redis, "stave-1")
-    assert result is True
-    mock_redis.set.assert_called_once_with(
-        "intelligence:lock:stave-1", "1", nx=True, ex=1800,
-    )
+    token = await _acquire_lock(mock_redis, "stave-1")
+    # Returns a non-empty hex token string on success
+    assert isinstance(token, str)
+    assert len(token) == 32
+    call_kwargs = mock_redis.set.call_args
+    assert call_kwargs.kwargs.get("nx") is True
+    assert call_kwargs.kwargs.get("ex") == 1800
+    assert call_kwargs.args[0] == "intelligence:lock:stave-1"
 
 
 @pytest.mark.asyncio
@@ -45,12 +34,25 @@ async def test_acquire_lock_already_held():
     mock_redis = AsyncMock()
     mock_redis.set = AsyncMock(return_value=False)
     result = await _acquire_lock(mock_redis, "stave-1")
-    assert result is False
+    # Returns None when the lock is already held
+    assert result is None
 
 
 @pytest.mark.asyncio
-async def test_release_lock():
+async def test_release_lock_when_token_matches():
     mock_redis = AsyncMock()
+    token = "abc123"
+    mock_redis.get = AsyncMock(return_value=token.encode())
     mock_redis.delete = AsyncMock(return_value=1)
-    await _release_lock(mock_redis, "stave-1")
+    await _release_lock(mock_redis, "stave-1", token)
     mock_redis.delete.assert_called_once_with("intelligence:lock:stave-1")
+
+
+@pytest.mark.asyncio
+async def test_release_lock_skipped_when_token_mismatch():
+    """Lock should not be deleted if a different task holds it (e.g. after TTL expiry)."""
+    mock_redis = AsyncMock()
+    mock_redis.get = AsyncMock(return_value=b"other-token")
+    mock_redis.delete = AsyncMock()
+    await _release_lock(mock_redis, "stave-1", "my-token")
+    mock_redis.delete.assert_not_called()

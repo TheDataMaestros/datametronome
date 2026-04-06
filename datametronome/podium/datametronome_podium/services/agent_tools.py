@@ -11,6 +11,17 @@ from datametronome_podium.core.database import get_db
 logger = logging.getLogger(__name__)
 
 
+def _quote_identifier(name: str) -> str:
+    """Safely quote a SQL identifier to prevent injection.
+
+    Wraps the name in double-quotes (ANSI SQL standard) and escapes any
+    embedded double-quotes by doubling them. This is safe for PostgreSQL,
+    SQLite, and BigQuery backtick-style names when the caller substitutes
+    the result into f-string SQL.
+    """
+    return '"' + name.replace('"', '""') + '"'
+
+
 async def list_staves(
     limit: int = 100, skip: int = 0, active_only: bool = False
 ) -> dict[str, object]:
@@ -275,12 +286,17 @@ async def get_table_sample(
 
         config = stave.connection_config if isinstance(stave.connection_config, dict) else {}
         if stave.data_source_type == "bigquery":
-            query = f"SELECT * FROM `{table_name}` LIMIT {limit}"
+            # BigQuery uses backtick quoting; escape backticks in the identifier
+            safe_table = table_name.replace("`", "")
+            query = f"SELECT * FROM `{safe_table}` LIMIT {limit}"
         elif stave.data_source_type in ["postgres", "postgresql"]:
             pg_schema = config.get("schema", "public")
-            query = f'SELECT * FROM "{pg_schema}"."{table_name}" LIMIT {limit}'
+            query = (
+                f"SELECT * FROM {_quote_identifier(pg_schema)}.{_quote_identifier(table_name)}"
+                f" LIMIT {limit}"
+            )
         else:
-            query = f"SELECT * FROM {table_name} LIMIT {limit}"
+            query = f"SELECT * FROM {_quote_identifier(table_name)} LIMIT {limit}"
 
         sample_data = await connector.query({"sql": query})
 
