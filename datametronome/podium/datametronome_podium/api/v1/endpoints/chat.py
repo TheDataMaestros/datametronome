@@ -8,14 +8,15 @@ and troubleshooting.
 
 import json
 import logging
+import re
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.config import settings
-from datametronome_podium.core.database import get_db, get_executor
+from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.metrics import record_chat_request
 from datametronome_podium.services.agent_tracing import (
     record_agent_trace,
@@ -44,12 +45,67 @@ def _user_friendly_error_detail(exc: Exception) -> str:
     return f"Failed to process chat message: {str(exc)[:200]}"
 
 
+def _parse_timestamp(raw: str | datetime | None) -> datetime | None:
+    """Normalise a raw DB timestamp value to a UTC-aware datetime.
+
+    Handles the several malformed formats that SQLite and Postgres can return:
+    - Pure Z suffix:          "2025-12-24T16:41:43Z"          → UTC datetime
+    - Offset + Z (invalid):  "2025-12-24T16:41:43+00:00Z"    → strip trailing Z
+    - Offset only:            "2025-12-24T16:41:43+00:00"     → parse as-is
+    - No TZ info:             "2025-12-24T16:41:43"           → assume UTC
+    - datetime object:        already a datetime               → ensure tz-aware
+    Returns None on any parse failure so callers can apply their own fallback.
+    """
+    if raw is None:
+        return None
+
+    if isinstance(raw, datetime):
+        if raw.tzinfo is None:
+            return raw.replace(tzinfo=timezone.utc)
+        return raw
+
+    if not isinstance(raw, str):
+        # Unexpected type — attempt coercion via str
+        raw = str(raw)
+
+    cleaned = raw.strip()
+
+    # Strip invalid "+HH:MM Z" double-suffix: keep the offset, drop trailing Z
+    if re.search(r"\+\d{1,2}:\d{2}Z$", cleaned):
+        cleaned = cleaned[:-1]  # remove trailing Z; offset is already present
+    elif cleaned.endswith("Z"):
+        cleaned = cleaned[:-1] + "+00:00"
+    elif "+" not in cleaned and (cleaned.count("-") < 4 or ":" not in cleaned[-6:]):
+        # No timezone information at all — assume UTC
+        cleaned = cleaned + "+00:00"
+
+    try:
+        dt = datetime.fromisoformat(cleaned)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt
+    except (ValueError, AttributeError):
+        return None
+
+
+def _format_timestamp_z(raw: str | datetime | None) -> str | None:
+    """Parse a raw timestamp and return an ISO-8601 string ending with 'Z'.
+
+    Used when the caller needs a serialisable string (e.g. JSON response).
+    Returns None only when the input cannot be parsed at all.
+    """
+    dt = _parse_timestamp(raw)
+    if dt is None:
+        return None
+    return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 class ToolCall(BaseModel):
     """Tool call model for agent tool calling."""
 
     id: str
     name: str
-    arguments: Dict[str, Any]
+    arguments: dict[str, Any]
 
 
 class ToolResult(BaseModel):
@@ -57,7 +113,7 @@ class ToolResult(BaseModel):
 
     callId: str
     result: Any
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class ChatMessage(BaseModel):
@@ -66,18 +122,18 @@ class ChatMessage(BaseModel):
     id: str
     role: str  # 'user', 'assistant', 'system'
     content: str
-    timestamp: Optional[datetime] = None
-    tool_calls: Optional[List[ToolCall]] = None
-    model: Optional[str] = None  # Model name that generated the response
-    finish_reason: Optional[str] = None  # Finish reason from the model
+    timestamp: datetime | None = None
+    tool_calls: list[ToolCall] | None = None
+    model: str | None = None  # Model name that generated the response
+    finish_reason: str | None = None  # Finish reason from the model
 
 
 class ChatRequest(BaseModel):
     """Chat request model."""
 
     message: str
-    conversationId: Optional[str] = None
-    context: Optional[Dict[str, Any]] = None
+    conversationId: str | None = None
+    context: dict[str, Any] | None = None
 
 
 class ChatResponse(BaseModel):
@@ -85,13 +141,13 @@ class ChatResponse(BaseModel):
 
     message: str
     conversationId: str
-    toolCalls: Optional[List[ToolCall]] = None
-    finishReason: Optional[str] = None
-    model: Optional[str] = None  # Model name that generated the response
-    intent: Optional[str] = None  # Classified intent (Phase 1 router)
-    agentType: Optional[str] = None  # Specialized agent used (Phase 2)
-    orchestrationMode: Optional[str] = None  # Phase 3: single, chain, parallel
-    agentChain: Optional[List[str]] = None  # Phase 3: agents used when mode=chain
+    toolCalls: list[ToolCall] | None = None
+    finishReason: str | None = None
+    model: str | None = None  # Model name that generated the response
+    intent: str | None = None  # Classified intent (Phase 1 router)
+    agentType: str | None = None  # Specialized agent used (Phase 2)
+    orchestrationMode: str | None = None  # Phase 3: single, chain, parallel
+    agentChain: list[str] | None = None  # Phase 3: agents used when mode=chain
 
 
 @router.post("/", response_model=ChatResponse)
@@ -139,7 +195,6 @@ async def send_chat_message(
         # Generate or use existing conversation ID
         conversation_id = request.conversationId or f"conv-{uuid.uuid4().hex[:12]}"
 
-        db = await get_db()
         # Get user identifier - users table has 'id' field
         user_id = current_user.get("id") or current_user.get("username") or "anonymous"
         logger.debug(
@@ -152,7 +207,7 @@ async def send_chat_message(
         if conversation_id:
             try:
                 logger.info(
-                    "📚 Loading conversation history for conversation_id=%s, user_id=%s",
+                    "Loading conversation history for conversation_id=%s, user_id=%s",
                     conversation_id, user_id,
                 )
                 history = await get_executor().query(
@@ -166,7 +221,7 @@ async def send_chat_message(
                     [conversation_id, user_id],
                 )
                 logger.info(
-                    "📚 Found %d messages in database for conversation %s",
+                    "Found %d messages in database for conversation %s",
                     len(history), conversation_id,
                 )
                 history_messages = []
@@ -181,18 +236,21 @@ async def send_chat_message(
                             tool_calls = json.loads(msg["tool_calls"])
                             if tool_calls:
                                 msg_dict["tool_calls"] = tool_calls
-                        except:
-                            pass
+                        except (json.JSONDecodeError, TypeError):
+                            logger.debug(
+                                "Skip invalid tool_calls JSON for message in %s",
+                                conversation_id,
+                            )
                     history_messages.append(msg_dict)
                     logger.debug(
-                        "📚 Added message to history: role=%s, content_preview=%s...",
+                        "Added message to history: role=%s, content_preview=%s...",
                         msg_dict["role"], msg_dict["content"][:50],
                     )
                 logger.info(
-                    "✅ Loaded %d messages into conversation history", len(history_messages)
+                    "Loaded %d messages into conversation history", len(history_messages)
                 )
             except Exception as e:
-                logger.error("❌ Could not load conversation history: %s", e, exc_info=True)
+                logger.error("Could not load conversation history: %s", e, exc_info=True)
 
         # Run the AI pipeline (router → sub-agents)
         agent_result = await run_chat(
@@ -207,7 +265,7 @@ async def send_chat_message(
         resolved_model = agent_result.get("model", "pydantic-ai")
 
         logger.info(
-            "📋 Intent=%s → mode=%s agents=%s",
+            "Intent=%s mode=%s agents=%s",
             intent, orchestration_mode, agent_types,
         )
 
@@ -261,32 +319,30 @@ async def send_chat_message(
         # Save user message to database
         # Get user identifier - users table has 'id' field
         user_id = current_user.get("id") or current_user.get("username") or "anonymous"
-        logger.info(
-            "💾 Saving message - user_id: %s, conversation_id: %s, user_keys: %s",
+        logger.debug(
+            "Saving messages for user_id=%s conversation_id=%s",
             user_id, conversation_id,
-            list(current_user.keys()) if isinstance(current_user, dict) else "not a dict",
         )
 
         message_id = f"msg-{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
         try:
-            await db.write(
-                [
-                    {
-                        "id": message_id,
-                        "conversation_id": conversation_id,
-                        "user_id": user_id,
-                        "role": "user",
-                        "content": request.message,
-                        "created_at": now,
-                    }
-                ],
+            await get_executor().insert(
                 "chat_messages",
+                {
+                    "id": message_id,
+                    "conversation_id": conversation_id,
+                    "user_id": user_id,
+                    "role": "user",
+                    "content": request.message,
+                    "created_at": now,
+                    "tool_calls": None,
+                },
             )
-            logger.info("✅ User message saved successfully - message_id: %s", message_id)
+            logger.info("User message saved - message_id: %s", message_id)
         except Exception as e:
-            logger.error("❌ Failed to save user message: %s", e, exc_info=True)
+            logger.error("Failed to save user message: %s", e, exc_info=True)
             raise
 
         # Track conversation for memory extraction — non-critical, extraction
@@ -307,25 +363,21 @@ async def send_chat_message(
         assistant_now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
         try:
-            await db.write(
-                [
-                    {
-                        "id": assistant_message_id,
-                        "conversation_id": conversation_id,
-                        "user_id": user_id,
-                        "role": "assistant",
-                        "content": response_message,
-                        "tool_calls": tool_calls_json,
-                        "created_at": assistant_now,
-                    }
-                ],
+            await get_executor().insert(
                 "chat_messages",
+                {
+                    "id": assistant_message_id,
+                    "conversation_id": conversation_id,
+                    "user_id": user_id,
+                    "role": "assistant",
+                    "content": response_message,
+                    "tool_calls": tool_calls_json,
+                    "created_at": assistant_now,
+                },
             )
-            logger.info(
-                "✅ Assistant message saved successfully - message_id: %s", assistant_message_id
-            )
+            logger.info("Assistant message saved - message_id: %s", assistant_message_id)
         except Exception as e:
-            logger.error("❌ Failed to save assistant message: %s", e, exc_info=True)
+            logger.error("Failed to save assistant message: %s", e, exc_info=True)
             raise
 
         # Convert tool calls to response format
@@ -382,11 +434,11 @@ async def send_chat_message(
         )
 
 
-@router.get("/conversations/{conversation_id}", response_model=List[ChatMessage])
+@router.get("/conversations/{conversation_id}", response_model=list[ChatMessage])
 async def get_conversation_history(
     conversation_id: str,
     current_user: dict = Depends(get_current_user),
-) -> List[ChatMessage]:
+) -> list[ChatMessage]:
     """
     Get conversation history for a specific conversation.
 
@@ -398,7 +450,6 @@ async def get_conversation_history(
         List of chat messages in the conversation
     """
     try:
-        db = await get_db()
         # Get user identifier - users table has 'id' field
         user_id = current_user.get("id") or current_user.get("username") or "anonymous"
         logger.debug(
@@ -409,112 +460,47 @@ async def get_conversation_history(
 
         logger.debug("Loading conversation %s for user_id: %s", conversation_id, user_id)
 
-        messages = await db.query(
-            {
-                "sql": """
-                    SELECT id, role, content, tool_calls, created_at
-                    FROM chat_messages
-                    WHERE conversation_id = ? AND user_id = ?
-                    ORDER BY created_at ASC
-                """,
-                "params": [conversation_id, user_id],
-            }
+        messages = await get_executor().query(
+            """
+            SELECT id, role, content, tool_calls, created_at
+            FROM chat_messages
+            WHERE conversation_id = ? AND user_id = ?
+            ORDER BY created_at ASC
+            """,
+            [conversation_id, user_id],
         )
 
-        logger.info("📨 Found %d messages in conversation %s", len(messages), conversation_id)
+        logger.info("Found %d messages in conversation %s", len(messages), conversation_id)
 
         # Get model name from settings for assistant messages
         model_name = settings.ai_model or "unknown"
 
         result = []
-        first_message_timestamp = None  # Store first valid timestamp as fallback
+        first_message_timestamp: datetime | None = None  # fallback for unparseable rows
 
         for idx, msg in enumerate(messages):
             tool_calls = None
             if msg.get("tool_calls"):
                 try:
                     tool_calls = json.loads(msg["tool_calls"])
-                except:
-                    pass
+                except (json.JSONDecodeError, TypeError):
+                    tool_calls = None
 
-            # Parse timestamp - handle various formats
-            timestamp = None
-            created_at = msg.get("created_at")
-            logger.debug(
-                "📅 Parsing timestamp for message %s: created_at=%s (type: %s)",
-                msg.get("id"), created_at, type(created_at),
-            )
+            timestamp = _parse_timestamp(msg.get("created_at"))
 
-            if created_at:
-                try:
-                    # Handle ISO format with or without Z
-                    if isinstance(created_at, str):
-                        # Clean up the timestamp string
-                        created_at_clean = created_at.strip()
-
-                        # Handle the case where timestamp has both +00:00 and Z (invalid format)
-                        # Example: 2025-12-24T16:41:43.558318+00:00Z
-                        # Solution: Remove the Z, keep the timezone offset
-                        if created_at_clean.endswith("Z"):
-                            # Check if there's a timezone offset (+HH:MM) before the Z
-                            # Use regex-like pattern matching: look for +HH:MM before Z
-                            import re
-
-                            # Pattern: + followed by digits, colon, digits before Z
-                            tz_pattern = r"\+(\d{1,2}):(\d{2})Z$"
-                            if re.search(tz_pattern, created_at_clean):
-                                # Has both +XX:XX and Z - remove Z, keep offset
-                                created_at_parsed = created_at_clean[:-1]
-                            else:
-                                # Only has Z, add +00:00
-                                created_at_parsed = created_at_clean[:-1] + "+00:00"
-                        elif "+" in created_at_clean or (
-                            created_at_clean.count("-") >= 4
-                            and ":" in created_at_clean[-6:]
-                        ):
-                            # Already has timezone offset, use as-is
-                            created_at_parsed = created_at_clean
-                        else:
-                            # No timezone info, assume UTC
-                            created_at_parsed = created_at_clean + "+00:00"
-
-                        timestamp = datetime.fromisoformat(created_at_parsed)
-                        # Ensure timezone-aware
-                        if timestamp.tzinfo is None:
-                            timestamp = timestamp.replace(tzinfo=timezone.utc)
-                        logger.debug("✅ Parsed timestamp: %s", timestamp.isoformat())
-                    elif isinstance(created_at, datetime):
-                        timestamp = created_at
-                        # Ensure timezone-aware
-                        if timestamp.tzinfo is None:
-                            timestamp = timestamp.replace(tzinfo=timezone.utc)
-                        logger.debug("✅ Using datetime object: %s", timestamp.isoformat())
-                except (ValueError, AttributeError) as e:
-                    logger.error(
-                        f"❌ Failed to parse timestamp '{created_at}': {e}",
-                        exc_info=True,
-                    )
-                    # Don't default to current time - this would show wrong timestamp
-                    # Instead, log error and use a sentinel value that frontend can detect
-                    timestamp = None
-
-            # If timestamp is still None, use first message's timestamp as fallback
+            # Apply fallback chain when the stored value cannot be parsed
             if timestamp is None:
                 logger.warning(
-                    f"⚠️ Message {msg.get('id')} has invalid or missing created_at field: {created_at}"
+                    "Message %s has invalid or missing created_at: %s",
+                    msg.get("id"), msg.get("created_at"),
                 )
-                # Use first message's timestamp if available, otherwise use epoch
-                if first_message_timestamp:
+                if first_message_timestamp is not None:
                     timestamp = first_message_timestamp
-                    logger.info(
-                        f"📅 Using first message timestamp as fallback: {timestamp.isoformat()}"
-                    )
                 else:
                     timestamp = datetime.fromtimestamp(0, tz=timezone.utc)
-                    logger.warning("📅 No fallback available, using epoch timestamp")
+                    logger.warning("No fallback available, using epoch timestamp")
 
-            # Store first valid timestamp for fallback
-            if first_message_timestamp is None and timestamp:
+            if first_message_timestamp is None:
                 first_message_timestamp = timestamp
 
             # Create message with all required fields
@@ -549,14 +535,11 @@ async def delete_conversation(
     Delete a conversation and all its messages for the current user.
     """
     try:
-        db = await get_db()
         user_id = current_user.get("id") or current_user.get("username") or "anonymous"
         # Check conversation exists and belongs to user
-        existing = await db.query(
-            {
-                "sql": "SELECT COUNT(*) as cnt FROM chat_messages WHERE conversation_id = ? AND user_id = ?",
-                "params": [conversation_id, user_id],
-            }
+        existing = await get_executor().query(
+            "SELECT COUNT(*) as cnt FROM chat_messages WHERE conversation_id = ? AND user_id = ?",
+            [conversation_id, user_id],
         )
         cnt = (existing[0].get("cnt", 0) or 0) if existing else 0
         if cnt == 0:
@@ -564,12 +547,12 @@ async def delete_conversation(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conversation not found or already deleted",
             )
-        await db.execute(
+        await get_executor().execute(
             "DELETE FROM chat_messages WHERE conversation_id = ? AND user_id = ?",
             [conversation_id, user_id],
         )
         logger.info(
-            "🗑️ Deleted conversation %s for user %s (%d messages)",
+            "Deleted conversation %s for user %s (%d messages)",
             conversation_id, user_id, cnt,
         )
     except HTTPException:
@@ -582,10 +565,10 @@ async def delete_conversation(
         )
 
 
-@router.get("/conversations", response_model=List[Dict[str, Any]])
+@router.get("/conversations", response_model=list[dict[str, Any]])
 async def list_conversations(
     current_user: dict = Depends(get_current_user),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     List all conversations for the current user.
 
@@ -596,7 +579,6 @@ async def list_conversations(
         List of conversations with id, title, and updatedAt
     """
     try:
-        db = await get_db()
         # Get user identifier - users table has 'id' field
         user_id = current_user.get("id") or current_user.get("username") or "anonymous"
         logger.debug(
@@ -605,48 +587,34 @@ async def list_conversations(
             list(current_user.keys()) if isinstance(current_user, dict) else "not a dict",
         )
 
-        logger.info("📋 Listing conversations for user_id: %s", user_id)
+        logger.info("Listing conversations for user_id: %s", user_id)
 
-        # First, let's check what user_ids exist in the database
-        all_users = await db.query(
-            {
-                "sql": "SELECT DISTINCT user_id FROM chat_messages",
-                "params": [],
-            }
-        )
-        logger.info("🔍 Found user_ids in database: %s", [u.get("user_id") for u in all_users])
-
-        conversations = await db.query(
-            {
-                "sql": """
-                    SELECT
-                        conversation_id as id,
-                        MAX(created_at) as updated_at,
-                        SUBSTR(
-                            (SELECT content FROM chat_messages cm2
-                             WHERE cm2.conversation_id = chat_messages.conversation_id
-                             ORDER BY cm2.created_at DESC LIMIT 1),
-                            1, 50
-                        ) as title
-                    FROM chat_messages
-                    WHERE user_id = ?
-                    GROUP BY conversation_id
-                    ORDER BY MAX(created_at) DESC
-                    LIMIT 50
-                """,
-                "params": [user_id],
-            }
+        conversations = await get_executor().query(
+            """
+            SELECT
+                conversation_id as id,
+                MAX(created_at) as updated_at,
+                SUBSTR(
+                    (SELECT content FROM chat_messages cm2
+                     WHERE cm2.conversation_id = chat_messages.conversation_id
+                     ORDER BY cm2.created_at DESC LIMIT 1),
+                    1, 50
+                ) as title
+            FROM chat_messages
+            WHERE user_id = ?
+            GROUP BY conversation_id
+            ORDER BY MAX(created_at) DESC
+            LIMIT 50
+            """,
+            [user_id],
         )
 
-        logger.info("✅ Found %d conversations for user_id: %s", len(conversations), user_id)
-
-        # Log the raw conversations for debugging
-        logger.info("📋 Raw conversations: %s", conversations)
+        logger.info("Found %d conversations for user_id: %s", len(conversations), user_id)
 
         result = []
         for conv in conversations:
-            # SQLite returns column names as-is, so check both possible names
-            # The SQL query uses MAX(created_at) as updated_at, so check for that
+            # SQLite returns column names as-is; the SQL alias is updated_at but
+            # fall back to other names just in case the driver remaps them.
             updated_at_raw = (
                 conv.get("updated_at")
                 or conv.get("updatedAt")
@@ -654,172 +622,47 @@ async def list_conversations(
                 or conv.get("createdAt")
             )
 
-            # Parse and format the timestamp properly
-            updated_at = None
-            if updated_at_raw:
-                try:
-                    # Handle datetime objects
-                    if isinstance(updated_at_raw, datetime):
-                        # Convert to UTC if timezone-aware, otherwise assume UTC
-                        if updated_at_raw.tzinfo is not None:
-                            dt_utc = updated_at_raw.astimezone(timezone.utc)
-                        else:
-                            dt_utc = updated_at_raw.replace(tzinfo=timezone.utc)
-                        # Format as ISO with Z suffix (no +00:00)
-                        updated_at = dt_utc.isoformat().replace("+00:00", "Z")
-                    # Handle string timestamps from SQLite
-                    elif isinstance(updated_at_raw, str):
-                        # Try to parse and reformat to ensure ISO format
-                        try:
-                            # Clean up the timestamp string first
-                            updated_at_clean = updated_at_raw.strip()
+            updated_at = _format_timestamp_z(updated_at_raw)
 
-                            # Check if it has both +00:00 and Z (invalid format)
-                            if (
-                                "+00:00Z" in updated_at_clean
-                                or updated_at_clean.endswith("+00:00Z")
-                            ):
-                                # Remove the Z, keep +00:00, then we'll convert to Z format
-                                updated_at_clean = updated_at_clean.replace(
-                                    "+00:00Z", "+00:00"
-                                ).replace("Z", "")
-
-                            # SQLite might return timestamps in various formats
-                            if (
-                                updated_at_clean.endswith("Z")
-                                and "+" not in updated_at_clean
-                            ):
-                                # Already in ISO format with Z (and no +00:00)
-                                updated_at = updated_at_clean
-                            elif "+" in updated_at_clean:
-                                # Has timezone info, parse and reformat
-                                dt = datetime.fromisoformat(
-                                    updated_at_clean.replace("Z", "+00:00")
-                                )
-                                updated_at = dt.isoformat().replace("+00:00", "Z")
-                            else:
-                                # No timezone, assume UTC and parse
-                                dt = datetime.fromisoformat(updated_at_clean + "+00:00")
-                                updated_at = dt.isoformat().replace("+00:00", "Z")
-                        except (ValueError, AttributeError) as e:
-                            logger.warning(
-                                f"Failed to parse updated_at '{updated_at_raw}' for conversation {conv.get('id')}: {e}"
-                            )
-                            # Don't use current time - use the raw string or epoch
-                            updated_at = updated_at_raw if updated_at_raw else None
-                    else:
-                        # Try to convert to string and parse
-                        updated_at_str = str(updated_at_raw)
-                        try:
-                            dt = datetime.fromisoformat(
-                                updated_at_str.replace("Z", "+00:00")
-                            )
-                            updated_at = dt.isoformat().replace("+00:00", "Z")
-                        except:
-                            updated_at = None
-                except Exception as e:
-                    logger.error(
-                        f"Error processing updated_at for conversation {conv.get('id')}: {e}",
-                        exc_info=True,
-                    )
-                    updated_at = None
-
-            # If no valid updated_at, try to get the first message's timestamp
+            # If MAX(created_at) came back unparseable, fetch the earliest message
+            # timestamp as a best-effort fallback before reaching epoch.
             if not updated_at:
                 conversation_id = conv.get("id") or conv.get("conversation_id", "")
                 logger.warning(
-                    f"Conversation {conversation_id} has no valid updated_at - fetching first message timestamp"
+                    "Conversation %s has no valid updated_at — fetching first message timestamp",
+                    conversation_id,
                 )
                 try:
-                    # Query the first message's timestamp for this conversation
-                    first_message = await db.query(
-                        {
-                            "sql": """
-                                SELECT created_at
-                                FROM chat_messages
-                                WHERE conversation_id = ? AND user_id = ?
-                                ORDER BY created_at ASC
-                                LIMIT 1
-                            """,
-                            "params": [conversation_id, user_id],
-                        }
+                    first_message = await get_executor().query(
+                        """
+                        SELECT created_at
+                        FROM chat_messages
+                        WHERE conversation_id = ? AND user_id = ?
+                        ORDER BY created_at ASC
+                        LIMIT 1
+                        """,
+                        [conversation_id, user_id],
                     )
-                    if first_message and len(first_message) > 0:
-                        first_msg_created_at = first_message[0].get("created_at")
-                        if first_msg_created_at:
-                            try:
-                                # Parse the first message timestamp
-                                if isinstance(first_msg_created_at, datetime):
-                                    if first_msg_created_at.tzinfo is not None:
-                                        dt_utc = first_msg_created_at.astimezone(
-                                            timezone.utc
-                                        )
-                                    else:
-                                        dt_utc = first_msg_created_at.replace(
-                                            tzinfo=timezone.utc
-                                        )
-                                    updated_at = dt_utc.isoformat().replace(
-                                        "+00:00", "Z"
-                                    )
-                                elif isinstance(first_msg_created_at, str):
-                                    # Parse string timestamp
-                                    first_msg_clean = first_msg_created_at.strip()
-
-                                    # Check if it has both +00:00 and Z (invalid format)
-                                    if (
-                                        "+00:00Z" in first_msg_clean
-                                        or first_msg_clean.endswith("+00:00Z")
-                                    ):
-                                        # Remove the Z, keep +00:00, then we'll convert to Z format
-                                        first_msg_clean = first_msg_clean.replace(
-                                            "+00:00Z", "+00:00"
-                                        ).replace("Z", "")
-
-                                    if (
-                                        first_msg_clean.endswith("Z")
-                                        and "+" not in first_msg_clean
-                                    ):
-                                        # Already in ISO format with Z (and no +00:00)
-                                        updated_at = first_msg_clean
-                                    elif "+" in first_msg_clean:
-                                        dt = datetime.fromisoformat(
-                                            first_msg_clean.replace("Z", "+00:00")
-                                        )
-                                        updated_at = dt.isoformat().replace(
-                                            "+00:00", "Z"
-                                        )
-                                    else:
-                                        dt = datetime.fromisoformat(
-                                            first_msg_clean + "+00:00"
-                                        )
-                                        updated_at = dt.isoformat().replace(
-                                            "+00:00", "Z"
-                                        )
-                                else:
-                                    # Try to convert to string and parse
-                                    dt = datetime.fromisoformat(
-                                        str(first_msg_created_at).replace("Z", "+00:00")
-                                    )
-                                    updated_at = dt.isoformat().replace("+00:00", "Z")
-                                logger.info(
-                                    f"✅ Using first message timestamp for conversation {conversation_id}: {updated_at}"
-                                )
-                            except Exception as e:
-                                logger.warning(
-                                    f"Failed to parse first message timestamp for conversation {conversation_id}: {e}"
-                                )
-                                updated_at = None
+                    if first_message:
+                        updated_at = _format_timestamp_z(
+                            first_message[0].get("created_at")
+                        )
+                        if updated_at:
+                            logger.info(
+                                "Using first message timestamp for conversation %s: %s",
+                                conversation_id, updated_at,
+                            )
                 except Exception as e:
                     logger.error(
-                        f"Error fetching first message timestamp for conversation {conversation_id}: {e}",
-                        exc_info=True,
+                        "Error fetching first message timestamp for conversation %s: %s",
+                        conversation_id, e, exc_info=True,
                     )
-                    updated_at = None
 
-            # Final fallback to epoch if we still don't have a timestamp
+            # Final fallback: epoch — frontend can detect and display "unknown date"
             if not updated_at:
                 logger.warning(
-                    f"Conversation {conv.get('id')} has no valid timestamp - using epoch as last resort"
+                    "Conversation %s has no valid timestamp — using epoch as last resort",
+                    conv.get("id"),
                 )
                 updated_at = (
                     datetime.fromtimestamp(0, tz=timezone.utc)
@@ -835,7 +678,6 @@ async def list_conversations(
                 }
             )
 
-        logger.info("📤 Returning conversations: %s", result)
         return result
 
     except Exception as e:

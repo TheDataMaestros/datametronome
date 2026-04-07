@@ -7,9 +7,9 @@ This service tracks job execution history and calculates health metrics.
 import logging
 import uuid
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from datametronome_podium.core.database import get_db
+from datametronome_podium.core.database import get_executor
 
 logger = logging.getLogger(__name__)
 
@@ -23,10 +23,10 @@ class JobExecution:
         job_id: str,
         clef_id: str,
         status: str,  # 'success', 'failure', 'retry'
-        execution_time: Optional[float] = None,
-        error_message: Optional[str] = None,
-        started_at: Optional[datetime] = None,
-        completed_at: Optional[datetime] = None,
+        execution_time: float | None = None,
+        error_message: str | None = None,
+        started_at: datetime | None = None,
+        completed_at: datetime | None = None,
     ):
         self.id = id
         self.job_id = job_id
@@ -37,7 +37,7 @@ class JobExecution:
         self.started_at = started_at or datetime.now(timezone.utc)
         self.completed_at = completed_at
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for database storage."""
         return {
             "id": self.id,
@@ -53,17 +53,17 @@ class JobExecution:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "JobExecution":
+    def from_dict(cls, data: dict[str, Any]) -> "JobExecution":
         """Create from dictionary loaded from database."""
 
-        def parse_datetime(dt_str: Optional[str]) -> Optional[datetime]:
+        def parse_datetime(dt_str: str | None) -> datetime | None:
             if not dt_str:
                 return None
             try:
                 if dt_str.endswith("Z"):
                     dt_str = dt_str[:-1] + "+00:00"
                 return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-            except:
+            except (ValueError, TypeError, OSError):
                 return None
 
         return cls(
@@ -91,8 +91,8 @@ class JobHealthMetrics:
         total_failures: int,
         consecutive_failures: int,
         health_status: str,  # 'healthy', 'degraded', 'failing'
-        last_success: Optional[datetime] = None,
-        last_failure: Optional[datetime] = None,
+        last_success: datetime | None = None,
+        last_failure: datetime | None = None,
     ):
         self.job_id = job_id
         self.clef_id = clef_id
@@ -105,7 +105,7 @@ class JobHealthMetrics:
         self.last_success = last_success
         self.last_failure = last_failure
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary."""
         return {
             "job_id": self.job_id,
@@ -129,9 +129,9 @@ async def record_job_execution(
     job_id: str,
     clef_id: str,
     status: str,
-    execution_time: Optional[float] = None,
-    error_message: Optional[str] = None,
-) -> Optional[str]:
+    execution_time: float | None = None,
+    error_message: str | None = None,
+) -> str | None:
     """
     Record a job execution in the database.
 
@@ -161,20 +161,20 @@ async def record_job_execution(
             completed_at=completed_at,
         )
 
-        db = await get_db()
-        await db.write([execution.to_dict()], "job_executions")
+        executor = get_executor()
+        await executor.insert("job_executions", execution.to_dict())
 
-        logger.debug(f"Recorded job execution: {execution_id} for job {job_id}")
+        logger.debug("Recorded job execution: %s for job %s", execution_id, job_id)
         return execution_id
 
     except Exception as e:
-        logger.error(f"Failed to record job execution: {e}")
+        logger.error("Failed to record job execution: %s", e)
         return None
 
 
 async def get_job_execution_history(
     job_id: str, limit: int = 100, offset: int = 0
-) -> List[JobExecution]:
+) -> list[JobExecution]:
     """
     Get execution history for a job.
 
@@ -187,29 +187,27 @@ async def get_job_execution_history(
         List of JobExecution objects
     """
     try:
-        db = await get_db()
-        results = await db.query(
-            {
-                "sql": """
-                SELECT * FROM job_executions
-                WHERE job_id = ?
-                ORDER BY started_at DESC
-                LIMIT ? OFFSET ?
+        executor = get_executor()
+        results = await executor.query(
+            """
+            SELECT * FROM job_executions
+            WHERE job_id = ?
+            ORDER BY started_at DESC
+            LIMIT ? OFFSET ?
             """,
-                "params": [job_id, limit, offset],
-            }
+            [job_id, limit, offset],
         )
 
         return [JobExecution.from_dict(row) for row in results]
 
     except Exception as e:
-        logger.error(f"Failed to get job execution history for {job_id}: {e}")
+        logger.error("Failed to get job execution history for %s: %s", job_id, e)
         return []
 
 
 async def calculate_job_health_metrics(
     job_id: str, lookback_days: int = 30
-) -> Optional[JobHealthMetrics]:
+) -> JobHealthMetrics | None:
     """
     Calculate health metrics for a job based on execution history.
 
@@ -221,22 +219,20 @@ async def calculate_job_health_metrics(
         JobHealthMetrics or None if no executions found
     """
     try:
-        db = await get_db()
+        executor = get_executor()
 
         # Get executions from the last N days
         cutoff_date = (
             datetime.now(timezone.utc) - timedelta(days=lookback_days)
         ).isoformat() + "Z"
 
-        results = await db.query(
-            {
-                "sql": """
-                SELECT * FROM job_executions
-                WHERE job_id = ? AND started_at >= ?
-                ORDER BY started_at DESC
+        results = await executor.query(
+            """
+            SELECT * FROM job_executions
+            WHERE job_id = ? AND started_at >= ?
+            ORDER BY started_at DESC
             """,
-                "params": [job_id, cutoff_date],
-            }
+            [job_id, cutoff_date],
         )
 
         if not results:
@@ -301,13 +297,13 @@ async def calculate_job_health_metrics(
         )
 
     except Exception as e:
-        logger.error(f"Failed to calculate health metrics for {job_id}: {e}")
+        logger.error("Failed to calculate health metrics for %s: %s", job_id, e)
         return None
 
 
 async def get_failing_jobs(
     consecutive_failure_threshold: int = 3,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Get list of jobs that are currently failing.
 
@@ -318,11 +314,11 @@ async def get_failing_jobs(
         List of job information dictionaries
     """
     try:
-        db = await get_db()
+        executor = get_executor()
 
         # Get all jobs
-        jobs = await db.query(
-            {"sql": "SELECT * FROM scheduler_jobs WHERE enabled = TRUE", "params": []}
+        jobs = await executor.query(
+            "SELECT * FROM scheduler_jobs WHERE enabled = TRUE", []
         )
 
         failing_jobs = []
@@ -351,5 +347,5 @@ async def get_failing_jobs(
         return failing_jobs
 
     except Exception as e:
-        logger.error(f"Failed to get failing jobs: {e}")
+        logger.error("Failed to get failing jobs: %s", e)
         return []

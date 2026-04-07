@@ -33,9 +33,9 @@ slowapi>=0.1.9
 # YAML configuration
 pyyaml>=6.0
 
-Faker
-watchdog
-apscheduler
+# Faker is used in production by the generate-data endpoint (not just for tests)
+Faker>=22.0.0
+watchdog>=4.0.0
 
 # HTTP client (used by existing endpoints)
 httpx>=0.25.0
@@ -52,4 +52,5 @@ sqlalchemy>=2.0.0
 aiosqlite>=0.20.0
 
 # Observability (tracing, spans, evals) - Pydantic Logfire
-logfire[fastapi,httpx]>=0.20.0
+# 4.31+ pulls OpenTelemetry versions compatible with logfire imports (ReadableLogRecord chain)
+logfire[fastapi,httpx]>=4.31.0

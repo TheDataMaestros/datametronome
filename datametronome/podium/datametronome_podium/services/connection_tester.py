@@ -11,7 +11,7 @@ import logging
 import sqlite3
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional, cast
+from typing import Any, cast
 
 from datametronome_podium.models.stave import Stave
 
@@ -29,7 +29,7 @@ class ConnectionTester:
     def __init__(self):
         self.timeout = 10  # seconds
 
-    async def test_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def test_connection(self, stave: Stave) -> dict[str, Any]:
         """
         Test connection to a stave's data source.
 
@@ -70,7 +70,7 @@ class ConnectionTester:
 
         except Exception as e:
             connection_time = time.time() - start_time
-            logger.error(f"Connection test failed for {stave.name}: {e}")
+            logger.error("Connection test failed for %s: %s", stave.name, e)
             return {
                 "success": False,
                 "message": f"Connection test failed: {str(e)}",
@@ -151,7 +151,7 @@ class ConnectionTester:
         await connector.connect()
         return connector
 
-    async def _test_postgres_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def _test_postgres_connection(self, stave: Stave) -> dict[str, Any]:
         """Test PostgreSQL connection using DataPulse."""
         try:
             # Import DataPulse PostgreSQL read-only connector
@@ -214,7 +214,7 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_mysql_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def _test_mysql_connection(self, stave: Stave) -> dict[str, Any]:
         """Test MySQL connection."""
         try:
             # Import here to avoid dependency issues if mysql-connector is not installed
@@ -275,7 +275,7 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_sqlite_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def _test_sqlite_connection(self, stave: Stave) -> dict[str, Any]:
         """Test SQLite connection using DataPulse."""
         try:
             # Import DataPulse SQLite read-only connector
@@ -334,7 +334,7 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_redis_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def _test_redis_connection(self, stave: Stave) -> dict[str, Any]:
         """Test Redis connection."""
         try:
             # Import here to avoid dependency issues if redis is not installed
@@ -381,7 +381,7 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_mongodb_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def _test_mongodb_connection(self, stave: Stave) -> dict[str, Any]:
         """Test MongoDB connection."""
         try:
             # Import here to avoid dependency issues if pymongo is not installed
@@ -427,7 +427,7 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_bigquery_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def _test_bigquery_connection(self, stave: Stave) -> dict[str, Any]:
         """Test BigQuery connection using DataPulse."""
         try:
             # Import DataPulse BigQuery read-only connector
@@ -501,7 +501,7 @@ class ConnectionTester:
 
                 except Exception as e:
                     error_msg = str(e)
-                    logger.warning(f"Could not list tables for dataset {dataset}: {e}")
+                    logger.warning("Could not list tables for dataset %s: %s", dataset, e)
 
                     # Provide helpful guidance for common errors
                     if "404" in error_msg or "Not found" in error_msg:
@@ -550,7 +550,7 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_api_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def _test_api_connection(self, stave: Stave) -> dict[str, Any]:
         """Test API/HTTP connection."""
         try:
             # Import here to avoid dependency issues if requests is not installed
@@ -599,5 +599,5 @@ class ConnectionTester:
 
             size_bytes = os.path.getsize(file_path)
             return size_bytes / (1024 * 1024)
-        except:
+        except OSError:
             return 0.0

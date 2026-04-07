@@ -10,16 +10,53 @@ import logging
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-from datametronome_podium.core.database import get_db
+from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.query import quote_identifier
+from datametronome_podium.models.stave import Stave
 from datametronome_podium.services import data_generator
 from datametronome_podium.services.connection_tester import ConnectionTester
 from datametronome_podium.services.stave_service import deserialize_stave
 from fastapi import APIRouter, HTTPException, Query, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Preview endpoint caps rows (count is reused as LIMIT; keep tight for safety).
+_PREVIEW_MAX_ROWS = 500
+
+
+def _bigquery_preview_table_ref(config: dict, table_name: str) -> str:
+    """Backtick-quoted table id for BigQuery Standard SQL (not ANSI double-quotes)."""
+    tn = (table_name or "").strip()
+    if not tn or "`" in tn:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid table name",
+        )
+    if "." in tn:
+        ref = tn
+    else:
+        ds = config.get("dataset")
+        if not ds:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="For BigQuery use dataset.table or set dataset in the stave config",
+            )
+        ref = f"{ds}.{tn}"
+    return "`" + ref.replace("`", "``") + "`"
+
+
+async def _load_stave_deserialized(stave_id: str) -> Stave:
+    """Load a stave row from Podium DB and deserialize, or raise 404."""
+    rows = await get_executor().query(
+        "SELECT * FROM staves WHERE id = ?", [stave_id]
+    )
+    if not rows:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Stave not found"
+        )
+    return deserialize_stave(rows[0])
 
 
 @router.post("/{stave_id}/test-connection")
@@ -48,19 +85,7 @@ async def test_stave_connection(stave_id: str) -> Dict[str, Any]:
         }
     """
     try:
-        # Get the stave from database
-        db = await get_db()
-        staves = await db.query(
-            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [stave_id]}
-        )
-
-        if not staves:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Stave not found"
-            )
-
-        # Deserialize the stave
-        stave = deserialize_stave(staves[0])
+        stave = await _load_stave_deserialized(stave_id)
 
         # Test the connection
         tester = ConnectionTester()
@@ -83,7 +108,7 @@ async def test_stave_connection(stave_id: str) -> Dict[str, Any]:
 
 class GenerateDataRequest(BaseModel):
     table_name: str
-    count: int = 100
+    count: int = Field(default=100, ge=1, le=500_000)
 
 
 @router.post("/{stave_id}/generate-data")
@@ -98,21 +123,11 @@ async def generate_sample_data(
     start_time = datetime.now(timezone.utc)
 
     try:
-        # Get the stave from database
-        db = await get_db()
-        staves = await db.query(
-            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [stave_id]}
-        )
-        if not staves:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Stave not found"
-            )
-
-        stave = deserialize_stave(staves[0])
+        stave = await _load_stave_deserialized(stave_id)
         table_name = request.table_name
         count = request.count
         logger.info(
-            "🔄 Starting data generation for stave %s, table %s, count %d",
+            "Starting data generation for stave %s, table %s, count %d",
             stave_id, table_name, count,
         )
 
@@ -163,7 +178,7 @@ async def generate_sample_data(
                 detail=f"Unsupported table '{table_name}' for data generation. Supported: users, products, orders, clicks",
             )
 
-        logger.info("📊 Generated %d %s records", len(data), table_name)
+        logger.info("Generated %d %s records", len(data), table_name)
 
         # Try to insert the data into the stave's database
         inserted_count = 0
@@ -185,7 +200,7 @@ async def generate_sample_data(
                 success = await connector.write(data, table_name)
                 inserted_count = len(data) if success else 0
                 await connector.close()
-                logger.info("✅ Successfully inserted %d records into %s", inserted_count, table_name)
+                logger.info("Successfully inserted %d records into %s", inserted_count, table_name)
             elif stave.data_source_type == "bigquery":
                 from metronome_pulse_bigquery import BigQueryPulse  # type: ignore
 
@@ -203,17 +218,17 @@ async def generate_sample_data(
                 await connector.write(data, table_name)
                 inserted_count = len(data)
                 await connector.close()
-                logger.info("✅ Successfully inserted %d records into %s", inserted_count, table_name)
+                logger.info("Successfully inserted %d records into %s", inserted_count, table_name)
             else:
                 logger.info(
-                    "⏭️  Skipping data insertion for %s (not implemented yet)",
+                    "Skipping data insertion for %s (not implemented yet)",
                     stave.data_source_type,
                 )
 
         except Exception as e:
-            logger.warning("⚠️ Could not insert data into stave database: %s", e)
+            logger.warning("Could not insert data into stave database: %s", e)
             logger.info(
-                "📝 Data was generated but not inserted (this is expected for some stave types)"
+                "Data was generated but not inserted (this is expected for some stave types)"
             )
             # Don't fail the request if we can't insert - the data generation itself is valuable
 
@@ -221,7 +236,7 @@ async def generate_sample_data(
         execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
 
         logger.info(
-            "🎉 Data generation completed for %s: %d generated, %d inserted, %.2fs",
+            "Data generation completed for %s: %d generated, %d inserted, %.2fs",
             table_name, len(data), inserted_count, execution_time,
         )
 
@@ -250,7 +265,7 @@ async def generate_sample_data(
     except Exception as e:
         execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
         logger.error(
-            "❌ Data generation failed for stave %s, table %s: %s",
+            "Data generation failed for stave %s, table %s: %s",
             stave_id, table_name, e, exc_info=True,
         )
         raise HTTPException(
@@ -270,21 +285,11 @@ async def preview_stave_data(
     This endpoint fetches a sample of data from the specified table for preview purposes.
     """
     try:
-        # Get the stave from database
-        db = await get_db()
-        staves = await db.query(
-            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [stave_id]}
-        )
-        if not staves:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Stave not found"
-            )
-
-        stave = deserialize_stave(staves[0])
+        stave = await _load_stave_deserialized(stave_id)
         table_name = request.table_name
-        limit = request.count  # Using count as limit for preview
+        limit = min(request.count, _PREVIEW_MAX_ROWS)
 
-        logger.info("🔍 Previewing data from stave %s, table %s, limit %d", stave_id, table_name, limit)
+        logger.info("Previewing data from stave %s, table %s, limit %d", stave_id, table_name, limit)
 
         # Try to fetch data from the stave's database
         try:
@@ -318,9 +323,12 @@ async def preview_stave_data(
                 )
                 await connector.connect()
 
-                # Query for sample data
+                bq_tbl = _bigquery_preview_table_ref(config, table_name)
                 data = await connector.query(
-                    f"SELECT * FROM {quote_identifier(table_name)} LIMIT {limit}"
+                    {
+                        "sql": f"SELECT * FROM {bq_tbl} LIMIT @lim",
+                        "named_parameters": {"lim": int(limit)},
+                    }
                 )
                 await connector.close()
             elif stave.data_source_type in ["postgres", "postgresql"]:
@@ -336,9 +344,10 @@ async def preview_stave_data(
                 )
                 await connector.connect()
 
-                # Query for sample data
-                data = await connector.query(
-                    f"SELECT * FROM {quote_identifier(table_name)} LIMIT {limit}"
+                qtbl = quote_identifier(table_name)
+                data = await connector.query_with_params(
+                    f"SELECT * FROM {qtbl} LIMIT $1",
+                    [limit],
                 )
                 await connector.close()
             else:
@@ -347,7 +356,7 @@ async def preview_stave_data(
                     detail=f"Preview not implemented for {stave.data_source_type} yet",
                 )
 
-            logger.info("📊 Retrieved %d records from %s", len(data) if data else 0, table_name)
+            logger.info("Retrieved %d records from %s", len(data) if data else 0, table_name)
 
             return {
                 "success": True,
@@ -362,7 +371,7 @@ async def preview_stave_data(
             }
 
         except Exception as e:
-            logger.warning("⚠️ Could not fetch data from table %s: %s", table_name, e)
+            logger.warning("Could not fetch data from table %s: %s", table_name, e)
 
             # If table doesn't exist or query fails, return helpful message
             if "no such table" in str(e).lower():
@@ -381,7 +390,7 @@ async def preview_stave_data(
         raise
     except Exception as e:
         logger.error(
-            "❌ Data preview failed for stave %s, table %s: %s",
+            "Data preview failed for stave %s, table %s: %s",
             stave_id, table_name, e, exc_info=True,
         )
         raise HTTPException(
@@ -444,7 +453,7 @@ async def _ensure_table_exists(connector, table_name: str):
             return
 
         await connector.execute(create_sql, [])
-        logger.info("✅ Ensured table %s exists", table_name)
+        logger.info("Ensured table %s exists", table_name)
 
     except Exception as e:
         logger.warning("Could not ensure table %s exists: %s", table_name, e)
@@ -496,20 +505,9 @@ async def list_stave_tables(
     """
     connector = None
     try:
-        # Get the stave from database
-        db = await get_db()
-        staves = await db.query(
-            {"sql": "SELECT * FROM staves WHERE id = ?", "params": [stave_id]}
-        )
+        stave = await _load_stave_deserialized(stave_id)
 
-        if not staves:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND, detail="Stave not found"
-            )
-
-        stave = deserialize_stave(staves[0])
-
-        logger.info("🔍 Listing tables for stave %s (%s)", stave_id, stave.data_source_type)
+        logger.info("Listing tables for stave %s (%s)", stave_id, stave.data_source_type)
 
         # Get connector based on stave type
         tester = ConnectionTester()
@@ -558,7 +556,7 @@ async def list_stave_tables(
 
             tables.append(table_info)
 
-        logger.info("📊 Found %d tables in stave %s", len(tables), stave_id)
+        logger.info("Found %d tables in stave %s", len(tables), stave_id)
 
         return {
             "success": True,
@@ -572,7 +570,7 @@ async def list_stave_tables(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error("❌ Failed to list tables for stave %s: %s", stave_id, e, exc_info=True)
+        logger.error("Failed to list tables for stave %s: %s", stave_id, e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to list tables",

@@ -8,9 +8,9 @@ allowing jobs to survive service restarts.
 import logging
 import uuid
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any
 
-from datametronome_podium.core.database import get_db
+from datametronome_podium.core.database import get_executor
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +24,12 @@ class SchedulerJob:
         clef_id: str,
         schedule: str,
         enabled: bool = True,
-        last_run_time: Optional[datetime] = None,
-        next_run_time: Optional[datetime] = None,
+        last_run_time: datetime | None = None,
+        next_run_time: datetime | None = None,
         execution_count: int = 0,
         failure_count: int = 0,
-        created_at: Optional[datetime] = None,
-        updated_at: Optional[datetime] = None,
+        created_at: datetime | None = None,
+        updated_at: datetime | None = None,
     ):
         self.id = id
         self.clef_id = clef_id
@@ -42,7 +42,7 @@ class SchedulerJob:
         self.created_at = created_at or datetime.now(timezone.utc)
         self.updated_at = updated_at or datetime.now(timezone.utc)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for database storage."""
         return {
             "id": self.id,
@@ -62,10 +62,10 @@ class SchedulerJob:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "SchedulerJob":
+    def from_dict(cls, data: dict[str, Any]) -> "SchedulerJob":
         """Create from dictionary loaded from database."""
 
-        def parse_datetime(dt_str: Optional[str]) -> Optional[datetime]:
+        def parse_datetime(dt_str: str | None) -> datetime | None:
             if not dt_str:
                 return None
             try:
@@ -73,7 +73,7 @@ class SchedulerJob:
                 if dt_str.endswith("Z"):
                     dt_str = dt_str[:-1] + "+00:00"
                 return datetime.fromisoformat(dt_str.replace("Z", "+00:00"))
-            except:
+            except (ValueError, TypeError, OSError):
                 return None
 
         return cls(
@@ -101,22 +101,30 @@ async def save_scheduler_job(job: SchedulerJob) -> bool:
         True if successful, False otherwise
     """
     try:
-        db = await get_db()
+        executor = get_executor()
         job_data = job.to_dict()
 
-        # Use replace semantics to avoid UNIQUE constraint errors on id and to keep
-        # writes serialized via the write connector lock.
-        await db.write([job_data], "scheduler_jobs", config={"type": "replace"})
+        # Upsert: insert the job, updating all columns on conflict with the primary key.
+        # This replaces the old db.write(..., config={"type": "replace"}) semantics.
+        columns = list(job_data.keys())
+        col_names = ", ".join(f'"{c}"' for c in columns)
+        placeholders = ", ".join("?" for _ in columns)
+        updates = ", ".join(f'"{c}" = EXCLUDED."{c}"' for c in columns if c != "id")
+        sql = (
+            f"INSERT INTO scheduler_jobs ({col_names}) VALUES ({placeholders})"
+            f" ON CONFLICT (id) DO UPDATE SET {updates}"
+        )
+        await executor.execute(sql, list(job_data.values()))
 
-        logger.debug(f"Saved scheduler job: {job.id}")
+        logger.debug("Saved scheduler job: %s", job.id)
         return True
 
     except Exception as e:
-        logger.error(f"Failed to save scheduler job {job.id}: {e}")
+        logger.error("Failed to save scheduler job %s: %s", job.id, e)
         return False
 
 
-async def get_scheduler_job(job_id: str) -> Optional[SchedulerJob]:
+async def get_scheduler_job(job_id: str) -> SchedulerJob | None:
     """
     Get a scheduler job by ID.
 
@@ -127,9 +135,9 @@ async def get_scheduler_job(job_id: str) -> Optional[SchedulerJob]:
         SchedulerJob or None if not found
     """
     try:
-        db = await get_db()
-        results = await db.query(
-            {"sql": "SELECT * FROM scheduler_jobs WHERE id = ?", "params": [job_id]}
+        executor = get_executor()
+        results = await executor.query(
+            "SELECT * FROM scheduler_jobs WHERE id = ?", [job_id]
         )
 
         if results:
@@ -137,11 +145,11 @@ async def get_scheduler_job(job_id: str) -> Optional[SchedulerJob]:
         return None
 
     except Exception as e:
-        logger.error(f"Failed to get scheduler job {job_id}: {e}")
+        logger.error("Failed to get scheduler job %s: %s", job_id, e)
         return None
 
 
-async def get_scheduler_job_by_clef_id(clef_id: str) -> Optional[SchedulerJob]:
+async def get_scheduler_job_by_clef_id(clef_id: str) -> SchedulerJob | None:
     """
     Get a scheduler job by clef ID.
 
@@ -152,12 +160,9 @@ async def get_scheduler_job_by_clef_id(clef_id: str) -> Optional[SchedulerJob]:
         SchedulerJob or None if not found
     """
     try:
-        db = await get_db()
-        results = await db.query(
-            {
-                "sql": "SELECT * FROM scheduler_jobs WHERE clef_id = ?",
-                "params": [clef_id],
-            }
+        executor = get_executor()
+        results = await executor.query(
+            "SELECT * FROM scheduler_jobs WHERE clef_id = ?", [clef_id]
         )
 
         if results:
@@ -165,11 +170,11 @@ async def get_scheduler_job_by_clef_id(clef_id: str) -> Optional[SchedulerJob]:
         return None
 
     except Exception as e:
-        logger.error(f"Failed to get scheduler job for clef {clef_id}: {e}")
+        logger.error("Failed to get scheduler job for clef %s: %s", clef_id, e)
         return None
 
 
-async def get_all_scheduler_jobs(enabled_only: bool = False) -> List[SchedulerJob]:
+async def get_all_scheduler_jobs(enabled_only: bool = False) -> list[SchedulerJob]:
     """
     Get all scheduler jobs.
 
@@ -180,24 +185,19 @@ async def get_all_scheduler_jobs(enabled_only: bool = False) -> List[SchedulerJo
         List of SchedulerJob objects
     """
     try:
-        db = await get_db()
+        executor = get_executor()
 
         if enabled_only:
-            results = await db.query(
-                {
-                    "sql": "SELECT * FROM scheduler_jobs WHERE enabled = TRUE",
-                    "params": [],
-                }
+            results = await executor.query(
+                "SELECT * FROM scheduler_jobs WHERE enabled = TRUE", []
             )
         else:
-            results = await db.query(
-                {"sql": "SELECT * FROM scheduler_jobs", "params": []}
-            )
+            results = await executor.query("SELECT * FROM scheduler_jobs", [])
 
         return [SchedulerJob.from_dict(row) for row in results]
 
     except Exception as e:
-        logger.error(f"Failed to get scheduler jobs: {e}")
+        logger.error("Failed to get scheduler jobs: %s", e)
         return []
 
 
@@ -212,23 +212,21 @@ async def delete_scheduler_job(job_id: str) -> bool:
         True if successful, False otherwise
     """
     try:
-        db = await get_db()
-        # Use db.execute (write connector) for DML to avoid leaving transactions open
-        # and to serialize writes via the SQLite write lock.
-        await db.execute("DELETE FROM scheduler_jobs WHERE id = ?", [job_id])
+        executor = get_executor()
+        await executor.execute("DELETE FROM scheduler_jobs WHERE id = ?", [job_id])
 
-        logger.debug(f"Deleted scheduler job: {job_id}")
+        logger.debug("Deleted scheduler job: %s", job_id)
         return True
 
     except Exception as e:
-        logger.error(f"Failed to delete scheduler job {job_id}: {e}")
+        logger.error("Failed to delete scheduler job %s: %s", job_id, e)
         return False
 
 
 async def update_job_run_time(
     job_id: str,
-    last_run: Optional[datetime] = None,
-    next_run: Optional[datetime] = None,
+    last_run: datetime | None = None,
+    next_run: datetime | None = None,
 ) -> bool:
     """
     Update job run times.
@@ -242,9 +240,9 @@ async def update_job_run_time(
         True if successful
     """
     try:
-        db = await get_db()
+        executor = get_executor()
         updates = []
-        params = []
+        params: list[Any] = []
 
         if last_run is not None:
             updates.append("last_run_time = ?")
@@ -262,13 +260,12 @@ async def update_job_run_time(
         params.append(job_id)
 
         sql = f"UPDATE scheduler_jobs SET {', '.join(updates)} WHERE id = ?"
-        # Use db.execute for DML so writes are committed and serialized.
-        await db.execute(sql, params)
+        await executor.execute(sql, params)
 
         return True
 
     except Exception as e:
-        logger.error(f"Failed to update job run times for {job_id}: {e}")
+        logger.error("Failed to update job run times for %s: %s", job_id, e)
         return False
 
 
@@ -284,24 +281,23 @@ async def increment_job_execution_count(job_id: str, success: bool = True) -> bo
         True if successful
     """
     try:
-        db = await get_db()
+        executor = get_executor()
 
         if success:
             sql = "UPDATE scheduler_jobs SET execution_count = execution_count + 1, updated_at = ? WHERE id = ?"
         else:
             sql = "UPDATE scheduler_jobs SET failure_count = failure_count + 1, updated_at = ? WHERE id = ?"
 
-        # Use db.execute for DML so writes are committed and serialized.
-        await db.execute(sql, [datetime.now(timezone.utc).isoformat() + "Z", job_id])
+        await executor.execute(sql, [datetime.now(timezone.utc).isoformat() + "Z", job_id])
 
         return True
 
     except Exception as e:
-        logger.error(f"Failed to increment execution count for {job_id}: {e}")
+        logger.error("Failed to increment execution count for %s: %s", job_id, e)
         return False
 
 
-async def create_scheduler_job(clef_id: str, schedule: str) -> Optional[SchedulerJob]:
+async def create_scheduler_job(clef_id: str, schedule: str) -> SchedulerJob | None:
     """
     Create a new scheduler job.
 
