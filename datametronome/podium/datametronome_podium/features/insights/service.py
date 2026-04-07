@@ -5,11 +5,11 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from datametronome_podium.archetypes import load_archetype, match_archetypes
 from datametronome_podium.core.query import QueryExecutor
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.features.insights.model import (
     BaselineSnapshot,
     DataProfile,
@@ -728,7 +728,7 @@ class InsightPipelineService:
 
 def _utc_now_iso() -> str:
     """Return current UTC time as ISO 8601 string."""
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return now_utc_iso()
 
 
 async def _list_tables_for_stave(connector: Any, stave: Any) -> list[str]:

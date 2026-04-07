@@ -13,8 +13,8 @@ import json
 from datetime import datetime
 
 import pytest
-from datametronome_podium.models.clef import SUPPORTED_CHECK_TYPES, Clef
-from datametronome_podium.models.stave import SUPPORTED_DATA_SOURCES, Stave
+from datametronome_podium.features.clefs.model import SUPPORTED_CHECK_TYPES, Clef
+from datametronome_podium.features.staves.model import SUPPORTED_DATA_SOURCES, Stave
 from datametronome_podium.services.stave_service import (
     create_clef,
     create_mysql_stave,

@@ -8,8 +8,8 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from datametronome_podium.models.clef import Clef
-from datametronome_podium.models.stave import Stave
+from datametronome_podium.features.clefs.model import Clef
+from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.services.stave_yaml_loader import (
     load_single_stave_yaml,
     load_staves_from_yaml,

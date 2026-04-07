@@ -47,7 +47,7 @@ class TestStaveRepo:
 
     @pytest.mark.asyncio
     async def test_create_stave(self, mock_executor):
-        from datametronome_podium.features.staves.model import Stave
+        from datametronome_podium.features.staves.model import StaveRow as Stave
         repo = StaveRepo(mock_executor)
         stave = Stave(
             id="1", name="pg", data_source_type="postgres",

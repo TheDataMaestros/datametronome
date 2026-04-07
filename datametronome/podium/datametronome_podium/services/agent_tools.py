@@ -2,16 +2,59 @@
 Standalone async tool functions for DataMetronome agents.
 
 These are extracted from ADKAgent and shared across all Pydantic AI sub-agents.
-Each function calls the DB directly (no HTTP) and has no runtime deps on agent state.
+Each function calls the DB via repo layer (no HTTP) and has no runtime deps on agent state.
 """
 import logging
 
 from datametronome_podium.core.database import get_executor
+from datametronome_podium.core.query import quote_identifier as _quote_identifier
+from datametronome_podium.features.checks.repo import CheckRepo
+from datametronome_podium.features.clefs.repo import ClefRepo
+from datametronome_podium.features.staves.repo import StaveRepo
 
 logger = logging.getLogger(__name__)
 
 
-from datametronome_podium.core.query import quote_identifier as _quote_identifier
+# ---------------------------------------------------------------------------
+# Serialisation helpers
+# ---------------------------------------------------------------------------
+
+
+def _serialize_stave_row(row) -> dict:
+    """Convert a StaveRow or Stave to a JSON-safe agent dict.
+
+    Accepts either type: StaveRow has string datetimes; Stave has datetime objects.
+    We normalise to ISO strings for both.
+    """
+    from datetime import datetime
+
+    from datametronome_podium.services.stave_service import deserialize_stave
+
+    # StaveRow.model_dump() yields the same shape as a raw DB dict,
+    # so deserialize_stave handles both StaveRow and raw dict inputs.
+    d = deserialize_stave(row.model_dump()).model_dump()
+    for field in ("created_at", "updated_at"):
+        if isinstance(d.get(field), datetime):
+            d[field] = d[field].isoformat()
+    return d
+
+
+def _serialize_clef_row(row) -> dict:
+    """Convert a ClefRow or Clef to a JSON-safe agent dict."""
+    from datetime import datetime
+
+    from datametronome_podium.services.stave_service import deserialize_clef
+
+    d = deserialize_clef(row.model_dump()).model_dump()
+    for field in ("created_at", "updated_at"):
+        if isinstance(d.get(field), datetime):
+            d[field] = d[field].isoformat()
+    return d
+
+
+# ---------------------------------------------------------------------------
+# Stave tools
+# ---------------------------------------------------------------------------
 
 
 async def list_staves(
@@ -25,35 +68,17 @@ async def list_staves(
         active_only: If True, return only active staves (is_active=True). Default: False (all staves)
     """
     try:
-        from datetime import datetime
-
-        from datametronome_podium.services.stave_service import deserialize_stave
-
-        executor = get_executor()
+        repo = StaveRepo(get_executor())
+        rows = await repo.list(limit=limit, offset=skip)
         if active_only:
-            staves = await executor.query(
-                "SELECT * FROM staves WHERE is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                [limit, skip],
-            )
-        else:
-            staves = await executor.query(
-                "SELECT * FROM staves ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                [limit, skip],
-            )
+            rows = [r for r in rows if r.is_active]
 
         staves_list = []
-        for stave in staves:
+        for row in rows:
             try:
-                deserialized = deserialize_stave(stave)
-                stave_dict = deserialized.model_dump()
-                if isinstance(stave_dict.get("created_at"), datetime):
-                    stave_dict["created_at"] = stave_dict["created_at"].isoformat()
-                if isinstance(stave_dict.get("updated_at"), datetime):
-                    stave_dict["updated_at"] = stave_dict["updated_at"].isoformat()
-                staves_list.append(stave_dict)
+                staves_list.append(_serialize_stave_row(row))
             except Exception as e:
-                logger.warning("Failed to deserialize stave %s: %s", stave.get('id', 'unknown'), e)
-                continue
+                logger.warning("Failed to serialize stave %s: %s", row.id, e)
 
         return {"staves": staves_list, "count": len(staves_list)}
     except Exception as e:
@@ -64,26 +89,11 @@ async def list_staves(
 async def get_stave(stave_id: str) -> dict[str, object]:
     """Get details about a specific data source (stave) by ID."""
     try:
-        from datetime import datetime
-
-        from datametronome_podium.services.stave_service import deserialize_stave
-
-        executor = get_executor()
-        staves = await executor.query(
-            "SELECT * FROM staves WHERE id = ?", [stave_id]
-        )
-
-        if not staves:
+        repo = StaveRepo(get_executor())
+        row = await repo.get(stave_id)
+        if row is None:
             return {"error": f"Stave not found: {stave_id}"}
-
-        deserialized = deserialize_stave(staves[0])
-        stave_dict = deserialized.model_dump()
-        if isinstance(stave_dict.get("created_at"), datetime):
-            stave_dict["created_at"] = stave_dict["created_at"].isoformat()
-        if isinstance(stave_dict.get("updated_at"), datetime):
-            stave_dict["updated_at"] = stave_dict["updated_at"].isoformat()
-
-        return stave_dict
+        return _serialize_stave_row(row)
     except Exception as e:
         logger.error("Error getting stave %s: %s", stave_id, e, exc_info=True)
         return {"error": f"Failed to get stave: {str(e)}"}
@@ -113,13 +123,13 @@ async def create_stave(
         import uuid
         from datetime import datetime, timezone
 
-        from datametronome_podium.services.stave_service import deserialize_stave
-
         executor = get_executor()
+        repo = StaveRepo(executor)
 
         stave_id = str(uuid.uuid4())
         now = datetime.now(timezone.utc).isoformat() + "Z"
 
+        # executor.insert expects a flat dict; connection_config is stored as JSON string
         await executor.insert("staves", {
             "id": stave_id,
             "name": name,
@@ -131,20 +141,10 @@ async def create_stave(
             "updated_at": now,
         })
 
-        staves = await executor.query(
-            "SELECT * FROM staves WHERE id = ?", [stave_id]
-        )
-        if not staves:
+        row = await repo.get(stave_id)
+        if row is None:
             return {"error": "Stave created but could not be retrieved"}
-
-        deserialized = deserialize_stave(staves[0])
-        stave_dict = deserialized.model_dump()
-        if isinstance(stave_dict.get("created_at"), datetime):
-            stave_dict["created_at"] = stave_dict["created_at"].isoformat()
-        if isinstance(stave_dict.get("updated_at"), datetime):
-            stave_dict["updated_at"] = stave_dict["updated_at"].isoformat()
-
-        return stave_dict
+        return _serialize_stave_row(row)
     except Exception as e:
         logger.error("Error creating stave: %s", e, exc_info=True)
         return {"error": f"Failed to create stave: {str(e)}"}
@@ -170,15 +170,11 @@ async def list_stave_tables(
         from datametronome_podium.services.connection_tester import ConnectionTester
         from datametronome_podium.services.stave_service import deserialize_stave
 
-        executor = get_executor()
-        staves = await executor.query(
-            "SELECT * FROM staves WHERE id = ?", [stave_id]
-        )
-
-        if not staves:
+        row = await StaveRepo(get_executor()).get(stave_id)
+        if row is None:
             return {"error": f"Stave not found: {stave_id}"}
 
-        stave = deserialize_stave(staves[0])
+        stave = deserialize_stave(row.model_dump())
 
         tester = ConnectionTester()
         connector = await tester.get_connector(stave, read_only=True)
@@ -250,15 +246,11 @@ async def get_table_sample(
         from datametronome_podium.services.connection_tester import ConnectionTester
         from datametronome_podium.services.stave_service import deserialize_stave
 
-        executor = get_executor()
-        staves = await executor.query(
-            "SELECT * FROM staves WHERE id = ?", [stave_id]
-        )
-
-        if not staves:
+        row = await StaveRepo(get_executor()).get(stave_id)
+        if row is None:
             return {"error": f"Stave not found: {stave_id}"}
 
-        stave = deserialize_stave(staves[0])
+        stave = deserialize_stave(row.model_dump())
 
         tester = ConnectionTester()
         connector = await tester.get_connector(stave, read_only=True)
@@ -350,15 +342,11 @@ async def suggest_quality_checks(
         from datametronome_podium.services.connection_tester import ConnectionTester
         from datametronome_podium.services.stave_service import deserialize_stave
 
-        executor = get_executor()
-        staves = await executor.query(
-            "SELECT * FROM staves WHERE id = ?", [stave_id]
-        )
-
-        if not staves:
+        row = await StaveRepo(get_executor()).get(stave_id)
+        if row is None:
             return {"error": f"Stave not found: {stave_id}"}
 
-        stave = deserialize_stave(staves[0])
+        stave = deserialize_stave(row.model_dump())
 
         tester = ConnectionTester()
         connector = await tester.get_connector(stave, read_only=True)
@@ -415,13 +403,13 @@ async def suggest_quality_checks(
                                         qualified_table = f"`{dataset}.{tbl_name}`"
                             else:
                                 qualified_table = f"`{tbl_name}`"
-                            query = f"SELECT * FROM {qualified_table} LIMIT {sample_limit}"
+                            sample_query = f"SELECT * FROM {qualified_table} LIMIT {sample_limit}"
                         elif stave.data_source_type in ["postgres", "postgresql"]:
-                            query = f'SELECT * FROM "{tbl_name}" LIMIT {sample_limit}'
+                            sample_query = f'SELECT * FROM "{tbl_name}" LIMIT {sample_limit}'
                         else:
-                            query = f"SELECT * FROM {tbl_name} LIMIT {sample_limit}"
+                            sample_query = f"SELECT * FROM {tbl_name} LIMIT {sample_limit}"
 
-                        sample_data = await connector.query({"sql": query})
+                        sample_data = await connector.query({"sql": sample_query})
                         if sample_data:
                             sample_analysis = _analyze_sample_data(sample_data)
                     except Exception as e:
@@ -487,6 +475,11 @@ async def suggest_quality_checks(
                 pass
 
 
+# ---------------------------------------------------------------------------
+# Clef tools
+# ---------------------------------------------------------------------------
+
+
 async def list_clefs(
     limit: int = 100,
     skip: int = 0,
@@ -502,46 +495,24 @@ async def list_clefs(
         active_only: If True, return only active clefs (is_active=True). Default: False (all clefs)
     """
     try:
-        from datetime import datetime
+        repo = ClefRepo(get_executor())
 
-        from datametronome_podium.services.stave_service import deserialize_clef
-
-        executor = get_executor()
-
-        if stave_id and active_only:
-            clefs = await executor.query(
-                "SELECT * FROM clefs WHERE stave_id = ? AND is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                [stave_id, limit, skip],
-            )
-        elif stave_id:
-            clefs = await executor.query(
-                "SELECT * FROM clefs WHERE stave_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                [stave_id, limit, skip],
-            )
-        elif active_only:
-            clefs = await executor.query(
-                "SELECT * FROM clefs WHERE is_active = TRUE ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                [limit, skip],
-            )
+        if stave_id:
+            rows = await repo.list_by_stave(stave_id)
+            # list_by_stave has no limit/offset; apply manually
+            rows = rows[skip: skip + limit]
         else:
-            clefs = await executor.query(
-                "SELECT * FROM clefs ORDER BY created_at DESC LIMIT ? OFFSET ?",
-                [limit, skip],
-            )
+            rows = await repo.list(limit=limit, offset=skip)
+
+        if active_only:
+            rows = [r for r in rows if r.is_active]
 
         clefs_list = []
-        for clef in clefs:
+        for row in rows:
             try:
-                deserialized = deserialize_clef(clef)
-                clef_dict = deserialized.model_dump()
-                if isinstance(clef_dict.get("created_at"), datetime):
-                    clef_dict["created_at"] = clef_dict["created_at"].isoformat()
-                if isinstance(clef_dict.get("updated_at"), datetime):
-                    clef_dict["updated_at"] = clef_dict["updated_at"].isoformat()
-                clefs_list.append(clef_dict)
+                clefs_list.append(_serialize_clef_row(row))
             except Exception as e:
-                logger.warning("Failed to deserialize clef %s: %s", clef.get('id', 'unknown'), e)
-                continue
+                logger.warning("Failed to serialize clef %s: %s", row.id, e)
 
         return {"clefs": clefs_list, "count": len(clefs_list)}
     except Exception as e:
@@ -552,29 +523,19 @@ async def list_clefs(
 async def get_clef(clef_id: str) -> dict[str, object]:
     """Get details about a specific quality check (clef) by ID."""
     try:
-        from datetime import datetime
-
-        from datametronome_podium.services.stave_service import deserialize_clef
-
-        executor = get_executor()
-        clefs = await executor.query(
-            "SELECT * FROM clefs WHERE id = ?", [clef_id]
-        )
-
-        if not clefs:
+        repo = ClefRepo(get_executor())
+        row = await repo.get(clef_id)
+        if row is None:
             return {"error": f"Clef not found: {clef_id}"}
-
-        deserialized = deserialize_clef(clefs[0])
-        clef_dict = deserialized.model_dump()
-        if isinstance(clef_dict.get("created_at"), datetime):
-            clef_dict["created_at"] = clef_dict["created_at"].isoformat()
-        if isinstance(clef_dict.get("updated_at"), datetime):
-            clef_dict["updated_at"] = clef_dict["updated_at"].isoformat()
-
-        return clef_dict
+        return _serialize_clef_row(row)
     except Exception as e:
         logger.error("Error getting clef %s: %s", clef_id, e, exc_info=True)
         return {"error": f"Failed to get clef: {str(e)}"}
+
+
+# ---------------------------------------------------------------------------
+# Check tools
+# ---------------------------------------------------------------------------
 
 
 async def list_checks(
@@ -585,33 +546,46 @@ async def list_checks(
 ) -> dict[str, object]:
     """List check execution results."""
     try:
+        repo = CheckRepo(get_executor())
 
-        executor = get_executor()
+        # Use specialised repo methods when a single filter matches a repo method.
+        # Fall back to raw SQL when multiple filters are combined, since the repo
+        # does not expose a multi-filter query.
+        if clef_id and not status and not stave_id:
+            checks = [c.model_dump() for c in await repo.list_by_clef(clef_id, limit=limit)]
+        elif stave_id and not status and not clef_id:
+            checks = [c.model_dump() for c in await repo.list_by_stave(stave_id, limit=limit)]
+        else:
+            # Build a filtered query for combinations the repo doesn't cover
+            executor = get_executor()
+            conditions = []
+            params: list = []
+            if status:
+                conditions.append("status = ?")
+                params.append(status)
+            if stave_id:
+                conditions.append("stave_id = ?")
+                params.append(stave_id)
+            if clef_id:
+                conditions.append("clef_id = ?")
+                params.append(clef_id)
 
-        conditions = []
-        params = []
-        if status:
-            conditions.append("status = ?")
-            params.append(status)
-        if stave_id:
-            conditions.append("stave_id = ?")
-            params.append(stave_id)
-        if clef_id:
-            conditions.append("clef_id = ?")
-            params.append(clef_id)
-
-        where_clause = " AND ".join(conditions) if conditions else "1=1"
-        params.extend([limit])
-
-        checks = await executor.query(
-            f"SELECT * FROM checks WHERE {where_clause} ORDER BY timestamp DESC LIMIT ?",
-            params,
-        )
+            where_clause = " AND ".join(conditions) if conditions else "1=1"
+            params.append(limit)
+            checks = await executor.query(
+                f"SELECT * FROM checks WHERE {where_clause} ORDER BY timestamp DESC LIMIT ?",
+                params,
+            )
 
         return {"checks": checks}
     except Exception as e:
         logger.error("Error listing checks: %s", e, exc_info=True)
         return {"error": f"Failed to list checks: {str(e)}", "checks": []}
+
+
+# ---------------------------------------------------------------------------
+# Report tools
+# ---------------------------------------------------------------------------
 
 
 async def get_summary_report(days: int = 7) -> dict[str, object]:
@@ -622,7 +596,6 @@ async def get_summary_report(days: int = 7) -> dict[str, object]:
     """
     try:
         from datetime import datetime, timedelta, timezone
-
 
         executor = get_executor()
 
@@ -666,7 +639,6 @@ async def get_quality_report(days: int = 7) -> dict[str, object]:
     """Get a quality report showing data quality metrics."""
     try:
         from datetime import datetime, timedelta, timezone
-
 
         executor = get_executor()
 

@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 
 
-FAKE_USER = {"id": "user-1", "username": "testuser", "is_active": True, "is_superuser": False}
+FAKE_USER = {"id": "user-1", "username": "testuser", "is_active": True, "role": "editor"}
 
 
 def _make_app():

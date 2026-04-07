@@ -8,7 +8,7 @@ and demonstrates the proper usage of the new structure.
 from datetime import datetime
 
 import pytest
-from datametronome_podium.models.clef import (
+from datametronome_podium.features.clefs.model import (
     CHECK_LEVEL_MAPPING,
     LEGACY_CHECK_MAPPING,
     LEVEL_1_CHECKS,
@@ -17,8 +17,8 @@ from datametronome_podium.models.clef import (
     LEVEL_4_CHECKS,
     Clef,
 )
-from datametronome_podium.models.severity import SeverityLevel
-from datametronome_podium.models.stave import Stave
+from datametronome_podium.features.checks.model import SeverityLevel
+from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.services.clef_executor import CheckResult
 
 

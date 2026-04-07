@@ -18,6 +18,7 @@ from datametronome_podium.core.celery_app import celery_app, QUEUE_DEFAULT
 from datametronome_podium.core.config import settings
 from datametronome_podium.core.query import QueryExecutor
 from datametronome_podium.core.redis import get_redis_client
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.core.worker_db import worker_db_session
 from datametronome_podium.services.clef_executor import ClefExecutor
 from datametronome_podium.services.stave_service import deserialize_clef, deserialize_stave
@@ -98,7 +99,7 @@ async def _execute_check_async(
         "status": result.status,
         "message": result.message,
         "details": json.dumps(metadata_for_storage),
-        "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        "timestamp": now_utc_iso(),
         "execution_time": result.execution_time,
         "anomalies_count": result.anomalies_count,
         "severity": result.severity.value,

@@ -1,6 +1,6 @@
 """User data access."""
 from datametronome_podium.core.query import QueryExecutor
-from datametronome_podium.features.users.model import User
+from datametronome_podium.features.users.model import UserRow as User
 
 
 class UserRepo:

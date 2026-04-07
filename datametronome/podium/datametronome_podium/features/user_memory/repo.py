@@ -2,13 +2,9 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
 
 from datametronome_podium.core.query import QueryExecutor
-
-
-def _now_utc() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 
 
 def _gen_id(prefix: str) -> str:
@@ -107,12 +103,12 @@ class UserMemoryRepo:
 
     async def update_memory(self, memory_id: str, data: dict) -> int:
         """Partial update of a memory row. Always stamps updated_at."""
-        data = {**data, "updated_at": _now_utc()}
+        data = {**data, "updated_at": now_utc_iso()}
         return await self.db.update("user_memories", data, where={"id": memory_id})
 
     async def supersede_memory(self, old_id: str, new_id: str) -> None:
         """Deactivate old_id and record which memory replaced it."""
-        now = _now_utc()
+        now = now_utc_iso()
         await self.db.update(
             "user_memories",
             {"active": 0, "superseded_by": new_id, "updated_at": now},
@@ -148,7 +144,7 @@ class UserMemoryRepo:
         now: str | None = None,
     ) -> None:
         """Insert or update the user's aggregated memory profile."""
-        ts = now or _now_utc()
+        ts = now or now_utc_iso()
         existing = await self.get_profile(user_id)
         if existing:
             await self.db.update(
@@ -220,7 +216,7 @@ class UserMemoryRepo:
 
     async def mark_extraction_done(self, conversation_id: str) -> None:
         """Reset status to idle and record extraction timestamp."""
-        now = _now_utc()
+        now = now_utc_iso()
         await self.db.execute(
             "UPDATE conversation_extraction_status "
             "SET status = 'idle', last_extracted_at = ? "

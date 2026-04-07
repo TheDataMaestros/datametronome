@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Protocol, runtime_checkable
 
+from datametronome_podium.core.timestamp_utils import now_utc_iso
+
 
 class JobStatus(Enum):
     """Status of a dispatched check job."""
@@ -103,7 +105,7 @@ class InlineDispatcher:
                 "status": result.status,
                 "message": result.message,
                 "details": json.dumps(metadata_for_storage),
-                "timestamp": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                "timestamp": now_utc_iso(),
                 "execution_time": result.execution_time,
                 "anomalies_count": result.anomalies_count,
                 "severity": result.severity.value,

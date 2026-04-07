@@ -13,7 +13,8 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ async def record_agent_trace(
 
         executor = get_executor()
         trace_id = f"trace-{uuid.uuid4().hex[:12]}"
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         preview = (
             (user_message[:MESSAGE_PREVIEW_MAX_LEN] + "...")
             if len(user_message) > MESSAGE_PREVIEW_MAX_LEN

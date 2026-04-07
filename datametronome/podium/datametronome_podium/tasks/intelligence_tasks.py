@@ -12,6 +12,7 @@ from typing import Any
 from datametronome_podium.core.celery_app import celery_app
 from datametronome_podium.core.config import settings
 from datametronome_podium.core.redis import get_redis_client
+from datametronome_podium.core.timestamp_utils import now_utc_iso, to_utc_isoformat
 
 logger = logging.getLogger(__name__)
 
@@ -129,11 +130,7 @@ async def _prune_snapshots_async() -> dict[str, Any]:
 
     from datametronome_podium.core.worker_db import worker_db_session
 
-    cutoff = (
-        (datetime.now(timezone.utc) - timedelta(days=90))
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    cutoff = to_utc_isoformat(datetime.now(timezone.utc) - timedelta(days=90))
 
     async with worker_db_session(settings.database_url) as (_, executor):
         await executor.execute(

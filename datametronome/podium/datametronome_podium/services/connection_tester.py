@@ -13,7 +13,7 @@ import time
 from datetime import datetime
 from typing import Any, cast
 
-from datametronome_podium.models.stave import Stave
+from datametronome_podium.features.staves.model import Stave
 
 logger = logging.getLogger(__name__)
 
@@ -84,72 +84,13 @@ class ConnectionTester:
 
         Callers are responsible for closing the connector when finished.
         """
-        data_source_type = (stave.data_source_type or "").lower()
-        config = stave.connection_config or {}
+        from datametronome_podium.core.connector_factory import create_connector
 
-        try:
-            if data_source_type in ["postgres", "postgresql"]:
-                if read_only:
-                    from metronome_pulse_postgres import (
-                        PostgresReadOnlyPulse as PulseClass,
-                    )
-                else:
-                    from metronome_pulse_postgres import PostgresPulse as PulseClass
-
-                connector = PulseClass(
-                    host=config["host"],
-                    port=config.get("port", 5432),
-                    database=config["database"],
-                    user=config["user"],
-                    password=config.get("password", ""),
-                )
-
-            elif data_source_type == "sqlite":
-                db_path = config.get("database_path") or config.get("path")
-                if not db_path:
-                    raise RuntimeError(
-                        "SQLite connection requires 'database_path' or 'path' in connection_config"
-                    )
-
-                if read_only:
-                    from metronome_pulse_sqlite import SQLiteReadonlyPulse as PulseClass
-                else:
-                    from metronome_pulse_sqlite import SQLitePulse as PulseClass
-
-                connector = PulseClass(db_path)
-
-            elif data_source_type == "bigquery":
-                if read_only:
-                    from metronome_pulse_bigquery import (
-                        BigQueryReadonlyPulse as PulseClass,  # type: ignore
-                    )
-                else:
-                    from metronome_pulse_bigquery import (
-                        BigQueryPulse as PulseClass,  # type: ignore
-                    )
-
-                connector = PulseClass(
-                    project_id=config["project_id"],
-                    credentials_path=config.get("credentials_path"),
-                    credentials_json=config.get("credentials_json"),
-                    dataset=config.get("dataset"),
-                    location=config.get("location", "US"),
-                )
-
-            else:
-                raise RuntimeError(
-                    f"Unsupported data source type: {stave.data_source_type}"
-                )
-
-        except KeyError as exc:
-            raise RuntimeError(f"Missing required connection field: {exc}") from exc
-        except ImportError as exc:
-            raise RuntimeError(
-                f"Required connector package is not installed: {exc.name}"
-            ) from exc
-
-        await connector.connect()
-        return connector
+        return await create_connector(
+            stave.data_source_type or "",
+            stave.connection_config or {},
+            read_only=read_only,
+        )
 
     async def _test_postgres_connection(self, stave: Stave) -> dict[str, Any]:
         """Test PostgreSQL connection using DataPulse."""

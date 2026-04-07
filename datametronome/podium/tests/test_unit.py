@@ -10,12 +10,10 @@ from typing import Any, Dict, List
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
-from datametronome_podium.models.check_run import CheckRun
-from datametronome_podium.models.clef import Clef
-from datametronome_podium.models.stave import Stave
-
-# Import the models and services for unit testing
-from datametronome_podium.models.user import User
+from datametronome_podium.features.checks.model import CheckRun
+from datametronome_podium.features.clefs.model import Clef
+from datametronome_podium.features.staves.model import Stave
+from datametronome_podium.features.users.model import User
 
 
 class TestUserModelUnit:

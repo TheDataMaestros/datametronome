@@ -8,9 +8,9 @@ Provides the persistence layer for LangGraph-style stateful orchestration:
 import json
 import logging
 import uuid
-from datetime import datetime, timezone
 
 from datametronome_podium.core.database import get_executor
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ async def create_checkpoint(
 ) -> str:
     """Create a new workflow checkpoint. Returns the checkpoint ID."""
     checkpoint_id = f"wf-{uuid.uuid4().hex[:12]}"
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = now_utc_iso()
 
     await get_executor().insert("workflow_checkpoints", {
         "id": checkpoint_id,
@@ -49,7 +49,7 @@ async def update_checkpoint(
     status: str | None = None,
 ) -> None:
     """Update a checkpoint's current state."""
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = now_utc_iso()
     set_parts = ["updated_at = ?"]
     params: list = [now]
 
@@ -95,7 +95,7 @@ async def log_event(
 ) -> None:
     """Log a workflow event (state transition, tool call, error, etc.)."""
     event_id = f"evt-{uuid.uuid4().hex[:12]}"
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = now_utc_iso()
 
     await get_executor().insert("workflow_events", {
         "id": event_id,

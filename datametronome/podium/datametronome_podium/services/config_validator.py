@@ -17,8 +17,8 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Set, Tuple
 
-from datametronome_podium.models.clef import SUPPORTED_CHECK_TYPES, Clef
-from datametronome_podium.models.stave import SUPPORTED_DATA_SOURCES, Stave
+from datametronome_podium.features.clefs.model import SUPPORTED_CHECK_TYPES, Clef
+from datametronome_podium.features.staves.model import SUPPORTED_DATA_SOURCES, Stave
 
 
 class ConfigurationIssue:

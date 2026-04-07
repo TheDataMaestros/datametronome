@@ -6,13 +6,14 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 
 def _make_mock_db(query_results: dict):
-    """Return a mock DB that returns different results per SQL keyword.
+    """Return a mock executor that returns different results per SQL keyword.
     Uses plain substring matching — keyword must be a substring of the SQL (lowercased).
+    Accepts QueryExecutor.query(sql, params) signature.
     """
-    async def mock_query(query_dict):
-        sql = query_dict.get("sql", "").lower()
+    async def mock_query(sql, params=None):
+        sql_lower = sql.lower()
         for keyword, result in query_results.items():
-            if keyword in sql:
+            if keyword in sql_lower:
                 return result
         return []
 
@@ -24,7 +25,7 @@ def _make_mock_db(query_results: dict):
 @pytest.mark.asyncio
 async def test_top_suggestions_include_stave_id_and_name():
     """top_suggestions items must have stave_id and stave_name fields."""
-    from datametronome_podium.api.v1.endpoints.metrics import _fetch_intelligence_metrics
+    from datametronome_podium.features.metrics.router import _fetch_intelligence_metrics
 
     suggestion_row = {
         "priority": "high",
@@ -56,7 +57,7 @@ async def test_top_suggestions_include_stave_id_and_name():
 @pytest.mark.asyncio
 async def test_top_suggestions_stave_name_falls_back_to_stave_id():
     """If stave_name is None/missing, fall back to stave_id."""
-    from datametronome_podium.api.v1.endpoints.metrics import _fetch_intelligence_metrics
+    from datametronome_podium.features.metrics.router import _fetch_intelligence_metrics
 
     suggestion_row = {
         "priority": "medium",
@@ -86,7 +87,7 @@ async def test_top_suggestions_stave_name_falls_back_to_stave_id():
 @pytest.mark.asyncio
 async def test_intelligence_includes_stave_health_scores_map():
     """intelligence block must include stave_health_scores: {stave_id: score}."""
-    from datametronome_podium.api.v1.endpoints.metrics import _fetch_intelligence_metrics
+    from datametronome_podium.features.metrics.router import _fetch_intelligence_metrics
 
     db = _make_mock_db({
         "avg(health_score)": [{"avg_health": 80.0, "report_count": 3}],
@@ -113,7 +114,7 @@ async def test_intelligence_includes_stave_health_scores_map():
 @pytest.mark.asyncio
 async def test_top_anomalies_include_stave_id_and_name():
     """top_anomalies items must have stave_id and stave_name fields."""
-    from datametronome_podium.api.v1.endpoints.metrics import _fetch_intelligence_metrics
+    from datametronome_podium.features.metrics.router import _fetch_intelligence_metrics
 
     anomaly = {"severity": "critical", "category": "volume", "description": "Spike", "table": "orders", "evidence": "3x baseline"}
     report_row = {
@@ -145,7 +146,7 @@ async def test_top_anomalies_include_stave_id_and_name():
 @pytest.mark.asyncio
 async def test_top_anomalies_stave_name_falls_back_to_stave_id():
     """top_anomalies stave_name falls back to stave_id when name is None."""
-    from datametronome_podium.api.v1.endpoints.metrics import _fetch_intelligence_metrics
+    from datametronome_podium.features.metrics.router import _fetch_intelligence_metrics
 
     anomaly = {"severity": "high", "category": "schema", "description": "Missing col", "table": "users", "evidence": "null"}
     report_row = {

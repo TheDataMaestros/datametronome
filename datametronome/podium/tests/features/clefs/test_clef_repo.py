@@ -51,7 +51,7 @@ class TestClefRepo:
 
     @pytest.mark.asyncio
     async def test_create_clef(self, mock_executor):
-        from datametronome_podium.features.clefs.model import Clef
+        from datametronome_podium.features.clefs.model import ClefRow as Clef
         repo = ClefRepo(mock_executor)
         clef = Clef(
             id="c1", stave_id="s1", name="Row Count",

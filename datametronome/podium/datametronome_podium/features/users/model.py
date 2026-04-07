@@ -12,8 +12,6 @@ class UserRow(BaseModel):
     email: str
     hashed_password: str
     is_active: bool = True
-    is_superuser: bool = False
-    # role is the primary RBAC control; is_superuser kept until migration 010 backfill is stable
     role: str = "viewer"
     created_at: str
     updated_at: str

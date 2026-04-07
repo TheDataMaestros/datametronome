@@ -1,26 +1,39 @@
 """Tests: sub-agents can be built and respond with TestModel.
 
-Uses a mock database to prevent real DB connections and asyncpg concurrency issues.
+Uses a mock QueryExecutor so agent_tools never calls the real DB.
 """
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 from pydantic_ai.models.test import TestModel
+
+# TestModel agent runs can exceed the default 10s CLI timeout (tool orchestration).
+pytestmark = pytest.mark.timeout(30)
 
 
 @pytest.fixture(autouse=True)
-def mock_db():
-    """Mock get_db so agent tools don't hit a real database."""
-    mock_connector = AsyncMock()
-    mock_connector.query.return_value = []
-    mock_connector.query_with_params.return_value = []
-    mock_connector.execute.return_value = 0
+def mock_executor_for_agent_tools():
+    """Patch get_executor everywhere agent_tools resolves it.
 
-    with patch(
-        "datametronome_podium.services.agent_tools.get_db",
-        new_callable=AsyncMock,
-        return_value=mock_connector,
+    Module-level `from core.database import get_executor` keeps a stale reference
+    unless we patch `agent_tools.get_executor`. Functions that import get_executor
+    inside the body need `core.database.get_executor` patched.
+    """
+    mock_executor = MagicMock()
+    mock_executor.query = AsyncMock(return_value=[])
+    mock_executor.insert = AsyncMock()
+    mock_executor.execute = AsyncMock(return_value=0)
+
+    with (
+        patch(
+            "datametronome_podium.core.database.get_executor",
+            return_value=mock_executor,
+        ),
+        patch(
+            "datametronome_podium.services.agent_tools.get_executor",
+            return_value=mock_executor,
+        ),
     ):
-        yield mock_connector
+        yield mock_executor
 
 
 @pytest.mark.asyncio

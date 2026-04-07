@@ -44,7 +44,7 @@ graph TB
     end
 
     subgraph "Processing"
-        Scheduler[APScheduler]
+        Scheduler[Celery Beat + RedBeat<br/>+ persisted jobs]
         Executor[Check Executor]
         Brain[Brain Library<br/>SARIMA / KS Drift / Isolation Forest]
     end

@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 
-from datametronome_podium.api.v1.endpoints.auth import get_current_user
+from datametronome_podium.core.auth import get_current_user
 from datametronome_podium.core.database import get_executor
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.features.user_memory.repo import UserMemoryRepo
 from datametronome_podium.features.user_memory.schemas import (
     UserMemoryCreate,
@@ -52,7 +52,7 @@ def _dispatch_rebuild(user_id: str) -> None:
 
 
 def _now_utc() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return now_utc_iso()
 
 
 def _gen_memory_id() -> str:

@@ -122,7 +122,6 @@ class DatabaseInitService:
             email TEXT UNIQUE NOT NULL,
             hashed_password TEXT NOT NULL,
             is_active BOOLEAN DEFAULT TRUE,
-            is_superuser BOOLEAN DEFAULT FALSE,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
@@ -141,7 +140,6 @@ class DatabaseInitService:
             "email": "admin@datametronome.dev",
             "hashed_password": "$2b$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewdBPj/RK.s5uO.G",  # admin
             "is_active": True,
-            "is_superuser": True,
             "created_at": now,
             "updated_at": now,
         }

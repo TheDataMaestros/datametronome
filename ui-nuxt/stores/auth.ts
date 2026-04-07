@@ -2,10 +2,38 @@ import { defineStore } from 'pinia'
 import { ref, computed, readonly } from 'vue'
 import { config, buildApiUrl } from '~/config/app'
 
+/**
+ * Session tokens live in localStorage for SPA simplicity. XSS on this origin can
+ * read them; production deployments should prefer httpOnly cookies or document the risk.
+ */
+
 export interface User {
   username: string
   email: string
   name: string
+  role?: 'admin' | 'editor' | 'viewer'
+  is_active?: boolean
+}
+
+async function fetchCurrentUser(accessToken: string): Promise<User | null> {
+  const response = await fetch(buildApiUrl('/auth/me'), {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/json',
+    },
+  })
+  if (!response.ok) {
+    return null
+  }
+  const me = await response.json()
+  const username = String(me.username ?? '')
+  return {
+    username,
+    email: String(me.email ?? ''),
+    name: username || String(me.email ?? ''),
+    role: (me.role as 'admin' | 'editor' | 'viewer') ?? 'viewer',
+    is_active: Boolean(me.is_active),
+  }
 }
 
 export interface LoginCredentials {
@@ -55,10 +83,11 @@ export const useAuthStore = defineStore('auth', () => {
       const data = await response.json()
       const authToken = data.access_token
 
-      const userData: User = {
+      const profile = await fetchCurrentUser(authToken)
+      const userData: User = profile ?? {
         username: credentials.username,
-        email: 'admin@datametronome.dev',
-        name: 'Admin User',
+        email: '',
+        name: credentials.username,
       }
 
       token.value = authToken
@@ -111,12 +140,13 @@ export const useAuthStore = defineStore('auth', () => {
     error.value = null
 
     try {
-      // Simulate API call to refresh user data
-      await new Promise((resolve) => setTimeout(resolve, 500))
-
-      // In a real app, you would call your API here
-      // const response = await apiService.get('/auth/me')
-      // user.value = response.data
+      const profile = await fetchCurrentUser(token.value)
+      if (profile) {
+        user.value = profile
+        if (process.client) {
+          localStorage.setItem('user_info', JSON.stringify(profile))
+        }
+      }
     } catch (err) {
       error.value = err instanceof Error ? err.message : 'Failed to refresh user data'
       console.error('Error refreshing user data:', err)

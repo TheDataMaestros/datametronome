@@ -5,8 +5,9 @@ from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from datametronome_podium.api.v1.endpoints.auth import get_current_user
+from datametronome_podium.core.auth import get_current_user
 from datametronome_podium.core.database import get_executor
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.features.insights.repo import InsightsRepo
 from datametronome_podium.features.insights.service import InsightPipelineService
 
@@ -212,7 +213,6 @@ async def assign_suggestion(
     current_user: Dict[str, Any] = Depends(get_current_user),  # noqa: ARG001 — enforces auth
 ):
     """Assign a suggestion to a user and create a notification."""
-    from datetime import datetime, timezone
     repo = _repo()
     sug = await repo.get_suggestion(suggestion_id)
     if not sug:
@@ -224,7 +224,7 @@ async def assign_suggestion(
     # Create notification for the assignee
     user = await repo.get_user_by_username(body.assigned_to)
     if user:
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         notif = Notification(
             id=f"notif-{uuid.uuid4().hex[:12]}",
             user_id=user["id"],
@@ -244,8 +244,6 @@ async def assign_suggestion(
 @router.post("/{stave_id}/suggestions/{suggestion_id}/accept")
 async def accept_suggestion(stave_id: str, suggestion_id: str):
     """Accept an insight suggestion. Auto-creates a clef if AI included a check_spec."""
-    from datetime import datetime, timezone
-
     repo = _repo()
     sug = await repo.get_suggestion(suggestion_id)
     if not sug:
@@ -257,7 +255,7 @@ async def accept_suggestion(stave_id: str, suggestion_id: str):
     check_created = False
     if sug.check_spec:
         try:
-            now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            now = now_utc_iso()
             service = InsightPipelineService(executor=get_executor())
             await service._create_check_from_spec(
                 stave_id, sug.report_id, sug.check_spec, now

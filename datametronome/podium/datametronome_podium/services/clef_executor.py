@@ -18,17 +18,17 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from datametronome_podium.models.check_run import CheckRun
-from datametronome_podium.models.clef import Clef
-from datametronome_podium.models.severity import (
+from datametronome_podium.features.checks.model import (
+    CheckRun,
     SeverityConfig,
     SeverityLevel,
     SeverityThreshold,
     evaluate_severity,
 )
-from datametronome_podium.models.stave import Stave
+from datametronome_podium.features.clefs.model import Clef
+from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.core.query import quote_identifier
-from datametronome_podium.services.connection_tester import ConnectionTester
+from datametronome_podium.core.connector_factory import create_connector
 
 try:
     from datametronome_brain_base.forecasting import SarimaForecaster  # type: ignore
@@ -149,8 +149,11 @@ class ClefExecutor:
 
         try:
             if connector is None:
-                tester = ConnectionTester()
-                connector = await tester.get_connector(stave, read_only=True)
+                connector = await create_connector(
+                    stave.data_source_type or "",
+                    stave.connection_config or {},
+                    read_only=True,
+                )
                 managed_connector = True
 
             logger.info(f"Executing clef '{clef.name}' on stave '{stave.name}'")
@@ -2305,8 +2308,11 @@ async def execute_stave_clefs(
     managed_connector = False
 
     if connector is None:
-        tester = ConnectionTester()
-        connector = await tester.get_connector(stave, read_only=True)
+        connector = await create_connector(
+            stave.data_source_type or "",
+            stave.connection_config or {},
+            read_only=True,
+        )
         managed_connector = True
 
     try:

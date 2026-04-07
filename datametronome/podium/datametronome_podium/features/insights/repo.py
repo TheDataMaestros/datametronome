@@ -5,6 +5,7 @@ import json
 from datetime import datetime, timezone, timedelta
 
 from datametronome_podium.core.query import QueryExecutor
+from datametronome_podium.core.timestamp_utils import now_utc_iso, to_utc_isoformat
 from datametronome_podium.features.insights.model import (
     BusinessReport,
     DataProfile,
@@ -95,7 +96,7 @@ class InsightsRepo:
         for field in (*_PROFILE_JSON_FIELDS, "previous_classification"):
             if field in data and not isinstance(data[field], str):
                 data[field] = _json_field(data[field])
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         data["updated_at"] = now
         return await self.db.update(
             "data_profiles", data, where={"stave_id": stave_id}
@@ -112,11 +113,7 @@ class InsightsRepo:
     async def list_snapshots(
         self, stave_id: str, days: int = 7, limit: int = 100
     ) -> list[BaselineSnapshot]:
-        cutoff = (
-            (datetime.now(timezone.utc) - timedelta(days=days))
-            .isoformat()
-            .replace("+00:00", "Z")
-        )
+        cutoff = to_utc_isoformat(datetime.now(timezone.utc) - timedelta(days=days))
         rows = await self.db.query(
             "SELECT * FROM baseline_snapshots "
             "WHERE stave_id = ? AND captured_at >= ? "
@@ -215,7 +212,7 @@ class InsightsRepo:
     async def update_suggestion_status(
         self, suggestion_id: str, status: str, dismiss_reason: str | None = None
     ) -> int:
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         data: dict = {"status": status, "resolved_at": now}
         if dismiss_reason is not None:
             data["dismiss_reason"] = dismiss_reason
@@ -230,7 +227,7 @@ class InsightsRepo:
         )
         if not rows or rows[0].get("read_at"):
             return 0  # already read or not found
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         return await self.db.update(
             "insight_suggestions",
             {"read_at": now, "read_by": username},
@@ -240,7 +237,7 @@ class InsightsRepo:
     async def assign_suggestion(
         self, suggestion_id: str, assigned_to: str
     ) -> int:
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         return await self.db.update(
             "insight_suggestions",
             {"assigned_to": assigned_to, "assigned_at": now},
@@ -270,7 +267,7 @@ class InsightsRepo:
         return [Notification(**dict(row)) for row in rows]
 
     async def mark_notification_read(self, notification_id: str) -> int:
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         return await self.db.update(
             "notifications", {"read_at": now}, where={"id": notification_id}
         )
