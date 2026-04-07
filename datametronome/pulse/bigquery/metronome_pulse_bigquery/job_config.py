@@ -2,10 +2,7 @@
 
 from typing import Any
 
-try:
-    from google.cloud import bigquery
-except ImportError:  # pragma: no cover
-    bigquery = None  # type: ignore
+from google.cloud import bigquery  # type: ignore
 
 
 def build_query_job_config(
@@ -17,9 +14,6 @@ def build_query_job_config(
     Use **named** when SQL uses ``@param`` (e.g. ``LIMIT @lim``). Use **positional**
     for legacy anonymous parameters (ScalarQueryParameter with name None).
     """
-    if bigquery is None:
-        raise RuntimeError("google-cloud-bigquery is not installed")
-
     query_parameters: list = []
 
     if named:
