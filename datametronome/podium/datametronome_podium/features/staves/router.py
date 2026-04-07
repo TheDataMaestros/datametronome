@@ -9,7 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from datametronome_podium.api.v1.endpoints.auth import get_current_user
 from datametronome_podium.core.circuit_breaker import StaveCircuitBreaker
 from datametronome_podium.core.database import get_executor
-from datametronome_podium.features.staves.model import Stave
+from datametronome_podium.core.redis import get_redis_client
+from datametronome_podium.features.staves.model import StaveRow as Stave
 from datametronome_podium.features.staves.repo import StaveRepo
 from datametronome_podium.features.staves.schema import StaveCreate, StaveUpdate, StaveResponse
 
@@ -18,18 +19,6 @@ router = APIRouter()
 VALID_DATA_SOURCE_TYPES = [
     "postgres", "mysql", "mongodb", "sqlite", "redis", "snowflake", "bigquery"
 ]
-
-_redis_client = None
-
-
-def _get_or_create_redis_client():
-    """Return a cached Redis client, creating one on first call."""
-    global _redis_client
-    if _redis_client is None:
-        import redis.asyncio as aioredis
-        from datametronome_podium.core.config import settings
-        _redis_client = aioredis.from_url(settings.redis_url)
-    return _redis_client
 
 
 def _dispatch_auto_scan(stave_id: str) -> None:
@@ -70,7 +59,7 @@ def _repo() -> StaveRepo:
 def _get_circuit_breaker() -> StaveCircuitBreaker | None:
     """Get circuit breaker if Redis is available. Returns None otherwise."""
     try:
-        client = _get_or_create_redis_client()
+        client = get_redis_client()
         return StaveCircuitBreaker(redis_client=client, executor=get_executor())
     except Exception:
         return None

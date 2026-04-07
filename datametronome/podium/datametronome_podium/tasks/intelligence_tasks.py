@@ -11,6 +11,7 @@ from typing import Any
 
 from datametronome_podium.core.celery_app import celery_app
 from datametronome_podium.core.config import settings
+from datametronome_podium.core.redis import get_redis_client
 
 logger = logging.getLogger(__name__)
 
@@ -57,12 +58,6 @@ async def _release_lock(redis_client, stave_id: str, token: str) -> None:
     if current and current.decode() == token:
         await redis_client.delete(key)
 
-
-def _get_redis_client():
-    """Lazy Redis client for intelligence tasks."""
-    import redis.asyncio as aioredis
-
-    return aioredis.from_url(settings.redis_url)
 
 
 @celery_app.task(
@@ -159,7 +154,7 @@ async def _prune_snapshots_async() -> dict[str, Any]:
 
 async def _run_auto_scan_async(stave_id: str) -> dict[str, Any]:
     """Auto-scan implementation. Acquires lock, runs stages 1->2->3->5."""
-    redis = _get_redis_client()
+    redis = get_redis_client()
     token = await _acquire_lock(redis, stave_id)
     if not token:
         logger.info("Auto-scan skipped for stave %s -- lock held", stave_id)
@@ -194,7 +189,7 @@ async def _run_auto_scan_async(stave_id: str) -> dict[str, Any]:
 
 async def _run_daily_async(stave_id: str) -> dict[str, Any]:
     """Daily intelligence implementation. Acquires lock, runs full pipeline."""
-    redis = _get_redis_client()
+    redis = get_redis_client()
     token = await _acquire_lock(redis, stave_id)
     if not token:
         logger.info(
@@ -237,7 +232,7 @@ async def _run_on_demand_async(
     stave_id: str, conversation_id: str | None
 ) -> dict[str, Any]:
     """On-demand analysis implementation. Acquires lock, runs stages 3->4->5."""
-    redis = _get_redis_client()
+    redis = get_redis_client()
     token = await _acquire_lock(redis, stave_id)
     if not token:
         await redis.aclose()

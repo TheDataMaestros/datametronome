@@ -17,29 +17,19 @@ from typing import Any
 from datametronome_podium.core.celery_app import celery_app, QUEUE_DEFAULT
 from datametronome_podium.core.config import settings
 from datametronome_podium.core.query import QueryExecutor
+from datametronome_podium.core.redis import get_redis_client
 from datametronome_podium.core.worker_db import worker_db_session
 from datametronome_podium.services.clef_executor import ClefExecutor
 from datametronome_podium.services.stave_service import deserialize_clef, deserialize_stave
 
 logger = logging.getLogger(__name__)
 
-_redis_client = None
-
-
-def _get_or_create_redis_client():
-    """Return a cached Redis client, creating one on first call."""
-    global _redis_client
-    if _redis_client is None:
-        import redis.asyncio as aioredis
-        _redis_client = aioredis.from_url(settings.redis_url)
-    return _redis_client
-
 
 def _get_circuit_breaker(executor):
     """Create a circuit breaker if Redis is available."""
     try:
         from datametronome_podium.core.circuit_breaker import StaveCircuitBreaker
-        client = _get_or_create_redis_client()
+        client = get_redis_client()
         return StaveCircuitBreaker(redis_client=client, threshold=5, executor=executor)
     except Exception:
         return None
