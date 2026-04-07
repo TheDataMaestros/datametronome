@@ -34,6 +34,7 @@ async def create_default_admin(executor: QueryExecutor) -> None:
             "hashed_password": get_password_hash("admin"),
             "is_active": True,
             "is_superuser": True,
+            "role": "admin",
             "created_at": "2025-01-01T00:00:00Z",
             "updated_at": "2025-01-01T00:00:00Z",
         })
