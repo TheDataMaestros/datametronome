@@ -134,7 +134,6 @@ async def register(user_data: UserCreate) -> dict[str, str]:
         "email": user_data.email,
         "hashed_password": hashed_password,
         "is_active": True,
-        "is_superuser": False,
         "created_at": now,
         "updated_at": now,
     }
@@ -188,7 +187,7 @@ async def get_current_user_info(
         "username": current_user["username"],
         "email": current_user["email"],
         "is_active": current_user["is_active"],
-        "is_superuser": current_user["is_superuser"],
+        "role": current_user.get("role", "viewer"),
         "dashboard_prefs": prefs,
     }
 
@@ -223,6 +222,6 @@ async def patch_current_user(
         "username": current_user["username"],
         "email": current_user["email"],
         "is_active": current_user["is_active"],
-        "is_superuser": current_user["is_superuser"],
+        "role": current_user.get("role", "viewer"),
         "dashboard_prefs": prefs_to_save,
     }
