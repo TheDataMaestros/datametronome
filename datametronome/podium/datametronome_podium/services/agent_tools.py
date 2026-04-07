@@ -608,7 +608,7 @@ async def list_checks(
             params,
         )
 
-        return checks
+        return {"checks": checks}
     except Exception as e:
         logger.error("Error listing checks: %s", e, exc_info=True)
         return {"error": f"Failed to list checks: {str(e)}", "checks": []}
