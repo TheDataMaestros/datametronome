@@ -1,101 +1,74 @@
 """
 Authentication endpoints for DataMetronome Podium.
+
+Route handlers only (login, register, /me, PATCH /me).
+Core auth utilities (get_current_user, create_access_token, security) live in
+datametronome_podium.core.auth so all feature routers can import from one place.
 """
 
 import json
-from datetime import datetime, timedelta, timezone
+import logging
+import sqlite3
 from typing import Any
+
+from pydantic import BaseModel
 
 from datametronome_podium.api.schemas.auth import (
     Token,
-    TokenData,
     UserCreate,
     UserLogin,
 )
-from datametronome_podium.core.config import settings
+from datametronome_podium.core.auth import (
+    create_access_token,
+    get_current_user,
+    security,
+)
 from datametronome_podium.core.database import get_executor
-from datametronome_podium.core.exceptions import AuthenticationError
 from datametronome_podium.core.security import get_password_hash, verify_password
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import ExpiredSignatureError, JWTError, jwt
 
 router = APIRouter()
-security = HTTPBearer()
+logger = logging.getLogger(__name__)
 
 
-def create_access_token(
-    data: dict[str, Any], expires_delta: timedelta | None = None
-) -> str:
-    """Create a JWT access token.
-
-    Args:
-        data: Data to encode in the token.
-        expires_delta: Token expiration time.
-
-    Returns:
-        JWT token string.
-    """
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(
-            minutes=settings.access_token_expire_minutes
-        )
-
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(
-        to_encode, settings.secret_key, algorithm=settings.algorithm
-    )
-    return encoded_jwt
+class DashboardPrefs(BaseModel):
+    pinned_staves: list[str] = []
 
 
-async def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-) -> dict[str, Any]:
-    """Get current authenticated user.
+class PatchUserRequest(BaseModel):
+    dashboard_prefs: DashboardPrefs
 
-    Args:
-        credentials: HTTP authorization credentials.
 
-    Returns:
-        Current user instance.
-
-    Raises:
-        AuthenticationError: If authentication fails.
-    """
+def _pg_unique_violation(exc: BaseException | None) -> bool:
+    """Postgres unique violation (asyncpg or SQLSTATE 23505)."""
+    if exc is None:
+        return False
     try:
-        token = credentials.credentials
-        payload = jwt.decode(
-            token, settings.secret_key, algorithms=[settings.algorithm]
-        )
-        username: str = payload.get("sub")
-        if username is None:
-            raise AuthenticationError("Invalid token")
-        token_data = TokenData(username=username)
-    except ExpiredSignatureError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired. Please log in again.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token. Please log in again.",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        import asyncpg
 
-    # Query user from database — exclude hashed_password from default return
-    users = await get_executor().query("SELECT * FROM users WHERE username = ?", [username])
-    if not users:
-        raise AuthenticationError("User not found")
+        if isinstance(exc, asyncpg.exceptions.UniqueViolationError):
+            return True
+    except ImportError:
+        pass
+    if getattr(exc, "sqlstate", None) == "23505":
+        return True
+    return False
 
-    user = dict(users[0])
-    # Store password hash separately for verify_password, strip from returned dict
-    user["_hashed_password"] = user.pop("hashed_password", "")
-    return user
+
+def _is_duplicate_user_insert(exc: BaseException) -> bool:
+    """True if the insert failed only because of a uniqueness constraint."""
+    if _pg_unique_violation(exc):
+        return True
+    bc = exc.__cause__
+    if isinstance(bc, BaseException) and _pg_unique_violation(bc):
+        return True
+    if isinstance(exc, sqlite3.IntegrityError):
+        return "unique" in str(exc).lower()
+    if isinstance(bc, sqlite3.IntegrityError):
+        return "unique" in str(bc).lower()
+    lowered = str(exc).lower()
+    return "unique" in lowered or "duplicate" in lowered
 
 
 @router.post("/login", response_model=Token)
@@ -111,9 +84,9 @@ async def login(user_credentials: UserLogin) -> dict[str, str]:
     Raises:
         HTTPException: If authentication fails.
     """
-    # get_executor().query adapts ? to $1 for Postgres via QueryAdapter
     users = await get_executor().query(
-        "SELECT * FROM users WHERE username = ?", [user_credentials.username]
+        "SELECT username, hashed_password FROM users WHERE username = ?",
+        [user_credentials.username],
     )
     user = users[0] if users else None
 
@@ -123,10 +96,8 @@ async def login(user_credentials: UserLogin) -> dict[str, str]:
             detail="Incorrect username or password",
         )
 
-    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-    access_token = create_access_token(
-        data={"sub": user["username"]}, expires_delta=access_token_expires
-    )
+    # expires_delta omitted — create_access_token defaults to settings.access_token_expire_minutes
+    access_token = create_access_token(data={"sub": user["username"]})
 
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -145,17 +116,17 @@ async def register(user_data: UserCreate) -> dict[str, str]:
         HTTPException: If registration fails.
     """
     existing_users = await get_executor().query(
-        "SELECT * FROM users WHERE username = ?", [user_data.username]
+        "SELECT 1 FROM users WHERE username = ?", [user_data.username]
     )
     if existing_users:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_409_CONFLICT,
             detail="Username already registered",
         )
 
     # Create new user
     hashed_password = get_password_hash(user_data.password)
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = now_utc_iso()
 
     new_user_data = {
         "id": user_data.username,  # Use username as ID for simplicity
@@ -170,17 +141,24 @@ async def register(user_data: UserCreate) -> dict[str, str]:
 
     try:
         await get_executor().insert("users", new_user_data)
-    except Exception:
+    except Exception as e:
+        if _is_duplicate_user_insert(e):
+            logger.warning(
+                "Duplicate user registration (constraint): username=%s",
+                user_data.username,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Username already registered",
+            ) from e
+        logger.exception("User insert failed for username=%s", user_data.username)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create user",
-        )
+        ) from e
 
-    # Generate access token
-    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
-    access_token = create_access_token(
-        data={"sub": user_data.username}, expires_delta=access_token_expires
-    )
+    # Generate access token — expires_delta defaults to settings.access_token_expire_minutes
+    access_token = create_access_token(data={"sub": user_data.username})
 
     return {"access_token": access_token, "token_type": "bearer"}
 
@@ -217,7 +195,7 @@ async def get_current_user_info(
 
 @router.patch("/me", response_model=dict[str, Any])
 async def patch_current_user(
-    body: dict[str, Any],
+    body: PatchUserRequest,
     current_user: dict[str, Any] = Depends(get_current_user),
 ) -> dict[str, Any]:
     """Update current user preferences.
@@ -225,19 +203,8 @@ async def patch_current_user(
     Accepts: { "dashboard_prefs": { "pinned_staves": ["id1", "id2", "id3"] } }
     Replaces dashboard_prefs fully (not a merge).
     """
-    if "dashboard_prefs" not in body:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="dashboard_prefs is required",
-        )
-    new_prefs = body["dashboard_prefs"]
-    pinned = new_prefs.get("pinned_staves", [])
+    pinned = body.dashboard_prefs.pinned_staves
 
-    if not isinstance(pinned, list):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="pinned_staves must be a list",
-        )
     if len(pinned) > 3:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

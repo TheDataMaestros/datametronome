@@ -1,13 +1,14 @@
 """Checks API router."""
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 
-from datametronome_podium.api.v1.endpoints.auth import get_current_user
+from datametronome_podium.core.auth import get_current_user, require_admin, require_editor
 from datametronome_podium.core.database import get_executor
+from datametronome_podium.core.timestamp_utils import now_utc_iso, to_utc_isoformat
 from datametronome_podium.features.checks.model import Check
 from datametronome_podium.features.checks.repo import CheckRepo
 from datametronome_podium.features.checks.schema import CheckCreate, CheckUpdate, CheckResponse
@@ -17,15 +18,6 @@ router = APIRouter()
 
 def _repo() -> CheckRepo:
     return CheckRepo(get_executor())
-
-
-def _isoformat(dt: datetime | None) -> str | None:
-    if dt is None:
-        return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=timezone.utc)
-    s = dt.isoformat()
-    return s.replace("+00:00", "Z")
 
 
 @router.get("/", response_model=list[CheckResponse])
@@ -64,10 +56,10 @@ async def get_checks(
         params.append(clef_id)
     if started_after:
         conditions.append("timestamp >= ?")
-        params.append(_isoformat(started_after))
+        params.append(to_utc_isoformat(started_after))
     if started_before:
         conditions.append("timestamp <= ?")
-        params.append(_isoformat(started_before))
+        params.append(to_utc_isoformat(started_before))
 
     if conditions:
         sql += " WHERE " + " AND ".join(conditions)
@@ -103,9 +95,9 @@ async def get_check(check_id: str, _user: dict = Depends(get_current_user)):
 
 
 @router.post("/", response_model=CheckResponse, status_code=201)
-async def create_check(check_in: CheckCreate, _user: dict = Depends(get_current_user)):
+async def create_check(check_in: CheckCreate, _user: dict = Depends(require_editor)):
     repo = _repo()
-    now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    now = now_utc_iso()
     check = Check(
         id=check_in.id,
         stave_id=check_in.stave_id,
@@ -114,7 +106,7 @@ async def create_check(check_in: CheckCreate, _user: dict = Depends(get_current_
         status=check_in.status,
         message=check_in.message,
         details=json.dumps(check_in.details) if check_in.details else None,
-        timestamp=_isoformat(check_in.timestamp) or now,
+        timestamp=to_utc_isoformat(check_in.timestamp) or now,
         execution_time=check_in.execution_time,
         anomalies_count=check_in.anomalies_count,
         severity=check_in.severity,
@@ -127,7 +119,7 @@ async def create_check(check_in: CheckCreate, _user: dict = Depends(get_current_
 
 
 @router.put("/{check_id}", response_model=CheckResponse)
-async def update_check(check_id: str, check_in: CheckUpdate, _user: dict = Depends(get_current_user)):
+async def update_check(check_id: str, check_in: CheckUpdate, _user: dict = Depends(require_editor)):
     repo = _repo()
     existing = await repo.get(check_id)
     if not existing:
@@ -149,7 +141,7 @@ async def update_check(check_id: str, check_in: CheckUpdate, _user: dict = Depen
 
 
 @router.delete("/{check_id}", status_code=204)
-async def delete_check(check_id: str, _user: dict = Depends(get_current_user)):
+async def delete_check(check_id: str, _user: dict = Depends(require_admin)):
     repo = _repo()
     existing = await repo.get(check_id)
     if not existing:

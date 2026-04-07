@@ -10,10 +10,12 @@ FAKE_USER = {"id": "user-1", "username": "testuser", "is_active": True, "is_supe
 def _make_app():
     from fastapi import FastAPI
     from datametronome_podium.features.staves.router import router
-    from datametronome_podium.api.v1.endpoints.auth import get_current_user
+    from datametronome_podium.core.auth import get_current_user, require_editor
     app = FastAPI()
     app.include_router(router, prefix="/staves")
+    # Override both get_current_user and require_editor so role checks are bypassed in unit tests.
     app.dependency_overrides[get_current_user] = lambda: FAKE_USER
+    app.dependency_overrides[require_editor] = lambda: FAKE_USER
     return app
 
 
