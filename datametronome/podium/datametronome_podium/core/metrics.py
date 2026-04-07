@@ -182,26 +182,26 @@ def get_metrics_content() -> tuple[bytes, str]:
 async def update_system_metrics():
     """Update system-level metrics from database."""
     try:
-        from .database import get_db
+        from .database import get_executor
 
-        db = await get_db()
+        executor = get_executor()
 
         # Count active staves
-        staves = await db.query(
+        staves = await executor.query(
             "SELECT COUNT(*) as count FROM staves WHERE is_active = 1"
         )
         if staves:
             active_staves.set(staves[0].get("count", 0))
 
         # Count active clefs
-        clefs = await db.query(
+        clefs = await executor.query(
             "SELECT COUNT(*) as count FROM clefs WHERE is_active = 1"
         )
         if clefs:
             active_clefs.set(clefs[0].get("count", 0))
 
         # Count users
-        users = await db.query(
+        users = await executor.query(
             "SELECT COUNT(*) as count, is_active FROM users GROUP BY is_active"
         )
         for user_group in users:

@@ -5,7 +5,7 @@ Service to set up default DEMO staves on application startup.
 import logging
 import random
 
-from datametronome_podium.core.database import get_db
+from datametronome_podium.core.database import get_executor
 from datametronome_podium.services.stave_service import (
     create_clef,
     create_stave,
@@ -21,11 +21,11 @@ async def create_default_staves_and_clefs():
     Create DEMO staves and clefs for demonstration purposes.
     Loads configuration from demo-clickstream.yaml if available.
     """
-    db = await get_db()
+    executor = get_executor()
 
     # Check if DEMO staves already exist to prevent duplicates
-    existing_demo_staves = await db.query(
-        {"sql": "SELECT * FROM staves WHERE name LIKE 'DEMO-%'", "params": []}
+    existing_demo_staves = await executor.query(
+        "SELECT * FROM staves WHERE name LIKE 'DEMO-%'"
     )
     if existing_demo_staves:
         logger.info("DEMO staves already exist. Skipping creation.")
@@ -58,7 +58,7 @@ async def create_default_staves_and_clefs():
                 if "id" in stave_config:
                     demo_stave.id = stave_config["id"]
 
-                await db.write([serialize_stave(demo_stave)], "staves")
+                await executor.insert("staves", serialize_stave(demo_stave))
                 logger.info(f"✅ Created stave: {demo_stave.name}")
 
             # Create clefs
@@ -78,7 +78,7 @@ async def create_default_staves_and_clefs():
                 if "id" in clef_config:
                     demo_clef.id = clef_config["id"]
 
-                await db.write([serialize_clef(demo_clef)], "clefs")
+                await executor.insert("clefs", serialize_clef(demo_clef))
                 logger.info(f"✅ Created clef: {demo_clef.name}")
 
             logger.info("✅ Demo configuration loaded from YAML")
@@ -96,7 +96,7 @@ async def create_default_staves_and_clefs():
             connection_config={"database_path": "demo.db"},
             description="Demo stave for clickstream data (clicks table only)",
         )
-        await db.write([serialize_stave(demo_clickstream)], "staves")
+        await executor.insert("staves", serialize_stave(demo_clickstream))
         logger.info("✅ Created DEMO-Clickstream stave")
 
     # Ensure the clicks table exists in demo.db

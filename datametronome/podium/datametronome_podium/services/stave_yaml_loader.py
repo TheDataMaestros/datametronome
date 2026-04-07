@@ -21,8 +21,8 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from datametronome_podium.models.clef import Clef
-from datametronome_podium.models.stave import Stave
+from datametronome_podium.features.clefs.model import Clef
+from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.services.config_validator import (
     ConfigurationIssue,
     validate_configuration,
@@ -290,8 +290,8 @@ async def import_staves_from_yaml(
         Dict with counts: {"staves": 3, "clefs": 5}
 
     Example:
-        >>> from datametronome_podium.core.database import get_db
-        >>> db = await get_db()
+        >>> from datametronome_podium.core.database import get_executor
+        >>> db = get_executor().connector
         >>> counts = await import_staves_from_yaml("staves.yaml", db)
         >>> print(f"Imported {counts['staves']} staves, {counts['clefs']} clefs")
     """
