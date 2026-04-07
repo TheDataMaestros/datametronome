@@ -103,7 +103,7 @@ A typical authenticated API request travels through the following layers:
 HTTP Request
     |
     v
-FastAPI router  (features/{name}/router.py  or  api/v1/endpoints/{name}.py)
+FastAPI router  (features/{name}/router.py)
     |
     v
 get_current_user()  -- validates JWT, raises 401 if missing or expired
@@ -144,7 +144,7 @@ to prevent SQL injection via config-driven or user-provided identifiers.
 ## AI Agent Architecture
 
 All agent interaction enters through the chat endpoint
-(`api/v1/endpoints/chat.py`). Agents are built with Pydantic AI.
+(`features/chat/router.py`). Agents are built with Pydantic AI.
 
 ```mermaid
 sequenceDiagram
@@ -179,9 +179,8 @@ sequenceDiagram
 
 ### Agent tools
 
-All tools live in `services/agents/agent_tools.py`. They receive a DB session and
-return structured data to the calling agent. The tools currently use the legacy
-`get_db()` pattern -- migration to `get_executor()` is pending (see CLAUDE.md).
+All tools live in `services/agents/agent_tools.py`. They receive a `QueryExecutor`
+and return structured data to the calling agent.
 
 ### Dispatch modes
 
@@ -199,6 +198,7 @@ Each business domain has a self-contained slice under `features/{name}/`:
 
 ```
 features/
+  auth/         -- login, register, /me (public endpoints)
   staves/
     model.py    -- Python dataclass/Pydantic model mirroring the DB row
     repo.py     -- All SQL for this domain, via QueryExecutor
@@ -207,10 +207,35 @@ features/
   clefs/
     model.py, repo.py, schema.py, router.py
   checks/   ...
-  users/    ...
   chat/     ...
   insights/ ...
+  metrics/  ...
+  reports/  ...
+  trends/   ...
+  users/    ...
   user_memory/ ...
+```
+
+All API endpoints live in `features/*/router.py`. There is no `api/v1/endpoints/` directory.
+
+### Authorization
+
+Roles: `admin` (full access), `editor` (read + write), `viewer` (read-only).
+
+```python
+from datametronome_podium.core.auth import get_current_user, require_editor, require_admin
+
+# Read-only endpoint — any authenticated user
+@router.get("/items")
+async def list_items(user: dict = Depends(get_current_user)): ...
+
+# Write endpoint — editor or admin
+@router.post("/items")
+async def create_item(user: dict = Depends(require_editor)): ...
+
+# Admin-only endpoint
+@router.delete("/items/{id}")
+async def delete_item(user: dict = Depends(require_admin)): ...
 ```
 
 ### model.py
@@ -324,11 +349,10 @@ async with executor.transaction():
     await executor.update("clefs", {"last_run": now}, {"id": clef_id})
 ```
 
-### Migration state
+### Pattern
 
-`api/v1/endpoints/` contains complex endpoints that still call `execute_query()`
-directly (old pattern). All code in `features/` uses `get_executor()` (current
-pattern). **New code must always use `get_executor()`.**
+All application code uses `get_executor()`. **New code must always use
+`get_executor()`.** Never call `get_db()` or `execute_query()` (both removed).
 
 ---
 
@@ -403,7 +427,7 @@ singleton to prevent duplicate execution across replicas.
 | Agent tools | `datametronome_podium/services/agents/agent_tools.py` |
 | Orchestrator | `datametronome_podium/services/orchestrator.py` |
 | Feature slices | `datametronome_podium/features/{name}/` |
-| Complex legacy endpoints | `datametronome_podium/api/v1/endpoints/` |
+| Auth utilities | `datametronome_podium/core/auth.py` |
 | Celery tasks | `datametronome_podium/tasks/` |
 | Alembic migrations | `datametronome/podium/alembic/` |
 | Worker architecture detail | `docs/architecture/worker-architecture.md` |
