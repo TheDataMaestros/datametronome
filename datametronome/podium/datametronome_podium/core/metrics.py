@@ -239,46 +239,6 @@ def record_http_request(method: str, endpoint: str, status_code: int, duration: 
     )
 
 
-def record_database_query(operation: str, duration: float, success: bool = True):
-    """
-    Record database query metrics.
-
-    Args:
-        operation: Type of operation (read, write, execute)
-        duration: Query duration in seconds
-        success: Whether the query succeeded
-    """
-    status = "success" if success else "error"
-    database_queries_total.labels(operation=operation, status=status).inc()
-    database_query_duration_seconds.labels(operation=operation).observe(duration)
-
-
-def record_check_run(
-    clef_id: str,
-    duration: float,
-    status: str,
-    anomaly_count: int = 0,
-    severity: str = "medium",
-):
-    """
-    Record data quality check run metrics.
-
-    Args:
-        clef_id: ID of the clef (check configuration)
-        duration: Check run duration in seconds
-        status: Check run status (success, failed, error)
-        anomaly_count: Number of anomalies detected
-        severity: Severity level of anomalies
-    """
-    check_runs_total.labels(clef_id=clef_id, status=status).inc()
-    check_run_duration_seconds.labels(clef_id=clef_id).observe(duration)
-
-    if anomaly_count > 0:
-        anomalies_detected_total.labels(clef_id=clef_id, severity=severity).inc(
-            anomaly_count
-        )
-
-
 def record_chat_request(
     status: str,
     duration_seconds: float,
@@ -313,21 +273,3 @@ def set_component_health(component: str, is_healthy: bool):
     system_health.labels(component=component).set(1 if is_healthy else 0)
 
 
-# =============================================================================
-# Initialize default values
-# =============================================================================
-
-
-def initialize_metrics():
-    """Initialize metrics with default values."""
-    # Set initial health states
-    set_component_health("api", True)
-    set_component_health("database", False)  # Will be updated when DB connects
-    set_component_health("scheduler", False)  # Will be updated when scheduler starts
-
-    # Initialize counters
-    active_staves.set(0)
-    active_clefs.set(0)
-    scheduler_jobs.set(0)
-
-    logger.info("Prometheus metrics initialized")

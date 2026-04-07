@@ -192,14 +192,15 @@ async def generate_sample_data(
                 )
                 connector = SQLitePulse(db_path)
                 await connector.connect()
+                try:
+                    # Create table if it doesn't exist
+                    await _ensure_table_exists(connector, table_name)
 
-                # Create table if it doesn't exist
-                await _ensure_table_exists(connector, table_name)
-
-                # Insert the data
-                success = await connector.write(data, table_name)
-                inserted_count = len(data) if success else 0
-                await connector.close()
+                    # Insert the data
+                    success = await connector.write(data, table_name)
+                    inserted_count = len(data) if success else 0
+                finally:
+                    await connector.close()
                 logger.info("Successfully inserted %d records into %s", inserted_count, table_name)
             elif stave.data_source_type == "bigquery":
                 from metronome_pulse_bigquery import BigQueryPulse  # type: ignore
@@ -213,11 +214,12 @@ async def generate_sample_data(
                     location=config.get("location", "US"),
                 )
                 await connector.connect()
-
-                # Insert the data
-                await connector.write(data, table_name)
-                inserted_count = len(data)
-                await connector.close()
+                try:
+                    # Insert the data
+                    await connector.write(data, table_name)
+                    inserted_count = len(data)
+                finally:
+                    await connector.close()
                 logger.info("Successfully inserted %d records into %s", inserted_count, table_name)
             else:
                 logger.info(
@@ -302,12 +304,13 @@ async def preview_stave_data(
                 )
                 connector = SQLiteReadonlyPulse(db_path)
                 await connector.connect()
-
-                # Query for sample data
-                data = await connector.query(
-                    {"sql": f"SELECT * FROM {quote_identifier(table_name)} LIMIT ?", "params": [limit]}
-                )
-                await connector.close()
+                try:
+                    # Query for sample data
+                    data = await connector.query(
+                        {"sql": f"SELECT * FROM {quote_identifier(table_name)} LIMIT ?", "params": [limit]}
+                    )
+                finally:
+                    await connector.close()
             elif stave.data_source_type == "bigquery":
                 from metronome_pulse_bigquery import (
                     BigQueryReadonlyPulse,  # type: ignore
@@ -322,15 +325,16 @@ async def preview_stave_data(
                     location=config.get("location", "US"),
                 )
                 await connector.connect()
-
-                bq_tbl = _bigquery_preview_table_ref(config, table_name)
-                data = await connector.query(
-                    {
-                        "sql": f"SELECT * FROM {bq_tbl} LIMIT @lim",
-                        "named_parameters": {"lim": int(limit)},
-                    }
-                )
-                await connector.close()
+                try:
+                    bq_tbl = _bigquery_preview_table_ref(config, table_name)
+                    data = await connector.query(
+                        {
+                            "sql": f"SELECT * FROM {bq_tbl} LIMIT @lim",
+                            "named_parameters": {"lim": int(limit)},
+                        }
+                    )
+                finally:
+                    await connector.close()
             elif stave.data_source_type in ["postgres", "postgresql"]:
                 from metronome_pulse_postgres import PostgresReadOnlyPulse
 
@@ -343,13 +347,14 @@ async def preview_stave_data(
                     password=config["password"],
                 )
                 await connector.connect()
-
-                qtbl = quote_identifier(table_name)
-                data = await connector.query_with_params(
-                    f"SELECT * FROM {qtbl} LIMIT $1",
-                    [limit],
-                )
-                await connector.close()
+                try:
+                    qtbl = quote_identifier(table_name)
+                    data = await connector.query_with_params(
+                        f"SELECT * FROM {qtbl} LIMIT $1",
+                        [limit],
+                    )
+                finally:
+                    await connector.close()
             else:
                 raise HTTPException(
                     status_code=status.HTTP_501_NOT_IMPLEMENTED,

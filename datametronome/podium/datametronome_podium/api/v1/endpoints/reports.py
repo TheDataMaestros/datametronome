@@ -1,10 +1,10 @@
 """Report endpoints for DataMetronome Podium using DataPulse connectors."""
 
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
-from datametronome_podium.core.database import get_db
+from datametronome_podium.core.database import get_executor
 from fastapi import APIRouter, HTTPException, status
 
 router = APIRouter()
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.get("/summary")
-async def get_summary_report(days: int = 7) -> Dict[str, Any]:
+async def get_summary_report(days: int = 7) -> dict[str, Any]:
     """Get summary report using DataPulse connector.
 
     Args:
@@ -22,41 +22,37 @@ async def get_summary_report(days: int = 7) -> Dict[str, Any]:
         Summary report data.
     """
     try:
-        db = await get_db()
+        executor = get_executor()
 
-        # Get basic counts
-        staves_count = await db.query(
-            {
-                "sql": "SELECT COUNT(*) as count FROM staves WHERE is_active = 1",
-                "params": [],
-            }
+        # Get basic counts — use ? placeholder with bool param; QueryAdapter
+        # handles bool→int conversion for SQLite and leaves it as-is for Postgres.
+        staves_count = await executor.query(
+            "SELECT COUNT(*) as count FROM staves WHERE is_active = ?",
+            [True],
         )
         total_staves = staves_count[0]["count"] if staves_count else 0
 
-        clefs_count = await db.query(
-            {
-                "sql": "SELECT COUNT(*) as count FROM clefs WHERE is_active = 1",
-                "params": [],
-            }
+        clefs_count = await executor.query(
+            "SELECT COUNT(*) as count FROM clefs WHERE is_active = ?",
+            [True],
         )
         total_clefs = clefs_count[0]["count"] if clefs_count else 0
 
-        checks_count = await db.query(
-            {"sql": "SELECT COUNT(*) as count FROM checks", "params": []}
+        checks_count = await executor.query(
+            "SELECT COUNT(*) as count FROM checks",
+            [],
         )
         total_checks = checks_count[0]["count"] if checks_count else 0
 
         # Get recent activity within the specified time period
-        threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
-        recent_checks = await db.query(
-            {
-                "sql": "SELECT * FROM checks WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 5",
-                "params": [threshold_date],
-            }
+        threshold_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        recent_checks = await executor.query(
+            "SELECT * FROM checks WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 5",
+            [threshold_date],
         )
 
         return {
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "period_days": days,
             "summary": {
                 "total_staves": total_staves,
@@ -75,7 +71,7 @@ async def get_summary_report(days: int = 7) -> Dict[str, Any]:
 
 
 @router.get("/quality")
-async def get_quality_report(days: int = 7) -> Dict[str, Any]:
+async def get_quality_report(days: int = 7) -> dict[str, Any]:
     """Get data quality report using DataPulse connector.
 
     Args:
@@ -85,17 +81,15 @@ async def get_quality_report(days: int = 7) -> Dict[str, Any]:
         Quality report data.
     """
     try:
-        db = await get_db()
+        executor = get_executor()
 
         # Calculate date threshold
-        threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
+        threshold_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
         # Get checks in the time period
-        period_checks = await db.query(
-            {
-                "sql": "SELECT * FROM checks WHERE timestamp >= ? ORDER BY timestamp DESC",
-                "params": [threshold_date],
-            }
+        period_checks = await executor.query(
+            "SELECT * FROM checks WHERE timestamp >= ? ORDER BY timestamp DESC",
+            [threshold_date],
         )
 
         # Calculate quality metrics
@@ -108,11 +102,9 @@ async def get_quality_report(days: int = 7) -> Dict[str, Any]:
         )
 
         # Get anomaly summary
-        anomalies = await db.query(
-            {
-                "sql": "SELECT * FROM anomalies WHERE detected_at >= ? ORDER BY detected_at DESC",
-                "params": [threshold_date],
-            }
+        anomalies = await executor.query(
+            "SELECT * FROM anomalies WHERE detected_at >= ? ORDER BY detected_at DESC",
+            [threshold_date],
         )
 
         return {
@@ -139,7 +131,7 @@ async def get_quality_report(days: int = 7) -> Dict[str, Any]:
 
 
 @router.get("/performance")
-async def get_performance_report(days: int = 7) -> Dict[str, Any]:
+async def get_performance_report(days: int = 7) -> dict[str, Any]:
     """Get performance report using DataPulse connector.
 
     Args:
@@ -149,25 +141,23 @@ async def get_performance_report(days: int = 7) -> Dict[str, Any]:
         Performance report data.
     """
     try:
-        db = await get_db()
+        executor = get_executor()
 
         # Calculate date threshold
-        threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
+        threshold_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
         # Get performance metrics
-        performance_data = await db.query(
-            {
-                "sql": """
-                SELECT
-                    AVG(execution_time) as avg_execution_time,
-                    MIN(execution_time) as min_execution_time,
-                    MAX(execution_time) as max_execution_time,
-                    COUNT(*) as total_checks
-                FROM checks
-                WHERE timestamp >= ? AND execution_time IS NOT NULL
+        performance_data = await executor.query(
+            """
+            SELECT
+                AVG(execution_time) as avg_execution_time,
+                MIN(execution_time) as min_execution_time,
+                MAX(execution_time) as max_execution_time,
+                COUNT(*) as total_checks
+            FROM checks
+            WHERE timestamp >= ? AND execution_time IS NOT NULL
             """,
-                "params": [threshold_date],
-            }
+            [threshold_date],
         )
 
         if not performance_data:

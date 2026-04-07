@@ -94,7 +94,7 @@ class _BigQueryBase(Pulse, Readable):
             return False
 
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             client = self._client
             # Dry run validates credentials and reachability without billing.
             await loop.run_in_executor(
@@ -141,7 +141,7 @@ class _BigQueryBase(Pulse, Readable):
             else:
                 raise ValueError(f"Invalid query_config type: {type(query_config)}")
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             client = self._client
             assert client is not None
 
@@ -199,7 +199,7 @@ class _BigQueryBase(Pulse, Readable):
             else:
                 raise ValueError(f"Invalid table name format: {table_name}")
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             client = self._client
             assert client is not None
             table = await loop.run_in_executor(
@@ -244,7 +244,7 @@ class _BigQueryBase(Pulse, Readable):
             raise ValueError("Dataset must be specified")
 
         try:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             client = self._client
             assert client is not None
             tables = await loop.run_in_executor(

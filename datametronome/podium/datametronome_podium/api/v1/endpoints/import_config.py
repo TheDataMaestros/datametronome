@@ -2,15 +2,14 @@
 
 import json
 import logging
+import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
-from datametronome_podium.features.clefs.schema import ClefCreate
-from datametronome_podium.features.staves.schema import StaveCreate
-from datametronome_podium.core.database import get_db
+from datametronome_podium.core.database import get_executor
 from datametronome_podium.services.env_interpolator import (
     InterpolationError,
     extract_env_vars,
@@ -33,6 +32,30 @@ from pydantic import BaseModel
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Resolve the safe root once at import time so every request can compare against it.
+# Operators may override via DATAMETRONOME_CONFIG_DIR to allow a broader directory.
+_SAFE_CONFIG_DIR = os.environ.get(
+    "DATAMETRONOME_CONFIG_DIR",
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "configs"),
+)
+
+
+def _validate_safe_path(file_path: str) -> str:
+    """Resolve and validate that a path stays under the designated config directory.
+
+    Why: file_path comes from user input, so a raw open() call would allow
+    arbitrary filesystem reads (path traversal / directory traversal attack).
+    Comparing realpath() prefixes prevents symlink tricks.
+    """
+    safe_root = os.path.realpath(_SAFE_CONFIG_DIR)
+    resolved = os.path.realpath(file_path)
+    if not resolved.startswith(safe_root + os.sep) and resolved != safe_root:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Path must be under the config directory: {safe_root}",
+        )
+    return resolved
 
 
 class ImportConfig(BaseModel):
@@ -97,7 +120,7 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
         }
         ```
     """
-    db = await get_db()
+    executor = get_executor()
 
     errors = []
     warnings = []
@@ -115,8 +138,8 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
             # Delete clefs first (foreign key constraints)
             for clef_id in clef_ids:
                 try:
-                    await db.execute("DELETE FROM checks WHERE clef_id = ?", [clef_id])
-                    await db.execute("DELETE FROM clefs WHERE id = ?", [clef_id])
+                    await executor.execute("DELETE FROM checks WHERE clef_id = ?", [clef_id])
+                    await executor.execute("DELETE FROM clefs WHERE id = ?", [clef_id])
                     clefs_deleted += 1
                 except Exception as e:
                     logger.warning("Failed to delete clef %s: %s", clef_id, e)
@@ -125,11 +148,11 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
             # Delete staves
             for stave_id in stave_ids:
                 try:
-                    await db.execute(
+                    await executor.execute(
                         "DELETE FROM checks WHERE stave_id = ?", [stave_id]
                     )
-                    await db.execute("DELETE FROM clefs WHERE stave_id = ?", [stave_id])
-                    await db.execute("DELETE FROM staves WHERE id = ?", [stave_id])
+                    await executor.execute("DELETE FROM clefs WHERE stave_id = ?", [stave_id])
+                    await executor.execute("DELETE FROM staves WHERE id = ?", [stave_id])
                     staves_deleted += 1
                 except Exception as e:
                     logger.warning("Failed to delete stave %s: %s", stave_id, e)
@@ -141,24 +164,18 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
                 stave_id = stave_data.get("id") or str(uuid.uuid4())
                 now = datetime.now(timezone.utc).isoformat() + "Z"
 
-                await db.write(
-                    [
-                        {
-                            "table": "staves",
-                            "id": stave_id,
-                            "name": stave_data["name"],
-                            "description": stave_data.get("description"),
-                            "data_source_type": stave_data["data_source_type"],
-                            "connection_config": json.dumps(
-                                stave_data["connection_config"]
-                            ),
-                            "is_active": stave_data.get("is_active", True),
-                            "created_at": now,
-                            "updated_at": now,
-                        }
-                    ],
-                    "staves",
-                )
+                await executor.insert("staves", {
+                    "id": stave_id,
+                    "name": stave_data["name"],
+                    "description": stave_data.get("description"),
+                    "data_source_type": stave_data["data_source_type"],
+                    "connection_config": json.dumps(
+                        stave_data["connection_config"]
+                    ),
+                    "is_active": stave_data.get("is_active", True),
+                    "created_at": now,
+                    "updated_at": now,
+                })
 
                 staves_created += 1
             except Exception as e:
@@ -171,26 +188,20 @@ async def import_configuration(config: ImportConfig) -> ImportResult:
                 clef_id = clef_data.get("id") or str(uuid.uuid4())
                 now = datetime.now(timezone.utc).isoformat() + "Z"
 
-                await db.write(
-                    [
-                        {
-                            "table": "clefs",
-                            "id": clef_id,
-                            "stave_id": clef_data["stave_id"],
-                            "name": clef_data["name"],
-                            "description": clef_data.get("description"),
-                            "check_type": clef_data["check_type"],
-                            "config": json.dumps(clef_data["config"]),
-                            "is_active": clef_data.get("is_active", True),
-                            "created_at": now,
-                            "updated_at": now,
-                            "schedule": clef_data.get("schedule"),
-                            "warn": clef_data.get("warn"),
-                            "fail": clef_data.get("fail"),
-                        }
-                    ],
-                    "clefs",
-                )
+                await executor.insert("clefs", {
+                    "id": clef_id,
+                    "stave_id": clef_data["stave_id"],
+                    "name": clef_data["name"],
+                    "description": clef_data.get("description"),
+                    "check_type": clef_data["check_type"],
+                    "config": json.dumps(clef_data["config"]),
+                    "is_active": clef_data.get("is_active", True),
+                    "created_at": now,
+                    "updated_at": now,
+                    "schedule": clef_data.get("schedule"),
+                    "warn": clef_data.get("warn"),
+                    "fail": clef_data.get("fail"),
+                })
 
                 clefs_created += 1
             except Exception as e:
@@ -341,7 +352,9 @@ async def import_yaml_advanced(request: YAMLImportRequest) -> ImportResult:
         if request.yaml_content:
             yaml_data = yaml.safe_load(request.yaml_content)
         elif request.file_path:
-            yaml_data = load_yaml_file(request.file_path)
+            # Validate before opening — rejects paths outside the config directory.
+            safe_path = _validate_safe_path(request.file_path)
+            yaml_data = load_yaml_file(safe_path)
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -458,7 +471,9 @@ async def validate_yaml_config(
         if yaml_content:
             yaml_data = yaml.safe_load(yaml_content)
         elif file_path:
-            yaml_data = load_yaml_file(file_path)
+            # Validate before opening — rejects paths outside the config directory.
+            safe_path = _validate_safe_path(file_path)
+            yaml_data = load_yaml_file(safe_path)
         else:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -589,6 +604,10 @@ async def watch_directory(path: str) -> Dict[str, Any]:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Path does not exist: {path}",
             )
+
+        # Reject paths that escape the config directory — watching arbitrary
+        # filesystem locations would expose directory structure to attackers.
+        _validate_safe_path(str(path_obj))
 
         watcher = get_watcher()
         watcher.watch_path(str(path_obj.absolute()))

@@ -317,36 +317,3 @@ def evaluate_severity(
     return threshold.evaluate(value)
 
 
-def get_severity_icon(severity: SeverityLevel) -> str:
-    """Get the icon for a severity level."""
-    return severity.icon
-
-
-def get_severity_description(severity: SeverityLevel) -> str:
-    """Get the description for a severity level."""
-    return severity.description
-
-
-def compare_severities(severity1: SeverityLevel, severity2: SeverityLevel) -> int:
-    """
-    Compare two severity levels.
-
-    Returns:
-        -1 if severity1 < severity2 (lower priority)
-         0 if severity1 == severity2 (same priority)
-         1 if severity1 > severity2 (higher priority)
-    """
-    if severity1.priority < severity2.priority:
-        return -1
-    elif severity1.priority > severity2.priority:
-        return 1
-    else:
-        return 0
-
-
-def get_worst_severity(severities: list[SeverityLevel]) -> SeverityLevel:
-    """Get the worst (highest priority) severity from a list."""
-    if not severities:
-        return SeverityLevel.HARMONY
-
-    return max(severities, key=lambda s: s.priority)

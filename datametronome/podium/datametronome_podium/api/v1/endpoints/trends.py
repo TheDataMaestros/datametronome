@@ -1,10 +1,12 @@
 """Trends endpoints for DataMetronome Podium using DataPulse connectors."""
 
+import json
 import logging
-from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timedelta, timezone
+from typing import Any
 
-from datametronome_podium.core.database import get_db
+from datametronome_podium.core.database import get_executor
+from datametronome_podium.core.query import QueryExecutor
 from fastapi import APIRouter, HTTPException, Query, status
 
 router = APIRouter()
@@ -16,7 +18,7 @@ async def get_stave_trends(
     stave_id: str,
     days: int = Query(7, description="Number of days to look back"),
     granularity: str = Query("hour", description="Data granularity: hour, day, week"),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get trends data for a specific stave.
 
     Args:
@@ -28,14 +30,12 @@ async def get_stave_trends(
         Trends data including row counts, check results, and distribution changes.
     """
     try:
-        db = await get_db()
+        executor = get_executor()
 
-        # Validate stave exists
-        stave_result = await db.query(
-            {
-                "sql": "SELECT * FROM staves WHERE id = ? AND is_active = 1",
-                "params": [stave_id],
-            }
+        # Validate stave exists — use ? with bool param for is_active
+        stave_result = await executor.query(
+            "SELECT * FROM staves WHERE id = ? AND is_active = ?",
+            [stave_id, True],
         )
 
         if not stave_result:
@@ -47,7 +47,7 @@ async def get_stave_trends(
         stave = stave_result[0]
 
         # Calculate date threshold
-        threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
+        threshold_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
         # Determine time grouping based on granularity
         time_grouping = {
@@ -56,7 +56,8 @@ async def get_stave_trends(
             "week": "%Y-%m-%d 00:00:00",
         }.get(granularity, "%Y-%m-%d %H:00:00")
 
-        # Get check results over time for this stave
+        # NOTE: strftime() is SQLite-only; needs dialect-aware date truncation
+        # (e.g. date_trunc() for PostgreSQL) when multi-dialect support is added.
         checks_query = f"""
             SELECT
                 strftime('{time_grouping}', timestamp) as time_bucket,
@@ -71,11 +72,9 @@ async def get_stave_trends(
             ORDER BY time_bucket DESC
         """
 
-        checks_result = await db.query(
-            {"sql": checks_query, "params": [stave_id, threshold_date]}
-        )
+        checks_result = await executor.query(checks_query, [stave_id, threshold_date])
 
-        # Get row count trends (from volume_check type checks)
+        # NOTE: strftime() is SQLite-only; see note above.
         row_count_query = f"""
             SELECT
                 strftime('{time_grouping}', timestamp) as time_bucket,
@@ -89,17 +88,14 @@ async def get_stave_trends(
             ORDER BY timestamp DESC
         """
 
-        row_count_result = await db.query(
-            {"sql": row_count_query, "params": [stave_id, threshold_date]}
+        row_count_result = await executor.query(
+            row_count_query, [stave_id, threshold_date]
         )
 
-        # Process row count data to extract actual counts
+        # Process row count data to extract actual counts from the details JSON blob.
         row_count_trends = []
         for row in row_count_result:
             try:
-                # Parse details JSON to extract row count
-                import json
-
                 details = json.loads(row["details"]) if row["details"] else {}
                 observed_value = details.get("row_count", 0)
 
@@ -115,7 +111,9 @@ async def get_stave_trends(
                 continue
 
         # Calculate distribution changes
-        distribution_changes = await _calculate_distribution_changes(db, stave_id, days)
+        distribution_changes = await _calculate_distribution_changes(
+            executor, stave_id, days
+        )
 
         # Get recent anomalies for this stave
         anomalies_query = """
@@ -130,8 +128,8 @@ async def get_stave_trends(
             LIMIT 10
         """
 
-        anomalies_result = await db.query(
-            {"sql": anomalies_query, "params": [stave_id, threshold_date]}
+        anomalies_result = await executor.query(
+            anomalies_query, [stave_id, threshold_date]
         )
 
         # Calculate trend summary
@@ -147,7 +145,7 @@ async def get_stave_trends(
                 "days": days,
                 "granularity": granularity,
                 "start_date": threshold_date,
-                "end_date": datetime.now().isoformat(),
+                "end_date": datetime.now(timezone.utc).isoformat(),
             },
             "row_count_trends": row_count_trends,
             "check_results": checks_result,
@@ -156,8 +154,12 @@ async def get_stave_trends(
             "trend_summary": trend_summary,
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error("Failed to fetch trends data for stave %s: %s", stave_id, e, exc_info=True)
+        logger.error(
+            "Failed to fetch trends data for stave %s: %s", stave_id, e, exc_info=True
+        )
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch trends data",
@@ -167,7 +169,7 @@ async def get_stave_trends(
 @router.get("/overview")
 async def get_trends_overview(
     days: int = Query(7, description="Number of days to look back")
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Get trends overview across all active staves.
 
     Args:
@@ -177,58 +179,50 @@ async def get_trends_overview(
         Overview trends data for all staves.
     """
     try:
-        db = await get_db()
+        executor = get_executor()
 
         # Calculate date threshold
-        threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
+        threshold_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
-        # Get all active staves
-        staves_result = await db.query(
-            {
-                "sql": "SELECT * FROM staves WHERE is_active = 1 ORDER BY name",
-                "params": [],
-            }
+        # Get all active staves — use ? with bool param for is_active
+        staves_result = await executor.query(
+            "SELECT * FROM staves WHERE is_active = ? ORDER BY name",
+            [True],
         )
 
         # Get summary data for each stave
         stave_summaries = []
         for stave in staves_result:
             # Get recent check counts
-            check_counts = await db.query(
-                {
-                    "sql": """
-                    SELECT
-                        status,
-                        COUNT(*) as count
-                    FROM checks
-                    WHERE stave_id = ? AND timestamp >= ?
-                    GROUP BY status
+            check_counts = await executor.query(
+                """
+                SELECT
+                    status,
+                    COUNT(*) as count
+                FROM checks
+                WHERE stave_id = ? AND timestamp >= ?
+                GROUP BY status
                 """,
-                    "params": [stave["id"], threshold_date],
-                }
+                [stave["id"], threshold_date],
             )
 
             # Get latest row count
-            latest_row_count = await db.query(
-                {
-                    "sql": """
-                    SELECT details, timestamp
-                    FROM checks
-                    WHERE stave_id = ?
-                        AND check_type = 'row_count'
-                        AND timestamp >= ?
-                    ORDER BY timestamp DESC
-                    LIMIT 1
+            latest_row_count = await executor.query(
+                """
+                SELECT details, timestamp
+                FROM checks
+                WHERE stave_id = ?
+                    AND check_type = 'row_count'
+                    AND timestamp >= ?
+                ORDER BY timestamp DESC
+                LIMIT 1
                 """,
-                    "params": [stave["id"], threshold_date],
-                }
+                [stave["id"], threshold_date],
             )
 
             latest_count = 0
             if latest_row_count:
                 try:
-                    import json
-
                     details = (
                         json.loads(latest_row_count[0]["details"])
                         if latest_row_count[0]["details"]
@@ -259,7 +253,7 @@ async def get_trends_overview(
             "period": {
                 "days": days,
                 "start_date": threshold_date,
-                "end_date": datetime.now().isoformat(),
+                "end_date": datetime.now(timezone.utc).isoformat(),
             },
             "stave_summaries": stave_summaries,
             "total_staves": len(staves_result),
@@ -274,41 +268,37 @@ async def get_trends_overview(
 
 
 async def _calculate_distribution_changes(
-    db, stave_id: str, days: int
-) -> Dict[str, Any]:
+    executor: QueryExecutor, stave_id: str, days: int
+) -> dict[str, Any]:
     """Calculate distribution changes for a stave."""
     try:
-        threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
+        threshold_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
         # Get check results for the period
-        checks_result = await db.query(
-            {
-                "sql": """
-                SELECT
-                    check_type,
-                    status,
-                    COUNT(*) as count,
-                    AVG(execution_time) as avg_execution_time
-                FROM checks
-                WHERE stave_id = ? AND timestamp >= ?
-                GROUP BY check_type, status
+        checks_result = await executor.query(
+            """
+            SELECT
+                check_type,
+                status,
+                COUNT(*) as count,
+                AVG(execution_time) as avg_execution_time
+            FROM checks
+            WHERE stave_id = ? AND timestamp >= ?
+            GROUP BY check_type, status
             """,
-                "params": [stave_id, threshold_date],
-            }
+            [stave_id, threshold_date],
         )
 
         # Calculate distribution metrics
         total_checks = sum(item["count"] for item in checks_result)
-        status_distribution = {}
-        check_type_distribution = {}
+        status_distribution: dict[str, int] = {}
+        check_type_distribution: dict[str, dict[str, int]] = {}
 
         for item in checks_result:
-            status = item["status"]
+            s = item["status"]
             check_type = item["check_type"]
 
-            if status not in status_distribution:
-                status_distribution[status] = 0
-            status_distribution[status] += item["count"]
+            status_distribution[s] = status_distribution.get(s, 0) + item["count"]
 
             if check_type not in check_type_distribution:
                 check_type_distribution[check_type] = {
@@ -317,12 +307,12 @@ async def _calculate_distribution_changes(
                     "failed": 0,
                 }
             check_type_distribution[check_type]["total"] += item["count"]
-            check_type_distribution[check_type][status] = item["count"]
+            check_type_distribution[check_type][s] = item["count"]
 
         # Calculate percentages
         status_percentages = {
-            status: (count / total_checks * 100) if total_checks > 0 else 0
-            for status, count in status_distribution.items()
+            s: (count / total_checks * 100) if total_checks > 0 else 0
+            for s, count in status_distribution.items()
         }
 
         return {
@@ -333,13 +323,15 @@ async def _calculate_distribution_changes(
         }
 
     except Exception as e:
-        logger.warning("Failed to calculate distribution changes for stave %s: %s", stave_id, e)
+        logger.warning(
+            "Failed to calculate distribution changes for stave %s: %s", stave_id, e
+        )
         return {"error": "Failed to calculate distribution changes"}
 
 
 async def _calculate_trend_summary(
-    checks_result: List[Dict], row_count_trends: List[Dict]
-) -> Dict[str, Any]:
+    checks_result: list[dict], row_count_trends: list[dict]
+) -> dict[str, Any]:
     """Calculate trend summary from check results and row count trends."""
     try:
         # Calculate check success rate trend

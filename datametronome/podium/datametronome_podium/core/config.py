@@ -161,7 +161,7 @@ class Settings(BaseSettings):
 
                 try:
                     return json.loads(cleaned)
-                except:
+                except json.JSONDecodeError:
                     pass
             # Split by comma
             v = [origin.strip() for origin in cleaned.split(",") if origin.strip()]
@@ -253,32 +253,6 @@ def validate_production_config() -> tuple[list[str], list[str]]:
         )
 
     return errors, warnings
-
-
-def print_startup_banner():
-    """Print startup banner with configuration info."""
-    banner = f"""
-╔══════════════════════════════════════════════════════════════╗
-║                                                              ║
-║          🎵  DataMetronome Podium API v{settings.version}              ║
-║                                                              ║
-╚══════════════════════════════════════════════════════════════╝
-
-Configuration:
-  📍 Host:        {settings.host}:{settings.port}
-  🔧 Debug:       {settings.debug}
-  📊 Metrics:     {settings.metrics_enabled}
-  ⏰ Scheduler:   {settings.scheduler_enabled}
-  📝 Log Level:   {settings.log_level}
-  🗄️  Database:    {settings.database_url.split('://')[0]}://***
-  🌐 CORS:        {len(settings.allowed_origins)} origins
-
-Endpoints:
-  📚 Docs:        http://{settings.host}:{settings.port}/docs
-  🔍 Health:      http://{settings.host}:{settings.port}/health
-  📊 Metrics:     http://{settings.host}:{settings.port}/metrics
-"""
-    print(banner)
 
 
 def validate_and_report_config():

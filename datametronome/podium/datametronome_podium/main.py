@@ -30,21 +30,6 @@ setup_logging(log_level=settings.log_level, log_format=log_format)
 logger = get_logger(__name__)
 
 
-def create_cors_middleware(app: FastAPI | None = None) -> CORSMiddleware:
-    """Create CORS middleware with configuration.
-
-    Returns:
-        Configured CORS middleware.
-    """
-    return CORSMiddleware(
-        app=app,  # type: ignore
-        allow_origins=settings.allowed_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-
 def create_root_endpoints(app: FastAPI) -> None:
     """Add root-level endpoints to the application.
 
@@ -102,12 +87,17 @@ def create_root_endpoints(app: FastAPI) -> None:
             }
             health_status["status"] = "degraded"
 
-        # Check scheduler status
-        # TODO: Replace with Celery Beat / RedBeat health check
+        # Scheduling: Celery Beat + RedBeat + persisted jobs (see api/v1/endpoints/scheduler.py).
+        sched_ok = settings.scheduler_enabled
         health_status["checks"]["scheduler"] = {
-            "status": "healthy",
-            "message": "Scheduling handled by Celery Beat",
+            "status": "healthy" if sched_ok else "degraded",
+            "message": (
+                f"Scheduler integration {'on' if sched_ok else 'off'} "
+                f"(Celery Beat / persisted jobs); dispatch_mode={settings.dispatch_mode}"
+            ),
         }
+        if not sched_ok:
+            health_status["status"] = "degraded"
 
         return health_status
 
@@ -150,8 +140,11 @@ async def lifespan(app: FastAPI):
     await init_db()
     logging.info("Database initialized")
 
-    # Scheduling is now handled by Celery Beat + RedBeat (no in-process scheduler)
-    logging.info("Scheduling handled by Celery Beat")
+    logging.info(
+        "Scheduler integration: Celery Beat + RedBeat (scheduler_enabled=%s, dispatch_mode=%s)",
+        settings.scheduler_enabled,
+        settings.dispatch_mode,
+    )
 
     yield
 

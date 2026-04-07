@@ -1,6 +1,6 @@
 import asyncio
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -131,7 +131,7 @@ class DatabaseInitService:
 
     async def _insert_default_data(self):
         """Insert default data into the database."""
-        now = datetime.now().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
 
         # Insert default admin user
         admin_user = {

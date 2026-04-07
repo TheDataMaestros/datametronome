@@ -1,7 +1,7 @@
 import csv
 import json
 from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -92,7 +92,7 @@ class ReportingService:
             failed_checks=4,
             total_anomalies=7,
             critical_anomalies=2,
-            last_check_time=datetime.now() - timedelta(hours=2),
+            last_check_time=datetime.now(timezone.utc) - timedelta(hours=2),
             uptime="2 days, 14 hours",
         )
 
@@ -109,7 +109,7 @@ class ReportingService:
                 status="passed",
                 message="Data quality check completed successfully",
                 details={"threshold": 0.95, "actual_score": 0.98},
-                timestamp=datetime.now() - timedelta(hours=1),
+                timestamp=datetime.now(timezone.utc) - timedelta(hours=1),
                 execution_time=2.3,
                 anomalies_count=0,
                 severity="low",
@@ -122,7 +122,7 @@ class ReportingService:
                 status="failed",
                 message="Anomalies detected in user data",
                 details={"anomalies_found": 3, "severity": "medium"},
-                timestamp=datetime.now() - timedelta(hours=2),
+                timestamp=datetime.now(timezone.utc) - timedelta(hours=2),
                 execution_time=5.1,
                 anomalies_count=3,
                 severity="medium",
@@ -143,7 +143,7 @@ class ReportingService:
                 anomaly_type="outlier",
                 description="Age value 150 is outside normal range",
                 severity="medium",
-                detected_at=datetime.now() - timedelta(hours=2),
+                detected_at=datetime.now(timezone.utc) - timedelta(hours=2),
                 data_sample={
                     "user_id": "user_123",
                     "age": 150,
@@ -159,7 +159,7 @@ class ReportingService:
                 anomaly_type="outlier",
                 description="Order amount $99999 is unusually high",
                 severity="high",
-                detected_at=datetime.now() - timedelta(hours=2),
+                detected_at=datetime.now(timezone.utc) - timedelta(hours=2),
                 data_sample={
                     "order_id": "order_456",
                     "amount": 99999.00,
@@ -181,7 +181,7 @@ class ReportingService:
             report.append("=" * 80)
             report.append("🎵 DATAMETRONOME - DATA QUALITY REPORT")
             report.append("=" * 80)
-            report.append(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+            report.append(f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}")
             report.append(f"Period: Last {days_back} days")
             report.append("")
 
@@ -244,7 +244,7 @@ class ReportingService:
                 "=" * 80,
                 "🎵 DATAMETRONOME - DATA QUALITY REPORT",
                 "=" * 80,
-                f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
+                f"Generated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')}",
                 f"Period: Last {days_back} days",
                 "",
                 "❌ ERROR: Could not generate report",
@@ -267,7 +267,7 @@ class ReportingService:
     ) -> str:
         """Generate CSV report files."""
         if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             filename = f"datametronome_report_{timestamp}.csv"
 
         filepath = self.reports_dir / filename
@@ -324,7 +324,7 @@ class ReportingService:
         except Exception as e:
             error_file = (
                 self.reports_dir
-                / f"error_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+                / f"error_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.txt"
             )
             with open(error_file, "w") as f:
                 f.write(f"Failed to generate CSV report: {str(e)}")
@@ -335,7 +335,7 @@ class ReportingService:
     ) -> str:
         """Generate JSON report file."""
         if filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            timestamp = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
             filename = f"datametronome_report_{timestamp}.json"
 
         filepath = self.reports_dir / filename
@@ -347,7 +347,7 @@ class ReportingService:
 
             report_data: Dict[str, Any] = {
                 "report_metadata": {
-                    "generated_at": datetime.now().isoformat(),
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
                     "period_days": days_back,
                     "version": "1.0",
                 },
@@ -375,7 +375,7 @@ class ReportingService:
         except Exception as e:
             error_file = (
                 self.reports_dir
-                / f"error_report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+                / f"error_report_{datetime.now(timezone.utc).strftime('%Y%m%d_%H%M%S')}.txt"
             )
             with open(error_file, "w") as f:
                 f.write(f"Failed to generate JSON report: {str(e)}")
@@ -415,7 +415,7 @@ class ReportingService:
             return {
                 "summary": {
                     "period_days": days_back,
-                    "generated_at": datetime.now().isoformat(),
+                    "generated_at": datetime.now(timezone.utc).isoformat(),
                     "overall_health_score": health.overall_score,
                     "total_checks": health.total_checks,
                     "total_anomalies": health.total_anomalies,

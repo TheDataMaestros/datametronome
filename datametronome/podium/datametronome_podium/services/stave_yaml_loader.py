@@ -16,7 +16,7 @@ Example Usage:
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -152,9 +152,9 @@ def load_staves_from_yaml(
 
         # Set timestamps if not provided
         if "created_at" not in stave_data:
-            stave_data["created_at"] = datetime.now()
+            stave_data["created_at"] = datetime.now(timezone.utc)
         if "updated_at" not in stave_data:
-            stave_data["updated_at"] = datetime.now()
+            stave_data["updated_at"] = datetime.now(timezone.utc)
 
         # Create Stave object
         stave = Stave(**stave_data)
@@ -175,9 +175,9 @@ def load_staves_from_yaml(
 
         # Set timestamps if not provided
         if "created_at" not in clef_data:
-            clef_data["created_at"] = datetime.now()
+            clef_data["created_at"] = datetime.now(timezone.utc)
         if "updated_at" not in clef_data:
-            clef_data["updated_at"] = datetime.now()
+            clef_data["updated_at"] = datetime.now(timezone.utc)
 
         # Create Clef object
         clef = Clef(**clef_data)
@@ -239,9 +239,9 @@ def load_single_stave_yaml(
 
     # Set timestamps if not provided
     if "created_at" not in stave_data:
-        stave_data["created_at"] = datetime.now()
+        stave_data["created_at"] = datetime.now(timezone.utc)
     if "updated_at" not in stave_data:
-        stave_data["updated_at"] = datetime.now()
+        stave_data["updated_at"] = datetime.now(timezone.utc)
 
     stave = Stave(**stave_data)
 
@@ -264,9 +264,9 @@ def load_single_stave_yaml(
 
         # Set timestamps if not provided
         if "created_at" not in clef_data:
-            clef_data["created_at"] = datetime.now()
+            clef_data["created_at"] = datetime.now(timezone.utc)
         if "updated_at" not in clef_data:
-            clef_data["updated_at"] = datetime.now()
+            clef_data["updated_at"] = datetime.now(timezone.utc)
 
         clef = Clef(**clef_data)
         clefs.append(clef)

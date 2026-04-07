@@ -1,12 +1,22 @@
 """Default data seeding. Uses QueryExecutor directly (no repo dependency)."""
 import logging
+from datametronome_podium.core.config import settings
 from datametronome_podium.core.query import QueryExecutor
 
 logger = logging.getLogger(__name__)
 
 
 async def create_default_admin(executor: QueryExecutor) -> None:
-    """Create default admin user for development."""
+    """Create default admin user — only in debug/development mode.
+
+    Why: shipping a known admin/admin account to production is a critical
+    credential exposure. The debug guard ensures this seed never runs unless
+    the operator explicitly enables debug mode.
+    """
+    if not settings.debug:
+        logger.debug("Skipping default admin seed (debug mode is off)")
+        return
+
     try:
         existing = await executor.query(
             "SELECT * FROM users WHERE username = ?", ["admin"]

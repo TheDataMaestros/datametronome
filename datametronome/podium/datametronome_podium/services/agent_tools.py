@@ -621,7 +621,7 @@ async def get_summary_report(days: int = 7) -> dict[str, object]:
         days: Number of days to look back for recent activity. Defaults to 7.
     """
     try:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
 
         executor = get_executor()
@@ -641,14 +641,14 @@ async def get_summary_report(days: int = 7) -> dict[str, object]:
         )
         total_checks = checks_count[0]["count"] if checks_count else 0
 
-        threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
+        threshold_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         recent_checks = await executor.query(
             "SELECT * FROM checks WHERE timestamp >= ? ORDER BY timestamp DESC LIMIT 5",
             [threshold_date],
         )
 
         return {
-            "generated_at": datetime.now().isoformat(),
+            "generated_at": datetime.now(timezone.utc).isoformat(),
             "period_days": days,
             "summary": {
                 "total_staves": total_staves,
@@ -665,12 +665,12 @@ async def get_summary_report(days: int = 7) -> dict[str, object]:
 async def get_quality_report(days: int = 7) -> dict[str, object]:
     """Get a quality report showing data quality metrics."""
     try:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
 
         executor = get_executor()
 
-        threshold_date = (datetime.now() - timedelta(days=days)).isoformat()
+        threshold_date = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
 
         period_checks = await executor.query(
             "SELECT * FROM checks WHERE timestamp >= ? ORDER BY timestamp DESC",

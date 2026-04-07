@@ -78,7 +78,7 @@ class CheckResult:
         if self.metadata is None:
             self.metadata = {}
         if self.timestamp is None:
-            self.timestamp = datetime.now()
+            self.timestamp = datetime.now(timezone.utc)
 
     @property
     def severity(self) -> SeverityLevel:
@@ -142,7 +142,7 @@ class ClefExecutor:
             >>> result = await executor.execute_clef(clef, stave, connector)
             >>> print(f"Check {result.status}: {result.message}")
         """
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
         connector = db_connector
         managed_connector = False
         result: CheckResult | None = None
@@ -235,7 +235,7 @@ class ClefExecutor:
                 timestamp=start_time,
             )
 
-        result.execution_time = (datetime.now() - start_time).total_seconds()
+        result.execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
         self._update_stats(result)
         logger.info(f"Clef '{clef.name}' completed: {result.severity}")
         return result
@@ -277,7 +277,7 @@ class ClefExecutor:
                 message=f"NULL check not supported for {stave.data_source_type}",
                 metadata={"error": "unsupported_data_source"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute query
@@ -292,7 +292,7 @@ class ClefExecutor:
                 message="Query returned no results",
                 metadata={"error": "empty_result"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         row = result_rows[0]
@@ -308,7 +308,7 @@ class ClefExecutor:
                 message="Table is empty",
                 metadata={"total_rows": 0, "null_rows": 0, "null_percentage": 0.0},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         null_percentage = null_rows / total_rows
@@ -339,7 +339,7 @@ class ClefExecutor:
                 "column": column,
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             anomalies_count=null_rows if severity != SeverityLevel.HARMONY else 0,
         )
 
@@ -361,7 +361,7 @@ class ClefExecutor:
                 message="Range check requires at least min or max value",
                 metadata={"error": "invalid_config"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Build SQL query to check values outside range
@@ -403,7 +403,7 @@ class ClefExecutor:
                 message=f"Range check not supported for {stave.data_source_type}",
                 metadata={"error": "unsupported_data_source"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute query
@@ -417,7 +417,7 @@ class ClefExecutor:
                 message="Query returned no results",
                 metadata={"error": "empty_result"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         row = result_rows[0]
@@ -434,7 +434,7 @@ class ClefExecutor:
                 message="No non-null values found",
                 metadata={"total_rows": 0, "out_of_range_rows": 0},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Evaluate result
@@ -461,7 +461,7 @@ class ClefExecutor:
                 "column": column,
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             anomalies_count=out_of_range_rows if status == "fail" else 0,
         )
 
@@ -482,7 +482,7 @@ class ClefExecutor:
                 message="Volume check requires at least expected_min or expected_max",
                 metadata={"error": "invalid_config"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Build SQL query to count rows
@@ -496,7 +496,7 @@ class ClefExecutor:
                 message=f"Volume check not supported for {stave.data_source_type}",
                 metadata={"error": "unsupported_data_source"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute query
@@ -510,7 +510,7 @@ class ClefExecutor:
                 message="Query returned no results",
                 metadata={"error": "empty_result"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         actual_count = result_rows[0]["row_count"]
@@ -540,7 +540,7 @@ class ClefExecutor:
                 "table": table,
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             anomalies_count=1 if status == "fail" else 0,
         )
 
@@ -562,7 +562,7 @@ class ClefExecutor:
                 message="Custom SQL check requires a query",
                 metadata={"error": "missing_query"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute custom SQL
@@ -577,7 +577,7 @@ class ClefExecutor:
                     message="Custom SQL returned no results",
                     metadata={"query": sql, "results": []},
                     execution_time=0.0,
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # Get the first result (assuming single value queries)
@@ -625,7 +625,7 @@ class ClefExecutor:
                     "all_results": result_rows,
                 },
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
                 anomalies_count=1 if status == "fail" else 0,
             )
 
@@ -638,7 +638,7 @@ class ClefExecutor:
                 message=f"Custom SQL execution failed: {str(e)}",
                 metadata={"error": str(e), "query": sql},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
     async def _execute_uniqueness_check(
@@ -684,7 +684,7 @@ class ClefExecutor:
                 message=f"Uniqueness check not supported for {stave.data_source_type}",
                 metadata={"error": "unsupported_data_source"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute query
@@ -711,7 +711,7 @@ class ClefExecutor:
                 "duplicates": duplicate_rows[:5],  # Show first 5 duplicates
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             anomalies_count=len(duplicate_rows) if status == "fail" else 0,
         )
 
@@ -764,7 +764,7 @@ class ClefExecutor:
                 message="Pattern check not fully supported in SQLite",
                 metadata={"error": "limited_regex_support"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
         else:
             return CheckResult(
@@ -774,7 +774,7 @@ class ClefExecutor:
                 message=f"Pattern check not supported for {stave.data_source_type}",
                 metadata={"error": "unsupported_data_source"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute query
@@ -788,7 +788,7 @@ class ClefExecutor:
                 message="Query returned no results",
                 metadata={"error": "empty_result"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         row = result_rows[0]
@@ -803,7 +803,7 @@ class ClefExecutor:
                 message="No non-null values found",
                 metadata={"total_rows": 0, "non_matching_rows": 0},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Evaluate result
@@ -827,7 +827,7 @@ class ClefExecutor:
                 "column": column,
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             anomalies_count=non_matching_rows if status == "fail" else 0,
         )
 
@@ -846,7 +846,7 @@ class ClefExecutor:
                 "note": "Schema validation requires database-specific metadata queries"
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
         )
 
     async def _execute_referential_check(
@@ -864,7 +864,7 @@ class ClefExecutor:
                 "note": "Referential integrity requires database-specific constraint queries"
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
         )
 
     def _evaluate_null_check_severity(
@@ -1962,7 +1962,7 @@ class ClefExecutor:
                 observed_value=None,
                 message="Forecast check requires a 'query' configuration",
                 metadata={"error": "missing_query"},
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         try:
@@ -1977,7 +1977,7 @@ class ClefExecutor:
                     observed_value=len(rows) if rows else 0,
                     message=f"Insufficient data for forecasting (got {len(rows)} rows, need 10+)",
                     metadata={"row_count": len(rows)},
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # 2. Extract numeric time series
@@ -2001,7 +2001,7 @@ class ClefExecutor:
                     observed_value=len(ts_values),
                     message="Insufficient non-null values for forecasting",
                     metadata={"valid_count": len(ts_values)},
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # Split: Train on all except last, test on last
@@ -2026,7 +2026,7 @@ class ClefExecutor:
                         observed_value=observed_value,
                         message=f"Value column '{value_column}' not found in query results",
                         metadata={"columns": list(df.columns)},
-                        timestamp=datetime.now(),
+                        timestamp=datetime.now(timezone.utc),
                     )
                 ts_values_model = df[value_column].dropna().tolist()
                 train_model = ts_values_model[:-1]
@@ -2059,7 +2059,7 @@ class ClefExecutor:
                         "p_value": result.p_value,
                         "model_info": result.model_info,
                     },
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # Fallback: mean ± k*std over recent window, accounting for trend
@@ -2073,7 +2073,7 @@ class ClefExecutor:
                     observed_value=observed_value,
                     message="Insufficient history for forecasting baseline window",
                     metadata={"window_size": 0},
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # Calculate mean and std
@@ -2134,7 +2134,7 @@ class ClefExecutor:
                     "upper_bound": upper,
                     "note": "Install statsmodels+pandas to enable SARIMA forecasting",
                 },
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         except Exception as e:
@@ -2146,7 +2146,7 @@ class ClefExecutor:
                 observed_value=None,
                 message=f"Forecast analysis failed: {str(e)}",
                 metadata={"error": str(e)},
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
     async def _execute_data_profile_drift_check(
@@ -2173,7 +2173,7 @@ class ClefExecutor:
                     "error": "missing_optional_dependency",
                     "dependencies": ["scipy"],
                 },
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         if not table or not column:
@@ -2184,7 +2184,7 @@ class ClefExecutor:
                 observed_value=None,
                 message="Drift check requires 'table' and 'column'",
                 metadata={"error": "missing_config"},
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         try:
@@ -2213,7 +2213,7 @@ class ClefExecutor:
                         "baseline_count": len(baseline_values),
                         "current_count": len(current_values),
                     },
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # 3. Perform Drift Detection using Brain Library
@@ -2234,7 +2234,7 @@ class ClefExecutor:
                     observed_value=None,
                     message="Drift check currently only supports numeric columns for KS test",
                     metadata={"error": "non_numeric_data"},
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             drift_result = detector.kolmogorov_smirnov_test(
@@ -2265,7 +2265,7 @@ class ClefExecutor:
                     "current_size": drift_result.current_size,
                     "stats_metadata": drift_result.metadata,
                 },
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         except Exception as e:
@@ -2277,7 +2277,7 @@ class ClefExecutor:
                 observed_value=None,
                 message=f"Drift analysis failed: {str(e)}",
                 metadata={"error": str(e)},
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
 

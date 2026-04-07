@@ -8,6 +8,8 @@ from fastapi import Request
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
+from datametronome_podium.core.config import settings
+
 
 def get_identifier(request: Request) -> str:
     """
@@ -31,11 +33,14 @@ def get_identifier(request: Request) -> str:
     return get_remote_address(request)
 
 
-# Initialize limiter with Redis storage (optional) or in-memory
+# Use Redis when available for distributed rate limiting across multiple workers.
+# Falls back to in-memory storage for local dev or when Redis is not configured.
+_storage_uri = settings.redis_url if settings.redis_url else "memory://"
+
 limiter = Limiter(
     key_func=get_identifier,
     default_limits=["100 per minute", "1000 per hour"],
-    storage_uri="memory://",  # Change to redis://localhost:6379 for distributed rate limiting
+    storage_uri=_storage_uri,
     headers_enabled=True,  # Add rate limit headers to responses
 )
 
@@ -48,16 +53,3 @@ RATE_LIMITS = {
     "health": "100 per minute",  # Health checks
     "metrics": "20 per minute",  # Metrics endpoint
 }
-
-
-def get_rate_limit(endpoint_type: str = "default") -> str:
-    """
-    Get rate limit for specific endpoint type.
-
-    Args:
-        endpoint_type: Type of endpoint (auth, read, write, health, metrics)
-
-    Returns:
-        Rate limit string (e.g., "10 per minute")
-    """
-    return RATE_LIMITS.get(endpoint_type, "100 per minute")

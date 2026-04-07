@@ -3,12 +3,11 @@ Clef action endpoints - Run now and view results functionality.
 """
 
 import logging
-from typing import Any, Dict
 
 from fastapi import APIRouter, HTTPException, Query, status
 
 from datametronome_podium.core.check_dispatcher import JobStatus
-from datametronome_podium.core.database import get_db
+from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.dispatcher_factory import get_dispatcher
 
 router = APIRouter()
@@ -16,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @router.post("/{clef_id}/run-now", status_code=status.HTTP_202_ACCEPTED)
-async def run_clef_now(clef_id: str) -> Dict[str, Any]:
+async def run_clef_now(clef_id: str) -> dict:
     """Dispatch a clef for immediate execution. Returns 202 with job_id."""
     try:
         dispatcher = get_dispatcher()
@@ -37,7 +36,7 @@ async def run_clef_now(clef_id: str) -> Dict[str, Any]:
 
 
 @router.get("/jobs/{job_id}/status")
-async def get_job_status(job_id: str) -> Dict[str, Any]:
+async def get_job_status(job_id: str) -> dict:
     """Get the status and result of a dispatched check job."""
     try:
         dispatcher = get_dispatcher()
@@ -60,7 +59,7 @@ async def get_job_status(job_id: str) -> Dict[str, Any]:
 @router.get("/{clef_id}/results")
 async def get_clef_results(
     clef_id: str, limit: int = Query(10, ge=1, le=100), offset: int = Query(0, ge=0)
-) -> Dict[str, Any]:
+) -> dict:
     """
     Get execution results for a clef.
 
@@ -76,28 +75,24 @@ async def get_clef_results(
         List of check execution results with pagination info
     """
     try:
-        db = await get_db()
+        executor = get_executor()
 
         # Get total count
-        count_result = await db.query(
-            {
-                "sql": "SELECT COUNT(*) as total FROM checks WHERE clef_id = ?",
-                "params": [clef_id],
-            }
+        count_result = await executor.query(
+            "SELECT COUNT(*) as total FROM checks WHERE clef_id = ?",
+            [clef_id],
         )
         total = count_result[0]["total"] if count_result else 0
 
         # Get results
-        results = await db.query(
-            {
-                "sql": """
+        results = await executor.query(
+            """
                 SELECT * FROM checks
                 WHERE clef_id = ?
                 ORDER BY timestamp DESC
                 LIMIT ? OFFSET ?
             """,
-                "params": [clef_id, limit, offset],
-            }
+            [clef_id, limit, offset],
         )
 
         # Format results with consistent UTC timestamps
@@ -168,7 +163,7 @@ async def get_clef_results(
 
 
 @router.get("/results/latest")
-async def get_latest_results(limit: int = Query(20, ge=1, le=100)) -> Dict[str, Any]:
+async def get_latest_results(limit: int = Query(20, ge=1, le=100)) -> dict:
     """
     Get the latest execution results across all clefs.
 
@@ -182,12 +177,11 @@ async def get_latest_results(limit: int = Query(20, ge=1, le=100)) -> Dict[str, 
         List of latest check execution results with clef and stave info
     """
     try:
-        db = await get_db()
+        executor = get_executor()
 
         # Get latest results with clef and stave info
-        results = await db.query(
-            {
-                "sql": """
+        results = await executor.query(
+            """
                 SELECT
                     c.*,
                     cl.name as clef_name,
@@ -200,8 +194,7 @@ async def get_latest_results(limit: int = Query(20, ge=1, le=100)) -> Dict[str, 
                 ORDER BY c.timestamp DESC
                 LIMIT ?
             """,
-                "params": [limit],
-            }
+            [limit],
         )
 
         # Format results

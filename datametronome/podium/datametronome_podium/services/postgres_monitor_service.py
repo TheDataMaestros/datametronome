@@ -1,7 +1,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Tuple, cast
 
 from metronome_pulse_core import Pulse, Readable
@@ -121,7 +121,7 @@ class PostgresMonitorService:
                     latest_timestamp.replace("Z", "+00:00")
                 )
 
-            age_hours = (datetime.now() - latest_timestamp).total_seconds() / 3600
+            age_hours = (datetime.now(timezone.utc) - latest_timestamp).total_seconds() / 3600
 
             status = "pass"
             if age_hours > max_age_hours:
@@ -240,7 +240,7 @@ class PostgresMonitorService:
                 "Connector not initialized. Call create_connector() first."
             )
 
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
         overall_results: Dict[str, Any] = {
             "check_started_at": start_time.isoformat(),
             "connector_type": self.connector_type,
@@ -320,9 +320,9 @@ class PostgresMonitorService:
             overall_results["overall_status"] = "error"
             overall_results["error"] = str(e)
 
-        overall_results["check_completed_at"] = datetime.now().isoformat()
+        overall_results["check_completed_at"] = datetime.now(timezone.utc).isoformat()
         overall_results["duration_seconds"] = (
-            datetime.now() - start_time
+            datetime.now(timezone.utc) - start_time
         ).total_seconds()
 
         return overall_results

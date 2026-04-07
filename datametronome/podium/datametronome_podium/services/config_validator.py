@@ -14,7 +14,7 @@ are in harmony rather than creating cacophony.
 
 import re
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Set, Tuple
 
 from datametronome_podium.models.clef import SUPPORTED_CHECK_TYPES, Clef
@@ -39,7 +39,7 @@ class ConfigurationIssue:
         self.message = message
         self.affected_items = affected_items or []
         self.suggestion = suggestion
-        self.timestamp = datetime.now()
+        self.timestamp = datetime.now(timezone.utc)
 
     def __str__(self) -> str:
         severity_icon = {"error": "❌", "warning": "⚠️", "info": "ℹ️"}.get(
