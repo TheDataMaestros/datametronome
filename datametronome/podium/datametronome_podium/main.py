@@ -87,7 +87,7 @@ def create_root_endpoints(app: FastAPI) -> None:
             }
             health_status["status"] = "degraded"
 
-        # Scheduling: Celery Beat + RedBeat + persisted jobs (see api/v1/endpoints/scheduler.py).
+        # Scheduling: Celery Beat + RedBeat handles all scheduling (no dedicated scheduler endpoint).
         sched_ok = settings.scheduler_enabled
         health_status["checks"]["scheduler"] = {
             "status": "healthy" if sched_ok else "degraded",

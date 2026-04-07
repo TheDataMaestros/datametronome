@@ -2,7 +2,7 @@
 Main API router for DataMetronome Podium v1.
 
 Uses feature-based routers for CRUD (staves, clefs, checks).
-Complex endpoints (auth, chat, actions, scheduler) stay in api/v1/endpoints/.
+Complex endpoints (auth, chat, actions) stay in api/v1/endpoints/.
 
 All routers except /auth require authentication via get_current_user.
 """
@@ -23,10 +23,8 @@ from .endpoints import (
     auth,
     chat,
     clef_actions,
-    import_config,
     metrics,
     reports,
-    scheduler,
     stave_actions,
     trends,
 )
@@ -54,9 +52,5 @@ api_router.include_router(
     stave_actions.router, prefix="/stave-actions", tags=["stave actions"], dependencies=_auth_deps,
 )
 api_router.include_router(clef_actions.router, prefix="/clefs", tags=["clef actions"], dependencies=_auth_deps)
-api_router.include_router(scheduler.router, prefix="/scheduler", tags=["scheduler"], dependencies=_auth_deps)
-api_router.include_router(
-    import_config.router, prefix="/config", tags=["configuration"], dependencies=_auth_deps,
-)
 api_router.include_router(trends.router, prefix="/trends", tags=["trends"], dependencies=_auth_deps)
 api_router.include_router(chat.router, prefix="/chat", tags=["chat"], dependencies=_auth_deps)
