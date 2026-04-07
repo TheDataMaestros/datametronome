@@ -52,7 +52,6 @@ class ApiService {
       if (config.signal?.aborted) {
         throw new Error('Request aborted')
       }
-      console.log(`API Response [${endpoint}]:`, response.status, response.statusText)
 
       const raw = await response.text()
       let data: any = null
@@ -61,7 +60,6 @@ class ApiService {
       } catch {
         data = raw
       }
-      console.log(`API Data [${endpoint}]:`, data)
 
       if (!response.ok) {
         // Handle 401 Unauthorized (expired token)
