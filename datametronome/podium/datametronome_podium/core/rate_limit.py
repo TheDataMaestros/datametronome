@@ -43,13 +43,3 @@ limiter = Limiter(
     storage_uri=_storage_uri,
     headers_enabled=True,  # Add rate limit headers to responses
 )
-
-
-# Custom rate limit configurations for different endpoints
-RATE_LIMITS = {
-    "auth": "5 per minute",  # Strict limit for login attempts
-    "read": "60 per minute",  # Read operations
-    "write": "30 per minute",  # Write operations
-    "health": "100 per minute",  # Health checks
-    "metrics": "20 per minute",  # Metrics endpoint
-}
