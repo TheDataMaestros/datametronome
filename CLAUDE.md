@@ -31,10 +31,20 @@ Search for "stave" not "data source", "clef" not "check definition". The musical
 datametronome/
   datametronome/podium/              # FastAPI backend
     datametronome_podium/
-      api/v1/endpoints/              # Complex endpoints (auth, chat, scheduler, stave_actions, etc.)
-      features/                      # Feature slices (staves, clefs, checks, chat, insights, user_memory, etc.)
+      features/                      # ALL endpoints — feature slices
+        auth/                        # login, register, /me
+        staves/                      # data sources
+        clefs/                       # quality check definitions
+        checks/                      # execution results
+        chat/                        # AI chat
+        insights/                    # data intelligence
+        metrics/                     # Prometheus metrics
+        reports/                     # quality reports
+        trends/                      # trend analysis
+        user_memory/                 # per-user agent memory
+        users/                       # user management
         {feature}/                   # model.py, repo.py, schema.py, router.py
-      core/                          # Config, database, query executor, middleware, metrics
+      core/                          # Config, database, query executor, auth, middleware
       services/                      # Business logic, agents, orchestrator
       tasks/                         # Celery task definitions
       archetypes/                    # Domain classification YAML templates
@@ -115,30 +125,18 @@ openssl rand -hex 32
 - **Feature slices**: New features go in `features/{name}/` with model.py, repo.py, schema.py, router.py.
 - **Database access**: Always use `get_executor()` to obtain a `QueryExecutor`. Never call `get_db()` directly (deprecated).
 - **SQL placeholders**: Use `?` everywhere. `QueryAdapter` translates to `$1, $2, ...` for PostgreSQL at runtime.
-- **Authentication**: Import `get_current_user` from `datametronome_podium.api.v1.endpoints.auth`. All endpoints require auth via `Depends(get_current_user)`.
+- **Authentication**: Import `get_current_user` from `datametronome_podium.core.auth`. All endpoints require auth via `Depends(get_current_user)`.
+- **Authorization**: Import `require_editor`, `require_admin` from `datametronome_podium.core.auth`. Roles: `admin` (full access), `editor` (read + write), `viewer` (read-only).
 - **AI agents**: Built with Pydantic AI. A router agent classifies intent, and the orchestrator dispatches to config/investigation/report/insight agents.
 - **Tests**: pytest with asyncio strict mode. Use `@pytest.mark.asyncio` for async tests. Timeout: 10s.
 - **Docker first**: Always use `docker-compose` for running the full stack. Use `.venv/bin/python` (not `python3`) for local commands from `datametronome/podium/`.
 - **Commits**: Use conventional commits format (`feat:`, `fix:`, `chore:`, `docs:`, `test:`, `refactor:`).
 - **Pre-commit hooks**: Have pre-existing failures. Use `--no-verify` for commits.
 
-## Migration State
-
-The codebase is mid-migration toward the feature-slice pattern:
-
-- **`features/`** -- current pattern. Uses `get_executor()` to obtain a `QueryExecutor`.
-  All new code goes here.
-- **`api/v1/endpoints/`** -- legacy pattern. Complex endpoints (auth, chat, scheduler,
-  stave_actions, clef_actions, metrics, reports, trends, import_config) still use the
-  old `execute_query()` call directly. These have not been migrated yet.
-
-**Rule: all new code must use `get_executor()`**. Never call `execute_query()` or
-`get_db()` in new files.
-
 ## Common Gotchas
 
 - The `Settings` class uses `validation_alias` for env vars (e.g., `DATAMETRONOME_DATABASE_URL`), not the `env_prefix` alone.
-- `agent_tools.py` still uses the old `get_db()` pattern. Migration to `get_executor()` is pending.
-- Some complex endpoints remain in `api/v1/endpoints/` alongside the newer `features/` pattern. Check both locations when looking for route handlers.
+- All route handlers live in `features/*/router.py`. There is no `api/v1/endpoints/` directory.
+- All database access uses `get_executor()`. Never call `get_db()` or `execute_query()` (both removed).
 - Celery workers need their own DB sessions via `worker_db_session()` context manager. They cannot use the global singleton.
 - Musical terminology is pervasive. Search for "stave" not "data source", "clef" not "check definition".
