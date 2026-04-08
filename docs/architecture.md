@@ -124,7 +124,7 @@ QueryExecutor.query() / .execute() / .execute_returning()
 QueryAdapter.adapt()  -- rewrites ? -> $1,$2,... for PostgreSQL; no-op for SQLite
     |
     v
-Pulse connector  -- asyncpg (PostgreSQL) or aiosqlite (SQLite)
+Pulse connector  -- asyncpg/psycopg3/sqlalchemy (PostgreSQL), aiosqlite (SQLite), or bigquery
     |
     v
 Database
@@ -198,6 +198,7 @@ Each business domain has a self-contained slice under `features/{name}/`:
 
 ```
 features/
+  analytics/    -- analytics events
   auth/         -- login, register, /me (public endpoints)
   staves/
     model.py    -- Python dataclass/Pydantic model mirroring the DB row
@@ -211,9 +212,11 @@ features/
   insights/ ...
   metrics/  ...
   reports/  ...
+  traces/   ...
   trends/   ...
   users/    ...
   user_memory/ ...
+  workflows/ ...
 ```
 
 All API endpoints live in `features/*/router.py`. There is no `api/v1/endpoints/` directory.

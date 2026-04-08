@@ -33,6 +33,7 @@ datametronome/
     datametronome_podium/
       features/                      # ALL endpoints — feature slices
         auth/                        # login, register, /me
+        analytics/                   # analytics events
         staves/                      # data sources
         clefs/                       # quality check definitions
         checks/                      # execution results
@@ -40,9 +41,11 @@ datametronome/
         insights/                    # data intelligence
         metrics/                     # Prometheus metrics
         reports/                     # quality reports
+        traces/                      # distributed tracing
         trends/                      # trend analysis
         user_memory/                 # per-user agent memory
         users/                       # user management
+        workflows/                   # automated workflows
         {feature}/                   # model.py, repo.py, schema.py, router.py
       core/                          # Config, database, query executor, auth, middleware
       services/                      # Business logic, agents, orchestrator
@@ -50,7 +53,7 @@ datametronome/
       archetypes/                    # Domain classification YAML templates
     alembic/                         # Database migrations
     tests/                           # pytest tests
-  datametronome/pulse/               # Database connectors (core, postgres, sqlite, bigquery)
+  datametronome/pulse/               # Database connectors (core, postgres, sqlite, bigquery, postgres-psycopg3, postgres-sqlalchemy)
   datametronome/brain/               # ML models
   ui-nuxt/                           # Nuxt 3 frontend
   docker-compose.yml                 # Full stack: postgres + rabbitmq + redis + podium + worker + beat + UI
