@@ -51,6 +51,23 @@
             {{ item.badge }}
           </UBadge>
         </NuxtLink>
+
+        <!-- Admin section -->
+        <template v-if="isAdmin">
+          <span class="dm-nav__section-label" style="margin-top: 12px">Admin</span>
+          <NuxtLink
+            v-for="item in adminItems"
+            :key="item.to"
+            :to="item.to"
+            class="dm-nav__item"
+            :class="{ 'is-active': isActive(item.to) }"
+            :title="collapsed ? item.label : undefined"
+          >
+            <span class="dm-nav__accent" />
+            <Icon :name="item.icon" class="dm-nav__icon" />
+            <span class="dm-nav__label">{{ item.label }}</span>
+          </NuxtLink>
+        </template>
       </nav>
 
       <!-- Stave Selector -->
@@ -257,6 +274,7 @@ const pageTitle = computed(() => {
     notifications: 'Notifications',
     profile: 'Profile',
     settings: 'Settings',
+    users: 'Users',
   }
   return titles[route.name as string] || 'DataMetronome'
 })
@@ -268,6 +286,7 @@ function isActive(to: string) {
 
 // ── Auth / user ──────────────────────────────────────────────────────────────
 const user = computed(() => authStore.user)
+const isAdmin = computed(() => authStore.user?.role === 'admin')
 const showNotifications = ref(false)
 const showSettings = ref(false)
 const isRefreshing = ref(false)
@@ -307,6 +326,11 @@ const navigationItems = [
   { to: '/chat', icon: 'i-heroicons-chat-bubble-left-right', label: 'Chat', badge: null },
   { to: '/reports', icon: 'i-heroicons-document-chart-bar', label: 'Reports', badge: null },
   { to: '/investigation', icon: 'i-heroicons-magnifying-glass', label: 'Investigation', badge: null },
+]
+
+const adminItems = [
+  { to: '/users', icon: 'i-heroicons-users', label: 'Users' },
+  { to: '/settings', icon: 'i-heroicons-cog-6-tooth', label: 'Settings' },
 ]
 
 const userMenuItems = [
@@ -379,7 +403,7 @@ async function refreshData() {
   background: #0f1117;
   border: 1px solid #1e293b;
   color: #94a3b8;
-  font-size: 12px;
+  font-size: 15.6px;
   cursor: pointer;
   transition: border-color 0.15s;
 }
@@ -408,7 +432,7 @@ async function refreshData() {
   gap: 8px;
   padding: 7px 10px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 15.6px;
   color: #94a3b8;
   cursor: pointer;
   width: 100%;

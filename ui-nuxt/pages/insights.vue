@@ -5,7 +5,7 @@
       <div>
         <p class="dm-label mb-2">AI Intelligence</p>
         <h1
-          style="font-family: var(--dm-font-display); font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; color: var(--dm-text-primary); line-height: 1.15;"
+          style="font-family: var(--dm-font-display); font-size: 2.4rem; font-weight: 700; letter-spacing: -0.03em; color: var(--dm-text-primary); line-height: 1.15;"
         >
           Data Insights
         </h1>

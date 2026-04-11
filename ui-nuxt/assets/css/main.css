@@ -27,8 +27,8 @@
   --dm-text-secondary: #94a3b8;
   --dm-text-muted: #475569;
 
-  --dm-font-display: 'Outfit', system-ui, sans-serif;
-  --dm-font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --dm-font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --dm-font-body: 'Manrope', system-ui, sans-serif;
   --dm-font-mono: 'JetBrains Mono', 'Cascadia Code', monospace;
 
   --dm-sidebar-w: 256px;
@@ -234,7 +234,7 @@ body {
 .dm-logo-text__brand {
   display: block;
   font-family: var(--dm-font-display);
-  font-size: 14px;
+  font-size: 18.2px;
   font-weight: 700;
   color: var(--dm-text-primary);
   letter-spacing: -0.2px;
@@ -244,7 +244,7 @@ body {
 .dm-logo-text__sub {
   display: block;
   font-family: var(--dm-font-mono);
-  font-size: 8.5px;
+  font-size: 13px;
   color: var(--dm-text-muted);
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -263,7 +263,7 @@ body {
 .dm-nav__section-label {
   display: block;
   font-family: var(--dm-font-mono);
-  font-size: 8.5px;
+  font-size: 13px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--dm-text-muted);
@@ -282,7 +282,7 @@ body {
   text-decoration: none;
   color: var(--dm-text-secondary);
   font-family: var(--dm-font-body);
-  font-size: 13px;
+  font-size: 16.9px;
   font-weight: 500;
   letter-spacing: -0.1px;
   transition: color var(--dm-transition), background var(--dm-transition);
@@ -361,7 +361,7 @@ body {
 
 .dm-user__name {
   display: block;
-  font-size: 12.5px;
+  font-size: 16.2px;
   font-weight: 600;
   color: var(--dm-text-primary);
   white-space: nowrap;
@@ -373,7 +373,7 @@ body {
 .dm-user__email {
   display: block;
   font-family: var(--dm-font-mono);
-  font-size: 9.5px;
+  font-size: 13px;
   color: var(--dm-text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -440,7 +440,7 @@ body {
 
 .dm-page-title {
   font-family: var(--dm-font-display);
-  font-size: 18px;
+  font-size: 23.4px;
   font-weight: 700;
   color: var(--dm-text-primary);
   letter-spacing: -0.5px;
@@ -483,7 +483,7 @@ body {
   background: var(--dm-cyan);
   color: var(--dm-bg-base);
   font-family: var(--dm-font-mono);
-  font-size: 7.5px;
+  font-size: 13px;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -501,7 +501,7 @@ body {
   background: var(--dm-cyan);
   color: #060a12;
   font-family: var(--dm-font-body);
-  font-size: 12.5px;
+  font-size: 16.2px;
   font-weight: 600;
   border: none;
   cursor: pointer;
@@ -601,7 +601,7 @@ body {
   gap: 0.375rem;
   padding: 0.2rem 0.65rem;
   border-radius: 9999px;
-  font-size: 0.65rem;
+  font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -684,7 +684,7 @@ body {
   padding: 6px 16px;
   border-radius: 8px;
   font-family: var(--dm-font-body);
-  font-size: 12.5px;
+  font-size: 16.2px;
   font-weight: 500;
   color: var(--dm-text-secondary);
   cursor: pointer;
@@ -754,7 +754,7 @@ body {
 
 .dm-notif-panel__title {
   font-family: var(--dm-font-display);
-  font-size: 13.5px;
+  font-size: 17.6px;
   font-weight: 700;
   color: var(--dm-text-primary);
   letter-spacing: -0.3px;
@@ -762,7 +762,7 @@ body {
 
 .dm-notif-panel__mark-all {
   font-family: var(--dm-font-mono);
-  font-size: 10px;
+  font-size: 13px;
   color: var(--dm-cyan);
   background: none;
   border: none;
@@ -789,13 +789,13 @@ body {
 }
 
 .dm-notif-panel__empty-title {
-  font-size: 13px;
+  font-size: 16.9px;
   font-weight: 600;
   color: var(--dm-text-secondary);
 }
 
 .dm-notif-panel__empty-sub {
-  font-size: 11.5px;
+  font-size: 15px;
   color: var(--dm-text-muted);
   text-align: center;
   margin-top: 2px;
@@ -871,14 +871,14 @@ body {
 }
 
 .dm-notif-item__title {
-  font-size: 12.5px;
+  font-size: 16.2px;
   font-weight: 600;
   color: var(--dm-text-primary);
   letter-spacing: -0.1px;
 }
 
 .dm-notif-item__body {
-  font-size: 11.5px;
+  font-size: 15px;
   color: var(--dm-text-secondary);
   white-space: nowrap;
   overflow: hidden;
@@ -887,7 +887,7 @@ body {
 
 .dm-notif-item__meta {
   font-family: var(--dm-font-mono);
-  font-size: 10px;
+  font-size: 13px;
   color: var(--dm-text-muted);
   margin-top: 2px;
   white-space: nowrap;
@@ -917,7 +917,7 @@ body {
   justify-content: center;
   gap: 6px;
   font-family: var(--dm-font-body);
-  font-size: 12px;
+  font-size: 15.6px;
   font-weight: 500;
   color: var(--dm-cyan);
   text-decoration: none;
@@ -956,7 +956,7 @@ body {
 
 .dm-notif-page-empty__title {
   font-family: var(--dm-font-display);
-  font-size: 16px;
+  font-size: 20.8px;
   font-weight: 700;
   color: var(--dm-text-secondary);
   letter-spacing: -0.3px;
@@ -964,7 +964,7 @@ body {
 
 .dm-notif-page-empty__sub {
   font-family: var(--dm-font-mono);
-  font-size: 11px;
+  font-size: 14.3px;
   color: var(--dm-text-muted);
   text-align: center;
 }
@@ -977,7 +977,7 @@ body {
 
 .dm-notif-group__label {
   font-family: var(--dm-font-mono);
-  font-size: 10px;
+  font-size: 13px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--dm-text-muted);
@@ -1024,14 +1024,14 @@ body {
 }
 
 .dm-notif-page-item__title {
-  font-size: 13px;
+  font-size: 16.9px;
   font-weight: 600;
   color: var(--dm-text-primary);
   letter-spacing: -0.1px;
 }
 
 .dm-notif-page-item__body {
-  font-size: 12.5px;
+  font-size: 16.2px;
   color: var(--dm-text-secondary);
   margin-top: 2px;
   line-height: 1.45;
@@ -1039,7 +1039,7 @@ body {
 
 .dm-notif-page-item__meta {
   font-family: var(--dm-font-mono);
-  font-size: 10.5px;
+  font-size: 13.7px;
   color: var(--dm-text-muted);
   margin-top: 5px;
 }
@@ -1054,7 +1054,7 @@ body {
   padding: 0 5px;
   border-radius: 9px;
   font-family: var(--dm-font-mono);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 600;
   background: rgba(255, 255, 255, 0.07);
   color: var(--dm-text-muted);
@@ -1069,7 +1069,7 @@ body {
 /* Stat number typography */
 .dm-stat-value {
   font-family: var(--dm-font-mono);
-  font-size: 2rem;
+  font-size: 2.4rem;
   font-weight: 500;
   color: var(--dm-text-primary);
   letter-spacing: -0.05em;
@@ -1079,7 +1079,7 @@ body {
 /* Mono label */
 .dm-label {
   font-family: var(--dm-font-mono);
-  font-size: 9px;
+  font-size: 13px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--dm-text-muted);

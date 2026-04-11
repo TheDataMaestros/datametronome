@@ -137,7 +137,7 @@ function healthColor(id: string): string {
   gap: 5px;
   padding: 5px 12px;
   border-radius: 20px;
-  font-size: 11px;
+  font-size: 14.3px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
@@ -148,7 +148,7 @@ function healthColor(id: string): string {
 .ds-pill--default:hover { border-color: #475569; }
 .ds-pill--others { background: #1e293b; color: #64748b; border-color: #334155; }
 .ds-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
-.ds-star { font-size: 11px; cursor: pointer; transition: color 0.1s; }
+.ds-star { font-size: 14.3px; cursor: pointer; transition: color 0.1s; }
 .ds-star--filled { color: #f59e0b; }
 .ds-star--ghost { color: #475569; opacity: 0; }
 .ds-star--ghost:hover, .group:hover .ds-star--ghost { opacity: 1; color: #f59e0b; }
@@ -176,7 +176,7 @@ function healthColor(id: string): string {
   gap: 8px;
   padding: 7px 10px;
   border-radius: 6px;
-  font-size: 12px;
+  font-size: 15.6px;
   color: #94a3b8;
   cursor: pointer;
   width: 100%;

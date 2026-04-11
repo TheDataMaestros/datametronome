@@ -5,7 +5,7 @@
       <div>
         <p class="dm-label mb-2">System Events</p>
         <h1
-          style="font-family: var(--dm-font-display); font-size: 2rem; font-weight: 800; letter-spacing: -0.05em; color: var(--dm-text-primary); line-height: 1.1;"
+          style="font-family: var(--dm-font-display); font-size: 2.4rem; font-weight: 800; letter-spacing: -0.05em; color: var(--dm-text-primary); line-height: 1.1;"
         >
           Notifications
         </h1>
@@ -77,7 +77,7 @@
     <!-- Loading -->
     <div v-if="isLoading" class="dm-notif-page-empty">
       <Icon name="i-heroicons-arrow-path" class="w-8 h-8 animate-spin opacity-20 mb-3" />
-      <p style="color: var(--dm-text-muted); font-size: 13px;">Loading notifications…</p>
+      <p style="color: var(--dm-text-muted); font-size: 16.9px;">Loading notifications…</p>
     </div>
 
     <!-- Empty state -->

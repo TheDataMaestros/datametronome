@@ -24,7 +24,7 @@
       <div>
         <p class="dm-label mb-2">Overview</p>
         <h1
-          style="font-family: var(--dm-font-display); font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; color: var(--dm-text-primary); line-height: 1.15;"
+          style="font-family: var(--dm-font-display); font-size: 2.4rem; font-weight: 700; letter-spacing: -0.03em; color: var(--dm-text-primary); line-height: 1.15;"
         >
           Welcome back
         </h1>
@@ -597,6 +597,7 @@ const { metrics: dashboardMetrics, fetchMetrics } = useDashboard()
 
 const { loadPrefs } = useDashboardPrefs()
 const { selectedStaveId, scopedDashboard, scopedProfile, isScopedLoading, selectStave } = useSelectedStave()
+const { runAllChecks: apiRunAllChecks } = useClefs()
 
 const isRunningChecks = ref(false)
 
@@ -853,10 +854,13 @@ async function triggerReanalyze() {
 async function runAllChecks() {
   isRunningChecks.value = true
   try {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await apiRunAllChecks()
+    // Wait briefly for some checks to complete
+    await new Promise((resolve) => setTimeout(resolve, 1500))
     // Refresh data
     await refreshData()
+  } catch (err) {
+    console.error('Failed to run all checks', err)
   } finally {
     isRunningChecks.value = false
   }
