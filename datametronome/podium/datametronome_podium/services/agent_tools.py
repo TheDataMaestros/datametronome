@@ -7,11 +7,11 @@ Each function calls the DB via repo layer (no HTTP) and has no runtime deps on a
 import logging
 
 from datametronome_podium.core.database import get_executor
-from datametronome_podium.core.query import quote_identifier as _quote_identifier
 from datametronome_podium.features.checks.repo import CheckRepo
 from datametronome_podium.features.clefs.repo import ClefRepo
 from datametronome_podium.features.staves.repo import StaveRepo
 
+from datametronome_podium.core.query import quote_identifier as _quote_identifier
 logger = logging.getLogger(__name__)
 
 

@@ -54,7 +54,7 @@ def _dispatch_auto_scan(stave_id: str) -> None:
 
     try:
         from datametronome_podium.services.intelligence_scheduler import register_daily_intelligence
-        register_daily_intelligence(stave_id)
+        background_tasks.add_task(register_daily_intelligence, stave_id)
     except Exception:
         pass
 
@@ -198,7 +198,7 @@ async def update_stave(stave_id: str, stave_in: StaveUpdate, _user: dict = Depen
 
 
 @router.post("/{stave_id}/unpause")
-async def unpause_stave(stave_id: str, _user: dict = Depends(require_editor)):
+async def unpause_stave(stave_id: str, background_tasks: BackgroundTasks, _user: dict = Depends(require_editor)):
     repo = _repo()
     stave = await repo.get(stave_id)
     if not stave:
@@ -213,7 +213,7 @@ async def unpause_stave(stave_id: str, _user: dict = Depends(require_editor)):
     # Re-register intelligence schedule
     try:
         from datametronome_podium.services.intelligence_scheduler import register_daily_intelligence
-        register_daily_intelligence(stave_id)
+        background_tasks.add_task(register_daily_intelligence, stave_id)
     except Exception:
         pass
 

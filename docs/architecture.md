@@ -179,7 +179,7 @@ sequenceDiagram
 
 ### Agent tools
 
-All tools live in `services/agent_tools.py`. They use `get_executor()` to obtain a
+All tools live in `datametronome_podium/services/agent_tools.py`. They use `get_executor()` to obtain a
 `QueryExecutor` and return structured data to the calling agent.
 
 ### Dispatch modes
@@ -427,7 +427,7 @@ singleton to prevent duplicate execution across replicas.
 | Celery app | `datametronome_podium/core/celery_app.py` |
 | CheckDispatcher protocol | `datametronome_podium/core/check_dispatcher.py` |
 | Dispatcher factory | `datametronome_podium/core/dispatcher_factory.py` |
-| Agent tools | `datametronome_podium/services/agents/agent_tools.py` |
+| Agent tools | `datametronome_podium/services/agent_tools.py` |
 | Orchestrator | `datametronome_podium/services/orchestrator.py` |
 | Feature slices | `datametronome_podium/features/{name}/` |
 | Auth utilities | `datametronome_podium/core/auth.py` |
