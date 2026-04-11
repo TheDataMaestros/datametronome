@@ -13,7 +13,7 @@
           What the AI found in your data — anomalies, findings, and actionable suggestions.
         </p>
       </div>
-      <div class="flex items-center gap-3">
+      <div v-if="staves.length" class="flex items-center gap-3">
         <span v-if="analyzeStatus" class="text-xs text-slate-400 italic">{{ analyzeStatus }}</span>
         <UButton
           color="primary"
@@ -34,11 +34,23 @@
       </div>
     </div>
 
-    <!-- No data state -->
+    <!-- No staves — guide user to connect a data source first -->
+    <div v-else-if="!staves.length" class="intelligence-panel rounded-xl p-12 text-center">
+      <Icon name="i-heroicons-server-stack" class="w-12 h-12 mx-auto text-slate-500 mb-4" />
+      <h3 class="text-lg font-semibold text-white mb-2">Connect Your First Data Source</h3>
+      <p class="text-slate-400 mb-6">
+        Add a database connection so the AI can analyze your data and surface insights.
+      </p>
+      <UButton color="primary" icon="i-heroicons-plus" to="/staves">
+        Add Data Source
+      </UButton>
+    </div>
+
+    <!-- Staves exist but no insights yet -->
     <div v-else-if="!staveInsights.length" class="intelligence-panel rounded-xl p-12 text-center">
       <Icon name="i-heroicons-sparkles" class="w-12 h-12 mx-auto text-slate-500 mb-4" />
       <h3 class="text-lg font-semibold text-white mb-2">No Insights Yet</h3>
-      <p class="text-slate-400 mb-6">Run an analysis to let the AI examine your data sources.</p>
+      <p class="text-slate-400 mb-6">Run an analysis to let the AI examine your {{ staves.length }} data source{{ staves.length === 1 ? '' : 's' }}.</p>
       <UButton color="primary" icon="i-heroicons-play" @click="triggerAnalysis">
         Run First Analysis
       </UButton>

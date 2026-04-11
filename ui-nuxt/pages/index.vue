@@ -52,6 +52,29 @@
       </div>
     </div>
 
+    <!-- First-run onboarding -->
+    <UCard v-if="!staves.length" class="animate-stagger-3 border-2 border-dashed border-blue-500/30 bg-blue-500/5">
+      <div class="flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+          <Icon name="i-heroicons-rocket-launch" class="w-6 h-6 text-blue-400" />
+        </div>
+        <div class="flex-1">
+          <h3 class="text-lg font-semibold text-white mb-1">Get started with DataMetronome</h3>
+          <p class="text-sm text-slate-400 mb-4">
+            Connect your first database to start monitoring data quality and get AI-powered insights.
+          </p>
+          <div class="flex items-center gap-3">
+            <UButton color="primary" icon="i-heroicons-plus" to="/staves">
+              Add Data Source
+            </UButton>
+            <UButton color="gray" variant="ghost" icon="i-heroicons-book-open" to="/chat">
+              Ask the AI
+            </UButton>
+          </div>
+        </div>
+      </div>
+    </UCard>
+
     <!-- System Health Metrics -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <UCard class="gradient-primary text-white">
