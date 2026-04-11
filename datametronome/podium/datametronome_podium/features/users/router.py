@@ -120,7 +120,9 @@ async def update_user(
 
     # Re-fetch to return updated state
     updated = await repo.find_by_id(user_id)
-    result = updated.model_dump()  # type: ignore[union-attr]
+    if not updated:
+        raise HTTPException(status_code=404, detail="User not found after update")
+    result = updated.model_dump()
     result.pop("hashed_password", None)
     return result
 
