@@ -54,7 +54,12 @@ def _dispatch_auto_scan(stave_id: str) -> None:
 
     try:
         from datametronome_podium.services.intelligence_scheduler import register_daily_intelligence
-        background_tasks.add_task(register_daily_intelligence, stave_id)
+        def safe_register():
+            try:
+                register_daily_intelligence(stave_id)
+            except Exception:
+                pass
+        background_tasks.add_task(safe_register)
     except Exception:
         pass
 
@@ -213,7 +218,12 @@ async def unpause_stave(stave_id: str, background_tasks: BackgroundTasks, _user:
     # Re-register intelligence schedule
     try:
         from datametronome_podium.services.intelligence_scheduler import register_daily_intelligence
-        background_tasks.add_task(register_daily_intelligence, stave_id)
+        def safe_register():
+            try:
+                register_daily_intelligence(stave_id)
+            except Exception:
+                pass
+        background_tasks.add_task(safe_register)
     except Exception:
         pass
 

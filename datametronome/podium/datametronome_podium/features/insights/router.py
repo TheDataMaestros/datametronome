@@ -315,6 +315,18 @@ async def get_business_report_history(stave_id: str, limit: int = 20):
 # --- Notifications ---
 
 
+@router.get("/notifications/{user_id}", response_model=list[NotificationResponse])
+async def list_notifications_legacy(
+    user_id: str,
+    unread_only: bool = False,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """List notifications for a specific user (legacy compatibility)."""
+    if user_id != current_user["id"] and current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Cannot access notifications for other users")
+    results = await _repo().list_notifications(user_id, unread_only=unread_only)
+    return [n.model_dump() for n in results]
+
 @router.get("/notifications/me", response_model=list[NotificationResponse])
 async def list_notifications(
     unread_only: bool = False,
