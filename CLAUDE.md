@@ -2,7 +2,7 @@
 
 ## Architecture Reference
 
-Full architecture reference: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+Full architecture reference: [docs/architecture.md](docs/architecture.md)
 
 Covers: system topology, request flow, AI agent design, feature slice conventions,
 database access layers (QueryExecutor / QueryAdapter / Pulse), and worker architecture.

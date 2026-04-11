@@ -174,9 +174,9 @@ class InsightsService {
     return response.data
   }
 
-  async getNotifications(userId: string, unreadOnly = false): Promise<InsightNotification[]> {
+  async getNotifications(unreadOnly = false): Promise<InsightNotification[]> {
     const params = unreadOnly ? '?unread_only=true' : ''
-    const response = await apiService.get<InsightNotification[]>(`/insights/notifications/${userId}${params}`)
+    const response = await apiService.get<InsightNotification[]>(`/insights/notifications/me${params}`)
     return response.data
   }
 

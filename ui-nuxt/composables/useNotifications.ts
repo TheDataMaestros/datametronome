@@ -98,7 +98,7 @@ export const useNotifications = () => {
       let insightNotifs: Notification[] = []
       if (userId) {
         try {
-          const apiNotifs = await insightsService.getNotifications(userId)
+          const apiNotifs = await insightsService.getNotifications()
           insightNotifs = apiNotifs.map((n) => insightNotifToNotification(n, _readIds.value))
         } catch { /* insight notifications optional */ }
       }

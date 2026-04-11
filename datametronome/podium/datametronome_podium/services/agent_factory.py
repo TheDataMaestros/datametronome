@@ -80,8 +80,45 @@ def build_model(
     )
 
 
+_ai_config_cache: dict[str, str | None] | None = None
+
+_DB_KEY_MAPPING = {
+    "ai_provider": "provider",
+    "ai_model": "model",
+    "ai_api_key": "api_key",
+    "ai_router_model": "router_model",
+    "ai_heavy_model": "heavy_model",
+    "ai_base_url": "base_url",
+}
+
+
+async def refresh_ai_config_cache() -> None:
+    """Load AI settings from DB into module-level cache.
+
+    Call this at application startup (e.g. FastAPI lifespan) so that sync
+    callers of ``_get_ai_config()`` see DB-managed values without needing
+    ``run_until_complete`` inside a running event loop.
+    """
+    global _ai_config_cache
+    try:
+        from datametronome_podium.core.database import get_executor
+        from datametronome_podium.features.settings.repo import AppSettingsRepo
+
+        repo = AppSettingsRepo(get_executor())
+        overlay: dict[str, str | None] = {}
+        for db_key, cfg_key in _DB_KEY_MAPPING.items():
+            val = await repo.get_decrypted(db_key)
+            if val:
+                overlay[cfg_key] = val
+        _ai_config_cache = overlay
+        logger.info("AI config cache refreshed from DB (%d overrides)", len(overlay))
+    except Exception:
+        _ai_config_cache = {}
+        logger.debug("AI config cache refresh skipped (DB not ready)")
+
+
 def _get_ai_config() -> dict[str, str | None]:
-    """Resolve AI configuration: DB app_settings first, env vars as fallback.
+    """Resolve AI configuration: cached DB values first, env vars as fallback.
 
     Returns a dict with keys: provider, model, api_key, router_model,
     heavy_model, base_url.
@@ -98,33 +135,9 @@ def _get_ai_config() -> dict[str, str | None]:
         "base_url": settings.ai_base_url,
     }
 
-    # Try to overlay DB settings (best-effort — table may not exist yet)
-    try:
-        import asyncio
-        from datametronome_podium.core.database import get_executor
-        from datametronome_podium.features.settings.repo import AppSettingsRepo
-
-        repo = AppSettingsRepo(get_executor())
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # We're inside an async context — can't block.  Use a sync query.
-            return cfg
-
-        mapping = {
-            "ai_provider": "provider",
-            "ai_model": "model",
-            "ai_api_key": "api_key",
-            "ai_router_model": "router_model",
-            "ai_heavy_model": "heavy_model",
-            "ai_base_url": "base_url",
-        }
-        for db_key, cfg_key in mapping.items():
-            val = loop.run_until_complete(repo.get_decrypted(db_key))
-            if val:
-                cfg[cfg_key] = val
-    except Exception:
-        # DB not ready, table missing, etc. — fall back silently to env vars.
-        pass
+    # Overlay cached DB settings (populated by refresh_ai_config_cache at startup)
+    if _ai_config_cache:
+        cfg.update(_ai_config_cache)
 
     return cfg
 

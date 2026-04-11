@@ -155,7 +155,7 @@ async def _run_auto_scan_async(stave_id: str) -> dict[str, Any]:
     token = await _acquire_lock(redis, stave_id)
     if not token:
         logger.info("Auto-scan skipped for stave %s -- lock held", stave_id)
-        await redis.aclose()
+
         return {"status": "skipped", "reason": "lock_held"}
     try:
         from datametronome_podium.core.worker_db import worker_db_session
@@ -181,7 +181,7 @@ async def _run_auto_scan_async(stave_id: str) -> dict[str, Any]:
         return {"status": "failed", "error": str(exc)}
     finally:
         await _release_lock(redis, stave_id, token)
-        await redis.aclose()
+
 
 
 async def _run_daily_async(stave_id: str) -> dict[str, Any]:
@@ -192,7 +192,7 @@ async def _run_daily_async(stave_id: str) -> dict[str, Any]:
         logger.info(
             "Daily intelligence skipped for stave %s -- lock held", stave_id
         )
-        await redis.aclose()
+
         return {"status": "skipped", "reason": "lock_held"}
     try:
         from datametronome_podium.core.worker_db import worker_db_session
@@ -222,7 +222,7 @@ async def _run_daily_async(stave_id: str) -> dict[str, Any]:
         return {"status": "failed", "error": str(exc)}
     finally:
         await _release_lock(redis, stave_id, token)
-        await redis.aclose()
+
 
 
 async def _run_on_demand_async(
@@ -232,7 +232,7 @@ async def _run_on_demand_async(
     redis = get_redis_client()
     token = await _acquire_lock(redis, stave_id)
     if not token:
-        await redis.aclose()
+
         return {
             "status": "in_progress",
             "message": "An analysis is already running for this data source.",
@@ -265,4 +265,4 @@ async def _run_on_demand_async(
         return {"status": "failed", "error": str(exc)}
     finally:
         await _release_lock(redis, stave_id, token)
-        await redis.aclose()
+

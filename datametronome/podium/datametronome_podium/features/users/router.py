@@ -5,7 +5,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from datametronome_podium.core.auth import get_current_user, require_admin
+from datametronome_podium.core.auth import require_admin
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.security import get_password_hash
 from datametronome_podium.core.timestamp_utils import now_utc_iso

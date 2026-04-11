@@ -10,13 +10,24 @@ from typing import Any
 from datametronome_podium.core.query_adapter import QueryAdapter
 
 
-def quote_identifier(name: str) -> str:
+def quote_identifier(name: str, dialect: str = "ansi") -> str:
     """Safely quote a SQL identifier to prevent injection.
 
-    Wraps the name in double-quotes (ANSI SQL standard) and escapes any
-    embedded double-quotes by doubling them.
+    Handles dot-separated names (e.g. ``schema.table``) by quoting each
+    segment individually.  For BigQuery uses backtick quoting; all other
+    dialects use ANSI double-quote quoting (PostgreSQL, SQLite, MySQL ANSI).
     """
-    return '"' + name.replace('"', '""') + '"'
+    def _quote_segment(seg: str) -> str:
+        seg = seg.strip()
+        if not seg:
+            raise ValueError(f"Empty segment in identifier: {name!r}")
+        if dialect == "bigquery":
+            return '`' + seg.replace('`', '\\`') + '`'
+        return '"' + seg.replace('"', '""') + '"'
+
+    if "." in name:
+        return ".".join(_quote_segment(s) for s in name.split("."))
+    return _quote_segment(name)
 
 
 _VALID_DIRECTIONS = {"ASC", "DESC"}

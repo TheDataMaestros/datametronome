@@ -38,6 +38,8 @@ def test_run_now_returns_202_with_job_id():
     assert data["job_id"] == "job-uuid-123"
     assert data["clef_id"] == "clef-1"
     assert data["status"] == "pending"
+    mock_dispatcher.dispatch.assert_awaited_once_with("clef-1")
+    mock_dispatcher.get_status.assert_awaited_once_with("job-uuid-123")
 
 
 def test_run_now_dispatch_failure_returns_500():

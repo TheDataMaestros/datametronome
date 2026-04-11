@@ -27,8 +27,14 @@ from datametronome_podium.features.checks.model import (
 )
 from datametronome_podium.features.clefs.model import Clef
 from datametronome_podium.features.staves.model import Stave
-from datametronome_podium.core.query import quote_identifier
+from datametronome_podium.core.query import quote_identifier as _quote_ident
 from datametronome_podium.core.connector_factory import create_connector
+
+
+def _qi(name: str, stave: Stave) -> str:
+    """Quote identifier using the correct dialect for the stave's data source."""
+    dialect = "bigquery" if stave.data_source_type == "bigquery" else "ansi"
+    return _quote_ident(name, dialect=dialect)
 
 try:
     from datametronome_brain_base.forecasting import SarimaForecaster  # type: ignore
@@ -253,8 +259,8 @@ class ClefExecutor:
         threshold = config.get("threshold", 0.0)
 
         # Build SQL query to count NULLs
-        qt = quote_identifier(table)
-        qc = quote_identifier(column)
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT
@@ -368,8 +374,8 @@ class ClefExecutor:
             )
 
         # Build SQL query to check values outside range
-        qt = quote_identifier(table)
-        qc = quote_identifier(column)
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         conditions = []
         if min_val is not None:
             conditions.append(f"{qc} < {min_val}")
@@ -490,7 +496,7 @@ class ClefExecutor:
 
         # Build SQL query to count rows
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "sqlite"]:
-            sql = f"SELECT COUNT(*) as row_count FROM {quote_identifier(table)}"
+            sql = f"SELECT COUNT(*) as row_count FROM {_qi(table, stave)}"
         else:
             return CheckResult(
                 clef_id=clef.id,
@@ -653,8 +659,8 @@ class ClefExecutor:
         column = config["column"]
 
         # Build SQL query to find duplicates
-        qt = quote_identifier(table)
-        qc = quote_identifier(column)
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT
@@ -729,8 +735,8 @@ class ClefExecutor:
 
         # Build SQL query to find non-matching patterns
         # Note: SQL regex support varies by database
-        qt = quote_identifier(table)
-        qc = quote_identifier(column)
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         if stave.data_source_type in ["postgres", "postgresql"]:
             sql = f"""
             SELECT
@@ -1142,8 +1148,8 @@ class ClefExecutor:
         parsed: Dict[str, Any],
     ) -> CheckResult:
         """Execute if_null condition check."""
-        qt = quote_identifier(table)
-        qc = quote_identifier(column)
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         sql = f"""
         SELECT
             COUNT(*) as total_rows,
@@ -1244,8 +1250,8 @@ class ClefExecutor:
     ) -> CheckResult:
         """Execute if_not_unique condition check - finds duplicate values."""
         # Build SQL to find duplicates
-        qt = quote_identifier(table)
-        qc = quote_identifier(column)
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT
@@ -1368,8 +1374,8 @@ class ClefExecutor:
 
         # Build SQL to count values not in allowed list
         # Escape values for SQL injection safety
-        qt = quote_identifier(table)
-        qc = quote_identifier(column)
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         if stave.data_source_type in ["postgres", "postgresql"]:
             # Use array syntax for PostgreSQL
             values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
@@ -1518,7 +1524,7 @@ class ClefExecutor:
                     metadata={"error": "missing_table"},
                 )
 
-            sql = f"SELECT COUNT(*) as row_count FROM {quote_identifier(table)}"
+            sql = f"SELECT COUNT(*) as row_count FROM {_qi(table, stave)}"
             results = await db_connector.query({"sql": sql})
 
             if not results:
@@ -1853,7 +1859,7 @@ class ClefExecutor:
             max_age_input = config.get("max_age_hours", config.get("max_age", 24))
             max_age_hours = _parse_duration_to_hours(max_age_input) or 24.0
 
-            sql = f"SELECT MAX({quote_identifier(column)}) as latest_timestamp FROM {quote_identifier(table)}"
+            sql = f"SELECT MAX({_qi(column, stave)}) as latest_timestamp FROM {_qi(table, stave)}"
             # Try dict format first, fallback to string if needed
             try:
                 results = await db_connector.query({"sql": sql})
@@ -2194,8 +2200,8 @@ class ClefExecutor:
             # 1. Fetch Baseline Data
             # Limit to prevent memory explosions
             # baseline_condition / current_condition are trusted config strings, not user input
-            qt = quote_identifier(table)
-            qc = quote_identifier(column)
+            qt = _qi(table, stave)
+            qc = _qi(column, stave)
             baseline_sql = f"SELECT {qc} as val FROM {qt} WHERE {baseline_condition} LIMIT 10000"
             baseline_rows = await db_connector.query({"sql": baseline_sql})
             baseline_values = [r["val"] for r in baseline_rows if r["val"] is not None]

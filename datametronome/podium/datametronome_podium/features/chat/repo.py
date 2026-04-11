@@ -5,7 +5,6 @@ import json
 import logging
 import uuid
 
-from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.query import QueryExecutor
 from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.features.chat.model import ChatMessage
@@ -57,7 +56,7 @@ class ChatRepo:
                 conversation_id,
                 user_id,
             )
-            history = await get_executor().query(
+            history = await self.db.query(
                 """
                 SELECT role, content, tool_calls, created_at
                 FROM chat_messages
@@ -116,7 +115,7 @@ class ChatRepo:
 
         user_message_id = f"msg-{uuid.uuid4().hex[:12]}"
         try:
-            await get_executor().insert(
+            await self.db.insert(
                 "chat_messages",
                 {
                     "id": user_message_id,
@@ -136,7 +135,7 @@ class ChatRepo:
         # Track conversation for memory extraction — non-critical, extraction
         # falls back to polling all recent conversations if this upsert fails.
         try:
-            await get_executor().execute(
+            await self.db.execute(
                 "INSERT INTO conversation_extraction_status (conversation_id, user_id, status) "
                 "VALUES (?, ?, 'idle') ON CONFLICT (conversation_id) DO NOTHING",
                 [conversation_id, user_id],
@@ -148,7 +147,7 @@ class ChatRepo:
         assistant_now = now_utc_iso()
         assistant_message_id = f"msg-{uuid.uuid4().hex[:12]}"
         try:
-            await get_executor().insert(
+            await self.db.insert(
                 "chat_messages",
                 {
                     "id": assistant_message_id,

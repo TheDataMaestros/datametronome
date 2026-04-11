@@ -17,13 +17,13 @@ def now_utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
-def to_utc_isoformat(dt: Optional[datetime] = None) -> str:
-    """Convert datetime to UTC ISO format string with 'Z' suffix.
+def to_utc_isoformat(dt: "Optional[datetime | str]" = None) -> str:
+    """Convert datetime or ISO string to UTC ISO format string with 'Z' suffix.
 
     Uses .isoformat() to preserve microsecond precision (strftime would truncate).
 
     Args:
-        dt: Datetime object or string. If None, uses current UTC time.
+        dt: Datetime object, ISO-8601 string, or None. If None, uses current UTC time.
 
     Returns:
         ISO format string in UTC (e.g., "2025-10-08T22:30:00.123456Z")

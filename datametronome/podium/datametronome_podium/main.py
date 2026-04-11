@@ -140,6 +140,10 @@ async def lifespan(app: FastAPI):
     await init_db()
     logging.info("Database initialized")
 
+    # Cache DB-managed AI settings so sync callers see them without blocking
+    from .services.agent_factory import refresh_ai_config_cache
+    await refresh_ai_config_cache()
+
     logging.info(
         "Scheduler integration: Celery Beat + RedBeat (scheduler_enabled=%s, dispatch_mode=%s)",
         settings.scheduler_enabled,

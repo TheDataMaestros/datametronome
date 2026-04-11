@@ -3,7 +3,7 @@ import json
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 
 from datametronome_podium.core.auth import get_current_user, require_admin, require_editor
@@ -126,7 +126,11 @@ async def get_stave_delete_info(stave_id: str, _user: dict = Depends(get_current
 
 
 @router.post("/", response_model=StaveResponse, status_code=201)
-async def create_stave(stave_in: StaveCreate, _user: dict = Depends(require_editor)):
+async def create_stave(
+    stave_in: StaveCreate,
+    background_tasks: BackgroundTasks,
+    _user: dict = Depends(require_editor),
+):
     repo = _repo()
     now = now_utc_iso()
     encrypted_config = encrypt_sensitive_fields(
@@ -147,8 +151,9 @@ async def create_stave(stave_in: StaveCreate, _user: dict = Depends(require_edit
     data["connection_config"] = mask_sensitive_fields(
         stave_in.connection_config, stave_in.data_source_type
     )
-    # Trigger background intelligence scan
-    _dispatch_auto_scan(stave.id)
+    # Dispatch intelligence scan in background to avoid blocking the response
+    # with sync Redis I/O from register_daily_intelligence().
+    background_tasks.add_task(_dispatch_auto_scan, stave.id)
     return data
 
 

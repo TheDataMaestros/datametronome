@@ -179,8 +179,8 @@ sequenceDiagram
 
 ### Agent tools
 
-All tools live in `services/agents/agent_tools.py`. They receive a `QueryExecutor`
-and return structured data to the calling agent.
+All tools live in `services/agent_tools.py`. They use `get_executor()` to obtain a
+`QueryExecutor` and return structured data to the calling agent.
 
 ### Dispatch modes
 

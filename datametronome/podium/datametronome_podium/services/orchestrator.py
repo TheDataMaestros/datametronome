@@ -117,11 +117,11 @@ def _get_agent_builder(agent_type: str, user_profile: str | None = None):
 
     # Profile-aware closures — bypasses the bare helpers intentionally because
     # the profile kwarg cannot be forwarded through the no-arg helper wrappers.
-    # Models are pre-built here (once) rather than inside each closure so that
-    # chain/parallel modes don't construct a new model object per agent call.
-    from datametronome_podium.services.agent_factory import build_heavy_model_from_settings
+    # Main model is pre-built; heavy model is lazily constructed only when the
+    # insight agent is actually requested (avoids wasted latency + failures if
+    # heavy-model credentials are misconfigured).
     _main_model = build_model_from_settings()
-    _heavy_model = build_heavy_model_from_settings()
+    _heavy_model = None
 
     def _config():
         return build_config_agent(_main_model, user_profile=user_profile)
@@ -133,6 +133,10 @@ def _get_agent_builder(agent_type: str, user_profile: str | None = None):
         return build_report_agent(_main_model, user_profile=user_profile)
 
     def _insight():
+        nonlocal _heavy_model
+        if _heavy_model is None:
+            from datametronome_podium.services.agent_factory import build_heavy_model_from_settings
+            _heavy_model = build_heavy_model_from_settings()
         return build_insight_agent(_heavy_model, user_profile=user_profile)
 
     builders_with_profile = {
