@@ -1,5 +1,7 @@
 """Analytics data access -- read-only aggregate queries."""
 from __future__ import annotations
+from datetime import datetime, timedelta, timezone
+
 from datametronome_podium.core.query import QueryExecutor
 
 
@@ -27,10 +29,11 @@ class AnalyticsRepo:
         return rows[0]["count"] if rows else 0
 
     async def get_anomaly_count(self, hours: int = 24) -> int:
+        cutoff = (datetime.now(timezone.utc) - timedelta(hours=hours)).isoformat()
         rows = await self.db.query(
             "SELECT COUNT(*) as count FROM checks "
-            "WHERE anomalies_count > 0 AND timestamp >= datetime('now', ?)",
-            [f"-{hours} hours"]
+            "WHERE anomalies_count > 0 AND timestamp >= ?",
+            [cutoff]
         )
         return rows[0]["count"] if rows else 0
 

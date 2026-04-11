@@ -14,6 +14,8 @@ from typing import Any
 from pydantic import BaseModel
 
 from datametronome_podium.api.schemas.auth import (
+    SetupInit,
+    SetupStatus,
     Token,
     UserCreate,
     UserLogin,
@@ -225,3 +227,40 @@ async def patch_current_user(
         "role": current_user.get("role", "viewer"),
         "dashboard_prefs": prefs_to_save,
     }
+
+
+@router.get("/setup/status", response_model=SetupStatus)
+async def setup_status() -> dict[str, bool]:
+    """Check if first-run setup is needed (users table is empty)."""
+    rows = await get_executor().query("SELECT COUNT(*) AS cnt FROM users", [])
+    count = rows[0]["cnt"] if rows else 0
+    return {"needs_setup": count == 0}
+
+
+@router.post("/setup/init", response_model=Token)
+async def setup_init(body: SetupInit) -> dict[str, str]:
+    """Create the initial admin account. Only works when no users exist."""
+    rows = await get_executor().query("SELECT COUNT(*) AS cnt FROM users", [])
+    count = rows[0]["cnt"] if rows else 0
+    if count > 0:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Setup already completed — users exist",
+        )
+
+    hashed_password = get_password_hash(body.password)
+    now = now_utc_iso()
+
+    await get_executor().insert("users", {
+        "id": body.username,
+        "username": body.username,
+        "email": body.email,
+        "hashed_password": hashed_password,
+        "is_active": True,
+        "role": "admin",
+        "created_at": now,
+        "updated_at": now,
+    })
+
+    access_token = create_access_token(data={"sub": body.username})
+    return {"access_token": access_token, "token_type": "bearer"}

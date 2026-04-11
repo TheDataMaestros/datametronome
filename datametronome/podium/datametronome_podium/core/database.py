@@ -76,10 +76,6 @@ async def init_db() -> None:
     await connector.connect()
     logger.info("Database connected (dialect=%s)", dialect)
 
-    # Seed default data
-    from datametronome_podium.core.seeding import create_default_admin
-    await create_default_admin(_executor)
-
     logger.info("Database initialized successfully")
 
 

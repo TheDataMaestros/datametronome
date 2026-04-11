@@ -25,9 +25,11 @@ def _serialize_stave_row(row) -> dict:
 
     Accepts either type: StaveRow has string datetimes; Stave has datetime objects.
     We normalise to ISO strings for both.
+    Sensitive fields (passwords, tokens) are masked so agents never see plaintext.
     """
     from datetime import datetime
 
+    from datametronome_podium.core.encryption import mask_sensitive_fields
     from datametronome_podium.services.stave_service import deserialize_stave
 
     # StaveRow.model_dump() yields the same shape as a raw DB dict,
@@ -36,6 +38,11 @@ def _serialize_stave_row(row) -> dict:
     for field in ("created_at", "updated_at"):
         if isinstance(d.get(field), datetime):
             d[field] = d[field].isoformat()
+    # Mask credentials before exposing to AI agents
+    if isinstance(d.get("connection_config"), dict):
+        d["connection_config"] = mask_sensitive_fields(
+            d["connection_config"], d.get("data_source_type")
+        )
     return d
 
 

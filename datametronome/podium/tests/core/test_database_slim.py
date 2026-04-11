@@ -11,8 +11,7 @@ class TestGetExecutor:
             mock_conn = AsyncMock()
             mock_create.return_value = (mock_conn, "sqlite")
 
-            with patch("datametronome_podium.core.seeding.create_default_admin", new_callable=AsyncMock):
-                await init_db()
+            await init_db()
 
             from datametronome_podium.core.query import QueryExecutor
             executor = get_executor()

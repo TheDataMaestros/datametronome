@@ -34,6 +34,11 @@ class Settings(BaseSettings):
         validation_alias="DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES",
         ge=1,
     )
+    encryption_key: str | None = Field(
+        default=None,
+        description="Fernet key for encrypting sensitive stave fields. If unset, derived from secret_key.",
+        validation_alias="DATAMETRONOME_ENCRYPTION_KEY",
+    )
 
     # Database
     database_url: str = Field(

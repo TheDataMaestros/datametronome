@@ -9,6 +9,11 @@ from pydantic import BaseModel, Field
 from datametronome_podium.core.auth import get_current_user, require_admin, require_editor
 from datametronome_podium.core.circuit_breaker import StaveCircuitBreaker
 from datametronome_podium.core.database import get_executor
+from datametronome_podium.core.encryption import (
+    MASKED_VALUE,
+    encrypt_sensitive_fields,
+    mask_sensitive_fields,
+)
 from datametronome_podium.core.redis import get_redis_client
 from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.features.staves.model import StaveRow as Stave
@@ -54,6 +59,20 @@ def _dispatch_auto_scan(stave_id: str) -> None:
         pass
 
 
+def _prepare_stave_response(data: dict[str, Any]) -> dict[str, Any]:
+    """Parse connection_config JSON and mask sensitive fields for API responses."""
+    if isinstance(data.get("connection_config"), str):
+        try:
+            data["connection_config"] = json.loads(data["connection_config"])
+        except (json.JSONDecodeError, TypeError):
+            pass
+    if isinstance(data.get("connection_config"), dict):
+        data["connection_config"] = mask_sensitive_fields(
+            data["connection_config"], data.get("data_source_type")
+        )
+    return data
+
+
 def _repo() -> StaveRepo:
     return StaveRepo(get_executor())
 
@@ -73,12 +92,7 @@ async def get_staves(skip: int = 0, limit: int = 100, _user: dict = Depends(get_
     staves = await repo.list(limit=limit, offset=skip)
     results = []
     for s in staves:
-        data = s.model_dump()
-        if isinstance(data.get("connection_config"), str):
-            try:
-                data["connection_config"] = json.loads(data["connection_config"])
-            except (json.JSONDecodeError, TypeError):
-                pass
+        data = _prepare_stave_response(s.model_dump())
         results.append(data)
     return results
 
@@ -94,13 +108,7 @@ async def get_stave(stave_id: str, _user: dict = Depends(get_current_user)):
     stave = await repo.get(stave_id)
     if not stave:
         raise HTTPException(status_code=404, detail="Stave not found")
-    data = stave.model_dump()
-    if isinstance(data.get("connection_config"), str):
-        try:
-            data["connection_config"] = json.loads(data["connection_config"])
-        except (json.JSONDecodeError, TypeError):
-            pass
-    return data
+    return _prepare_stave_response(stave.model_dump())
 
 
 @router.get("/{stave_id}/delete-info")
@@ -121,19 +129,24 @@ async def get_stave_delete_info(stave_id: str, _user: dict = Depends(get_current
 async def create_stave(stave_in: StaveCreate, _user: dict = Depends(require_editor)):
     repo = _repo()
     now = now_utc_iso()
+    encrypted_config = encrypt_sensitive_fields(
+        stave_in.connection_config, stave_in.data_source_type
+    )
     stave = Stave(
         id=str(uuid.uuid4()),
         name=stave_in.name,
         description=stave_in.description,
         data_source_type=stave_in.data_source_type,
-        connection_config=json.dumps(stave_in.connection_config),
+        connection_config=json.dumps(encrypted_config),
         is_active=stave_in.is_active,
         created_at=now,
         updated_at=now,
     )
     await repo.create(stave)
     data = stave.model_dump()
-    data["connection_config"] = stave_in.connection_config
+    data["connection_config"] = mask_sensitive_fields(
+        stave_in.connection_config, stave_in.data_source_type
+    )
     # Trigger background intelligence scan
     _dispatch_auto_scan(stave.id)
     return data
@@ -147,20 +160,36 @@ async def update_stave(stave_id: str, stave_in: StaveUpdate, _user: dict = Depen
         raise HTTPException(status_code=404, detail="Stave not found")
     update_data = stave_in.model_dump(exclude_unset=True)
     if "connection_config" in update_data and isinstance(update_data["connection_config"], dict):
-        update_data["connection_config"] = json.dumps(update_data["connection_config"])
+        # Preserve existing encrypted values when user sends MASKED_VALUE
+        existing_config_raw = existing.connection_config
+        if isinstance(existing_config_raw, str):
+            try:
+                existing_config_raw = json.loads(existing_config_raw)
+            except (json.JSONDecodeError, TypeError):
+                existing_config_raw = {}
+        if isinstance(existing_config_raw, dict):
+            from datametronome_podium.core.encryption import _sensitive_keys
+            ds_type = update_data.get("data_source_type") or existing.data_source_type
+            for key in _sensitive_keys(ds_type):
+                if update_data["connection_config"].get(key) == MASKED_VALUE:
+                    # Keep the existing (encrypted) value from DB
+                    if key in existing_config_raw:
+                        update_data["connection_config"][key] = existing_config_raw[key]
+                    else:
+                        del update_data["connection_config"][key]
+        update_data["connection_config"] = json.dumps(
+            encrypt_sensitive_fields(
+                update_data["connection_config"],
+                update_data.get("data_source_type") or existing.data_source_type,
+            )
+        )
     now = now_utc_iso()
     update_data["updated_at"] = now
     await repo.update(stave_id, update_data)
     updated = await repo.get(stave_id)
     if not updated:
         raise HTTPException(status_code=404, detail="Stave not found")
-    data = updated.model_dump()
-    if isinstance(data.get("connection_config"), str):
-        try:
-            data["connection_config"] = json.loads(data["connection_config"])
-        except (json.JSONDecodeError, TypeError):
-            pass
-    return data
+    return _prepare_stave_response(updated.model_dump())
 
 
 @router.post("/{stave_id}/unpause")

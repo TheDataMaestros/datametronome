@@ -427,6 +427,51 @@ class TestHelperFunctionsExamples:
         print("Supported check types:", SUPPORTED_CHECK_TYPES)
 
 
+class TestEncryptionRoundtripExamples:
+    """
+    Examples showing that serialize/deserialize handles encryption transparently.
+    """
+
+    def test_serialize_encrypts_password(self):
+        """serialize_stave encrypts the password field."""
+        stave = create_postgres_stave(
+            name="Encrypted DB",
+            host="db.example.com",
+            database="prod",
+            user="monitor",
+            password="super_secret",
+        )
+        db_data = serialize_stave(stave)
+        config = json.loads(db_data["connection_config"])
+        # Password should be encrypted
+        assert config["password"].startswith("enc::")
+        # Non-sensitive fields remain readable
+        assert config["host"] == "db.example.com"
+        assert config["user"] == "monitor"
+
+    def test_roundtrip_preserves_plaintext(self):
+        """serialize → deserialize roundtrip returns original values."""
+        stave = create_postgres_stave(
+            name="Roundtrip DB",
+            host="localhost",
+            database="test",
+            user="admin",
+            password="my_password",
+        )
+        db_data = serialize_stave(stave)
+        loaded = deserialize_stave(db_data)
+        assert loaded.connection_config["password"] == "my_password"
+        assert loaded.connection_config["host"] == "localhost"
+        assert loaded.connection_config["user"] == "admin"
+
+    def test_sqlite_no_encryption_needed(self):
+        """SQLite configs have no sensitive fields — pass through unchanged."""
+        stave = create_sqlite_stave(name="Local DB", path="/data/test.db")
+        db_data = serialize_stave(stave)
+        config = json.loads(db_data["connection_config"])
+        assert config["path"] == "/data/test.db"
+
+
 class TestRealWorldScenarioExamples:
     """
     Real-world scenarios showing how to use Staves and Clefs together.

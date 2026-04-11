@@ -27,9 +27,12 @@ def upgrade() -> None:
         "ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'viewer'"
     )
     # Backfill: superusers become admin, all others stay viewer.
-    dao.execute("UPDATE users SET role = 'admin' WHERE is_superuser = 1")
-    # SQLite stores TRUE as 1; PostgreSQL stores it as TRUE — cover both.
-    dao.execute("UPDATE users SET role = 'admin' WHERE is_superuser = TRUE")
+    from alembic import op as _op
+    dialect_name = _op.get_bind().dialect.name
+    if dialect_name == "sqlite":
+        dao.execute("UPDATE users SET role = 'admin' WHERE is_superuser = 1")
+    else:
+        dao.execute("UPDATE users SET role = 'admin' WHERE is_superuser = TRUE")
 
 
 def downgrade() -> None:

@@ -1,5 +1,9 @@
 """
-Builds Pydantic AI Model objects from environment configuration.
+Builds Pydantic AI Model objects from configuration.
+
+Resolution order for AI settings: DB (app_settings table) → env vars.
+This lets each installation manage its AI provider/model/key via the UI
+without requiring a redeploy.
 
 Supported providers: anthropic | openai | gemini | ollama
 
@@ -76,24 +80,72 @@ def build_model(
     )
 
 
-def build_model_from_settings() -> Model:
-    """Build the main agent model from application settings."""
+def _get_ai_config() -> dict[str, str | None]:
+    """Resolve AI configuration: DB app_settings first, env vars as fallback.
+
+    Returns a dict with keys: provider, model, api_key, router_model,
+    heavy_model, base_url.
+    """
     from datametronome_podium.core.config import settings
 
-    base_url = settings.ai_base_url
-    if settings.ai_provider == "ollama" and not base_url:
-        # Derive from ollama_api_base (legacy compat)
+    # Start with env-var defaults
+    cfg: dict[str, str | None] = {
+        "provider": settings.ai_provider,
+        "model": settings.ai_model,
+        "api_key": settings.ai_api_key or None,
+        "router_model": settings.ai_router_model,
+        "heavy_model": settings.ai_heavy_model,
+        "base_url": settings.ai_base_url,
+    }
+
+    # Try to overlay DB settings (best-effort — table may not exist yet)
+    try:
+        import asyncio
+        from datametronome_podium.core.database import get_executor
+        from datametronome_podium.features.settings.repo import AppSettingsRepo
+
+        repo = AppSettingsRepo(get_executor())
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # We're inside an async context — can't block.  Use a sync query.
+            return cfg
+
+        mapping = {
+            "ai_provider": "provider",
+            "ai_model": "model",
+            "ai_api_key": "api_key",
+            "ai_router_model": "router_model",
+            "ai_heavy_model": "heavy_model",
+            "ai_base_url": "base_url",
+        }
+        for db_key, cfg_key in mapping.items():
+            val = loop.run_until_complete(repo.get_decrypted(db_key))
+            if val:
+                cfg[cfg_key] = val
+    except Exception:
+        # DB not ready, table missing, etc. — fall back silently to env vars.
+        pass
+
+    return cfg
+
+
+def build_model_from_settings() -> Model:
+    """Build the main agent model from application settings."""
+    cfg = _get_ai_config()
+    provider = cfg["provider"] or "ollama"
+    model_name = cfg["model"] or "qwen2.5"
+    api_key = cfg["api_key"]
+    base_url = cfg["base_url"]
+
+    if provider == "ollama" and not base_url:
+        from datametronome_podium.core.config import settings
         base_url = settings.ollama_api_base.rstrip("/") + "/v1"
 
-    logger.info(
-        "Building main model: provider=%s model=%s",
-        settings.ai_provider,
-        settings.ai_model,
-    )
+    logger.info("Building main model: provider=%s model=%s", provider, model_name)
     return build_model(
-        provider=settings.ai_provider,
-        model_name=settings.ai_model,
-        api_key=settings.ai_api_key or None,
+        provider=provider,
+        model_name=model_name,
+        api_key=api_key,
         base_url=base_url,
     )
 
@@ -103,22 +155,21 @@ def build_router_model_from_settings() -> Model:
 
     Uses ai_router_model if set (cheaper model for routing), otherwise ai_model.
     """
-    from datametronome_podium.core.config import settings
+    cfg = _get_ai_config()
+    provider = cfg["provider"] or "ollama"
+    model_name = cfg["router_model"] or cfg["model"] or "qwen2.5"
+    api_key = cfg["api_key"]
+    base_url = cfg["base_url"]
 
-    router_model_name = settings.ai_router_model or settings.ai_model
-    base_url = settings.ai_base_url
-    if settings.ai_provider == "ollama" and not base_url:
+    if provider == "ollama" and not base_url:
+        from datametronome_podium.core.config import settings
         base_url = settings.ollama_api_base.rstrip("/") + "/v1"
 
-    logger.info(
-        "Building router model: provider=%s model=%s",
-        settings.ai_provider,
-        router_model_name,
-    )
+    logger.info("Building router model: provider=%s model=%s", provider, model_name)
     return build_model(
-        provider=settings.ai_provider,
-        model_name=router_model_name,
-        api_key=settings.ai_api_key or None,
+        provider=provider,
+        model_name=model_name,
+        api_key=api_key,
         base_url=base_url,
     )
 
@@ -129,21 +180,20 @@ def build_heavy_model_from_settings() -> Model:
     Uses ai_heavy_model if set (e.g. gemini-2.5-pro for deep analysis),
     otherwise falls back to ai_model.
     """
-    from datametronome_podium.core.config import settings
+    cfg = _get_ai_config()
+    provider = cfg["provider"] or "ollama"
+    model_name = cfg["heavy_model"] or cfg["model"] or "qwen2.5"
+    api_key = cfg["api_key"]
+    base_url = cfg["base_url"]
 
-    heavy_model_name = settings.ai_heavy_model or settings.ai_model
-    base_url = settings.ai_base_url
-    if settings.ai_provider == "ollama" and not base_url:
+    if provider == "ollama" and not base_url:
+        from datametronome_podium.core.config import settings
         base_url = settings.ollama_api_base.rstrip("/") + "/v1"
 
-    logger.info(
-        "Building heavy model: provider=%s model=%s",
-        settings.ai_provider,
-        heavy_model_name,
-    )
+    logger.info("Building heavy model: provider=%s model=%s", provider, model_name)
     return build_model(
-        provider=settings.ai_provider,
-        model_name=heavy_model_name,
-        api_key=settings.ai_api_key or None,
+        provider=provider,
+        model_name=model_name,
+        api_key=api_key,
         base_url=base_url,
     )

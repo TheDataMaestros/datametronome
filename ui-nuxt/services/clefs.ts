@@ -93,6 +93,11 @@ class ClefsService {
     return response.data
   }
 
+  async runAllChecks(): Promise<{ message: string; job_ids: string[] }> {
+    const response = await apiService.post<{ message: string; job_ids: string[] }>(`${this.endpoint}/run-all`)
+    return response.data
+  }
+
   async getResults(id: string, limit = 50): Promise<Check[]> {
     const response = await apiService.get<{ results: Check[] }>(
       `${this.endpoint}/${id}/results?limit=${limit}`,

@@ -150,6 +150,35 @@ async def get_job_status(job_id: str, _user: dict = Depends(get_current_user)) -
         )
 
 
+@router.post("/run-all", status_code=status.HTTP_202_ACCEPTED)
+async def run_all_clefs(_user: dict = Depends(require_editor)) -> dict:
+    """Dispatch all active clefs for immediate execution."""
+    try:
+        executor = get_executor()
+        active_clefs = await executor.query("SELECT id FROM clefs WHERE is_active = TRUE")
+        
+        if not active_clefs:
+            return {"message": "No active clefs found to run", "job_ids": []}
+            
+        dispatcher = get_dispatcher()
+        job_ids = []
+        for row in active_clefs:
+            job_id = await dispatcher.dispatch(row["id"])
+            job_ids.append(job_id)
+            
+        logger.info("Dispatched %d clefs", len(job_ids))
+        return {
+            "message": f"Successfully dispatched {len(job_ids)} checks",
+            "job_ids": job_ids
+        }
+    except Exception as e:
+        logger.error("Failed to run all clefs: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to dispatch all checks",
+        )
+
+
 # ── Parameterised routes (/{clef_id} and sub-paths) ──────────────────────────
 
 @router.get("/{clef_id}", response_model=ClefResponse)

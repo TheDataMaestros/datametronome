@@ -437,7 +437,13 @@ def serialize_stave(stave: Stave) -> dict[str, Any]:
         >>> data = serialize_stave(stave)
         >>> # data["connection_config"] is now a JSON string
     """
+    from datametronome_podium.core.encryption import encrypt_sensitive_fields
+
     data = stave.model_dump()
+    # Encrypt sensitive fields before JSON serialization
+    data["connection_config"] = encrypt_sensitive_fields(
+        data["connection_config"], data.get("data_source_type")
+    )
     # Convert connection_config dict to JSON string
     data["connection_config"] = json.dumps(data["connection_config"])
     # Convert datetime objects to ISO strings
@@ -469,6 +475,14 @@ def deserialize_stave(data: dict[str, Any]) -> Stave:
     # Convert connection_config JSON string to dict
     if isinstance(data.get("connection_config"), str):
         data["connection_config"] = json.loads(data["connection_config"])
+
+    # Decrypt any encrypted sensitive fields
+    from datametronome_podium.core.encryption import decrypt_sensitive_fields
+
+    if isinstance(data.get("connection_config"), dict):
+        data["connection_config"] = decrypt_sensitive_fields(
+            data["connection_config"], data.get("data_source_type")
+        )
 
     # Fix malformed datetime strings (remove trailing Z if timezone offset is present)
     for field in ["created_at", "updated_at"]:
