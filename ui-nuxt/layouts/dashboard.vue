@@ -1,5 +1,10 @@
 <template>
   <div class="dm-shell">
+    <!-- Aesthetic Additions -->
+    <div class="bg-noise"></div>
+    <div class="ambient-glow"></div>
+    <div class="ambient-glow-2"></div>
+
     <!-- ===================== SIDEBAR ===================== -->
     <aside class="dm-sidebar" :class="{ 'is-collapsed': collapsed }">
       <!-- Logo -->

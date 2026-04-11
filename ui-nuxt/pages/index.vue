@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6">
     <!-- Persistent Datasource Bar -->
-    <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-sm">
+    <div class="animate-stagger-1 flex glass-card items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-sm">
       <DatasourceSelector
         :model-value="selectedStaveId"
         :staves="staves"
@@ -20,7 +20,7 @@
     </div>
 
     <!-- Welcome Header -->
-    <div class="flex items-center justify-between">
+    <div class="animate-stagger-2 flex items-center justify-between">
       <div>
         <p class="dm-label mb-2">Overview</p>
         <h1
