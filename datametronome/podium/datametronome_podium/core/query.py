@@ -10,6 +10,45 @@ from typing import Any
 from datametronome_podium.core.query_adapter import QueryAdapter
 
 
+def quote_identifier(name: str, dialect: str = "ansi") -> str:
+    """Safely quote a SQL identifier to prevent injection.
+
+    Handles dot-separated names (e.g. ``schema.table``) by quoting each
+    segment individually.  For BigQuery uses backtick quoting; all other
+    dialects use ANSI double-quote quoting (PostgreSQL, SQLite, MySQL ANSI).
+    """
+    def _quote_segment(seg: str) -> str:
+        seg = seg.strip()
+        if not seg:
+            raise ValueError(f"Empty segment in identifier: {name!r}")
+        if dialect == "bigquery":
+            return '`' + seg.replace('`', '\\`') + '`'
+        return '"' + seg.replace('"', '""') + '"'
+
+    if "." in name:
+        return ".".join(_quote_segment(s) for s in name.split("."))
+    return _quote_segment(name)
+
+
+_VALID_DIRECTIONS = {"ASC", "DESC"}
+
+
+def _safe_order_by(clause: str) -> str:
+    """Quote column names in an ORDER BY clause while preserving direction.
+
+    Accepts: "created_at DESC", "name", "created_at DESC, name ASC"
+    """
+    parts = []
+    for term in clause.split(","):
+        tokens = term.strip().split()
+        col = quote_identifier(tokens[0])
+        direction = tokens[1].upper() if len(tokens) > 1 else ""
+        if direction and direction not in _VALID_DIRECTIONS:
+            raise ValueError(f"Invalid ORDER BY direction: {direction}")
+        parts.append(f"{col} {direction}".strip())
+    return ", ".join(parts)
+
+
 class QueryExecutor:
     """Database-agnostic query executor.
 
@@ -50,19 +89,19 @@ class QueryExecutor:
         offset: int | None = None,
     ) -> list[dict]:
         """SELECT from a single table."""
-        cols = ", ".join(columns) if columns else "*"
-        sql = f"SELECT {cols} FROM {table}"
+        cols = ", ".join(quote_identifier(c) for c in columns) if columns else "*"
+        sql = f"SELECT {cols} FROM {quote_identifier(table)}"
         params: list[Any] = []
 
         if where:
             clauses = []
             for key, value in where.items():
-                clauses.append(f"{key} = ?")
+                clauses.append(f"{quote_identifier(key)} = ?")
                 params.append(value)
             sql += " WHERE " + " AND ".join(clauses)
 
         if order_by:
-            sql += f" ORDER BY {order_by}"
+            sql += f" ORDER BY {_safe_order_by(order_by)}"
         if limit is not None:
             sql += " LIMIT ?"
             params.append(limit)
@@ -76,34 +115,34 @@ class QueryExecutor:
         """INSERT a single row. Callers must generate IDs before calling."""
         columns = list(data.keys())
         placeholders = ", ".join("?" for _ in columns)
-        col_names = ", ".join(columns)
-        sql = f"INSERT INTO {table} ({col_names}) VALUES ({placeholders})"
+        col_names = ", ".join(quote_identifier(c) for c in columns)
+        sql = f"INSERT INTO {quote_identifier(table)} ({col_names}) VALUES ({placeholders})"
         return await self.execute(sql, list(data.values()))
 
     async def update(
         self, table: str, data: dict[str, Any], where: dict[str, Any] | None = None
     ) -> int:
         """UPDATE rows in a table."""
-        set_clauses = [f"{k} = ?" for k in data.keys()]
+        set_clauses = [f"{quote_identifier(k)} = ?" for k in data.keys()]
         params = list(data.values())
-        sql = f"UPDATE {table} SET {', '.join(set_clauses)}"
+        sql = f"UPDATE {quote_identifier(table)} SET {', '.join(set_clauses)}"
 
         if where:
-            where_clauses = [f"{k} = ?" for k in where.keys()]
+            where_clauses = [f"{quote_identifier(k)} = ?" for k in where.keys()]
             sql += " WHERE " + " AND ".join(where_clauses)
             params.extend(where.values())
 
         return await self.execute(sql, params)
 
     async def delete(self, table: str, where: dict[str, Any] | None = None) -> int:
-        """DELETE rows from a table."""
-        sql = f"DELETE FROM {table}"
+        """DELETE rows from a table. Requires a WHERE clause to prevent accidental full-table deletes."""
+        if not where:
+            raise ValueError("delete() requires a where clause. Use execute() for unconditional deletes.")
+        sql = f"DELETE FROM {quote_identifier(table)}"
         params: list[Any] = []
-
-        if where:
-            clauses = [f"{k} = ?" for k in where.keys()]
-            sql += " WHERE " + " AND ".join(clauses)
-            params.extend(where.values())
+        clauses = [f"{quote_identifier(k)} = ?" for k in where.keys()]
+        sql += " WHERE " + " AND ".join(clauses)
+        params.extend(where.values())
 
         return await self.execute(sql, params)
 

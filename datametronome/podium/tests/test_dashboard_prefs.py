@@ -1,7 +1,7 @@
 """Tests for dashboard_prefs on /auth/me endpoints."""
 
 import json
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -13,11 +13,11 @@ async def test_get_me_includes_dashboard_prefs():
         "username": "admin",
         "email": "admin@datametronome.dev",
         "is_active": True,
-        "is_superuser": True,
+        "role": "admin",
         "dashboard_prefs": json.dumps({"pinned_staves": ["stave-1", "stave-2"]}),
     }
 
-    from datametronome_podium.api.v1.endpoints.auth import get_current_user_info
+    from datametronome_podium.features.auth.router import get_current_user_info
 
     result = await get_current_user_info(current_user=mock_user)
 
@@ -34,11 +34,11 @@ async def test_get_me_dashboard_prefs_defaults_to_empty():
         "username": "admin",
         "email": "admin@datametronome.dev",
         "is_active": True,
-        "is_superuser": True,
+        "role": "admin",
         # no dashboard_prefs key — simulates legacy row
     }
 
-    from datametronome_podium.api.v1.endpoints.auth import get_current_user_info
+    from datametronome_podium.features.auth.router import get_current_user_info
 
     result = await get_current_user_info(current_user=mock_user)
 
@@ -48,23 +48,24 @@ async def test_get_me_dashboard_prefs_defaults_to_empty():
 @pytest.mark.asyncio
 async def test_patch_me_saves_pinned_staves():
     """PATCH /auth/me saves pinned_staves (up to 3) and returns updated prefs."""
-    from datametronome_podium.api.v1.endpoints.auth import patch_current_user
+    from datametronome_podium.features.auth.router import patch_current_user, PatchUserRequest, DashboardPrefs
 
     mock_user = {
         "username": "admin",
         "email": "admin@datametronome.dev",
         "is_active": True,
-        "is_superuser": True,
+        "role": "admin",
         "dashboard_prefs": "{}",
     }
 
+    mock_executor = MagicMock()
+    mock_executor.execute = AsyncMock(return_value=1)
     with patch(
-        "datametronome_podium.api.v1.endpoints.auth.execute_write",
-        new_callable=AsyncMock,
-        return_value=True,
+        "datametronome_podium.features.auth.router.get_executor",
+        return_value=mock_executor,
     ):
         result = await patch_current_user(
-            body={"dashboard_prefs": {"pinned_staves": ["s1", "s2"]}},
+            body=PatchUserRequest(dashboard_prefs=DashboardPrefs(pinned_staves=["s1", "s2"])),
             current_user=mock_user,
         )
 
@@ -74,23 +75,24 @@ async def test_patch_me_saves_pinned_staves():
 @pytest.mark.asyncio
 async def test_patch_me_accepts_exactly_3_pinned():
     """PATCH /auth/me accepts exactly 3 pinned_staves (boundary)."""
-    from datametronome_podium.api.v1.endpoints.auth import patch_current_user
+    from datametronome_podium.features.auth.router import patch_current_user, PatchUserRequest, DashboardPrefs
 
     mock_user = {
         "username": "admin",
         "email": "admin@datametronome.dev",
         "is_active": True,
-        "is_superuser": True,
+        "role": "admin",
         "dashboard_prefs": "{}",
     }
 
+    mock_executor = MagicMock()
+    mock_executor.execute = AsyncMock(return_value=1)
     with patch(
-        "datametronome_podium.api.v1.endpoints.auth.execute_write",
-        new_callable=AsyncMock,
-        return_value=True,
+        "datametronome_podium.features.auth.router.get_executor",
+        return_value=mock_executor,
     ):
         result = await patch_current_user(
-            body={"dashboard_prefs": {"pinned_staves": ["s1", "s2", "s3"]}},
+            body=PatchUserRequest(dashboard_prefs=DashboardPrefs(pinned_staves=["s1", "s2", "s3"])),
             current_user=mock_user,
         )
 
@@ -101,13 +103,13 @@ async def test_patch_me_accepts_exactly_3_pinned():
 async def test_patch_me_rejects_more_than_3_pinned():
     """PATCH /auth/me returns 400 when more than 3 staves are pinned."""
     from fastapi import HTTPException
-    from datametronome_podium.api.v1.endpoints.auth import patch_current_user
+    from datametronome_podium.features.auth.router import patch_current_user, PatchUserRequest, DashboardPrefs
 
-    mock_user = {"username": "admin", "email": "x", "is_active": True, "is_superuser": False, "dashboard_prefs": "{}"}
+    mock_user = {"username": "admin", "email": "x", "is_active": True, "role": "viewer", "dashboard_prefs": "{}"}
 
     with pytest.raises(HTTPException) as exc_info:
         await patch_current_user(
-            body={"dashboard_prefs": {"pinned_staves": ["s1", "s2", "s3", "s4"]}},
+            body=PatchUserRequest(dashboard_prefs=DashboardPrefs(pinned_staves=["s1", "s2", "s3", "s4"])),
             current_user=mock_user,
         )
 

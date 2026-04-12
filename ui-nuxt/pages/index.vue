@@ -1,7 +1,7 @@
 <template>
   <div class="space-y-6">
     <!-- Persistent Datasource Bar -->
-    <div class="flex items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-sm">
+    <div class="animate-stagger-1 flex glass-card items-center gap-3 px-4 py-2.5 rounded-xl border border-slate-700/50 bg-slate-900/60 backdrop-blur-sm">
       <DatasourceSelector
         :model-value="selectedStaveId"
         :staves="staves"
@@ -20,11 +20,11 @@
     </div>
 
     <!-- Welcome Header -->
-    <div class="flex items-center justify-between">
+    <div class="animate-stagger-2 flex items-center justify-between">
       <div>
         <p class="dm-label mb-2">Overview</p>
         <h1
-          style="font-family: var(--dm-font-display); font-size: 2rem; font-weight: 700; letter-spacing: -0.03em; color: var(--dm-text-primary); line-height: 1.15;"
+          style="font-family: var(--dm-font-display); font-size: 2.4rem; font-weight: 700; letter-spacing: -0.03em; color: var(--dm-text-primary); line-height: 1.15;"
         >
           Welcome back
         </h1>
@@ -51,6 +51,29 @@
         </UButton>
       </div>
     </div>
+
+    <!-- First-run onboarding -->
+    <UCard v-if="!staves.length" class="animate-stagger-3 border-2 border-dashed border-blue-500/30 bg-blue-500/5">
+      <div class="flex items-start gap-4">
+        <div class="w-12 h-12 rounded-xl bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+          <Icon name="i-heroicons-rocket-launch" class="w-6 h-6 text-blue-400" />
+        </div>
+        <div class="flex-1">
+          <h3 class="text-lg font-semibold text-white mb-1">Get started with DataMetronome</h3>
+          <p class="text-sm text-slate-400 mb-4">
+            Connect your first database to start monitoring data quality and get AI-powered insights.
+          </p>
+          <div class="flex items-center gap-3">
+            <UButton color="primary" icon="i-heroicons-plus" to="/staves">
+              Add Data Source
+            </UButton>
+            <UButton color="gray" variant="ghost" icon="i-heroicons-book-open" to="/chat">
+              Ask the AI
+            </UButton>
+          </div>
+        </div>
+      </div>
+    </UCard>
 
     <!-- System Health Metrics -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -597,6 +620,7 @@ const { metrics: dashboardMetrics, fetchMetrics } = useDashboard()
 
 const { loadPrefs } = useDashboardPrefs()
 const { selectedStaveId, scopedDashboard, scopedProfile, isScopedLoading, selectStave } = useSelectedStave()
+const { runAllChecks: apiRunAllChecks } = useClefs()
 
 const isRunningChecks = ref(false)
 
@@ -853,10 +877,13 @@ async function triggerReanalyze() {
 async function runAllChecks() {
   isRunningChecks.value = true
   try {
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
+    await apiRunAllChecks()
+    // Wait briefly for some checks to complete
+    await new Promise((resolve) => setTimeout(resolve, 1500))
     // Refresh data
     await refreshData()
+  } catch (err) {
+    console.error('Failed to run all checks', err)
   } finally {
     isRunningChecks.value = false
   }

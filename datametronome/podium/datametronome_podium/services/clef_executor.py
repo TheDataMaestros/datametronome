@@ -18,16 +18,23 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
-from datametronome_podium.models.check_run import CheckRun
-from datametronome_podium.models.clef import Clef
-from datametronome_podium.models.severity import (
+from datametronome_podium.features.checks.model import (
+    CheckRun,
     SeverityConfig,
     SeverityLevel,
     SeverityThreshold,
     evaluate_severity,
 )
-from datametronome_podium.models.stave import Stave
-from datametronome_podium.services.connection_tester import ConnectionTester
+from datametronome_podium.features.clefs.model import Clef
+from datametronome_podium.features.staves.model import Stave
+from datametronome_podium.core.query import quote_identifier as _quote_ident
+from datametronome_podium.core.connector_factory import create_connector
+
+
+def _qi(name: str, stave: Stave) -> str:
+    """Quote identifier using the correct dialect for the stave's data source."""
+    dialect = "bigquery" if stave.data_source_type == "bigquery" else "ansi"
+    return _quote_ident(name, dialect=dialect)
 
 try:
     from datametronome_brain_base.forecasting import SarimaForecaster  # type: ignore
@@ -77,7 +84,7 @@ class CheckResult:
         if self.metadata is None:
             self.metadata = {}
         if self.timestamp is None:
-            self.timestamp = datetime.now()
+            self.timestamp = datetime.now(timezone.utc)
 
     @property
     def severity(self) -> SeverityLevel:
@@ -141,15 +148,18 @@ class ClefExecutor:
             >>> result = await executor.execute_clef(clef, stave, connector)
             >>> print(f"Check {result.status}: {result.message}")
         """
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
         connector = db_connector
         managed_connector = False
         result: CheckResult | None = None
 
         try:
             if connector is None:
-                tester = ConnectionTester()
-                connector = await tester.get_connector(stave, read_only=True)
+                connector = await create_connector(
+                    stave.data_source_type or "",
+                    stave.connection_config or {},
+                    read_only=True,
+                )
                 managed_connector = True
 
             logger.info(f"Executing clef '{clef.name}' on stave '{stave.name}'")
@@ -172,8 +182,6 @@ class ClefExecutor:
                 result = await self._execute_lookup_validation_check(
                     clef, stave, connector
                 )
-            elif clef.check_type == "python":
-                result = await self._execute_python_check(clef, stave, connector)
             # Legacy check types (for backward compatibility)
             elif clef.check_type == "null_check":
                 result = await self._execute_null_check(clef, stave, connector)
@@ -236,7 +244,7 @@ class ClefExecutor:
                 timestamp=start_time,
             )
 
-        result.execution_time = (datetime.now() - start_time).total_seconds()
+        result.execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
         self._update_stats(result)
         logger.info(f"Clef '{clef.name}' completed: {result.severity}")
         return result
@@ -251,21 +259,23 @@ class ClefExecutor:
         threshold = config.get("threshold", 0.0)
 
         # Build SQL query to count NULLs
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT({column}) as non_null_rows,
-                COUNT(*) - COUNT({column}) as null_rows
-            FROM {table}
+                COUNT({qc}) as non_null_rows,
+                COUNT(*) - COUNT({qc}) as null_rows
+            FROM {qt}
             """
         elif stave.data_source_type == "sqlite":
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT({column}) as non_null_rows,
-                COUNT(*) - COUNT({column}) as null_rows
-            FROM {table}
+                COUNT({qc}) as non_null_rows,
+                COUNT(*) - COUNT({qc}) as null_rows
+            FROM {qt}
             """
         else:
             return CheckResult(
@@ -276,7 +286,7 @@ class ClefExecutor:
                 message=f"NULL check not supported for {stave.data_source_type}",
                 metadata={"error": "unsupported_data_source"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute query
@@ -291,7 +301,7 @@ class ClefExecutor:
                 message="Query returned no results",
                 metadata={"error": "empty_result"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         row = result_rows[0]
@@ -307,7 +317,7 @@ class ClefExecutor:
                 message="Table is empty",
                 metadata={"total_rows": 0, "null_rows": 0, "null_percentage": 0.0},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         null_percentage = null_rows / total_rows
@@ -338,7 +348,7 @@ class ClefExecutor:
                 "column": column,
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             anomalies_count=null_rows if severity != SeverityLevel.HARMONY else 0,
         )
 
@@ -360,15 +370,17 @@ class ClefExecutor:
                 message="Range check requires at least min or max value",
                 metadata={"error": "invalid_config"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Build SQL query to check values outside range
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         conditions = []
         if min_val is not None:
-            conditions.append(f"{column} < {min_val}")
+            conditions.append(f"{qc} < {min_val}")
         if max_val is not None:
-            conditions.append(f"{column} > {max_val}")
+            conditions.append(f"{qc} > {max_val}")
 
         where_clause = " OR ".join(conditions)
 
@@ -377,20 +389,20 @@ class ClefExecutor:
             SELECT
                 COUNT(*) as total_rows,
                 COUNT(CASE WHEN {where_clause} THEN 1 END) as out_of_range_rows,
-                MIN({column}) as min_value,
-                MAX({column}) as max_value
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                MIN({qc}) as min_value,
+                MAX({qc}) as max_value
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "sqlite":
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
                 COUNT(CASE WHEN {where_clause} THEN 1 END) as out_of_range_rows,
-                MIN({column}) as min_value,
-                MAX({column}) as max_value
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                MIN({qc}) as min_value,
+                MAX({qc}) as max_value
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         else:
             return CheckResult(
@@ -400,7 +412,7 @@ class ClefExecutor:
                 message=f"Range check not supported for {stave.data_source_type}",
                 metadata={"error": "unsupported_data_source"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute query
@@ -414,7 +426,7 @@ class ClefExecutor:
                 message="Query returned no results",
                 metadata={"error": "empty_result"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         row = result_rows[0]
@@ -431,7 +443,7 @@ class ClefExecutor:
                 message="No non-null values found",
                 metadata={"total_rows": 0, "out_of_range_rows": 0},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Evaluate result
@@ -458,7 +470,7 @@ class ClefExecutor:
                 "column": column,
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             anomalies_count=out_of_range_rows if status == "fail" else 0,
         )
 
@@ -479,12 +491,12 @@ class ClefExecutor:
                 message="Volume check requires at least expected_min or expected_max",
                 metadata={"error": "invalid_config"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Build SQL query to count rows
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "sqlite"]:
-            sql = f"SELECT COUNT(*) as row_count FROM {table}"
+            sql = f"SELECT COUNT(*) as row_count FROM {_qi(table, stave)}"
         else:
             return CheckResult(
                 clef_id=clef.id,
@@ -493,7 +505,7 @@ class ClefExecutor:
                 message=f"Volume check not supported for {stave.data_source_type}",
                 metadata={"error": "unsupported_data_source"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute query
@@ -507,7 +519,7 @@ class ClefExecutor:
                 message="Query returned no results",
                 metadata={"error": "empty_result"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         actual_count = result_rows[0]["row_count"]
@@ -537,7 +549,7 @@ class ClefExecutor:
                 "table": table,
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             anomalies_count=1 if status == "fail" else 0,
         )
 
@@ -559,7 +571,7 @@ class ClefExecutor:
                 message="Custom SQL check requires a query",
                 metadata={"error": "missing_query"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute custom SQL
@@ -574,7 +586,7 @@ class ClefExecutor:
                     message="Custom SQL returned no results",
                     metadata={"query": sql, "results": []},
                     execution_time=0.0,
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # Get the first result (assuming single value queries)
@@ -622,7 +634,7 @@ class ClefExecutor:
                     "all_results": result_rows,
                 },
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
                 anomalies_count=1 if status == "fail" else 0,
             )
 
@@ -635,7 +647,7 @@ class ClefExecutor:
                 message=f"Custom SQL execution failed: {str(e)}",
                 metadata={"error": str(e), "query": sql},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
     async def _execute_uniqueness_check(
@@ -647,14 +659,16 @@ class ClefExecutor:
         column = config["column"]
 
         # Build SQL query to find duplicates
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT
-                {column},
+                {qc},
                 COUNT(*) as duplicate_count
-            FROM {table}
-            WHERE {column} IS NOT NULL
-            GROUP BY {column}
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
+            GROUP BY {qc}
             HAVING COUNT(*) > 1
             ORDER BY duplicate_count DESC
             LIMIT 10
@@ -662,11 +676,11 @@ class ClefExecutor:
         elif stave.data_source_type == "sqlite":
             sql = f"""
             SELECT
-                {column},
+                {qc},
                 COUNT(*) as duplicate_count
-            FROM {table}
-            WHERE {column} IS NOT NULL
-            GROUP BY {column}
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
+            GROUP BY {qc}
             HAVING COUNT(*) > 1
             ORDER BY duplicate_count DESC
             LIMIT 10
@@ -679,7 +693,7 @@ class ClefExecutor:
                 message=f"Uniqueness check not supported for {stave.data_source_type}",
                 metadata={"error": "unsupported_data_source"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute query
@@ -706,7 +720,7 @@ class ClefExecutor:
                 "duplicates": duplicate_rows[:5],  # Show first 5 duplicates
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             anomalies_count=len(duplicate_rows) if status == "fail" else 0,
         )
 
@@ -721,32 +735,34 @@ class ClefExecutor:
 
         # Build SQL query to find non-matching patterns
         # Note: SQL regex support varies by database
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         if stave.data_source_type in ["postgres", "postgresql"]:
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} ~ '{pattern}' THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN {column} !~ '{pattern}' THEN 1 END) as non_matching_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN {qc} ~ '{pattern}' THEN 1 END) as matching_rows,
+                COUNT(CASE WHEN {qc} !~ '{pattern}' THEN 1 END) as non_matching_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "bigquery":
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN REGEXP_CONTAINS({column}, r'{pattern}') THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN NOT REGEXP_CONTAINS({column}, r'{pattern}') THEN 1 END) as non_matching_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN REGEXP_CONTAINS({qc}, r'{pattern}') THEN 1 END) as matching_rows,
+                COUNT(CASE WHEN NOT REGEXP_CONTAINS({qc}, r'{pattern}') THEN 1 END) as non_matching_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "mysql":
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} REGEXP '{pattern}' THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN {column} NOT REGEXP '{pattern}' THEN 1 END) as non_matching_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN {qc} REGEXP '{pattern}' THEN 1 END) as matching_rows,
+                COUNT(CASE WHEN {qc} NOT REGEXP '{pattern}' THEN 1 END) as non_matching_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "sqlite":
             # SQLite has limited regex support, use LIKE as fallback
@@ -757,7 +773,7 @@ class ClefExecutor:
                 message="Pattern check not fully supported in SQLite",
                 metadata={"error": "limited_regex_support"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
         else:
             return CheckResult(
@@ -767,7 +783,7 @@ class ClefExecutor:
                 message=f"Pattern check not supported for {stave.data_source_type}",
                 metadata={"error": "unsupported_data_source"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Execute query
@@ -781,7 +797,7 @@ class ClefExecutor:
                 message="Query returned no results",
                 metadata={"error": "empty_result"},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         row = result_rows[0]
@@ -796,7 +812,7 @@ class ClefExecutor:
                 message="No non-null values found",
                 metadata={"total_rows": 0, "non_matching_rows": 0},
                 execution_time=0.0,
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         # Evaluate result
@@ -820,7 +836,7 @@ class ClefExecutor:
                 "column": column,
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
             anomalies_count=non_matching_rows if status == "fail" else 0,
         )
 
@@ -839,7 +855,7 @@ class ClefExecutor:
                 "note": "Schema validation requires database-specific metadata queries"
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
         )
 
     async def _execute_referential_check(
@@ -857,7 +873,7 @@ class ClefExecutor:
                 "note": "Referential integrity requires database-specific constraint queries"
             },
             execution_time=0.0,
-            timestamp=datetime.now(),
+            timestamp=datetime.now(timezone.utc),
         )
 
     def _evaluate_null_check_severity(
@@ -1132,12 +1148,14 @@ class ClefExecutor:
         parsed: Dict[str, Any],
     ) -> CheckResult:
         """Execute if_null condition check."""
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         sql = f"""
         SELECT
             COUNT(*) as total_rows,
-            COUNT({column}) as non_null_rows,
-            COUNT(*) - COUNT({column}) as null_rows
-        FROM {table}
+            COUNT({qc}) as non_null_rows,
+            COUNT(*) - COUNT({qc}) as null_rows
+        FROM {qt}
         """
 
         results = await db_connector.query({"sql": sql})
@@ -1232,23 +1250,25 @@ class ClefExecutor:
     ) -> CheckResult:
         """Execute if_not_unique condition check - finds duplicate values."""
         # Build SQL to find duplicates
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(DISTINCT {column}) as unique_values,
-                COUNT(*) - COUNT(DISTINCT {column}) as duplicate_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(DISTINCT {qc}) as unique_values,
+                COUNT(*) - COUNT(DISTINCT {qc}) as duplicate_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "sqlite":
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(DISTINCT {column}) as unique_values,
-                COUNT(*) - COUNT(DISTINCT {column}) as duplicate_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(DISTINCT {qc}) as unique_values,
+                COUNT(*) - COUNT(DISTINCT {qc}) as duplicate_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         else:
             return CheckResult(
@@ -1354,33 +1374,35 @@ class ClefExecutor:
 
         # Build SQL to count values not in allowed list
         # Escape values for SQL injection safety
+        qt = _qi(table, stave)
+        qc = _qi(column, stave)
         if stave.data_source_type in ["postgres", "postgresql"]:
             # Use array syntax for PostgreSQL
             values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "mysql":
             values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "sqlite":
             values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {column} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         elif stave.data_source_type == "bigquery":
             # BigQuery uses different syntax
@@ -1389,9 +1411,9 @@ class ClefExecutor:
             sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNTIF({column} NOT IN ({values_list})) as not_in_list_rows
-            FROM {table}
-            WHERE {column} IS NOT NULL
+                COUNTIF({qc} NOT IN ({values_list})) as not_in_list_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
             """
         else:
             return CheckResult(
@@ -1502,7 +1524,7 @@ class ClefExecutor:
                     metadata={"error": "missing_table"},
                 )
 
-            sql = f"SELECT COUNT(*) as row_count FROM {table}"
+            sql = f"SELECT COUNT(*) as row_count FROM {_qi(table, stave)}"
             results = await db_connector.query({"sql": sql})
 
             if not results:
@@ -1763,35 +1785,6 @@ class ClefExecutor:
                 metadata={"error": str(e)},
             )
 
-    async def _execute_python_check(
-        self, clef: Clef, stave: Stave, db_connector: Any = None
-    ) -> CheckResult:
-        """Execute custom Python check (TDD Level 4: Custom Code)."""
-        try:
-            # For now, return a mock result since this would execute custom Python code
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="pass",
-                observed_value="custom_result",
-                message="Custom Python check passed: business logic validation successful",
-                metadata={
-                    "check_type": "python",
-                    "script_executed": True,
-                    "execution_time": 0.5,
-                    "note": "Mock implementation - would execute custom Python scripts",
-                },
-            )
-        except Exception as e:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Custom Python check failed: {str(e)}",
-                metadata={"error": str(e)},
-            )
-
     async def _execute_freshness_check(
         self, clef: Clef, stave: Stave, db_connector: Any = None
     ) -> CheckResult:
@@ -1866,7 +1859,7 @@ class ClefExecutor:
             max_age_input = config.get("max_age_hours", config.get("max_age", 24))
             max_age_hours = _parse_duration_to_hours(max_age_input) or 24.0
 
-            sql = f"SELECT MAX({column}) as latest_timestamp FROM {table}"
+            sql = f"SELECT MAX({_qi(column, stave)}) as latest_timestamp FROM {_qi(table, stave)}"
             # Try dict format first, fallback to string if needed
             try:
                 results = await db_connector.query({"sql": sql})
@@ -1978,7 +1971,7 @@ class ClefExecutor:
                 observed_value=None,
                 message="Forecast check requires a 'query' configuration",
                 metadata={"error": "missing_query"},
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         try:
@@ -1993,7 +1986,7 @@ class ClefExecutor:
                     observed_value=len(rows) if rows else 0,
                     message=f"Insufficient data for forecasting (got {len(rows)} rows, need 10+)",
                     metadata={"row_count": len(rows)},
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # 2. Extract numeric time series
@@ -2017,7 +2010,7 @@ class ClefExecutor:
                     observed_value=len(ts_values),
                     message="Insufficient non-null values for forecasting",
                     metadata={"valid_count": len(ts_values)},
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # Split: Train on all except last, test on last
@@ -2042,7 +2035,7 @@ class ClefExecutor:
                         observed_value=observed_value,
                         message=f"Value column '{value_column}' not found in query results",
                         metadata={"columns": list(df.columns)},
-                        timestamp=datetime.now(),
+                        timestamp=datetime.now(timezone.utc),
                     )
                 ts_values_model = df[value_column].dropna().tolist()
                 train_model = ts_values_model[:-1]
@@ -2075,7 +2068,7 @@ class ClefExecutor:
                         "p_value": result.p_value,
                         "model_info": result.model_info,
                     },
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # Fallback: mean ± k*std over recent window, accounting for trend
@@ -2089,7 +2082,7 @@ class ClefExecutor:
                     observed_value=observed_value,
                     message="Insufficient history for forecasting baseline window",
                     metadata={"window_size": 0},
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # Calculate mean and std
@@ -2150,7 +2143,7 @@ class ClefExecutor:
                     "upper_bound": upper,
                     "note": "Install statsmodels+pandas to enable SARIMA forecasting",
                 },
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         except Exception as e:
@@ -2162,7 +2155,7 @@ class ClefExecutor:
                 observed_value=None,
                 message=f"Forecast analysis failed: {str(e)}",
                 metadata={"error": str(e)},
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
     async def _execute_data_profile_drift_check(
@@ -2189,7 +2182,7 @@ class ClefExecutor:
                     "error": "missing_optional_dependency",
                     "dependencies": ["scipy"],
                 },
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         if not table or not column:
@@ -2200,18 +2193,21 @@ class ClefExecutor:
                 observed_value=None,
                 message="Drift check requires 'table' and 'column'",
                 metadata={"error": "missing_config"},
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         try:
             # 1. Fetch Baseline Data
             # Limit to prevent memory explosions
-            baseline_sql = f"SELECT {column} as val FROM {table} WHERE {baseline_condition} LIMIT 10000"
+            # baseline_condition / current_condition are trusted config strings, not user input
+            qt = _qi(table, stave)
+            qc = _qi(column, stave)
+            baseline_sql = f"SELECT {qc} as val FROM {qt} WHERE {baseline_condition} LIMIT 10000"
             baseline_rows = await db_connector.query({"sql": baseline_sql})
             baseline_values = [r["val"] for r in baseline_rows if r["val"] is not None]
 
             # 2. Fetch Current Data
-            current_sql = f"SELECT {column} as val FROM {table} WHERE {current_condition} LIMIT 10000"
+            current_sql = f"SELECT {qc} as val FROM {qt} WHERE {current_condition} LIMIT 10000"
             current_rows = await db_connector.query({"sql": current_sql})
             current_values = [r["val"] for r in current_rows if r["val"] is not None]
 
@@ -2226,7 +2222,7 @@ class ClefExecutor:
                         "baseline_count": len(baseline_values),
                         "current_count": len(current_values),
                     },
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             # 3. Perform Drift Detection using Brain Library
@@ -2247,7 +2243,7 @@ class ClefExecutor:
                     observed_value=None,
                     message="Drift check currently only supports numeric columns for KS test",
                     metadata={"error": "non_numeric_data"},
-                    timestamp=datetime.now(),
+                    timestamp=datetime.now(timezone.utc),
                 )
 
             drift_result = detector.kolmogorov_smirnov_test(
@@ -2278,7 +2274,7 @@ class ClefExecutor:
                     "current_size": drift_result.current_size,
                     "stats_metadata": drift_result.metadata,
                 },
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
         except Exception as e:
@@ -2290,7 +2286,7 @@ class ClefExecutor:
                 observed_value=None,
                 message=f"Drift analysis failed: {str(e)}",
                 metadata={"error": str(e)},
-                timestamp=datetime.now(),
+                timestamp=datetime.now(timezone.utc),
             )
 
 
@@ -2318,8 +2314,11 @@ async def execute_stave_clefs(
     managed_connector = False
 
     if connector is None:
-        tester = ConnectionTester()
-        connector = await tester.get_connector(stave, read_only=True)
+        connector = await create_connector(
+            stave.data_source_type or "",
+            stave.connection_config or {},
+            read_only=True,
+        )
         managed_connector = True
 
     try:

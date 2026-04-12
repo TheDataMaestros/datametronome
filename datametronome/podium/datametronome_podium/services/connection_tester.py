@@ -11,9 +11,9 @@ import logging
 import sqlite3
 import time
 from datetime import datetime
-from typing import Any, Dict, Optional, cast
+from typing import Any, cast
 
-from datametronome_podium.models.stave import Stave
+from datametronome_podium.features.staves.model import Stave
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +29,7 @@ class ConnectionTester:
     def __init__(self):
         self.timeout = 10  # seconds
 
-    async def test_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def test_connection(self, stave: Stave) -> dict[str, Any]:
         """
         Test connection to a stave's data source.
 
@@ -70,7 +70,7 @@ class ConnectionTester:
 
         except Exception as e:
             connection_time = time.time() - start_time
-            logger.error(f"Connection test failed for {stave.name}: {e}")
+            logger.error("Connection test failed for %s: %s", stave.name, e)
             return {
                 "success": False,
                 "message": f"Connection test failed: {str(e)}",
@@ -84,74 +84,15 @@ class ConnectionTester:
 
         Callers are responsible for closing the connector when finished.
         """
-        data_source_type = (stave.data_source_type or "").lower()
-        config = stave.connection_config or {}
+        from datametronome_podium.core.connector_factory import create_connector
 
-        try:
-            if data_source_type in ["postgres", "postgresql"]:
-                if read_only:
-                    from metronome_pulse_postgres import (
-                        PostgresReadOnlyPulse as PulseClass,
-                    )
-                else:
-                    from metronome_pulse_postgres import PostgresPulse as PulseClass
+        return await create_connector(
+            stave.data_source_type or "",
+            stave.connection_config or {},
+            read_only=read_only,
+        )
 
-                connector = PulseClass(
-                    host=config["host"],
-                    port=config.get("port", 5432),
-                    database=config["database"],
-                    user=config["user"],
-                    password=config.get("password", ""),
-                )
-
-            elif data_source_type == "sqlite":
-                db_path = config.get("database_path") or config.get("path")
-                if not db_path:
-                    raise RuntimeError(
-                        "SQLite connection requires 'database_path' or 'path' in connection_config"
-                    )
-
-                if read_only:
-                    from metronome_pulse_sqlite import SQLiteReadonlyPulse as PulseClass
-                else:
-                    from metronome_pulse_sqlite import SQLitePulse as PulseClass
-
-                connector = PulseClass(db_path)
-
-            elif data_source_type == "bigquery":
-                if read_only:
-                    from metronome_pulse_bigquery import (
-                        BigQueryReadonlyPulse as PulseClass,  # type: ignore
-                    )
-                else:
-                    from metronome_pulse_bigquery import (
-                        BigQueryPulse as PulseClass,  # type: ignore
-                    )
-
-                connector = PulseClass(
-                    project_id=config["project_id"],
-                    credentials_path=config.get("credentials_path"),
-                    credentials_json=config.get("credentials_json"),
-                    dataset=config.get("dataset"),
-                    location=config.get("location", "US"),
-                )
-
-            else:
-                raise RuntimeError(
-                    f"Unsupported data source type: {stave.data_source_type}"
-                )
-
-        except KeyError as exc:
-            raise RuntimeError(f"Missing required connection field: {exc}") from exc
-        except ImportError as exc:
-            raise RuntimeError(
-                f"Required connector package is not installed: {exc.name}"
-            ) from exc
-
-        await connector.connect()
-        return connector
-
-    async def _test_postgres_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def _test_postgres_connection(self, stave: Stave) -> dict[str, Any]:
         """Test PostgreSQL connection using DataPulse."""
         try:
             # Import DataPulse PostgreSQL read-only connector
@@ -214,53 +155,54 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_mysql_connection(self, stave: Stave) -> Dict[str, Any]:
-        """Test MySQL connection."""
+    async def _test_mysql_connection(self, stave: Stave) -> dict[str, Any]:
+        """Test MySQL connection.
+
+        The mysql.connector library is synchronous; run it in the default
+        thread-pool executor to avoid blocking the event loop.
+        """
         try:
-            # Import here to avoid dependency issues if mysql-connector is not installed
             import mysql.connector  # type: ignore
 
             config = stave.connection_config
 
-            # Test connection
-            conn = mysql.connector.connect(
-                host=config["host"],
-                port=config.get("port", 3306),
-                database=config["database"],
-                user=config["user"],
-                password=config.get("password", ""),
-                connect_timeout=self.timeout,
-            )
+            def _connect_and_query() -> dict[str, Any]:
+                conn = mysql.connector.connect(
+                    host=config["host"],
+                    port=config.get("port", 3306),
+                    database=config["database"],
+                    user=config["user"],
+                    password=config.get("password", ""),
+                    connect_timeout=self.timeout,
+                )
+                cursor = conn.cursor()
 
-            # Get basic info
-            cursor = conn.cursor()
-            cursor.execute("SELECT VERSION();")
-            row = cursor.fetchone()
-            version = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
+                cursor.execute("SELECT VERSION();")
+                row = cursor.fetchone()
+                version = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
 
-            cursor.execute("SELECT COUNT(*) FROM information_schema.schemata;")
-            row = cursor.fetchone()
-            schema_count = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
+                cursor.execute("SELECT COUNT(*) FROM information_schema.schemata;")
+                row = cursor.fetchone()
+                schema_count = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
 
-            cursor.execute("SELECT COUNT(*) FROM information_schema.tables;")
-            row = cursor.fetchone()
-            table_count = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
+                cursor.execute("SELECT COUNT(*) FROM information_schema.tables;")
+                row = cursor.fetchone()
+                table_count = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
 
-            cursor.close()
-            conn.close()
-
-            return {
-                "success": True,
-                "message": "MySQL connection successful",
-                "metadata": {
+                cursor.close()
+                conn.close()
+                return {
                     "database_version": version,
                     "schema_count": schema_count,
                     "table_count": table_count,
                     "host": config["host"],
                     "port": config.get("port", 3306),
                     "database": config["database"],
-                },
-            }
+                }
+
+            loop = asyncio.get_running_loop()
+            metadata = await loop.run_in_executor(None, _connect_and_query)
+            return {"success": True, "message": "MySQL connection successful", "metadata": metadata}
 
         except ImportError:
             return {
@@ -275,7 +217,7 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_sqlite_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def _test_sqlite_connection(self, stave: Stave) -> dict[str, Any]:
         """Test SQLite connection using DataPulse."""
         try:
             # Import DataPulse SQLite read-only connector
@@ -334,30 +276,27 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_redis_connection(self, stave: Stave) -> Dict[str, Any]:
-        """Test Redis connection."""
+    async def _test_redis_connection(self, stave: Stave) -> dict[str, Any]:
+        """Test Redis connection.
+
+        The redis-py client is synchronous; run it in the default thread-pool
+        executor to avoid blocking the event loop.
+        """
         try:
-            # Import here to avoid dependency issues if redis is not installed
             import redis
 
             config = stave.connection_config
 
-            # Create Redis client
-            r = redis.Redis(
-                host=config["host"],
-                port=config.get("port", 6379),
-                db=config.get("db", 0),
-                password=config.get("password"),
-                socket_timeout=self.timeout,
-            )
-
-            # Test connection
-            info = cast(dict, r.info())
-
-            return {
-                "success": True,
-                "message": "Redis connection successful",
-                "metadata": {
+            def _connect_and_query() -> dict[str, Any]:
+                r = redis.Redis(
+                    host=config["host"],
+                    port=config.get("port", 6379),
+                    db=config.get("db", 0),
+                    password=config.get("password"),
+                    socket_timeout=self.timeout,
+                )
+                info = cast(dict, r.info())
+                return {
                     "redis_version": info.get("redis_version"),
                     "connected_clients": info.get("connected_clients"),
                     "used_memory_human": info.get("used_memory_human"),
@@ -365,8 +304,11 @@ class ConnectionTester:
                     "host": config["host"],
                     "port": config.get("port", 6379),
                     "db": config.get("db", 0),
-                },
-            }
+                }
+
+            loop = asyncio.get_running_loop()
+            metadata = await loop.run_in_executor(None, _connect_and_query)
+            return {"success": True, "message": "Redis connection successful", "metadata": metadata}
 
         except ImportError:
             return {
@@ -381,38 +323,37 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_mongodb_connection(self, stave: Stave) -> Dict[str, Any]:
-        """Test MongoDB connection."""
+    async def _test_mongodb_connection(self, stave: Stave) -> dict[str, Any]:
+        """Test MongoDB connection.
+
+        pymongo is synchronous; run it in the default thread-pool executor to
+        avoid blocking the event loop.
+        """
         try:
-            # Import here to avoid dependency issues if pymongo is not installed
             import pymongo  # type: ignore
 
             config = stave.connection_config
 
-            # Create MongoDB client
-            client = pymongo.MongoClient(
-                config["uri"], serverSelectionTimeoutMS=self.timeout * 1000
-            )
-
-            # Test connection
-            server_info = client.server_info()
-            db = client[config["database"]]
-            collection_count = len(db.list_collection_names())
-
-            client.close()
-
-            return {
-                "success": True,
-                "message": "MongoDB connection successful",
-                "metadata": {
+            def _connect_and_query() -> dict[str, Any]:
+                client = pymongo.MongoClient(
+                    config["uri"], serverSelectionTimeoutMS=self.timeout * 1000
+                )
+                server_info = client.server_info()
+                db = client[config["database"]]
+                collection_count = len(db.list_collection_names())
+                client.close()
+                return {
                     "mongodb_version": server_info.get("version"),
                     "database": config["database"],
                     "collection_count": collection_count,
                     "uri": config["uri"].replace(config.get("password", ""), "***")
                     if config.get("password")
                     else config["uri"],
-                },
-            }
+                }
+
+            loop = asyncio.get_running_loop()
+            metadata = await loop.run_in_executor(None, _connect_and_query)
+            return {"success": True, "message": "MongoDB connection successful", "metadata": metadata}
 
         except ImportError:
             return {
@@ -427,7 +368,7 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_bigquery_connection(self, stave: Stave) -> Dict[str, Any]:
+    async def _test_bigquery_connection(self, stave: Stave) -> dict[str, Any]:
         """Test BigQuery connection using DataPulse."""
         try:
             # Import DataPulse BigQuery read-only connector
@@ -501,7 +442,7 @@ class ConnectionTester:
 
                 except Exception as e:
                     error_msg = str(e)
-                    logger.warning(f"Could not list tables for dataset {dataset}: {e}")
+                    logger.warning("Could not list tables for dataset %s: %s", dataset, e)
 
                     # Provide helpful guidance for common errors
                     if "404" in error_msg or "Not found" in error_msg:
@@ -550,33 +491,37 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def _test_api_connection(self, stave: Stave) -> Dict[str, Any]:
-        """Test API/HTTP connection."""
+    async def _test_api_connection(self, stave: Stave) -> dict[str, Any]:
+        """Test API/HTTP connection.
+
+        The requests library is synchronous; run it in the default thread-pool
+        executor to avoid blocking the event loop.
+        """
         try:
-            # Import here to avoid dependency issues if requests is not installed
             import requests  # type: ignore
 
             config = stave.connection_config
             base_url = config["base_url"]
-
-            # Test connection with a simple GET request
-            headers = {}
+            headers: dict[str, str] = {}
             if config.get("api_key"):
                 headers["Authorization"] = f"Bearer {config['api_key']}"
 
-            response = requests.get(base_url, headers=headers, timeout=self.timeout)
+            def _do_request() -> dict[str, Any]:
+                response = requests.get(base_url, headers=headers, timeout=self.timeout)
+                return {
+                    "status_code": response.status_code,
+                    "status_text": str(response.status_code),
+                    "base_url": base_url,
+                    "response_time_ms": round(response.elapsed.total_seconds() * 1000, 2),
+                    "content_type": response.headers.get("content-type", "unknown"),
+                }
 
+            loop = asyncio.get_running_loop()
+            metadata = await loop.run_in_executor(None, _do_request)
             return {
                 "success": True,
-                "message": f"API connection successful (HTTP {response.status_code})",
-                "metadata": {
-                    "status_code": response.status_code,
-                    "base_url": base_url,
-                    "response_time_ms": round(
-                        response.elapsed.total_seconds() * 1000, 2
-                    ),
-                    "content_type": response.headers.get("content-type", "unknown"),
-                },
+                "message": f"API connection successful (HTTP {metadata['status_code']})",
+                "metadata": metadata,
             }
 
         except ImportError:
@@ -599,5 +544,5 @@ class ConnectionTester:
 
             size_bytes = os.path.getsize(file_path)
             return size_bytes / (1024 * 1024)
-        except:
+        except OSError:
             return 0.0

@@ -76,7 +76,7 @@ class TestCRUDHelpers:
     async def test_select_basic(self, sqlite_executor, mock_connector):
         await sqlite_executor.select("staves")
         call_args = mock_connector.query_with_params.call_args
-        assert "SELECT * FROM staves" in call_args[0][0]
+        assert 'SELECT * FROM "staves"' in call_args[0][0]
 
     @pytest.mark.asyncio
     async def test_select_with_where(self, sqlite_executor, mock_connector):
@@ -90,7 +90,7 @@ class TestCRUDHelpers:
         await sqlite_executor.select("staves", order_by="created_at DESC", limit=10, offset=5)
         call_args = mock_connector.query_with_params.call_args
         sql = call_args[0][0]
-        assert "ORDER BY created_at DESC" in sql
+        assert 'ORDER BY "created_at" DESC' in sql
         assert "LIMIT" in sql
         assert "OFFSET" in sql
 
@@ -100,14 +100,14 @@ class TestCRUDHelpers:
         assert result == 1
         call_args = mock_connector.execute.call_args
         sql = call_args[0][0]
-        assert "INSERT INTO staves" in sql
+        assert 'INSERT INTO "staves"' in sql
 
     @pytest.mark.asyncio
     async def test_update(self, sqlite_executor, mock_connector):
         await sqlite_executor.update("staves", {"name": "new"}, where={"id": "1"})
         call_args = mock_connector.execute.call_args
         sql = call_args[0][0]
-        assert "UPDATE staves SET" in sql
+        assert 'UPDATE "staves" SET' in sql
         assert "WHERE" in sql
 
     @pytest.mark.asyncio
@@ -115,8 +115,13 @@ class TestCRUDHelpers:
         await sqlite_executor.delete("staves", where={"id": "1"})
         call_args = mock_connector.execute.call_args
         sql = call_args[0][0]
-        assert "DELETE FROM staves" in sql
+        assert 'DELETE FROM "staves"' in sql
         assert "WHERE" in sql
+
+    @pytest.mark.asyncio
+    async def test_delete_without_where_raises(self, sqlite_executor):
+        with pytest.raises(ValueError, match="requires a where clause"):
+            await sqlite_executor.delete("staves")
 
 
 class TestTransaction:

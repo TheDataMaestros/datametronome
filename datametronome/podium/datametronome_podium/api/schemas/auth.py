@@ -35,3 +35,17 @@ class TokenData(BaseModel):
     """Schema for token data."""
 
     username: str | None = None
+
+
+class SetupStatus(BaseModel):
+    """Response for setup status check."""
+
+    needs_setup: bool
+
+
+class SetupInit(BaseModel):
+    """Request body for initial admin setup."""
+
+    username: str = Field(..., min_length=3, max_length=100)
+    email: str = Field(..., pattern=r"^[^@]+@[^@]+\.[^@]+$")
+    password: str = Field(..., min_length=8)

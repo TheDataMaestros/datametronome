@@ -3,12 +3,12 @@ from __future__ import annotations
 
 import logging
 import uuid
-from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
 from pydantic import BaseModel
 from pydantic_ai import Agent
 
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.features.user_memory.schemas import MemoryExtraction
 
 if TYPE_CHECKING:
@@ -68,7 +68,7 @@ Be factual and concise. If a category has no memories, return an empty string.""
 
 
 def _now_utc() -> str:
-    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+    return now_utc_iso()
 
 
 def _gen_memory_id() -> str:

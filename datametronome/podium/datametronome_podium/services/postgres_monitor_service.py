@@ -1,10 +1,12 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Tuple, cast
 
 from metronome_pulse_core import Pulse, Readable
+
+from datametronome_podium.core.query import quote_identifier
 from metronome_pulse_postgres import PostgresPulse
 from metronome_pulse_postgres_psycopg3 import PostgresPsycopg3Pulse
 from metronome_pulse_postgres_sqlalchemy import PostgresSQLAlchemyPulse
@@ -67,7 +69,7 @@ class PostgresMonitorService:
     ) -> Dict[str, Any]:
         """Check if a table has the expected number of rows."""
         try:
-            query = f"SELECT COUNT(*) as row_count FROM {table_name}"
+            query = f"SELECT COUNT(*) as row_count FROM {quote_identifier(table_name)}"
             assert self.connector is not None
             results = await self.connector.query(query)
             actual_count = results[0]["row_count"] if results else 0
@@ -96,10 +98,12 @@ class PostgresMonitorService:
     ) -> Dict[str, Any]:
         """Check if the latest data in a table is fresh enough."""
         try:
+            qt = quote_identifier(table_name)
+            qtc = quote_identifier(timestamp_column)
             query = f"""
-                SELECT MAX({timestamp_column}) as latest_timestamp
-                FROM {table_name}
-                WHERE {timestamp_column} IS NOT NULL
+                SELECT MAX({qtc}) as latest_timestamp
+                FROM {qt}
+                WHERE {qtc} IS NOT NULL
             """
             assert self.connector is not None
             results = await self.connector.query(query)
@@ -117,7 +121,7 @@ class PostgresMonitorService:
                     latest_timestamp.replace("Z", "+00:00")
                 )
 
-            age_hours = (datetime.now() - latest_timestamp).total_seconds() / 3600
+            age_hours = (datetime.now(timezone.utc) - latest_timestamp).total_seconds() / 3600
 
             status = "pass"
             if age_hours > max_age_hours:
@@ -236,7 +240,7 @@ class PostgresMonitorService:
                 "Connector not initialized. Call create_connector() first."
             )
 
-        start_time = datetime.now()
+        start_time = datetime.now(timezone.utc)
         overall_results: Dict[str, Any] = {
             "check_started_at": start_time.isoformat(),
             "connector_type": self.connector_type,
@@ -316,9 +320,9 @@ class PostgresMonitorService:
             overall_results["overall_status"] = "error"
             overall_results["error"] = str(e)
 
-        overall_results["check_completed_at"] = datetime.now().isoformat()
+        overall_results["check_completed_at"] = datetime.now(timezone.utc).isoformat()
         overall_results["duration_seconds"] = (
-            datetime.now() - start_time
+            datetime.now(timezone.utc) - start_time
         ).total_seconds()
 
         return overall_results

@@ -44,7 +44,7 @@ graph TB
     end
 
     subgraph "Processing"
-        Scheduler[APScheduler]
+        Scheduler[Celery Beat + RedBeat<br/>+ persisted jobs]
         Executor[Check Executor]
         Brain[Brain Library<br/>SARIMA / KS Drift / Isolation Forest]
     end
@@ -132,7 +132,7 @@ sequenceDiagram
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Docker Compose (recommended)
 
@@ -140,12 +140,28 @@ sequenceDiagram
 git clone https://github.com/datametronome/datametronome.git
 cd datametronome
 cp env.example .env
-docker compose up -d
+
+# Start the full stack (API + PostgreSQL + Redis + RabbitMQ + UI)
+make up
 ```
 
 - **API:** http://localhost:8001
-- **UI:** http://localhost:3000 (start with `docker compose --profile full up -d`)
+- **UI:** http://localhost:3000
 - **Login:** `admin` / `admin`
+
+```bash
+# Start with Celery workers (adds worker + Beat scheduler containers)
+make up-workers
+
+# Run database migrations
+make migrate
+
+# View logs
+make logs
+
+# Stop everything
+make down
+```
 
 ### Create Your First Check
 
@@ -263,22 +279,23 @@ erDiagram
 
 ---
 
-## 🎬 Live Demo
+## Live Demo
 
 A **Retail Demo** is included so you can see DataMetronome in action with synthetic e-commerce data (60 days of order history, volume anomalies, pricing drift).
 
 ```bash
-# Generate demo data and start everything
-make setup-env
-make install
-make retail-db
+# Start the stack
+make up
+
+# Import retail demo data (from a separate terminal)
 export DB_PATH="$(pwd)/datametronome/podium/data/retail.db"
-python3 showcase/retail_demo/import_to_podium.py
-make start-podium   # API at :8000
-make start-ui       # UI at :3000
+python showcase/retail_demo/import_to_podium.py
+
+# Run tests to verify everything is working
+make test
 ```
 
-> 💡 See [docs/TUTORIAL.md](docs/TUTORIAL.md) for a detailed walkthrough.
+See [docs/TUTORIAL.md](docs/TUTORIAL.md) for a detailed walkthrough.
 
 ---
 

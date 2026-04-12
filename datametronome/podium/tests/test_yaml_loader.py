@@ -8,8 +8,8 @@ import tempfile
 from pathlib import Path
 
 import pytest
-from datametronome_podium.models.clef import Clef
-from datametronome_podium.models.stave import Stave
+from datametronome_podium.features.clefs.model import Clef
+from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.services.stave_yaml_loader import (
     load_single_stave_yaml,
     load_staves_from_yaml,
@@ -298,7 +298,7 @@ class TestRealExampleFiles:
         example_file = Path(__file__).parent.parent / "examples" / "staves.yaml"
 
         if not example_file.exists():
-            pytest.skip("Example file not found")  # ty: ignore[too-many-positional-arguments, invalid-argument-type]
+            pytest.skip("Example file not found")  # ty: ignore
 
         # Load the example
         staves, clefs = load_staves_from_yaml(example_file, resolve_env=False)
@@ -319,7 +319,7 @@ class TestRealExampleFiles:
         example_file = Path(__file__).parent.parent / "examples" / "production-db.yaml"
 
         if not example_file.exists():
-            pytest.skip("Example file not found")  # ty: ignore[too-many-positional-arguments, invalid-argument-type]
+            pytest.skip("Example file not found")  # ty: ignore
 
         # Load the example
         stave, clefs = load_single_stave_yaml(example_file, resolve_env=False)

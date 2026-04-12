@@ -6,10 +6,9 @@ Thank you for your interest in contributing to DataMetronome! This document prov
 
 ### Prerequisites
 
-- Python 3.9+
+- Python 3.12+
+- Docker and Docker Compose
 - Git
-- pip or poetry
-- Docker (optional, for development environment)
 
 ### Development Setup
 
@@ -19,42 +18,40 @@ Thank you for your interest in contributing to DataMetronome! This document prov
    cd datametronome
    ```
 
-2. **Set up the development environment**
+2. **Set up environment variables**
    ```bash
-   # Create virtual environment
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-   # Install packages in development mode
-   make install
-   make install-dev
-
-   # Install pre-commit hooks
-   pre-commit install
+   cp env.example .env
+   # Edit .env -- set DATAMETRONOME_SECRET_KEY to a random 32+ char string:
+   # openssl rand -hex 32
    ```
 
-3. **Set up environment variables**
+3. **Start the full stack with Docker Compose**
    ```bash
-   # Copy example environment file
-   cp .env.example .env
+   # API + PostgreSQL + Redis + RabbitMQ + UI
+   make up
 
-   # Edit .env with your configuration
-   # Make sure to set DATAMETRONOME_SECRET_KEY
+   # With Celery workers (for scheduled check execution)
+   make up-workers
    ```
 
-4. **Set up database**
+4. **Run database migrations**
    ```bash
-   make setup-db
+   make migrate
    ```
 
-5. **Start services**
+5. **Run tests**
    ```bash
-   # Terminal 1: Start backend
-   make start-podium
-
-   # Terminal 2: Start UI
-   make start-ui
+   make test
    ```
+
+The project is Docker-first. All services run in containers. For local Python
+development (e.g., running tests outside Docker), use the virtualenv in
+`datametronome/podium/.venv/`:
+
+```bash
+cd datametronome/podium
+.venv/bin/python -m pytest --timeout=10 -q
+```
 
 ## Project Structure
 
@@ -87,14 +84,15 @@ git checkout -b feature/your-feature-name
 ### 3. Run Tests and Linting
 
 ```bash
-# Run tests
+# Run tests (fast, uses SQLite, runs locally via .venv)
 make test
 
-# Run linting
-make lint
+# Run linting manually (ruff + ty)
+cd datametronome/podium && .venv/bin/python -m ruff check .
+cd datametronome/podium && .venv/bin/ty check .
 
 # Format code
-make format
+cd datametronome/podium && .venv/bin/python -m ruff format .
 ```
 
 ### 4. Commit Changes
@@ -180,10 +178,10 @@ Create a pull request on GitHub with:
 make test
 
 # Run specific test file
-pytest tests/test_specific.py
+cd datametronome/podium && .venv/bin/python -m pytest tests/test_specific.py --timeout=10
 
 # Run with coverage
-pytest --cov=datametronome --cov-report=html
+cd datametronome/podium && .venv/bin/python -m pytest --cov=datametronome_podium --cov-report=html
 ```
 
 ### Writing Tests
@@ -244,4 +242,4 @@ By contributing to DataMetronome, you agree that your contributions will be lice
 
 ---
 
-Thank you for contributing to DataMetronome! 🎵
+Thank you for contributing to DataMetronome!

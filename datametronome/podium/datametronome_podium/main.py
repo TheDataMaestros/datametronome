@@ -30,21 +30,6 @@ setup_logging(log_level=settings.log_level, log_format=log_format)
 logger = get_logger(__name__)
 
 
-def create_cors_middleware(app: FastAPI | None = None) -> CORSMiddleware:
-    """Create CORS middleware with configuration.
-
-    Returns:
-        Configured CORS middleware.
-    """
-    return CORSMiddleware(
-        app=app,  # type: ignore
-        allow_origins=settings.allowed_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
-
 def create_root_endpoints(app: FastAPI) -> None:
     """Add root-level endpoints to the application.
 
@@ -102,12 +87,17 @@ def create_root_endpoints(app: FastAPI) -> None:
             }
             health_status["status"] = "degraded"
 
-        # Check scheduler status
-        # TODO: Replace with Celery Beat / RedBeat health check
+        # Scheduling: Celery Beat + RedBeat handles all scheduling (no dedicated scheduler endpoint).
+        sched_ok = settings.scheduler_enabled
         health_status["checks"]["scheduler"] = {
-            "status": "healthy",
-            "message": "Scheduling handled by Celery Beat",
+            "status": "healthy" if sched_ok else "degraded",
+            "message": (
+                f"Scheduler integration {'on' if sched_ok else 'off'} "
+                f"(Celery Beat / persisted jobs); dispatch_mode={settings.dispatch_mode}"
+            ),
         }
+        if not sched_ok:
+            health_status["status"] = "degraded"
 
         return health_status
 
@@ -142,12 +132,23 @@ async def lifespan(app: FastAPI):
     # Startup
     logging.info("Starting DataMetronome Podium...")
 
+    # Validate configuration (blocks startup on critical errors like default secret key)
+    from .core.config import validate_and_report_config
+    validate_and_report_config()
+
     # Initialize database
     await init_db()
     logging.info("Database initialized")
 
-    # Scheduling is now handled by Celery Beat + RedBeat (no in-process scheduler)
-    logging.info("Scheduling handled by Celery Beat")
+    # Cache DB-managed AI settings so sync callers see them without blocking
+    from .services.agent_factory import refresh_ai_config_cache
+    await refresh_ai_config_cache()
+
+    logging.info(
+        "Scheduler integration: Celery Beat + RedBeat (scheduler_enabled=%s, dispatch_mode=%s)",
+        settings.scheduler_enabled,
+        settings.dispatch_mode,
+    )
 
     yield
 

@@ -3,10 +3,10 @@ from __future__ import annotations
 
 import json
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from datametronome_podium.core.query import QueryExecutor
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 
 
 class WorkflowRepo:
@@ -17,7 +17,7 @@ class WorkflowRepo:
         self, conversation_id: str, user_id: str, workflow_name: str
     ) -> str:
         cp_id = f"wf-{uuid.uuid4().hex[:12]}"
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         await self.db.insert("workflow_checkpoints", {
             "id": cp_id,
             "conversation_id": conversation_id,
@@ -39,7 +39,7 @@ class WorkflowRepo:
     async def update_checkpoint(
         self, checkpoint_id: str, **kwargs: Any
     ) -> int:
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         data = {k: v for k, v in kwargs.items() if v is not None}
         if "state_data" in data and isinstance(data["state_data"], dict):
             data["state_data"] = json.dumps(data["state_data"])
@@ -60,7 +60,7 @@ class WorkflowRepo:
         node_name: str | None = None, event_data: dict | None = None
     ) -> str:
         evt_id = f"evt-{uuid.uuid4().hex[:12]}"
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         await self.db.insert("workflow_events", {
             "id": evt_id,
             "checkpoint_id": checkpoint_id,

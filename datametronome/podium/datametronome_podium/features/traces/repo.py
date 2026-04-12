@@ -2,10 +2,10 @@
 from __future__ import annotations
 import json
 import uuid
-from datetime import datetime, timezone
 from typing import Any
 
 from datametronome_podium.core.query import QueryExecutor
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.features.traces.model import AgentTrace
 
 
@@ -24,7 +24,7 @@ class TraceRepo:
         duration_ms: float | None = None,
     ) -> str:
         trace_id = f"trace-{uuid.uuid4().hex[:12]}"
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         preview = user_message[:500] + "..." if len(user_message) > 500 else user_message
         await self.db.insert("agent_traces", {
             "id": trace_id,

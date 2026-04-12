@@ -1,24 +1,28 @@
 """Tests for intelligence data in dashboard metrics."""
 import pytest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
-from datametronome_podium.api.v1.endpoints.metrics import get_dashboard_metrics
+from datametronome_podium.features.metrics.router import get_dashboard_metrics
+
+
+def _make_mock_executor(query_fn):
+    """Create a mock QueryExecutor with the given query function."""
+    mock = MagicMock()
+    mock.query = query_fn
+    return mock
 
 
 @pytest.mark.asyncio
 async def test_dashboard_includes_intelligence_key():
     """Dashboard metrics should include an 'intelligence' section."""
-    mock_db = AsyncMock()
-    # Return empty list for GROUP BY queries, sensible defaults for COUNT queries
-    async def _mock_query(params):
-        sql = params.get("sql", "")
+    async def _mock_query(sql, params=None):
         if "GROUP BY" in sql:
             return []
         return [{"count": 0, "total": 0, "passed": 0, "failed": 0, "critical": 0, "avg_health": None, "report_count": 0}]
 
-    mock_db.query = AsyncMock(side_effect=_mock_query)
+    executor = _make_mock_executor(_mock_query)
 
-    with patch("datametronome_podium.api.v1.endpoints.metrics.get_db", return_value=mock_db):
+    with patch("datametronome_podium.features.metrics.router.get_executor", return_value=executor):
         result = await get_dashboard_metrics()
 
     assert "intelligence" in result
@@ -27,13 +31,7 @@ async def test_dashboard_includes_intelligence_key():
 @pytest.mark.asyncio
 async def test_dashboard_intelligence_with_data():
     """Intelligence section should reflect actual database values."""
-    call_count = 0
-
-    async def mock_query(params):
-        nonlocal call_count
-        call_count += 1
-        sql = params.get("sql", "")
-
+    async def mock_query(sql, params=None):
         # Intelligence queries
         if "insight_reports" in sql:
             return [{"avg_health": 82.5, "report_count": 10}]
@@ -45,10 +43,9 @@ async def test_dashboard_intelligence_with_data():
         # Default for existing dashboard queries
         return [{"count": 0, "total": 0, "passed": 0, "failed": 0, "critical": 0, "status": "passed"}]
 
-    mock_db = AsyncMock()
-    mock_db.query = AsyncMock(side_effect=mock_query)
+    executor = _make_mock_executor(mock_query)
 
-    with patch("datametronome_podium.api.v1.endpoints.metrics.get_db", return_value=mock_db):
+    with patch("datametronome_podium.features.metrics.router.get_executor", return_value=executor):
         result = await get_dashboard_metrics()
 
     intel = result.get("intelligence", {})
@@ -60,13 +57,7 @@ async def test_dashboard_intelligence_with_data():
 @pytest.mark.asyncio
 async def test_dashboard_intelligence_graceful_on_missing_tables():
     """If intelligence tables do not exist, dashboard should still work."""
-    call_count = 0
-
-    async def mock_query(params):
-        nonlocal call_count
-        call_count += 1
-        sql = params.get("sql", "")
-
+    async def mock_query(sql, params=None):
         # Intelligence tables don't exist
         if any(t in sql for t in ("insight_reports", "data_profiles", "insight_suggestions")):
             raise Exception("no such table: insight_reports")
@@ -74,10 +65,9 @@ async def test_dashboard_intelligence_graceful_on_missing_tables():
         # Existing dashboard queries work fine
         return [{"count": 0, "total": 0, "passed": 0, "failed": 0, "critical": 0, "status": "passed"}]
 
-    mock_db = AsyncMock()
-    mock_db.query = AsyncMock(side_effect=mock_query)
+    executor = _make_mock_executor(mock_query)
 
-    with patch("datametronome_podium.api.v1.endpoints.metrics.get_db", return_value=mock_db):
+    with patch("datametronome_podium.features.metrics.router.get_executor", return_value=executor):
         result = await get_dashboard_metrics()
 
     # Should still return successfully with empty intelligence

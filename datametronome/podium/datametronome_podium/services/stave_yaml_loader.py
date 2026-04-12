@@ -16,13 +16,13 @@ Example Usage:
 """
 
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import yaml
-from datametronome_podium.models.clef import Clef
-from datametronome_podium.models.stave import Stave
+from datametronome_podium.features.clefs.model import Clef
+from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.services.config_validator import (
     ConfigurationIssue,
     validate_configuration,
@@ -152,9 +152,9 @@ def load_staves_from_yaml(
 
         # Set timestamps if not provided
         if "created_at" not in stave_data:
-            stave_data["created_at"] = datetime.now()
+            stave_data["created_at"] = datetime.now(timezone.utc)
         if "updated_at" not in stave_data:
-            stave_data["updated_at"] = datetime.now()
+            stave_data["updated_at"] = datetime.now(timezone.utc)
 
         # Create Stave object
         stave = Stave(**stave_data)
@@ -175,9 +175,9 @@ def load_staves_from_yaml(
 
         # Set timestamps if not provided
         if "created_at" not in clef_data:
-            clef_data["created_at"] = datetime.now()
+            clef_data["created_at"] = datetime.now(timezone.utc)
         if "updated_at" not in clef_data:
-            clef_data["updated_at"] = datetime.now()
+            clef_data["updated_at"] = datetime.now(timezone.utc)
 
         # Create Clef object
         clef = Clef(**clef_data)
@@ -239,9 +239,9 @@ def load_single_stave_yaml(
 
     # Set timestamps if not provided
     if "created_at" not in stave_data:
-        stave_data["created_at"] = datetime.now()
+        stave_data["created_at"] = datetime.now(timezone.utc)
     if "updated_at" not in stave_data:
-        stave_data["updated_at"] = datetime.now()
+        stave_data["updated_at"] = datetime.now(timezone.utc)
 
     stave = Stave(**stave_data)
 
@@ -264,9 +264,9 @@ def load_single_stave_yaml(
 
         # Set timestamps if not provided
         if "created_at" not in clef_data:
-            clef_data["created_at"] = datetime.now()
+            clef_data["created_at"] = datetime.now(timezone.utc)
         if "updated_at" not in clef_data:
-            clef_data["updated_at"] = datetime.now()
+            clef_data["updated_at"] = datetime.now(timezone.utc)
 
         clef = Clef(**clef_data)
         clefs.append(clef)
@@ -290,8 +290,8 @@ async def import_staves_from_yaml(
         Dict with counts: {"staves": 3, "clefs": 5}
 
     Example:
-        >>> from datametronome_podium.core.database import get_db
-        >>> db = await get_db()
+        >>> from datametronome_podium.core.database import get_executor
+        >>> db = get_executor().connector
         >>> counts = await import_staves_from_yaml("staves.yaml", db)
         >>> print(f"Imported {counts['staves']} staves, {counts['clefs']} clefs")
     """

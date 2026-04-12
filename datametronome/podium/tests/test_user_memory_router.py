@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 from fastapi import FastAPI
 
-from datametronome_podium.api.deps import get_current_user
+from datametronome_podium.core.auth import get_current_user
 from datametronome_podium.features.user_memory.router import router
 
 

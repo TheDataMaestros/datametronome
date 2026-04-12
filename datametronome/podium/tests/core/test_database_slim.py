@@ -11,8 +11,7 @@ class TestGetExecutor:
             mock_conn = AsyncMock()
             mock_create.return_value = (mock_conn, "sqlite")
 
-            with patch("datametronome_podium.core.seeding.create_default_admin", new_callable=AsyncMock):
-                await init_db()
+            await init_db()
 
             from datametronome_podium.core.query import QueryExecutor
             executor = get_executor()
@@ -32,37 +31,17 @@ class TestGetExecutorNotInitialized:
             database._executor = old_executor
 
 
-class TestBackwardCompat:
-    @pytest.mark.asyncio
-    async def test_execute_query_delegates_to_executor(self):
-        from datametronome_podium.core.database import execute_query
+class TestDeprecatedFunctionsRemoved:
+    """Verify that deprecated backward-compat functions were removed from database.py."""
 
-        mock_executor = AsyncMock()
-        mock_executor.query = AsyncMock(return_value=[{"id": "1"}])
+    def test_execute_query_removed(self):
+        import datametronome_podium.core.database as db_module
+        assert not hasattr(db_module, "execute_query"), "execute_query should be removed"
 
-        with patch("datametronome_podium.core.database.get_executor", return_value=mock_executor):
-            result = await execute_query("SELECT * FROM t WHERE id = ?", ["1"])
-            assert result == [{"id": "1"}]
-            mock_executor.query.assert_called_once_with("SELECT * FROM t WHERE id = ?", ["1"])
+    def test_execute_write_removed(self):
+        import datametronome_podium.core.database as db_module
+        assert not hasattr(db_module, "execute_write"), "execute_write should be removed"
 
-    @pytest.mark.asyncio
-    async def test_execute_write_delegates_to_executor(self):
-        from datametronome_podium.core.database import execute_write
-
-        mock_executor = AsyncMock()
-        mock_executor.execute = AsyncMock(return_value=1)
-
-        with patch("datametronome_podium.core.database.get_executor", return_value=mock_executor):
-            result = await execute_write("INSERT INTO t VALUES (?)", ["x"])
-            assert result is True
-
-    @pytest.mark.asyncio
-    async def test_insert_data_delegates_to_executor(self):
-        from datametronome_podium.core.database import insert_data
-
-        mock_executor = AsyncMock()
-        mock_executor.insert = AsyncMock(return_value=1)
-
-        with patch("datametronome_podium.core.database.get_executor", return_value=mock_executor):
-            result = await insert_data("t", {"id": "1"})
-            assert result is True
+    def test_insert_data_removed(self):
+        import datametronome_podium.core.database as db_module
+        assert not hasattr(db_module, "insert_data"), "insert_data should be removed"

@@ -101,6 +101,18 @@ export const useClefs = () => {
     }
   }
 
+  const runAllChecks = async (): Promise<{ message: string; job_ids: string[] }> => {
+    isLoading.value = true
+    try {
+      return await clefsService.runAllChecks()
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to run all checks'
+      throw err
+    } finally {
+      isLoading.value = false
+    }
+  }
+
   const fetchCheckResults = async (clefId: string, limit = 50) => {
     try {
       return await clefsService.getResults(clefId, limit)
@@ -175,6 +187,7 @@ export const useClefs = () => {
     updateClef,
     deleteClef,
     runCheck,
+    runAllChecks,
     fetchCheckResults,
     fetchLatestResults,
     getClefById,

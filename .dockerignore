@@ -1,0 +1,50 @@
+# Secrets and environment
+.env
+.env.*
+.secrets/
+.secrets.baseline
+
+# Version control
+.git/
+.gitignore
+
+# Virtual environments
+.venv/
+*/.venv/
+venv/
+
+# Node modules
+node_modules/
+ui-nuxt/node_modules/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+*.egg
+
+# IDE / editor
+.idea/
+.cursor/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Test artifacts
+.pytest_cache/
+htmlcov/
+.coverage
+*.db
+
+# Documentation and plans (not needed in runtime image)
+docs/superpowers/
+.superpowers/
+.worktrees/
+
+# Claude / AI config
+.claude/
+
+# Note: uv.lock files are NOT excluded — they ensure reproducible builds

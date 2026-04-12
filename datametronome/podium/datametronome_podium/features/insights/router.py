@@ -1,11 +1,15 @@
 """Insights API router."""
 import logging
-from fastapi import APIRouter, HTTPException
+import uuid
+from typing import Any, Dict
 
+from fastapi import APIRouter, Depends, HTTPException
+
+from datametronome_podium.core.auth import get_current_user
 from datametronome_podium.core.database import get_executor
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.features.insights.repo import InsightsRepo
 from datametronome_podium.features.insights.service import InsightPipelineService
-import uuid
 
 from datametronome_podium.features.insights.model import Notification
 from datametronome_podium.features.insights.schema import (
@@ -183,11 +187,18 @@ async def list_suggestions(stave_id: str, status: str | None = None):
 
 
 @router.post("/{stave_id}/suggestions/{suggestion_id}/read")
-async def mark_suggestion_read(stave_id: str, suggestion_id: str, username: str = "admin"):
-    """Mark a suggestion as read by a user."""
+async def mark_suggestion_read(
+    stave_id: str,
+    suggestion_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """Mark a suggestion as read by the authenticated user."""
+    username: str = current_user["username"]
     repo = _repo()
     sug = await repo.get_suggestion(suggestion_id)
     if not sug:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    if sug.stave_id != stave_id:
         raise HTTPException(status_code=404, detail="Suggestion not found")
     await repo.mark_suggestion_read(suggestion_id, username)
     updated = await repo.get_suggestion(suggestion_id)
@@ -195,19 +206,25 @@ async def mark_suggestion_read(stave_id: str, suggestion_id: str, username: str 
 
 
 @router.post("/{stave_id}/suggestions/{suggestion_id}/assign")
-async def assign_suggestion(stave_id: str, suggestion_id: str, body: AssignRequest):
+async def assign_suggestion(
+    stave_id: str,
+    suggestion_id: str,
+    body: AssignRequest,
+    current_user: Dict[str, Any] = Depends(get_current_user),  # noqa: ARG001 — enforces auth
+):
     """Assign a suggestion to a user and create a notification."""
-    from datetime import datetime, timezone
     repo = _repo()
     sug = await repo.get_suggestion(suggestion_id)
     if not sug:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    if sug.stave_id != stave_id:
         raise HTTPException(status_code=404, detail="Suggestion not found")
     await repo.assign_suggestion(suggestion_id, body.assigned_to)
 
     # Create notification for the assignee
     user = await repo.get_user_by_username(body.assigned_to)
     if user:
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         notif = Notification(
             id=f"notif-{uuid.uuid4().hex[:12]}",
             user_id=user["id"],
@@ -227,18 +244,18 @@ async def assign_suggestion(stave_id: str, suggestion_id: str, body: AssignReque
 @router.post("/{stave_id}/suggestions/{suggestion_id}/accept")
 async def accept_suggestion(stave_id: str, suggestion_id: str):
     """Accept an insight suggestion. Auto-creates a clef if AI included a check_spec."""
-    from datetime import datetime, timezone
-
     repo = _repo()
     sug = await repo.get_suggestion(suggestion_id)
     if not sug:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    if sug.stave_id != stave_id:
         raise HTTPException(status_code=404, detail="Suggestion not found")
     await repo.update_suggestion_status(suggestion_id, "accepted")
 
     check_created = False
     if sug.check_spec:
         try:
-            now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            now = now_utc_iso()
             service = InsightPipelineService(executor=get_executor())
             await service._create_check_from_spec(
                 stave_id, sug.report_id, sug.check_spec, now
@@ -263,6 +280,8 @@ async def dismiss_suggestion(stave_id: str, suggestion_id: str, body: DismissReq
     repo = _repo()
     sug = await repo.get_suggestion(suggestion_id)
     if not sug:
+        raise HTTPException(status_code=404, detail="Suggestion not found")
+    if sug.stave_id != stave_id:
         raise HTTPException(status_code=404, detail="Suggestion not found")
     await repo.update_suggestion_status(suggestion_id, "dismissed", dismiss_reason=body.reason)
     return {"id": suggestion_id, "status": "dismissed", "reason": body.reason}
@@ -297,8 +316,24 @@ async def get_business_report_history(stave_id: str, limit: int = 20):
 
 
 @router.get("/notifications/{user_id}", response_model=list[NotificationResponse])
-async def list_notifications(user_id: str, unread_only: bool = False):
-    """List notifications for a user."""
+async def list_notifications_legacy(
+    user_id: str,
+    unread_only: bool = False,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """List notifications for a specific user (legacy compatibility)."""
+    if user_id != current_user["id"] and current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Cannot access notifications for other users")
+    results = await _repo().list_notifications(user_id, unread_only=unread_only)
+    return [n.model_dump() for n in results]
+
+@router.get("/notifications/me", response_model=list[NotificationResponse])
+async def list_notifications(
+    unread_only: bool = False,
+    current_user: Dict[str, Any] = Depends(get_current_user),
+):
+    """List notifications for the authenticated user."""
+    user_id: str = current_user["id"]
     results = await _repo().list_notifications(user_id, unread_only=unread_only)
     return [n.model_dump() for n in results]
 

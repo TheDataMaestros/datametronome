@@ -97,7 +97,6 @@ class TrendsService {
   }
 
   async getTrendsOverview(days: number = 7): Promise<TrendsOverview> {
-    console.log('Making API call to trends overview...')
     const response = await fetch(buildApiUrl(`/trends/overview?days=${days}`), {
       method: 'GET',
       headers: {
@@ -105,18 +104,11 @@ class TrendsService {
       },
     })
 
-    console.log('Response status:', response.status)
-    console.log('Response headers:', response.headers)
-
     if (!response.ok) {
-      const errorText = await response.text()
-      console.error('API Error:', response.status, errorText)
       throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
 
-    const data = await response.json()
-    console.log('API Response data:', data)
-    return data
+    return await response.json()
   }
 }
 

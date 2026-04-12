@@ -12,30 +12,18 @@ _Date generated: November 30, 2025_
 
 ## Architecture Decisions
 
-### Scheduler Technology: APScheduler (Not Celery)
+### Scheduling and dispatch: Celery Beat + RedBeat + `dispatch_mode`
 
-**Decision**: We use **APScheduler** (specifically `AsyncIOScheduler`) for scheduled task execution. **Celery is not needed** for our current use case.
+**Authoritative detail**: See [docs/ARCHITECTURE.md](ARCHITECTURE.md) and `api/v1/endpoints/scheduler.py` (module doc). In-process APScheduler has been removed from Podium.
 
-**Rationale**:
-- **APScheduler** is an in-process scheduler that runs within the FastAPI application
-- Simpler architecture: No message broker (Redis/RabbitMQ) required
-- Native async support via `AsyncIOScheduler` aligns with FastAPI's async model
-- Sufficient for scheduled data quality checks (cron-style execution)
-- Lightweight with fewer dependencies
+**Job scheduling**:
+- **Celery Beat + RedBeat** drive cron-style clef schedules; state lives in **`scheduler_jobs`** / **`job_executions`** (persistence, retries, API under `/scheduler/*`).
 
-**Current Implementation**:
-- `AsyncIOScheduler` with thread pool executor
-- Job persistence via custom database tables (`scheduler_jobs`, `job_executions`)
-- Automatic job restoration on service restart
-- Retry logic with exponential backoff
-- Job health monitoring and metrics
+**Check execution**:
+- **`DATAMETRONOME_DISPATCH_MODE`**: `inline`, **`celery`**, or `remote` — how clef checks run once scheduled.
+- **`make up-workers`**: RabbitMQ, Redis, Celery worker(s), Beat — see `docker-compose.yml`.
 
-**Future Considerations**:
-- If distributed scheduling is needed (multiple FastAPI instances), consider:
-  - APScheduler with shared database jobstore, or
-  - Celery with Redis/RabbitMQ, or
-  - Kubernetes CronJobs for distributed execution
-- For now, single-process APScheduler meets all requirements
+**Takeaway**: Beat decides when jobs fire; `dispatch_mode` decides whether runs are in-process, queued, or remote.
 
 ## Recently Completed Highlights
 
@@ -48,7 +36,7 @@ _Date generated: November 30, 2025_
 | UI Integration | ✅ **COMPLETED**: Full UI integration with backend API, authentication flow, real-time data fetching, responsive design |
 | Level 1 Checks | ✅ **COMPLETED (Nov 2025)**: All three Level 1 declarative checks (row_count, freshness, column_values) fully implemented with all condition types (if_null, if_not_unique, if_not_in), comprehensive test suite (47+ tests), API integration, result persistence |
 | YAML Loader | ✅ **COMPLETED (Nov 2025)**: YAML parser with flat/nested format support, environment variable interpolation (${VAR} and ${VAR:-default}), hot reload with file watching, comprehensive API endpoints for import/validate/reload |
-| Enhanced Scheduler | ✅ **COMPLETED (Nov 2025)**: APScheduler with job persistence, retry logic with exponential backoff, job execution history & health monitoring, enhanced API endpoints (pause/resume/retry/stats), automatic job restoration on restart |
+| Enhanced Scheduler | ✅ **COMPLETED (Nov 2025)**: Persisted jobs + Celery Beat/RedBeat integration, retry/backoff, execution history & health, scheduler API (pause/resume/retry/stats) |
 
 ## Active Workstreams
 
@@ -65,12 +53,12 @@ _Date generated: November 30, 2025_
 | --- | --- |
 | Tiered Check System | Level 1 ✅ complete, Levels 2-4 pending |
 | Stave Lifecycle | YAML ingestion ✅, validation ✅, hot reload ✅, scheduler integration ✅ - All complete |
-| Brain Libraries | `datametronome-brain-base` and `advanced` still unstarted |
-| Execution Engine | Check orchestration, result persistence, profile history absent |
+| Brain Libraries | `datametronome/brain/base` ships forecasting + drift helpers with tests; deeper “advanced” tier / full Podium wiring still evolving |
+| Execution Engine | Clef execution + persistence exist; richer profile history / analytics gaps remain |
 | Security | Credential encryption, RBAC, audit logging outstanding |
 | Ecosystem | Plugin groundwork (dbt, Great Expectations) not started |
 | Observability | Real-time alerting/streaming features outstanding |
-| Documentation | Quickstart, API, architecture, development guides missing |
+| Documentation | README + `docs/ARCHITECTURE.md` exist; API reference / contributor quickstart still thin in places |
 
 ## Next Steps
 

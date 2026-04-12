@@ -13,7 +13,8 @@ import json
 import logging
 import time
 import uuid
-from datetime import datetime, timezone
+
+from datametronome_podium.core.timestamp_utils import now_utc_iso
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +43,11 @@ async def record_agent_trace(
         duration_ms: Request duration in milliseconds
     """
     try:
-        from datametronome_podium.core.database import get_db
+        from datametronome_podium.core.database import get_executor
 
-        db = await get_db()
+        executor = get_executor()
         trace_id = f"trace-{uuid.uuid4().hex[:12]}"
-        now = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+        now = now_utc_iso()
         preview = (
             (user_message[:MESSAGE_PREVIEW_MAX_LEN] + "...")
             if len(user_message) > MESSAGE_PREVIEW_MAX_LEN
@@ -54,27 +55,25 @@ async def record_agent_trace(
         )
         tool_calls_json = json.dumps(tool_calls) if tool_calls else None
 
-        await db.write(
-            [
-                {
-                    "id": trace_id,
-                    "conversation_id": conversation_id,
-                    "user_id": user_id,
-                    "user_message_preview": preview,
-                    "intent": intent,
-                    "model": model,
-                    "tool_calls": tool_calls_json,
-                    "duration_ms": duration_ms,
-                    "created_at": now,
-                }
-            ],
+        await executor.insert(
             "agent_traces",
+            {
+                "id": trace_id,
+                "conversation_id": conversation_id,
+                "user_id": user_id,
+                "user_message_preview": preview,
+                "intent": intent,
+                "model": model,
+                "tool_calls": tool_calls_json,
+                "duration_ms": duration_ms,
+                "created_at": now,
+            },
         )
         logger.debug(
-            f"Recorded agent trace {trace_id} intent={intent} duration={duration_ms:.0f}ms"
+            "Recorded agent trace %s intent=%s duration=%.0fms", trace_id, intent, duration_ms
         )
     except Exception as e:
-        logger.warning(f"Failed to record agent trace: {e}")
+        logger.warning("Failed to record agent trace: %s", e)
 
 
 def trace_duration(start_time: float) -> float:

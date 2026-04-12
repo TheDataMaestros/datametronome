@@ -1,3 +1,12 @@
+# Scratch / debug artifacts
+chat_payload.json
+latest_results.json
+run_res.json
+test-script.js
+test_clef.json
+test_stave.json
+token_resp.json
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -328,3 +337,6 @@ ui-react/node_modules/
 
 # Internal development docs
 docs/superpowers/
+
+# Superpowers brainstorm artifacts
+.superpowers/

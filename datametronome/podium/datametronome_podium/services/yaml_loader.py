@@ -11,8 +11,8 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 import yaml
-from datametronome_podium.models.clef import Clef
-from datametronome_podium.models.stave import Stave
+from datametronome_podium.features.clefs.model import Clef
+from datametronome_podium.features.staves.model import Stave
 
 logger = logging.getLogger(__name__)
 

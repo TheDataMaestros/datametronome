@@ -24,7 +24,7 @@ class TestUserRepo:
         mock_executor.select.return_value = [{
             "id": "1", "username": "admin", "email": "a@b.com",
             "hashed_password": "hash", "is_active": True,
-            "is_superuser": False, "created_at": "2025-01-01", "updated_at": "2025-01-01"
+            "role": "viewer", "created_at": "2025-01-01", "updated_at": "2025-01-01"
         }]
         repo = UserRepo(mock_executor)
         result = await repo.find_by_username("admin")
@@ -34,10 +34,10 @@ class TestUserRepo:
     @pytest.mark.asyncio
     async def test_create_user(self, mock_executor):
         repo = UserRepo(mock_executor)
-        from datametronome_podium.features.users.model import User
+        from datametronome_podium.features.users.model import UserRow as User
         user = User(
             id="1", username="test", email="t@t.com",
-            hashed_password="hash", is_active=True, is_superuser=False,
+            hashed_password="hash", is_active=True,
             created_at="2025-01-01", updated_at="2025-01-01"
         )
         result = await repo.create(user)

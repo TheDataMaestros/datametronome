@@ -13,9 +13,9 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from datametronome_podium.models.clef import Clef
-from datametronome_podium.models.severity import SeverityLevel
-from datametronome_podium.models.stave import Stave
+from datametronome_podium.features.clefs.model import Clef
+from datametronome_podium.features.checks.model import SeverityLevel
+from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.services.clef_executor import CheckResult, ClefExecutor
 
 

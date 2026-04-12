@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datametronome_podium.core.query import QueryExecutor
-from datametronome_podium.features.staves.model import Stave
+from datametronome_podium.features.staves.model import StaveRow as Stave
 
 
 class StaveRepo:
