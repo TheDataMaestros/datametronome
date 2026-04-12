@@ -12,6 +12,7 @@ from datametronome_podium.features.clefs.repo import ClefRepo
 from datametronome_podium.features.staves.repo import StaveRepo
 
 from datametronome_podium.core.query import quote_identifier as _quote_identifier
+
 logger = logging.getLogger(__name__)
 
 

@@ -43,8 +43,6 @@ def test_run_now_returns_202_with_job_id():
     # Verify dispatch and get_status were called with expected arguments
     mock_dispatcher.dispatch.assert_awaited_once_with("clef-1")
     mock_dispatcher.get_status.assert_awaited_once_with("job-uuid-123")
-    mock_dispatcher.dispatch.assert_awaited_once_with("clef-1")
-    mock_dispatcher.get_status.assert_awaited_once_with("job-uuid-123")
 
 
 def test_run_now_dispatch_failure_returns_500():

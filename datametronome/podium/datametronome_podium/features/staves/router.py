@@ -54,12 +54,7 @@ def _dispatch_auto_scan(stave_id: str) -> None:
 
     try:
         from datametronome_podium.services.intelligence_scheduler import register_daily_intelligence
-        def safe_register():
-            try:
-                register_daily_intelligence(stave_id)
-            except Exception:
-                pass
-        background_tasks.add_task(safe_register)
+        register_daily_intelligence(stave_id)
     except Exception:
         pass
 
