@@ -38,7 +38,7 @@ class TestBuildDbtConnector:
                     read_only=True,
                 )
             except ImportError:
-                pytest.skip("metronome_pulse_dbt not installed")
+                pytest.skip("metronome_pulse_dbt not installed")  # ty: ignore[too-many-positional-arguments]
 
     def test_dbt_cloud_mode(self):
         """Verify cloud config keys are forwarded correctly."""
@@ -60,7 +60,7 @@ class TestBuildDbtConnector:
                     read_only=True,
                 )
             except ImportError:
-                pytest.skip("metronome_pulse_dbt not installed")
+                pytest.skip("metronome_pulse_dbt not installed")  # ty: ignore[too-many-positional-arguments]
 
 
 class TestDbtInStaveTypes:

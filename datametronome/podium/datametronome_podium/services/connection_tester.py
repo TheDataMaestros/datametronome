@@ -496,7 +496,7 @@ class ConnectionTester:
     async def _test_dbt_connection(self, stave: Stave) -> dict[str, Any]:
         """Test dbt artifact connection using DbtReadonlyPulse."""
         try:
-            from metronome_pulse_dbt import DbtReadonlyPulse  # ty: ignore[unresolved-import]
+            from metronome_pulse_dbt import DbtReadonlyPulse
 
             config = stave.connection_config
 

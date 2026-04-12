@@ -165,7 +165,7 @@ class TestSnowflakeConnector:
         async with DbtReadonlyPulse(mode="local", project_path=str(SNOWFLAKE_DIR)) as conn:
             models = await conn.query("models")
             if not models:
-                pytest.skip(reason="No models found")
+                pytest.skip("No models found")  # ty: ignore[too-many-positional-arguments]
 
             # Get materializations used
             mats = set(m["materialization"] for m in models)
@@ -184,7 +184,7 @@ class TestSnowflakeConnector:
         async with DbtReadonlyPulse(mode="local", project_path=str(SNOWFLAKE_DIR)) as conn:
             models = await conn.query("models")
             if not models:
-                pytest.skip(reason="No models")
+                pytest.skip("No models")  # ty: ignore[too-many-positional-arguments]
 
             # Try getting column info for the first model
             first_model = models[0]["name"]
