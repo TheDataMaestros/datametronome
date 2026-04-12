@@ -126,7 +126,7 @@ def _build_dbt_connector(config: dict[str, Any], *, read_only: bool) -> Any:
     if not read_only:
         raise ValueError("dbt connector is read-only. Set read_only=True.")
 
-    from metronome_pulse_dbt import DbtReadonlyPulse
+    from metronome_pulse_dbt import DbtReadonlyPulse  # ty: ignore[unresolved-import]
 
     mode = config.get("mode", "local")
     return DbtReadonlyPulse(

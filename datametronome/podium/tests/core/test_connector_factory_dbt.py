@@ -1,7 +1,7 @@
 """Tests for dbt connector factory integration."""
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -11,22 +11,20 @@ from datametronome_podium.core.connector_factory import _build_connector
 class TestBuildDbtConnector:
     """Test _build_connector with dst='dbt'."""
 
-    @patch("datametronome_podium.core.connector_factory._build_dbt_connector")
-    def test_dispatches_to_dbt_builder(self, mock_build):
-        mock_build.return_value = MagicMock()
-        _build_connector("dbt", {"mode": "local", "project_path": "/tmp"}, read_only=True)
-        mock_build.assert_called_once_with(
-            {"mode": "local", "project_path": "/tmp"}, read_only=True
-        )
+    def test_dispatches_to_dbt_builder(self):
+        with patch("datametronome_podium.core.connector_factory._build_dbt_connector") as mock_build:
+            mock_build.return_value = MagicMock()
+            _build_connector("dbt", {"mode": "local", "project_path": "/tmp"}, read_only=True)
+            mock_build.assert_called_once_with(
+                {"mode": "local", "project_path": "/tmp"}, read_only=True
+            )
 
     def test_dbt_read_only_false_raises(self):
         with pytest.raises(ValueError, match="read-only"):
             _build_connector("dbt", {"mode": "local", "project_path": "/tmp"}, read_only=False)
 
-    @patch("datametronome_podium.core.connector_factory.DbtReadonlyPulse", create=True)
-    def test_dbt_local_mode(self, _mock_cls):
+    def test_dbt_local_mode(self):
         """Verify local config keys are forwarded correctly."""
-        # Use a real import to test the actual builder
         from datametronome_podium.core.connector_factory import _build_dbt_connector
 
         with patch(
@@ -42,8 +40,7 @@ class TestBuildDbtConnector:
             except ImportError:
                 pytest.skip("metronome_pulse_dbt not installed")
 
-    @patch("datametronome_podium.core.connector_factory.DbtReadonlyPulse", create=True)
-    def test_dbt_cloud_mode(self, _mock_cls):
+    def test_dbt_cloud_mode(self):
         """Verify cloud config keys are forwarded correctly."""
         from datametronome_podium.core.connector_factory import _build_dbt_connector
 

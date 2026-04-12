@@ -58,6 +58,7 @@ jobs:
           uv pip install -e ./datametronome/pulse/postgres-psycopg3
           uv pip install -e ./datametronome/pulse/postgres-sqlalchemy
           uv pip install -e ./datametronome/pulse/postgres
+          uv pip install -e ./datametronome/pulse/dbt
           uv pip install -e ./datametronome/brain/base
           uv pip install -e ./datametronome/podium
           # Install runtime deps not covered by -e
@@ -72,6 +73,7 @@ jobs:
           uv run pytest datametronome/pulse/postgres/tests/ -v
           uv run pytest datametronome/pulse/postgres-psycopg3/tests/ -v
           uv run pytest datametronome/pulse/postgres-sqlalchemy/tests/ -v
+          uv run pytest datametronome/pulse/dbt/tests/ -v --ignore=datametronome/pulse/dbt/tests/test_real_artifacts.py
           uv run pytest datametronome/podium/tests/test_unit.py -v
 
   release:
