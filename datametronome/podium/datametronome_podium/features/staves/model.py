@@ -14,6 +14,7 @@ SUPPORTED_DATA_SOURCES = [
     "redis",
     "snowflake",
     "bigquery",
+    "dbt",
     "api",
     "http",
 ]

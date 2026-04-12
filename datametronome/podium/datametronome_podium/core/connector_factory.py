@@ -70,6 +70,8 @@ def _build_connector(
         return _build_sqlite_connector(config, read_only=read_only)
     elif dst == "bigquery":
         return _build_bigquery_connector(config, read_only=read_only)
+    elif dst == "dbt":
+        return _build_dbt_connector(config, read_only=read_only)
     else:
         raise ValueError(f"Unsupported data source type: {dst!r}")
 
@@ -117,4 +119,22 @@ def _build_bigquery_connector(config: dict[str, Any], *, read_only: bool) -> Any
         credentials_json=config.get("credentials_json"),
         dataset=config.get("dataset"),
         location=config.get("location", "US"),
+    )
+
+
+def _build_dbt_connector(config: dict[str, Any], *, read_only: bool) -> Any:
+    if not read_only:
+        raise ValueError("dbt connector is read-only. Set read_only=True.")
+
+    from metronome_pulse_dbt import DbtReadonlyPulse
+
+    mode = config.get("mode", "local")
+    return DbtReadonlyPulse(
+        mode=mode,
+        project_path=config.get("project_path", ""),
+        target_path=config.get("target_path", "target"),
+        api_token=config.get("api_token", ""),
+        account_id=config.get("account_id", ""),
+        job_id=config.get("job_id", ""),
+        base_url=config.get("base_url", "https://cloud.getdbt.com/api/v2"),
     )

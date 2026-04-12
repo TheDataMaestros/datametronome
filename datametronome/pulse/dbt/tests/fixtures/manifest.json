@@ -1,0 +1,159 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/manifest/v11/manifest.json",
+    "dbt_version": "1.7.0",
+    "generated_at": "2026-04-12T10:00:00Z",
+    "project_name": "my_project"
+  },
+  "nodes": {
+    "model.my_project.stg_customers": {
+      "unique_id": "model.my_project.stg_customers",
+      "name": "stg_customers",
+      "resource_type": "model",
+      "schema": "public",
+      "database": "analytics",
+      "config": {"materialized": "view"},
+      "tags": ["staging"],
+      "description": "Staged customers from raw source",
+      "depends_on": {
+        "nodes": ["source.my_project.raw.customers"]
+      },
+      "path": "staging/stg_customers.sql"
+    },
+    "model.my_project.stg_orders": {
+      "unique_id": "model.my_project.stg_orders",
+      "name": "stg_orders",
+      "resource_type": "model",
+      "schema": "public",
+      "database": "analytics",
+      "config": {"materialized": "view"},
+      "tags": ["staging"],
+      "description": "Staged orders from raw source",
+      "depends_on": {
+        "nodes": ["source.my_project.raw.orders"]
+      },
+      "path": "staging/stg_orders.sql"
+    },
+    "model.my_project.fct_orders": {
+      "unique_id": "model.my_project.fct_orders",
+      "name": "fct_orders",
+      "resource_type": "model",
+      "schema": "public",
+      "database": "analytics",
+      "config": {"materialized": "table"},
+      "tags": ["marts", "finance"],
+      "description": "Orders fact table joining customers and orders",
+      "depends_on": {
+        "nodes": [
+          "model.my_project.stg_customers",
+          "model.my_project.stg_orders"
+        ]
+      },
+      "path": "marts/fct_orders.sql"
+    },
+    "test.my_project.not_null_stg_customers_id.abc123": {
+      "unique_id": "test.my_project.not_null_stg_customers_id.abc123",
+      "name": "not_null_stg_customers_id",
+      "resource_type": "test",
+      "schema": "public",
+      "database": "analytics",
+      "config": {"severity": "ERROR"},
+      "tags": [],
+      "description": "",
+      "depends_on": {
+        "nodes": ["model.my_project.stg_customers"]
+      },
+      "column_name": "id",
+      "test_metadata": {
+        "name": "not_null",
+        "kwargs": {"column_name": "id", "model": "ref('stg_customers')"}
+      },
+      "path": "generic_tests/not_null_stg_customers_id.sql"
+    },
+    "test.my_project.unique_stg_customers_id.def456": {
+      "unique_id": "test.my_project.unique_stg_customers_id.def456",
+      "name": "unique_stg_customers_id",
+      "resource_type": "test",
+      "schema": "public",
+      "database": "analytics",
+      "config": {"severity": "ERROR"},
+      "tags": [],
+      "description": "",
+      "depends_on": {
+        "nodes": ["model.my_project.stg_customers"]
+      },
+      "column_name": "id",
+      "test_metadata": {
+        "name": "unique",
+        "kwargs": {"column_name": "id", "model": "ref('stg_customers')"}
+      },
+      "path": "generic_tests/unique_stg_customers_id.sql"
+    },
+    "test.my_project.accepted_values_stg_orders_status.ghi789": {
+      "unique_id": "test.my_project.accepted_values_stg_orders_status.ghi789",
+      "name": "accepted_values_stg_orders_status",
+      "resource_type": "test",
+      "schema": "public",
+      "database": "analytics",
+      "config": {"severity": "WARN"},
+      "tags": ["data-quality"],
+      "description": "",
+      "depends_on": {
+        "nodes": ["model.my_project.stg_orders"]
+      },
+      "column_name": "status",
+      "test_metadata": {
+        "name": "accepted_values",
+        "kwargs": {
+          "column_name": "status",
+          "model": "ref('stg_orders')",
+          "values": ["placed", "shipped", "completed", "cancelled"]
+        }
+      },
+      "path": "generic_tests/accepted_values_stg_orders_status.sql"
+    }
+  },
+  "sources": {
+    "source.my_project.raw.customers": {
+      "unique_id": "source.my_project.raw.customers",
+      "name": "customers",
+      "source_name": "raw",
+      "schema": "raw",
+      "database": "analytics",
+      "identifier": "customers",
+      "freshness": {
+        "warn_after": {"count": 24, "period": "hour"},
+        "error_after": {"count": 48, "period": "hour"}
+      },
+      "description": "Raw customers table from operational database"
+    },
+    "source.my_project.raw.orders": {
+      "unique_id": "source.my_project.raw.orders",
+      "name": "orders",
+      "source_name": "raw",
+      "schema": "raw",
+      "database": "analytics",
+      "identifier": "orders",
+      "freshness": {
+        "warn_after": {"count": 6, "period": "hour"},
+        "error_after": {"count": 12, "period": "hour"}
+      },
+      "description": "Raw orders table from operational database"
+    }
+  },
+  "exposures": {
+    "exposure.my_project.weekly_report": {
+      "unique_id": "exposure.my_project.weekly_report",
+      "name": "weekly_report",
+      "type": "dashboard",
+      "owner": {
+        "name": "Finance Team",
+        "email": "finance@example.com"
+      },
+      "depends_on": {
+        "nodes": ["model.my_project.fct_orders"]
+      },
+      "description": "Weekly orders summary dashboard for finance"
+    }
+  }
+}

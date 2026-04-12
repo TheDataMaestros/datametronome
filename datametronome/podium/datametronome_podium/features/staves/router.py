@@ -24,7 +24,7 @@ import datametronome_podium.features.staves.service as stave_svc
 router = APIRouter()
 
 VALID_DATA_SOURCE_TYPES = [
-    "postgres", "mysql", "mongodb", "sqlite", "redis", "snowflake", "bigquery"
+    "postgres", "mysql", "mongodb", "sqlite", "redis", "snowflake", "bigquery", "dbt"
 ]
 
 

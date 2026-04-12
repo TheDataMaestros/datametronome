@@ -89,6 +89,8 @@ async def _call_list_tables(connector: Any, stave: Stave) -> list[str]:
     if stave.data_source_type in ("postgres", "postgresql"):
         schema = stave.connection_config.get("schema", "public")
         return await connector.list_tables(schema)
+    if stave.data_source_type == "dbt":
+        return await connector.list_tables()
     return await connector.list_tables()
 
 
@@ -219,6 +221,13 @@ async def _fetch_preview_data(stave: Stave, table_name: str, limit: int) -> list
             return await connector.query_with_params(
                 f"SELECT * FROM {qtbl} LIMIT $1", [limit]
             )
+        finally:
+            await connector.close()
+
+    if dst == "dbt":
+        connector = await create_connector(dst, config, read_only=True)
+        try:
+            return await connector.query({"table": table_name, "limit": limit})
         finally:
             await connector.close()
 
