@@ -2,7 +2,7 @@
 from pydantic import BaseModel, field_validator
 
 VALID_DATA_SOURCE_TYPES = [
-    "postgres", "mysql", "mongodb", "sqlite", "redis", "snowflake", "bigquery"
+    "postgres", "mysql", "mongodb", "sqlite", "redis", "snowflake", "bigquery", "dbt"
 ]
 
 
