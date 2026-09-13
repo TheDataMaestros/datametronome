@@ -66,7 +66,7 @@ class ConnectionTester:
                 }
 
             connection_time = time.time() - start_time
-            result["connection_time"] = connection_time  # ty: ignore[assignment]
+            result["connection_time"] = connection_time  # ty: ignore[assignment]  # ty:ignore[ignore-comment-unknown-rule, invalid-assignment]
 
             return result
 
@@ -181,15 +181,15 @@ class ConnectionTester:
 
                 cursor.execute("SELECT VERSION();")
                 row = cursor.fetchone()
-                version = row[0] if row else None  # ty: ignore[index]
+                version = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
 
                 cursor.execute("SELECT COUNT(*) FROM information_schema.schemata;")
                 row = cursor.fetchone()
-                schema_count = row[0] if row else None  # ty: ignore[index]
+                schema_count = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
 
                 cursor.execute("SELECT COUNT(*) FROM information_schema.tables;")
                 row = cursor.fetchone()
-                table_count = row[0] if row else None  # ty: ignore[index]
+                table_count = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
 
                 cursor.close()
                 conn.close()
@@ -546,7 +546,7 @@ class ConnectionTester:
         executor to avoid blocking the event loop.
         """
         try:
-            import requests
+            import requests  # type: ignore
 
             config = stave.connection_config
             base_url = config["base_url"]

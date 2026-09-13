@@ -125,7 +125,7 @@ class InsightPipelineService:
             "matched_archetype (if any)."
         )
 
-        agent: Agent[None, LLMDomainClassification] = Agent(
+        agent: Agent[None, LLMDomainClassification] = Agent(  # ty: ignore[invalid-assignment]
             model=model,
             output_type=LLMDomainClassification,
             retries=2,
@@ -193,7 +193,7 @@ class InsightPipelineService:
         )
 
         model = build_heavy_model_from_settings()
-        agent: Agent[None, LLMInsightReport] = Agent(
+        agent: Agent[None, LLMInsightReport] = Agent(  # ty: ignore[invalid-assignment]
             model=model,
             output_type=LLMInsightReport,
             system_prompt=system_prompt,

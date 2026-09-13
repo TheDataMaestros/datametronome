@@ -17,7 +17,7 @@ try:
 
     _WATCHDOG_AVAILABLE = True
 except ModuleNotFoundError:
-    Observer = None
+    Observer = None  # type: ignore
     FileSystemEventHandler = object  # type: ignore
     FileSystemEvent = object  # type: ignore
     _WATCHDOG_AVAILABLE = False

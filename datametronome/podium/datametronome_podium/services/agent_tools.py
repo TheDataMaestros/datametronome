@@ -805,7 +805,7 @@ def _analyze_sample_data(sample_data: list[dict]) -> dict:
                 }
             )
 
-    important_fields.sort(key=lambda x: float(x["importance_score"]), reverse=True)
+    important_fields.sort(key=lambda x: x["importance_score"], reverse=True)
 
     return {
         "message": f"Analyzed {len(sample_data)} rows and {len(columns)} columns",

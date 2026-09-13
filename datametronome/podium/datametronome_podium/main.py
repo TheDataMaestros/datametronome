@@ -12,7 +12,7 @@ import uvicorn
 try:
     import logfire
 except ImportError:
-    logfire = None
+    logfire = None  # type: ignore
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
@@ -179,16 +179,16 @@ def create_app() -> FastAPI:
     # Add metrics middleware (first, to track all requests)
     from .core.middleware import MetricsMiddleware
 
-    app.add_middleware(MetricsMiddleware)
+    app.add_middleware(MetricsMiddleware)  # type: ignore
 
     # Add CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
+    app.add_middleware(  # type: ignore
+        CORSMiddleware,  # type: ignore
         allow_origins=settings.allowed_origins,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
-    )
+    )  # type: ignore
 
     # Include API router
     app.include_router(api_router, prefix="/api/v1")
