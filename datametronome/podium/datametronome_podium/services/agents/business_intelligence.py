@@ -77,7 +77,7 @@ Be precise. Your output is used to generate SQL — wrong column role mappings p
 """
 
 
-def build_phase1_agent(model: Any) -> Agent:
+def build_phase1_agent(model: Any) -> Agent[Any, SchemaInterpretation]:
     """Agent that reasons over schema data and produces SchemaInterpretation. No tools."""
     return Agent(
         model=model,
@@ -146,7 +146,7 @@ class Phase2Deps:
         self.schema_prefix = schema_prefix
 
 
-def build_phase2_agent(model: Any, schema_prefix: str) -> Agent:
+def build_phase2_agent(model: Any, schema_prefix: str) -> Agent[Any, GeneratedQueryPlan]:
     """Agent that generates and validates SQL for KPIs and performer dimensions."""
     agent: Agent[Phase2Deps, GeneratedQueryPlan] = Agent(  # ty: ignore[invalid-assignment]
         model=model,
@@ -255,7 +255,7 @@ class Phase3Deps:
         self.skipped = skipped
 
 
-def build_phase3_agent(model: Any) -> Agent:
+def build_phase3_agent(model: Any) -> Agent[Any, LLMBusinessReport]:
     """Agent that executes stored SQL and reasons over results."""
     agent: Agent[Phase3Deps, LLMBusinessReport] = Agent(  # ty: ignore[invalid-assignment]
         model=model,

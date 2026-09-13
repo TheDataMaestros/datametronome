@@ -25,6 +25,7 @@ SENSITIVE_FIELDS: dict[str, list[str]] = {
     "mongodb": ["password"],
     "snowflake": ["password", "private_key"],
     "bigquery": ["credentials_json"],
+    "dbt": ["api_token"],
 }
 
 # Fallback for unknown / future types

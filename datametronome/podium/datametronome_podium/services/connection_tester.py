@@ -54,6 +54,8 @@ class ConnectionTester:
                 result = await self._test_mongodb_connection(stave)
             elif stave.data_source_type == "bigquery":
                 result = await self._test_bigquery_connection(stave)
+            elif stave.data_source_type == "dbt":
+                result = await self._test_dbt_connection(stave)
             elif stave.data_source_type in ["api", "http"]:
                 result = await self._test_api_connection(stave)
             else:
@@ -431,14 +433,9 @@ class ConnectionTester:
 
                     # If we used a different dataset for listing, add info
                     if dataset_for_listing != dataset and "table_count" in metadata:
-                        if metadata.get("note"):
-                            metadata[
-                                "note"
-                            ] += f" Found {metadata['table_count']} tables."
-                        else:
-                            metadata[
-                                "note"
-                            ] = f"Found {metadata['table_count']} tables."
+                        found = f"Found {metadata['table_count']} tables."
+                        existing = metadata.get("note")
+                        metadata["note"] = f"{existing} {found}" if existing else found
 
                 except Exception as e:
                     error_msg = str(e)
@@ -488,6 +485,57 @@ class ConnectionTester:
             return {
                 "success": False,
                 "message": f"BigQuery connection failed: {str(e)}",
+                "metadata": {},
+            }
+
+    async def _test_dbt_connection(self, stave: Stave) -> dict[str, Any]:
+        """Test dbt artifact connection using DbtReadonlyPulse."""
+        try:
+            from metronome_pulse_dbt import DbtReadonlyPulse
+
+            config = stave.connection_config
+
+            connector = DbtReadonlyPulse(
+                mode=config.get("mode", "local"),
+                project_path=config.get("project_path", ""),
+                target_path=config.get("target_path", "target"),
+                api_token=config.get("api_token", ""),
+                account_id=config.get("account_id", ""),
+                job_id=config.get("job_id", ""),
+                base_url=config.get(
+                    "base_url", "https://cloud.getdbt.com/api/v2"
+                ),
+            )
+
+            await connector.connect()
+
+            models = await connector.query("models")
+            sources = await connector.query("sources")
+            tests = await connector.query("tests")
+
+            await connector.close()
+
+            return {
+                "success": True,
+                "message": "dbt connection successful",
+                "metadata": {
+                    "mode": config.get("mode", "local"),
+                    "model_count": len(models),
+                    "source_count": len(sources),
+                    "test_count": len(tests),
+                },
+            }
+
+        except ImportError:
+            return {
+                "success": False,
+                "message": "metronome_pulse_dbt not installed. Install with: pip install metronome-pulse-dbt",
+                "metadata": {},
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "message": f"dbt connection failed: {str(e)}",
                 "metadata": {},
             }
 

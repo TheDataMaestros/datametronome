@@ -1,0 +1,65 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/catalog/v1/catalog.json",
+    "dbt_version": "1.7.0",
+    "generated_at": "2026-04-12T10:10:00Z"
+  },
+  "nodes": {
+    "model.my_project.stg_customers": {
+      "metadata": {
+        "name": "stg_customers",
+        "schema": "public",
+        "database": "analytics",
+        "type": "BASE TABLE"
+      },
+      "columns": {
+        "id": {"type": "integer", "comment": "Primary key"},
+        "name": {"type": "text", "comment": "Customer name"},
+        "email": {"type": "text", "comment": "Customer email"}
+      }
+    },
+    "model.my_project.stg_orders": {
+      "metadata": {
+        "name": "stg_orders",
+        "schema": "public",
+        "database": "analytics",
+        "type": "BASE TABLE"
+      },
+      "columns": {
+        "id": {"type": "integer", "comment": "Primary key"},
+        "customer_id": {"type": "integer", "comment": "FK to customers"},
+        "status": {"type": "text", "comment": "Order status"},
+        "amount": {"type": "numeric", "comment": "Order amount"}
+      }
+    },
+    "model.my_project.fct_orders": {
+      "metadata": {
+        "name": "fct_orders",
+        "schema": "public",
+        "database": "analytics",
+        "type": "BASE TABLE"
+      },
+      "columns": {
+        "order_id": {"type": "integer", "comment": ""},
+        "customer_name": {"type": "text", "comment": ""},
+        "status": {"type": "text", "comment": ""},
+        "amount": {"type": "numeric", "comment": ""}
+      }
+    }
+  },
+  "sources": {
+    "source.my_project.raw.customers": {
+      "metadata": {
+        "name": "customers",
+        "schema": "raw",
+        "database": "analytics",
+        "type": "BASE TABLE"
+      },
+      "columns": {
+        "id": {"type": "integer", "comment": ""},
+        "name": {"type": "text", "comment": ""},
+        "email": {"type": "text", "comment": ""}
+      }
+    }
+  }
+}

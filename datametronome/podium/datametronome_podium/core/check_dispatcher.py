@@ -45,6 +45,7 @@ class CheckDispatcher(Protocol):
 
 
 from datametronome_podium.core.database import get_executor
+from datametronome_podium.services.alerting import notify_check_failure
 from datametronome_podium.services.clef_executor import ClefExecutor
 from datametronome_podium.services.stave_service import deserialize_clef, deserialize_stave
 
@@ -110,6 +111,18 @@ class InlineDispatcher:
                 "anomalies_count": result.anomalies_count,
                 "severity": result.severity.value,
             })
+
+            await notify_check_failure(
+                executor,
+                check_id=check_id,
+                clef_id=clef.id,
+                clef_name=clef.name,
+                stave_id=stave.id,
+                stave_name=stave.name,
+                status=result.status,
+                message=result.message,
+                severity=result.severity.value,
+            )
 
             self._statuses[job_id] = JobStatus.COMPLETED
             self._results[job_id] = {

@@ -343,7 +343,7 @@ class TestSQLiteWriteonlyPulseIntegration:
 
         # Add table name to each record for writeonly connector
         users_data_with_table = [{**user, "table": "users"} for user in users_data]
-        await writeonly_pulse.write(users_data_with_table)
+        await writeonly_pulse.write(users_data_with_table, "users")
 
         # Verify data was written (using a temporary readonly connection)
         temp_pulse = SQLitePulse(writeonly_pulse.database_path)

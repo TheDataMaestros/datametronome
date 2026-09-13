@@ -1,0 +1,45 @@
+{
+  "metadata": {
+    "dbt_schema_version": "https://schemas.getdbt.com/dbt/run-results/v5/run-results.json",
+    "dbt_version": "1.7.0",
+    "generated_at": "2026-04-12T10:05:00Z"
+  },
+  "results": [
+    {
+      "unique_id": "model.my_project.stg_customers",
+      "status": "success",
+      "execution_time": 1.23,
+      "message": "CREATE TABLE",
+      "failures": null
+    },
+    {
+      "unique_id": "model.my_project.fct_orders",
+      "status": "success",
+      "execution_time": 2.45,
+      "message": "CREATE TABLE",
+      "failures": null
+    },
+    {
+      "unique_id": "test.my_project.not_null_stg_customers_id.abc123",
+      "status": "pass",
+      "execution_time": 0.5,
+      "message": "Pass",
+      "failures": 0
+    },
+    {
+      "unique_id": "test.my_project.unique_stg_customers_id.def456",
+      "status": "pass",
+      "execution_time": 0.3,
+      "message": "Pass",
+      "failures": 0
+    },
+    {
+      "unique_id": "test.my_project.accepted_values_stg_orders_status.ghi789",
+      "status": "fail",
+      "execution_time": 0.8,
+      "message": "Got 2 results, configured to fail if != 0",
+      "failures": 2
+    }
+  ],
+  "elapsed_time": 5.28
+}

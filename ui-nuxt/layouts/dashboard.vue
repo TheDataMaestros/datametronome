@@ -12,9 +12,27 @@
         <div class="dm-logo-icon">
           <div class="dm-logo-icon__bg" />
           <div class="dm-logo-icon__pulse" />
-          <svg class="dm-logo-icon__svg" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 2.5L18.5 17.5H1.5L10 2.5Z" stroke="rgba(255,255,255,0.9)" stroke-width="1.35" stroke-linejoin="round" />
-            <line x1="10" y1="16" x2="14.8" y2="7.2" stroke="white" stroke-width="1.35" stroke-linecap="round" />
+          <svg
+            class="dm-logo-icon__svg"
+            viewBox="0 0 20 20"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M10 2.5L18.5 17.5H1.5L10 2.5Z"
+              stroke="rgba(255,255,255,0.9)"
+              stroke-width="1.35"
+              stroke-linejoin="round"
+            />
+            <line
+              x1="10"
+              y1="16"
+              x2="14.8"
+              y2="7.2"
+              stroke="white"
+              stroke-width="1.35"
+              stroke-linecap="round"
+            />
             <circle cx="14.8" cy="6.6" r="1.4" fill="white" />
             <circle cx="10" cy="16" r="0.8" fill="rgba(255,255,255,0.55)" />
           </svg>
@@ -24,7 +42,11 @@
           <span class="dm-logo-text__sub">Data Quality Platform</span>
         </div>
         <!-- Collapse toggle -->
-        <button class="dm-collapse-btn" :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'" @click="toggleCollapse">
+        <button
+          class="dm-collapse-btn"
+          :title="collapsed ? 'Expand sidebar' : 'Collapse sidebar'"
+          @click="toggleCollapse"
+        >
           <Icon
             :name="collapsed ? 'i-heroicons-chevron-right' : 'i-heroicons-chevron-left'"
             class="w-3.5 h-3.5"
@@ -81,17 +103,20 @@
         <div class="dm-stave-picker" ref="stavePicker">
           <button class="dm-stave-trigger" @click="staveOpen = !staveOpen">
             <template v-if="selectedStaveId">
-              <span
-                class="dm-stave-dot"
-                :style="{ background: selectedStaveHealthColor }"
-              />
+              <span class="dm-stave-dot" :style="{ background: selectedStaveHealthColor }" />
               <span class="dm-stave-name">{{ selectedSlaveName }}</span>
             </template>
             <template v-else>
-              <Icon name="i-heroicons-circle-stack" class="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+              <Icon
+                name="i-heroicons-circle-stack"
+                class="w-3.5 h-3.5 text-slate-500 flex-shrink-0"
+              />
               <span class="dm-stave-placeholder">Select Stave</span>
             </template>
-            <Icon name="i-heroicons-chevron-up-down" class="w-3.5 h-3.5 text-slate-500 ml-auto flex-shrink-0" />
+            <Icon
+              name="i-heroicons-chevron-up-down"
+              class="w-3.5 h-3.5 text-slate-500 ml-auto flex-shrink-0"
+            />
           </button>
           <div v-if="staveOpen" class="dm-stave-dropdown">
             <button
@@ -129,7 +154,7 @@
 
       <!-- User Footer -->
       <div class="dm-sidebar__footer">
-        <div class="dm-user" :title="collapsed ? (user?.name || 'Admin User') : undefined">
+        <div class="dm-user" :title="collapsed ? user?.name || 'Admin User' : undefined">
           <UAvatar :src="user?.avatar || undefined" :alt="user?.name || 'Admin'" size="sm" />
           <div class="dm-user__info">
             <span class="dm-user__name">{{ user?.name || 'Admin User' }}</span>
@@ -171,7 +196,11 @@
               <div v-if="showNotifications" class="dm-notif-panel">
                 <div class="dm-notif-panel__header">
                   <span class="dm-notif-panel__title">Notifications</span>
-                  <button v-if="unreadCount > 0" class="dm-notif-panel__mark-all" @click="markAllRead">
+                  <button
+                    v-if="unreadCount > 0"
+                    class="dm-notif-panel__mark-all"
+                    @click="markAllRead"
+                  >
                     Mark all read
                   </button>
                 </div>
@@ -181,7 +210,9 @@
                 <div v-else-if="notifications.length === 0" class="dm-notif-panel__empty">
                   <Icon name="i-heroicons-bell-slash" class="w-8 h-8 mb-2 opacity-20" />
                   <p class="dm-notif-panel__empty-title">No new notifications</p>
-                  <p class="dm-notif-panel__empty-sub">Failed and warning checks will appear here</p>
+                  <p class="dm-notif-panel__empty-sub">
+                    Failed and warning checks will appear here
+                  </p>
                 </div>
                 <div v-else class="dm-notif-panel__list">
                   <button
@@ -192,18 +223,31 @@
                     @click="handleNotifClick(n)"
                   >
                     <span class="dm-notif-item__icon" :class="`dm-notif-item__icon--${n.type}`">
-                      <Icon :name="n.type === 'error' ? 'i-heroicons-x-circle' : 'i-heroicons-exclamation-triangle'" class="w-3.5 h-3.5" />
+                      <Icon
+                        :name="
+                          n.type === 'error'
+                            ? 'i-heroicons-x-circle'
+                            : 'i-heroicons-exclamation-triangle'
+                        "
+                        class="w-3.5 h-3.5"
+                      />
                     </span>
                     <span class="dm-notif-item__content">
                       <span class="dm-notif-item__title">{{ n.title }}</span>
                       <span class="dm-notif-item__body">{{ n.body }}</span>
-                      <span class="dm-notif-item__meta">{{ n.source }} · {{ formatTimeAgo(n.timestamp) }}</span>
+                      <span class="dm-notif-item__meta"
+                        >{{ n.source }} · {{ formatTimeAgo(n.timestamp) }}</span
+                      >
                     </span>
                     <span v-if="!n.read" class="dm-notif-item__unread-dot" />
                   </button>
                 </div>
                 <div class="dm-notif-panel__footer">
-                  <NuxtLink to="/notifications" class="dm-notif-panel__see-all" @click="showNotifications = false">
+                  <NuxtLink
+                    to="/notifications"
+                    class="dm-notif-panel__see-all"
+                    @click="showNotifications = false"
+                  >
                     See all notifications
                     <Icon name="i-heroicons-arrow-right" class="w-3.5 h-3.5" />
                   </NuxtLink>
@@ -217,7 +261,11 @@
           </button>
 
           <button class="dm-header__btn-primary" :disabled="isRefreshing" @click="refreshData">
-            <Icon name="i-heroicons-arrow-path" class="w-3.5 h-3.5" :class="{ 'animate-spin': isRefreshing }" />
+            <Icon
+              name="i-heroicons-arrow-path"
+              class="w-3.5 h-3.5"
+              :class="{ 'animate-spin': isRefreshing }"
+            />
             <span>Refresh</span>
           </button>
         </div>
@@ -252,7 +300,9 @@ const collapsed = ref(false)
 onMounted(() => {
   try {
     collapsed.value = localStorage.getItem(COLLAPSE_KEY) === 'true'
-  } catch {}
+  } catch {
+    // localStorage unavailable — fall back to the default expanded state
+  }
   fetchNotifications()
 })
 
@@ -260,7 +310,9 @@ function toggleCollapse() {
   collapsed.value = !collapsed.value
   try {
     localStorage.setItem(COLLAPSE_KEY, String(collapsed.value))
-  } catch {}
+  } catch {
+    // localStorage unavailable — collapse state just won't persist
+  }
 }
 
 // ── Page title ───────────────────────────────────────────────────────────────
@@ -297,7 +349,9 @@ const showSettings = ref(false)
 const isRefreshing = ref(false)
 const notifRef = ref<HTMLElement | null>(null)
 
-onClickOutside(notifRef, () => { showNotifications.value = false })
+onClickOutside(notifRef, () => {
+  showNotifications.value = false
+})
 
 function toggleNotifications() {
   showNotifications.value = !showNotifications.value
@@ -323,14 +377,25 @@ function formatTimeAgo(timestamp: string) {
 // ── Navigation ───────────────────────────────────────────────────────────────
 const navigationItems = [
   { to: '/', icon: 'i-heroicons-squares-2x2', label: 'Dashboard', badge: null },
-  { to: '/anomalies', icon: 'i-heroicons-exclamation-triangle', label: 'Anomalies', badge: null, badgeColor: 'red' },
+  {
+    to: '/anomalies',
+    icon: 'i-heroicons-exclamation-triangle',
+    label: 'Anomalies',
+    badge: null,
+    badgeColor: 'red',
+  },
   { to: '/trends', icon: 'i-heroicons-chart-bar', label: 'Trends', badge: null },
   { to: '/insights', icon: 'i-heroicons-sparkles', label: 'AI Insights', badge: null },
   { to: '/staves', icon: 'i-heroicons-server', label: 'Data Sources', badge: null },
   { to: '/clefs', icon: 'i-heroicons-check-circle', label: 'Quality Checks', badge: null },
   { to: '/chat', icon: 'i-heroicons-chat-bubble-left-right', label: 'Chat', badge: null },
   { to: '/reports', icon: 'i-heroicons-document-chart-bar', label: 'Reports', badge: null },
-  { to: '/investigation', icon: 'i-heroicons-magnifying-glass', label: 'Investigation', badge: null },
+  {
+    to: '/investigation',
+    icon: 'i-heroicons-magnifying-glass',
+    label: 'Investigation',
+    badge: null,
+  },
 ]
 
 const adminItems = [
@@ -341,7 +406,13 @@ const adminItems = [
 const userMenuItems = [
   [{ label: 'Profile', icon: 'i-heroicons-user', click: () => navigateTo('/profile') }],
   [{ label: 'Settings', icon: 'i-heroicons-cog-6-tooth', click: () => navigateTo('/settings') }],
-  [{ label: 'Sign out', icon: 'i-heroicons-arrow-right-on-rectangle', click: () => authStore.logout() }],
+  [
+    {
+      label: 'Sign out',
+      icon: 'i-heroicons-arrow-right-on-rectangle',
+      click: () => authStore.logout(),
+    },
+  ],
 ]
 
 // ── Stave picker ─────────────────────────────────────────────────────────────
@@ -351,22 +422,29 @@ const { metrics: dashboardMetrics, fetchMetrics } = useDashboard()
 
 const staveOpen = ref(false)
 const stavePicker = ref<HTMLElement | null>(null)
-onClickOutside(stavePicker, () => { staveOpen.value = false })
+onClickOutside(stavePicker, () => {
+  staveOpen.value = false
+})
 
 const sidebarStaves = computed(() => staves.value ?? [])
 const sidebarHealthScores = computed<Record<string, number>>(
-  () => (dashboardMetrics.value as any)?.intelligence?.stave_health_scores ?? {}
+  () => (dashboardMetrics.value as any)?.intelligence?.stave_health_scores ?? {},
 )
 
-function staveColor(id: string) { return healthColor(sidebarHealthScores.value[id]) }
+function staveColor(id: string) {
+  return healthColor(sidebarHealthScores.value[id])
+}
 
 const selectedSlaveName = computed(() => {
   if (!selectedStaveId.value) return null
-  return sidebarStaves.value.find((s: any) => s.id === selectedStaveId.value)?.name ?? selectedStaveId.value
+  return (
+    sidebarStaves.value.find((s: any) => s.id === selectedStaveId.value)?.name ??
+    selectedStaveId.value
+  )
 })
 
 const selectedStaveHealthColor = computed(() =>
-  healthColor(selectedStaveId.value ? sidebarHealthScores.value[selectedStaveId.value] : undefined)
+  healthColor(selectedStaveId.value ? sidebarHealthScores.value[selectedStaveId.value] : undefined),
 )
 
 function pickStave(id: string | null) {
@@ -412,14 +490,36 @@ async function refreshData() {
   cursor: pointer;
   transition: border-color 0.15s;
 }
-.dm-stave-trigger:hover { border-color: #334155; }
-.dm-stave-name { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #e2e8f0; font-weight: 500; }
-.dm-stave-placeholder { flex: 1; text-align: left; color: #475569; font-style: italic; }
-.dm-stave-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; display: inline-block; }
+.dm-stave-trigger:hover {
+  border-color: #334155;
+}
+.dm-stave-name {
+  flex: 1;
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #e2e8f0;
+  font-weight: 500;
+}
+.dm-stave-placeholder {
+  flex: 1;
+  text-align: left;
+  color: #475569;
+  font-style: italic;
+}
+.dm-stave-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+}
 .dm-stave-dropdown {
   position: absolute;
   bottom: calc(100% + 4px);
-  left: 0; right: 0;
+  left: 0;
+  right: 0;
   z-index: 100;
   background: #1e293b;
   border: 1px solid #334155;
@@ -444,6 +544,12 @@ async function refreshData() {
   text-align: left;
   transition: background 0.1s;
 }
-.dm-stave-option:hover { background: #263347; color: #e2e8f0; }
-.dm-stave-option.is-active { background: #1e3a5f; color: white; }
+.dm-stave-option:hover {
+  background: #263347;
+  color: #e2e8f0;
+}
+.dm-stave-option.is-active {
+  background: #1e3a5f;
+  color: white;
+}
 </style>

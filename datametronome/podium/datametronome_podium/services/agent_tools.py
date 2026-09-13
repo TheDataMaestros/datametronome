@@ -5,6 +5,7 @@ These are extracted from ADKAgent and shared across all Pydantic AI sub-agents.
 Each function calls the DB via repo layer (no HTTP) and has no runtime deps on agent state.
 """
 import logging
+from typing import Any
 
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.features.checks.repo import CheckRepo
@@ -701,7 +702,7 @@ def _analyze_sample_data(sample_data: list[dict]) -> dict:
     if not sample_data:
         return {"message": "No data to analyze", "important_fields": [], "patterns": {}}
 
-    important_fields = []
+    important_fields: list[dict[str, Any]] = []
     patterns = {}
     field_stats = {}
 

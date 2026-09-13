@@ -3,7 +3,14 @@
     <div>
       <p class="dm-label mb-2">Administration</p>
       <h1
-        style="font-family: var(--dm-font-display); font-size: 2.4rem; font-weight: 700; letter-spacing: -0.03em; color: var(--dm-text-primary); line-height: 1.15;"
+        style="
+          font-family: var(--dm-font-display);
+          font-size: 2.4rem;
+          font-weight: 700;
+          letter-spacing: -0.03em;
+          color: var(--dm-text-primary);
+          line-height: 1.15;
+        "
       >
         Settings
       </h1>
@@ -24,7 +31,9 @@
           <span v-if="isDirty" class="text-[10px] text-amber-400 ml-auto">Unsaved changes</span>
         </div>
 
-        <div v-if="loading" class="text-center py-8 text-slate-500 text-sm">Loading settings...</div>
+        <div v-if="loading" class="text-center py-8 text-slate-500 text-sm">
+          Loading settings...
+        </div>
 
         <div v-else class="space-y-4">
           <!-- Provider -->
@@ -66,15 +75,22 @@
                 class="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300"
                 @click="showKey = !showKey"
               >
-                <Icon :name="showKey ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'" class="w-4 h-4" />
+                <Icon
+                  :name="showKey ? 'i-heroicons-eye-slash' : 'i-heroicons-eye'"
+                  class="w-4 h-4"
+                />
               </button>
             </div>
-            <p class="text-[10px] text-slate-600 mt-1">Not required for Ollama. Encrypted at rest.</p>
+            <p class="text-[10px] text-slate-600 mt-1">
+              Not required for Ollama. Encrypted at rest.
+            </p>
           </div>
 
           <!-- Base URL -->
           <div>
-            <label class="block text-xs text-slate-400 mb-1.5">Base URL <span class="text-slate-600">(optional)</span></label>
+            <label class="block text-xs text-slate-400 mb-1.5"
+              >Base URL <span class="text-slate-600">(optional)</span></label
+            >
             <input
               v-model="form.ai_base_url"
               type="text"
@@ -85,7 +101,12 @@
 
           <!-- Router Model -->
           <div>
-            <label class="block text-xs text-slate-400 mb-1.5">Router Model <span class="text-slate-600">(optional, cheaper model for intent routing)</span></label>
+            <label class="block text-xs text-slate-400 mb-1.5"
+              >Router Model
+              <span class="text-slate-600"
+                >(optional, cheaper model for intent routing)</span
+              ></label
+            >
             <input
               v-model="form.ai_router_model"
               type="text"
@@ -96,7 +117,10 @@
 
           <!-- Heavy Model -->
           <div>
-            <label class="block text-xs text-slate-400 mb-1.5">Heavy Model <span class="text-slate-600">(optional, for complex analysis)</span></label>
+            <label class="block text-xs text-slate-400 mb-1.5"
+              >Heavy Model
+              <span class="text-slate-600">(optional, for complex analysis)</span></label
+            >
             <input
               v-model="form.ai_heavy_model"
               type="text"
@@ -105,14 +129,33 @@
             />
           </div>
 
+          <!-- Alert Webhook -->
+          <div class="pt-2 border-t border-slate-700/40">
+            <label class="block text-xs text-slate-400 mb-1.5"
+              >Alert Webhook URL
+              <span class="text-slate-600">(optional, Slack-compatible)</span></label
+            >
+            <input
+              v-model="form.alert_webhook_url"
+              type="password"
+              placeholder="https://hooks.slack.com/services/..."
+              class="w-full bg-slate-800/60 border border-slate-700/50 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-600 focus:outline-none focus:border-blue-500/50"
+            />
+            <p class="text-[10px] text-slate-600 mt-1">
+              Failed checks are POSTed here. Leave empty to disable alerting. Encrypted at rest.
+            </p>
+          </div>
+
           <!-- Actions -->
           <div class="flex items-center gap-3 pt-2">
             <button
               :disabled="saving || !isDirty"
               class="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-              :class="isDirty
-                ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                : 'bg-slate-700/50 text-slate-500 cursor-not-allowed'"
+              :class="
+                isDirty
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                  : 'bg-slate-700/50 text-slate-500 cursor-not-allowed'
+              "
               @click="save"
             >
               {{ saving ? 'Saving...' : 'Save Changes' }}
@@ -124,7 +167,11 @@
             >
               Discard
             </button>
-            <p v-if="saveMessage" class="text-xs ml-auto" :class="saveError ? 'text-red-400' : 'text-emerald-400'">
+            <p
+              v-if="saveMessage"
+              class="text-xs ml-auto"
+              :class="saveError ? 'text-red-400' : 'text-emerald-400'"
+            >
               {{ saveMessage }}
             </p>
           </div>
@@ -158,6 +205,7 @@ interface SettingsForm {
   ai_base_url: string
   ai_router_model: string
   ai_heavy_model: string
+  alert_webhook_url: string
 }
 
 const defaults: SettingsForm = {
@@ -167,13 +215,14 @@ const defaults: SettingsForm = {
   ai_base_url: '',
   ai_router_model: '',
   ai_heavy_model: '',
+  alert_webhook_url: '',
 }
 
 const form = reactive<SettingsForm>({ ...defaults })
 const saved = ref<SettingsForm>({ ...defaults })
 
 const isDirty = computed(() => {
-  return (Object.keys(defaults) as (keyof SettingsForm)[]).some(k => form[k] !== saved.value[k])
+  return (Object.keys(defaults) as (keyof SettingsForm)[]).some((k) => form[k] !== saved.value[k])
 })
 
 function resetForm() {
@@ -185,7 +234,7 @@ async function loadSettings() {
   loading.value = true
   try {
     const all = await settingsService.getAll()
-    const map = Object.fromEntries(all.map(s => [s.key, s.value]))
+    const map = Object.fromEntries(all.map((s) => [s.key, s.value]))
     for (const key of Object.keys(defaults) as (keyof SettingsForm)[]) {
       if (map[key] !== undefined) {
         form[key] = map[key]
@@ -212,14 +261,20 @@ async function save() {
         if (form[key]) {
           await settingsService.set(key, form[key])
         } else {
-          try { await settingsService.remove(key) } catch { /* not found is fine */ }
+          try {
+            await settingsService.remove(key)
+          } catch {
+            /* not found is fine */
+          }
         }
       }
     }
     // Reload to get server state
     await loadSettings()
     saveMessage.value = 'Settings saved'
-    setTimeout(() => { saveMessage.value = '' }, 3000)
+    setTimeout(() => {
+      saveMessage.value = ''
+    }, 3000)
   } catch (err: any) {
     saveError.value = true
     saveMessage.value = err?.message || 'Failed to save'

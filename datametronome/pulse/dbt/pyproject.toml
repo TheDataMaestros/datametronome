@@ -1,0 +1,54 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "metronome-pulse-dbt"
+dynamic = ["version"]
+description = "Read-only dbt artifact connector for DataMetronome — exposes dbt project metadata as virtual queryable tables"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "DataMetronome Team", email = "team@datametronome.dev"}
+]
+keywords = ["dbt", "data-quality", "connector", "async", "metadata"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Framework :: AsyncIO",
+    "Typing :: Typed",
+]
+requires-python = ">=3.12"
+dependencies = [
+    "metronome-pulse-core>=0.1.0",
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+]
+test = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-cov>=4.0.0",
+    "pytest-mock>=3.10.0",
+]
+
+[tool.hatch.version]
+path = "metronome_pulse_dbt/__init__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["metronome_pulse_dbt"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"

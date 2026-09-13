@@ -304,6 +304,63 @@
               </UFormGroup>
             </template>
 
+            <!-- dbt (read-only: reads manifest/run_results artifacts) -->
+            <template v-else-if="newStaveForm.data_source_type === 'dbt'">
+              <UFormGroup label="Mode" name="mode" required>
+                <USelect v-model="connectionFields.mode" :options="dbtModes" />
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Read artifacts from a local dbt project, or pull them from a dbt Cloud job run
+                </p>
+              </UFormGroup>
+
+              <template v-if="connectionFields.mode === 'cloud'">
+                <UFormGroup label="API Token" name="api_token" required>
+                  <UInput
+                    v-model="connectionFields.api_token"
+                    type="password"
+                    placeholder="dbtc_..."
+                  />
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    dbt Cloud service token. Stored encrypted.
+                  </p>
+                </UFormGroup>
+                <UFormGroup label="Account ID" name="account_id" required>
+                  <UInput v-model="connectionFields.account_id" placeholder="12345" />
+                </UFormGroup>
+                <UFormGroup label="Job ID" name="job_id" required>
+                  <UInput v-model="connectionFields.job_id" placeholder="67890" />
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Artifacts are read from this job's most recent run
+                  </p>
+                </UFormGroup>
+                <UFormGroup label="Base URL" name="base_url">
+                  <UInput
+                    v-model="connectionFields.base_url"
+                    placeholder="https://cloud.getdbt.com/api/v2"
+                  />
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Override for single-tenant or EU dbt Cloud instances
+                  </p>
+                </UFormGroup>
+              </template>
+
+              <template v-else>
+                <UFormGroup label="Project Path" name="project_path" required>
+                  <UInput v-model="connectionFields.project_path" placeholder="/path/to/dbt" />
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Root of your dbt project, readable by the DataMetronome server
+                  </p>
+                </UFormGroup>
+                <UFormGroup label="Target Path" name="target_path">
+                  <UInput v-model="connectionFields.target_path" placeholder="target" />
+                  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Directory holding manifest.json and run_results.json — defaults to
+                    <code class="px-1 py-0.5 bg-gray-100 dark:bg-gray-800 rounded">target</code>
+                  </p>
+                </UFormGroup>
+              </template>
+            </template>
+
             <!-- MongoDB -->
             <template v-else-if="newStaveForm.data_source_type === 'mongodb'">
               <UFormGroup label="Connection URI" name="uri" required>
@@ -595,6 +652,12 @@ const dataSourceTypes = [
   { label: 'Redis', value: 'redis' },
   { label: 'Snowflake', value: 'snowflake' },
   { label: 'BigQuery', value: 'bigquery' },
+  { label: 'dbt', value: 'dbt' },
+]
+
+const dbtModes = [
+  { label: 'Local artifacts', value: 'local' },
+  { label: 'dbt Cloud', value: 'cloud' },
 ]
 
 const newStaveForm = ref({
@@ -608,9 +671,11 @@ const newStaveForm = ref({
 const connectionFields = ref<Record<string, any>>({})
 const formError = ref<string | null>(null)
 
-function resetConnectionFields() {
-  // Reset connection fields when data source type changes
-  connectionFields.value = {}
+function resetConnectionFields(type?: string) {
+  // Reset connection fields when data source type changes. The select passes
+  // the new type in, so this does not depend on v-model having applied yet.
+  const next = type ?? newStaveForm.value.data_source_type
+  connectionFields.value = next === 'dbt' ? { mode: 'local' } : {}
 }
 
 function handleCredentialsFileUpload(event: Event) {
@@ -696,6 +761,7 @@ function getDataSourceTypeColor(type: string) {
     redis: 'red',
     snowflake: 'cyan',
     bigquery: 'yellow',
+    dbt: 'orange',
   }
   return colors[type] || 'gray'
 }
@@ -778,6 +844,17 @@ function buildConnectionConfig(): Record<string, any> {
     }
     if (fields.dataset) config.dataset = fields.dataset
     if (fields.location) config.location = fields.location
+  } else if (type === 'dbt') {
+    config.mode = fields.mode || 'local'
+    if (config.mode === 'cloud') {
+      config.api_token = fields.api_token
+      config.account_id = fields.account_id
+      config.job_id = fields.job_id
+      if (fields.base_url) config.base_url = fields.base_url
+    } else {
+      config.project_path = fields.project_path
+      if (fields.target_path) config.target_path = fields.target_path
+    }
   } else if (type === 'mongodb') {
     config.uri = fields.uri
     config.database = fields.database
@@ -816,6 +893,15 @@ function validateConnectionConfig(): string | null {
     if (!fields.project_id) return 'Project ID is required'
     if (!fields.credentials_json && !fields.credentials_path) {
       return 'Please upload a credentials JSON file or paste the JSON content'
+    }
+  } else if (type === 'dbt') {
+    // Mirrors DbtReadonlyPulse, which raises on these same missing fields
+    if ((fields.mode || 'local') === 'cloud') {
+      if (!fields.api_token) return 'API token is required for dbt Cloud mode'
+      if (!fields.account_id) return 'Account ID is required for dbt Cloud mode'
+      if (!fields.job_id) return 'Job ID is required for dbt Cloud mode'
+    } else if (!fields.project_path) {
+      return 'Project path is required for local mode'
     }
   } else if (type === 'mongodb') {
     if (!fields.uri) return 'Connection URI is required'

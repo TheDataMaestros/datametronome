@@ -52,3 +52,18 @@ extra-paths = [
 
 [tool.ty.terminal]
 output-format = "concise"
+
+# ty exits non-zero on any diagnostic, warnings included, so every rule left
+# enabled here is effectively a build gate.
+[tool.ty.rules]
+# Whether a suppression is "unused" depends on how the environment resolves
+# third-party stubs, so these fire in one environment and are required in
+# another. Acting on them breaks the build somewhere else.
+unused-ignore-comment = "ignore"
+unused-type-ignore-comment = "ignore"
+# Legacy "# type: ignore[rule]" comments whose rule names predate ty.
+ignore-comment-unknown-rule = "ignore"
+# Stdlib functions slated for removal in 3.16, mostly inside test fixtures.
+deprecated = "ignore"
+# Defensive checks that are provably dead given the annotations, but harmless.
+redundant-condition = "ignore"
