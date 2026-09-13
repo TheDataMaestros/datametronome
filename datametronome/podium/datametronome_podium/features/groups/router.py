@@ -125,7 +125,7 @@ async def delete_group(
     """Delete a group. Refused while staves still belong to it.
 
     Deleting a group that owns staves would leave them with no owner, which
-    assert_stave_write_access treats as unwritable by anyone but an admin.
+    assert_stave_group_access treats as unwritable by anyone but an admin.
     """
     repo = _repo()
     group = await repo.get(group_id)

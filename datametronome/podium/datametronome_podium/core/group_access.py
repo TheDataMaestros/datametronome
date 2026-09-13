@@ -57,10 +57,14 @@ async def user_group_ids(
     return [row["group_id"] for row in rows]
 
 
-async def assert_stave_write_access(
+async def assert_stave_group_access(
     stave_id: str, user: dict[str, Any], executor: QueryExecutor | None = None
 ) -> None:
-    """Raise unless the user may modify this stave.
+    """Raise unless the user belongs to this stave's owning group.
+
+    Guards two things. Modifying a stave or its clefs, and reaching into the
+    source database behind it, which listing tables and previewing rows both
+    do. Viewing our own metadata about a stave is not guarded.
 
     Raises 404 when the stave does not exist, and 403 when it exists but
     belongs to another group.
@@ -93,7 +97,7 @@ async def assert_stave_write_access(
         )
 
 
-async def assert_clef_write_access(
+async def assert_clef_group_access(
     clef_id: str, user: dict[str, Any], executor: QueryExecutor | None = None
 ) -> None:
     """Raise unless the user may modify this clef, via its stave's group."""
@@ -108,7 +112,7 @@ async def assert_clef_write_access(
             detail=f"Clef not found: {clef_id}",
         )
 
-    await assert_stave_write_access(rows[0]["stave_id"], user, executor)
+    await assert_stave_group_access(rows[0]["stave_id"], user, executor)
 
 
 async def assert_group_membership(

@@ -9,8 +9,8 @@ from datametronome_podium.core.auth import get_current_user, require_admin, requ
 from datametronome_podium.core.check_dispatcher import JobStatus
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.group_access import (
-    assert_clef_write_access,
-    assert_stave_write_access,
+    assert_clef_group_access,
+    assert_stave_group_access,
 )
 from datametronome_podium.core.dispatcher_factory import get_dispatcher
 from datametronome_podium.core.timestamp_utils import now_utc_iso, to_utc_isoformat
@@ -204,7 +204,7 @@ async def get_clef(clef_id: str, _user: dict = Depends(get_current_user)):
 async def create_clef(clef_in: ClefCreate, user: dict = Depends(require_editor)):
     # A clef inherits its group from the stave it is attached to, so creating
     # one is a write against that stave.
-    await assert_stave_write_access(clef_in.stave_id, user)
+    await assert_stave_group_access(clef_in.stave_id, user)
     repo = _repo()
     now = now_utc_iso()
     clef = Clef(
@@ -229,7 +229,7 @@ async def create_clef(clef_in: ClefCreate, user: dict = Depends(require_editor))
 
 @router.put("/{clef_id}", response_model=ClefResponse)
 async def update_clef(clef_id: str, clef_in: ClefUpdate, user: dict = Depends(require_editor)):
-    await assert_clef_write_access(clef_id, user)
+    await assert_clef_group_access(clef_id, user)
     repo = _repo()
     existing = await repo.get(clef_id)
     if not existing:
@@ -252,7 +252,7 @@ async def update_clef(clef_id: str, clef_in: ClefUpdate, user: dict = Depends(re
 
 @router.delete("/{clef_id}", status_code=204)
 async def delete_clef(clef_id: str, user: dict = Depends(require_admin)):
-    await assert_clef_write_access(clef_id, user)
+    await assert_clef_group_access(clef_id, user)
     repo = _repo()
     existing = await repo.get(clef_id)
     if not existing:
@@ -267,7 +267,7 @@ async def run_clef_now(clef_id: str, user: dict = Depends(require_editor)) -> di
 
     Group-guarded: running a check queries the owning team's database.
     """
-    await assert_clef_write_access(clef_id, user)
+    await assert_clef_group_access(clef_id, user)
     try:
         dispatcher = get_dispatcher()
         job_id = await dispatcher.dispatch(clef_id)

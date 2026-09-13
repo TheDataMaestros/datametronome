@@ -10,9 +10,9 @@ import pytest
 from fastapi import HTTPException
 
 from datametronome_podium.core.group_access import (
-    assert_clef_write_access,
+    assert_clef_group_access,
     assert_group_membership,
-    assert_stave_write_access,
+    assert_stave_group_access,
     is_super_admin,
     user_group_ids,
 )
@@ -54,7 +54,7 @@ async def test_member_may_write_own_group_stave():
         [{"group_id": "g1"}],              # stave lookup
         [{"group_id": "g1"}],              # caller's memberships
     ])
-    await assert_stave_write_access("stave-1", EDITOR_A, executor)
+    await assert_stave_group_access("stave-1", EDITOR_A, executor)
 
 
 @pytest.mark.asyncio
@@ -64,7 +64,7 @@ async def test_non_member_is_refused():
         [{"group_id": "g2"}],              # caller is only in g2
     ])
     with pytest.raises(HTTPException) as exc:
-        await assert_stave_write_access("stave-1", EDITOR_B, executor)
+        await assert_stave_group_access("stave-1", EDITOR_B, executor)
 
     assert exc.value.status_code == 403
     assert "another group" in exc.value.detail
@@ -73,7 +73,7 @@ async def test_non_member_is_refused():
 @pytest.mark.asyncio
 async def test_super_admin_bypasses_without_querying():
     executor = _executor([])
-    await assert_stave_write_access("stave-1", ADMIN, executor)
+    await assert_stave_group_access("stave-1", ADMIN, executor)
     executor.query.assert_not_called()
 
 
@@ -82,7 +82,7 @@ async def test_missing_stave_is_404_not_403():
     """A non-existent stave must not look like a permission problem."""
     executor = _executor([[]])
     with pytest.raises(HTTPException) as exc:
-        await assert_stave_write_access("ghost", EDITOR_A, executor)
+        await assert_stave_group_access("ghost", EDITOR_A, executor)
 
     assert exc.value.status_code == 404
 
@@ -92,7 +92,7 @@ async def test_ungrouped_stave_is_refused():
     """A stave with no owner must not be writable by everyone."""
     executor = _executor([[{"group_id": None}]])
     with pytest.raises(HTTPException) as exc:
-        await assert_stave_write_access("orphan", EDITOR_A, executor)
+        await assert_stave_group_access("orphan", EDITOR_A, executor)
 
     assert exc.value.status_code == 403
     assert "no owning group" in exc.value.detail
@@ -105,7 +105,7 @@ async def test_clef_inherits_group_from_its_stave():
         [{"group_id": "g1"}],              # stave lookup
         [{"group_id": "g1"}],              # caller's memberships
     ])
-    await assert_clef_write_access("clef-1", EDITOR_A, executor)
+    await assert_clef_group_access("clef-1", EDITOR_A, executor)
 
 
 @pytest.mark.asyncio
@@ -116,7 +116,7 @@ async def test_clef_write_refused_when_stave_belongs_elsewhere():
         [{"group_id": "g2"}],
     ])
     with pytest.raises(HTTPException) as exc:
-        await assert_clef_write_access("clef-1", EDITOR_B, executor)
+        await assert_clef_group_access("clef-1", EDITOR_B, executor)
 
     assert exc.value.status_code == 403
 
@@ -125,7 +125,7 @@ async def test_clef_write_refused_when_stave_belongs_elsewhere():
 async def test_missing_clef_is_404():
     executor = _executor([[]])
     with pytest.raises(HTTPException) as exc:
-        await assert_clef_write_access("ghost", EDITOR_A, executor)
+        await assert_clef_group_access("ghost", EDITOR_A, executor)
 
     assert exc.value.status_code == 404
 

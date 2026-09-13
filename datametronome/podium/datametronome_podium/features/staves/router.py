@@ -11,7 +11,7 @@ from datametronome_podium.core.circuit_breaker import StaveCircuitBreaker
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.group_access import (
     assert_group_membership,
-    assert_stave_write_access,
+    assert_stave_group_access,
     is_super_admin,
     user_group_ids,
 )
@@ -200,7 +200,7 @@ async def create_stave(
 
 @router.put("/{stave_id}", response_model=StaveResponse)
 async def update_stave(stave_id: str, stave_in: StaveUpdate, user: dict = Depends(require_editor)):
-    await assert_stave_write_access(stave_id, user)
+    await assert_stave_group_access(stave_id, user)
     repo = _repo()
     existing = await repo.get(stave_id)
     if not existing:
@@ -241,7 +241,7 @@ async def update_stave(stave_id: str, stave_in: StaveUpdate, user: dict = Depend
 
 @router.post("/{stave_id}/unpause")
 async def unpause_stave(stave_id: str, background_tasks: BackgroundTasks, user: dict = Depends(require_editor)):
-    await assert_stave_write_access(stave_id, user)
+    await assert_stave_group_access(stave_id, user)
     repo = _repo()
     stave = await repo.get(stave_id)
     if not stave:
@@ -270,7 +270,7 @@ async def unpause_stave(stave_id: str, background_tasks: BackgroundTasks, user: 
 
 @router.delete("/{stave_id}")
 async def delete_stave(stave_id: str, force: bool = False, user: dict = Depends(require_admin)):
-    await assert_stave_write_access(stave_id, user)
+    await assert_stave_group_access(stave_id, user)
     repo = _repo()
     existing = await repo.get(stave_id)
     if not existing:
@@ -307,7 +307,7 @@ async def test_stave_connection(
     their stored credentials, which is an action against their infrastructure
     rather than a read of ours.
     """
-    await assert_stave_write_access(stave_id, user)
+    await assert_stave_group_access(stave_id, user)
     try:
         return await stave_svc.test_connection(stave_id)
     except LookupError as exc:
@@ -331,7 +331,7 @@ async def generate_sample_data(
 
     Group-guarded: this inserts rows into the owning team's database.
     """
-    await assert_stave_write_access(stave_id, user)
+    await assert_stave_group_access(stave_id, user)
     try:
         return await stave_svc.generate_data(stave_id, request.table_name, request.count)
     except LookupError as exc:
@@ -350,12 +350,17 @@ async def generate_sample_data(
         )
 
 
-# Returns real rows from the stave's underlying database, so it is gated at
-# editor rather than any authenticated user. This narrows who can reach it but
-# not which staves they can reach; per-group scoping is what closes that.
-@router.post("/{stave_id}/preview-data", dependencies=[Depends(require_editor)])
-async def preview_stave_data(stave_id: str, request: GenerateDataRequest) -> dict[str, Any]:
-    """Preview rows from a stave table (capped at 500 rows)."""
+@router.post("/{stave_id}/preview-data")
+async def preview_stave_data(
+    stave_id: str, request: GenerateDataRequest, user: dict = Depends(get_current_user)
+) -> dict[str, Any]:
+    """Preview rows from a stave table (capped at 500 rows).
+
+    Group-scoped rather than role-gated. This returns real rows from the
+    owning team's database, so membership is the right gate, and a viewer in
+    that group should see their own group's data.
+    """
+    await assert_stave_group_access(stave_id, user)
     try:
         return await stave_svc.preview_data(stave_id, request.table_name, request.count)
     except LookupError as exc:
@@ -374,13 +379,18 @@ async def preview_stave_data(stave_id: str, request: GenerateDataRequest) -> dic
         )
 
 
-# Exposes the source database's schema; same reasoning as preview-data.
-@router.get("/{stave_id}/tables", dependencies=[Depends(require_editor)])
+@router.get("/{stave_id}/tables")
 async def list_stave_tables(
     stave_id: str,
     include_structure: bool = Query(True, description="Include table structure/schema"),
+    user: dict = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """List tables available in a stave's data source."""
+    """List tables available in a stave's data source.
+
+    Group-scoped for the same reason as preview-data: it reads the source
+    database's schema, not our metadata about it.
+    """
+    await assert_stave_group_access(stave_id, user)
     try:
         return await stave_svc.list_tables(stave_id, include_structure=include_structure)
     except LookupError as exc:
