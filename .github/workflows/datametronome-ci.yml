@@ -51,7 +51,7 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install pytest pytest-asyncio pytest-cov pytest-mock ty
+          uv pip install pytest pytest-asyncio pytest-cov pytest-mock pytest-timeout ty
           # Install core first for dependencies
           uv pip install -e ./datametronome/pulse/core
           uv pip install -e ./datametronome/pulse/sqlite
@@ -67,30 +67,68 @@ jobs:
       - name: Type check with ty
         run: uv run ty check --output-format github
 
-      - name: Run Unit Tests
+      # Each suite is a separate invocation on purpose: the pulse packages each
+      # ship their own tests/conftest.py with no package marker, so collecting
+      # two of them in one pytest run raises ImportPathMismatchError.
+      - name: Run Pulse Tests
         run: |
-          uv run pytest datametronome/pulse/core/tests/ -v
-          uv run pytest datametronome/pulse/postgres/tests/ -v
-          uv run pytest datametronome/pulse/postgres-psycopg3/tests/ -v
-          uv run pytest datametronome/pulse/postgres-sqlalchemy/tests/ -v
-          uv run pytest datametronome/pulse/dbt/tests/ -v --ignore=datametronome/pulse/dbt/tests/test_real_artifacts.py
-          uv run pytest datametronome/podium/tests/test_unit.py -v
+          uv run pytest datametronome/pulse/core/tests/ -v --timeout=60
+          uv run pytest datametronome/pulse/postgres/tests/ -v --timeout=60
+          uv run pytest datametronome/pulse/postgres-psycopg3/tests/ -v --timeout=60
+          uv run pytest datametronome/pulse/postgres-sqlalchemy/tests/ -v --timeout=60
+          uv run pytest datametronome/pulse/sqlite/tests/ -v --timeout=60
+          uv run pytest datametronome/pulse/dbt/tests/ -v --timeout=60 --ignore=datametronome/pulse/dbt/tests/test_real_artifacts.py
+
+      - name: Run Podium Tests
+        run: uv run pytest datametronome/podium/tests/ -v --timeout=60
+
+  frontend:
+    name: Frontend Lint & Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui-nuxt
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: ui-nuxt/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build
 
   release:
     name: Build & Release
-    needs: quality-and-test
+    needs: [quality-and-test, frontend]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Install uv
         uses: astral-sh/setup-uv@v4
-      - name: Build and Publish
+
+      # Only the pulse connector libraries are published. Podium is the
+      # deployable app, not a library, so it is not pushed to PyPI.
+      - name: Build pulse packages
+        run: |
+          mkdir -p dist
+          for pkg in core postgres postgres-psycopg3 postgres-sqlalchemy sqlite bigquery dbt; do
+            echo "::group::build $pkg"
+            uv build "datametronome/pulse/$pkg" --out-dir dist
+            echo "::endgroup::"
+          done
+          ls -l dist
+
+      - name: Publish to PyPI
         env:
           UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
-        run: |
-          # Minimal build logic as per user requirement to start fresh
-          # but keeping the spirit of the old publish workflow
-          echo "Ready to build and publish..."
-          # uv build
-          # uv publish
+        run: uv publish dist/*

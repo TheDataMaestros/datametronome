@@ -25,3 +25,11 @@ export default createConfigForNuxt()
       'nuxt/prefer-import-meta': 'off',
     },
   })
+  .append({
+    files: ['**/*.vue'],
+    rules: {
+      // Vue 3 supports fragments; this is a Vue 2 rule and pages here
+      // legitimately render a main element plus a sibling modal.
+      'vue/no-multiple-template-root': 'off',
+    },
+  })

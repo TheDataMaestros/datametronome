@@ -30,7 +30,9 @@ function loadReadIds(): Set<string> {
 function saveReadIds(ids: Set<string>) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]))
-  } catch {}
+  } catch {
+    // localStorage unavailable (private browsing / SSR) — read state is best-effort
+  }
 }
 
 function checkToNotification(check: Check, readIds: Set<string>): Notification | null {
@@ -48,7 +50,9 @@ function checkToNotification(check: Check, readIds: Set<string>): Notification |
     id: check.id,
     type: isError ? 'error' : 'warning',
     title: isError ? 'Check Failed' : 'Check Warning',
-    body: check.message || `${check.check_type?.replace(/_/g, ' ')} check ${isError ? 'failed' : 'flagged a warning'}`,
+    body:
+      check.message ||
+      `${check.check_type?.replace(/_/g, ' ')} check ${isError ? 'failed' : 'flagged a warning'}`,
     source,
     timestamp: check.timestamp,
     read: readIds.has(check.id),
@@ -100,7 +104,9 @@ export const useNotifications = () => {
         try {
           const apiNotifs = await insightsService.getNotifications()
           insightNotifs = apiNotifs.map((n) => insightNotifToNotification(n, _readIds.value))
-        } catch { /* insight notifications optional */ }
+        } catch {
+          /* insight notifications optional */
+        }
       }
 
       // Merge and sort by timestamp descending

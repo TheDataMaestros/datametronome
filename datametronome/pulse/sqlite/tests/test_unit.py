@@ -50,7 +50,7 @@ class TestSQLitePulse:
                 await pulse.connect()
 
                 mock_mkdir.assert_called_once_with(parents=True, exist_ok=True)
-                mock_connect.assert_called_once_with(":memory:")
+                mock_connect.assert_called_once_with(":memory:", timeout=30)
                 assert pulse.connection == mock_connection
                 assert mock_connection.row_factory == sqlite3.Row
                 pulse._readonly.connect.assert_called_once()
@@ -167,7 +167,7 @@ class TestSQLitePulse:
             {"name": "Alice", "table": "users"},
             {"name": "Bob", "table": "users"},
         ]
-        pulse._writeonly.write.assert_called_once_with(expected_data, None)
+        pulse._writeonly.write.assert_called_once_with(expected_data, destination, None)
 
     @pytest.mark.asyncio
     async def test_write_with_existing_table_field(self):
@@ -184,7 +184,7 @@ class TestSQLitePulse:
         await pulse.write(data, destination)
 
         # Should not override existing table field
-        pulse._writeonly.write.assert_called_once_with(data, None)
+        pulse._writeonly.write.assert_called_once_with(data, destination, None)
 
     @pytest.mark.asyncio
     async def test_execute_delegation(self):
@@ -241,7 +241,9 @@ class TestSQLiteReadonlyPulse:
 
             await readonly.connect()
 
-            mock_connect.assert_called_once_with(":memory:")
+            mock_connect.assert_called_once_with(
+                ":memory:", timeout=30, check_same_thread=False
+            )
             assert readonly.connection == mock_connection
             assert mock_connection.row_factory == sqlite3.Row
 
@@ -298,7 +300,7 @@ class TestSQLiteWriteonlyPulse:
 
             await writeonly.connect()
 
-            mock_connect.assert_called_once_with(":memory:")
+            mock_connect.assert_called_once_with(":memory:", timeout=30)
             assert writeonly.connection == mock_connection
             assert mock_connection.row_factory == sqlite3.Row
 
