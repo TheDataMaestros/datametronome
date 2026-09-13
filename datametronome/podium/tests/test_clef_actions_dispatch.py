@@ -5,7 +5,8 @@ from fastapi.testclient import TestClient
 
 from datametronome_podium.core.auth import get_current_user, require_editor
 
-FAKE_USER = {"id": "u1", "username": "test", "role": "editor"}
+# admin so the group write guard is bypassed; see test_group_access.py
+FAKE_USER = {"id": "u1", "username": "test", "role": "admin"}
 
 
 def _make_app():

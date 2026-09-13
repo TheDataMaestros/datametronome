@@ -15,6 +15,7 @@ from datametronome_podium.features.auth.router import router as auth_router
 from datametronome_podium.features.chat.router import router as chat_router
 from datametronome_podium.features.checks.router import router as checks_router
 from datametronome_podium.features.clefs.router import router as clefs_router
+from datametronome_podium.features.groups.router import router as groups_router
 from datametronome_podium.features.insights.router import router as insights_router
 from datametronome_podium.features.metrics.router import router as metrics_router
 from datametronome_podium.features.reports.router import router as reports_router
@@ -27,7 +28,7 @@ from datametronome_podium.features.users.router import router as users_router
 api_router = APIRouter()
 
 # Auth dependency applied at router level — every endpoint below requires a valid JWT
-# except /auth (login + register must be public)
+# except /auth (login and first-run setup must be public)
 _auth_deps = [Depends(get_current_user)]
 
 # Feature-based routers (CRUD via QueryExecutor + Repos)
@@ -37,7 +38,7 @@ api_router.include_router(checks_router, prefix="/checks", tags=["checks"])
 api_router.include_router(insights_router, prefix="/insights", tags=["intelligence"], dependencies=_auth_deps)
 api_router.include_router(user_memory_router, prefix="/user/memory", tags=["user memory"])
 
-# Auth endpoints (public — login/register don't require a token)
+# Auth endpoints (public — login and first-run setup don't require a token)
 api_router.include_router(auth_router, prefix="/auth", tags=["authentication"])
 
 # All other endpoints require authentication
@@ -48,3 +49,4 @@ api_router.include_router(chat_router, prefix="/chat", tags=["chat"], dependenci
 api_router.include_router(analytics_router, prefix="/analytics", tags=["analytics"], dependencies=_auth_deps)
 api_router.include_router(settings_router, prefix="/settings", tags=["settings"], dependencies=_auth_deps)
 api_router.include_router(users_router, prefix="/users", tags=["users"], dependencies=_auth_deps)
+api_router.include_router(groups_router, prefix="/groups", tags=["groups"], dependencies=_auth_deps)

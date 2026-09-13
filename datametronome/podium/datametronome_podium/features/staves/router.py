@@ -9,6 +9,12 @@ from pydantic import BaseModel, Field
 from datametronome_podium.core.auth import get_current_user, require_admin, require_editor
 from datametronome_podium.core.circuit_breaker import StaveCircuitBreaker
 from datametronome_podium.core.database import get_executor
+from datametronome_podium.core.group_access import (
+    assert_group_membership,
+    assert_stave_write_access,
+    is_super_admin,
+    user_group_ids,
+)
 from datametronome_podium.core.encryption import (
     MASKED_VALUE,
     encrypt_sensitive_fields,
@@ -77,6 +83,39 @@ def _repo() -> StaveRepo:
     return StaveRepo(get_executor())
 
 
+async def _resolve_create_group(user: dict, requested: str | None) -> str:
+    """Decide which group a new stave belongs to.
+
+    An explicit group is honoured if the caller may write to it. Otherwise it
+    is inferred, but only when there is exactly one candidate: guessing between
+    several groups would silently put a data source somewhere unintended.
+    """
+    executor = get_executor()
+
+    if requested:
+        await assert_group_membership(requested, user, executor)
+        return requested
+
+    groups = await user_group_ids(user, executor)
+    if len(groups) == 1:
+        return groups[0]
+
+    if is_super_admin(user):
+        raise HTTPException(
+            status_code=400,
+            detail="group_id is required: admins are not scoped to one group",
+        )
+    if not groups:
+        raise HTTPException(
+            status_code=403,
+            detail="You do not belong to any group. Ask an admin to add you to one.",
+        )
+    raise HTTPException(
+        status_code=400,
+        detail="group_id is required: you belong to more than one group",
+    )
+
+
 def _get_circuit_breaker() -> StaveCircuitBreaker | None:
     """Get circuit breaker if Redis is available. Returns None otherwise."""
     try:
@@ -129,9 +168,10 @@ async def get_stave_delete_info(stave_id: str, _user: dict = Depends(get_current
 async def create_stave(
     stave_in: StaveCreate,
     background_tasks: BackgroundTasks,
-    _user: dict = Depends(require_editor),
+    user: dict = Depends(require_editor),
 ):
     repo = _repo()
+    group_id = await _resolve_create_group(user, stave_in.group_id)
     now = now_utc_iso()
     encrypted_config = encrypt_sensitive_fields(
         stave_in.connection_config, stave_in.data_source_type
@@ -143,6 +183,7 @@ async def create_stave(
         data_source_type=stave_in.data_source_type,
         connection_config=json.dumps(encrypted_config),
         is_active=stave_in.is_active,
+        group_id=group_id,
         created_at=now,
         updated_at=now,
     )
@@ -158,7 +199,8 @@ async def create_stave(
 
 
 @router.put("/{stave_id}", response_model=StaveResponse)
-async def update_stave(stave_id: str, stave_in: StaveUpdate, _user: dict = Depends(require_editor)):
+async def update_stave(stave_id: str, stave_in: StaveUpdate, user: dict = Depends(require_editor)):
+    await assert_stave_write_access(stave_id, user)
     repo = _repo()
     existing = await repo.get(stave_id)
     if not existing:
@@ -198,7 +240,8 @@ async def update_stave(stave_id: str, stave_in: StaveUpdate, _user: dict = Depen
 
 
 @router.post("/{stave_id}/unpause")
-async def unpause_stave(stave_id: str, background_tasks: BackgroundTasks, _user: dict = Depends(require_editor)):
+async def unpause_stave(stave_id: str, background_tasks: BackgroundTasks, user: dict = Depends(require_editor)):
+    await assert_stave_write_access(stave_id, user)
     repo = _repo()
     stave = await repo.get(stave_id)
     if not stave:
@@ -226,7 +269,8 @@ async def unpause_stave(stave_id: str, background_tasks: BackgroundTasks, _user:
 
 
 @router.delete("/{stave_id}")
-async def delete_stave(stave_id: str, force: bool = False, _user: dict = Depends(require_admin)):
+async def delete_stave(stave_id: str, force: bool = False, user: dict = Depends(require_admin)):
+    await assert_stave_write_access(stave_id, user)
     repo = _repo()
     existing = await repo.get(stave_id)
     if not existing:
@@ -253,9 +297,17 @@ class GenerateDataRequest(BaseModel):
     count: int = Field(default=100, ge=1, le=500_000)
 
 
-@router.post("/{stave_id}/test-connection", dependencies=[Depends(require_editor)])
-async def test_stave_connection(stave_id: str) -> dict[str, Any]:
-    """Test connectivity to a stave's data source."""
+@router.post("/{stave_id}/test-connection")
+async def test_stave_connection(
+    stave_id: str, user: dict = Depends(require_editor)
+) -> dict[str, Any]:
+    """Test connectivity to a stave's data source.
+
+    Group-guarded: this opens a connection to another team's database using
+    their stored credentials, which is an action against their infrastructure
+    rather than a read of ours.
+    """
+    await assert_stave_write_access(stave_id, user)
     try:
         return await stave_svc.test_connection(stave_id)
     except LookupError as exc:
@@ -271,9 +323,15 @@ async def test_stave_connection(stave_id: str) -> dict[str, Any]:
         )
 
 
-@router.post("/{stave_id}/generate-data", dependencies=[Depends(require_editor)])
-async def generate_sample_data(stave_id: str, request: GenerateDataRequest) -> dict[str, Any]:
-    """Generate and optionally insert sample data for a stave table."""
+@router.post("/{stave_id}/generate-data")
+async def generate_sample_data(
+    stave_id: str, request: GenerateDataRequest, user: dict = Depends(require_editor)
+) -> dict[str, Any]:
+    """Generate and optionally insert sample data for a stave table.
+
+    Group-guarded: this inserts rows into the owning team's database.
+    """
+    await assert_stave_write_access(stave_id, user)
     try:
         return await stave_svc.generate_data(stave_id, request.table_name, request.count)
     except LookupError as exc:

@@ -12,6 +12,9 @@ class StaveCreate(BaseModel):
     data_source_type: str
     connection_config: dict
     is_active: bool = True
+    # Owning group. Optional when the caller belongs to exactly one group,
+    # in which case the router fills it in.
+    group_id: str | None = None
 
     @field_validator("data_source_type")
     @classmethod

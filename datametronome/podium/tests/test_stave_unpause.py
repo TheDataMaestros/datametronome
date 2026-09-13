@@ -4,7 +4,9 @@ from unittest.mock import AsyncMock, patch, MagicMock
 from fastapi.testclient import TestClient
 
 
-FAKE_USER = {"id": "user-1", "username": "testuser", "is_active": True, "role": "editor"}
+# admin so the group write guard is bypassed: these tests cover unpause
+# behaviour, and group access has its own tests in test_group_access.py
+FAKE_USER = {"id": "user-1", "username": "testuser", "is_active": True, "role": "admin"}
 
 
 def _make_app():
