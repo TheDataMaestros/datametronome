@@ -47,14 +47,14 @@ except ModuleNotFoundError:
     DriftDetector = None
 
 try:
-    import pandas as pd  # type: ignore
+    import pandas as pd
 except ModuleNotFoundError:
-    pd = None  # type: ignore
+    pd = None
 
 try:
-    import numpy as np  # type: ignore
+    import numpy as np
 except ModuleNotFoundError:
-    np = None  # type: ignore
+    np = None
 
 
 logger = logging.getLogger(__name__)

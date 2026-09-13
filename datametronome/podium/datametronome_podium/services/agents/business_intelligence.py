@@ -77,7 +77,7 @@ Be precise. Your output is used to generate SQL — wrong column role mappings p
 """
 
 
-def build_phase1_agent(model: Any) -> Agent:
+def build_phase1_agent(model: Any) -> Agent[Any, SchemaInterpretation]:
     """Agent that reasons over schema data and produces SchemaInterpretation. No tools."""
     return Agent(
         model=model,
@@ -112,7 +112,7 @@ async def run_phase1_schema_overview(
         f"Sample rows (up to 3 per table): {json.dumps(samples_summary, indent=2)}"
     )
     result = await agent.run(prompt)
-    return result.output  # ty: ignore[invalid-return-type]
+    return result.output
 
 
 # ── Phase 2 Deps + Agent ──────────────────────────────────────────────────────
@@ -146,9 +146,9 @@ class Phase2Deps:
         self.schema_prefix = schema_prefix
 
 
-def build_phase2_agent(model: Any, schema_prefix: str) -> Agent:
+def build_phase2_agent(model: Any, schema_prefix: str) -> Agent[Any, GeneratedQueryPlan]:
     """Agent that generates and validates SQL for KPIs and performer dimensions."""
-    agent: Agent[Phase2Deps, GeneratedQueryPlan] = Agent(  # ty: ignore[invalid-assignment]
+    agent: Agent[Phase2Deps, GeneratedQueryPlan] = Agent(
         model=model,
         system_prompt=_PHASE2_SYSTEM_PROMPT.format(
             schema_prefix=schema_prefix or "(no prefix)",
@@ -167,7 +167,7 @@ def build_phase2_agent(model: Any, schema_prefix: str) -> Agent:
         except Exception as exc:
             return f"ERROR: {exc}"
 
-    return agent  # ty: ignore[invalid-return-type]
+    return agent
 
 
 async def run_phase2_generate_and_validate(
@@ -198,7 +198,7 @@ async def run_phase2_generate_and_validate(
 
     try:
         deps = Phase2Deps(connector=connector, schema_prefix=schema_prefix)
-        result = await agent.run(prompt, deps=deps)  # ty: ignore[invalid-argument-type]
+        result = await agent.run(prompt, deps=deps)
         plan = result.output
 
         succeeded = len(plan.kpi_queries) + sum(
@@ -255,9 +255,9 @@ class Phase3Deps:
         self.skipped = skipped
 
 
-def build_phase3_agent(model: Any) -> Agent:
+def build_phase3_agent(model: Any) -> Agent[Any, LLMBusinessReport]:
     """Agent that executes stored SQL and reasons over results."""
-    agent: Agent[Phase3Deps, LLMBusinessReport] = Agent(  # ty: ignore[invalid-assignment]
+    agent: Agent[Phase3Deps, LLMBusinessReport] = Agent(
         model=model,
         system_prompt=_PHASE3_SYSTEM_PROMPT,
         output_type=LLMBusinessReport,
@@ -330,7 +330,7 @@ def build_phase3_agent(model: Any) -> Agent:
         rows = await _execute_sql(ctx.deps.connector, sql)
         return _json({"entity": entity_name, "breakdown": rows[:8]})
 
-    return agent  # ty: ignore[invalid-return-type]
+    return agent
 
 
 async def run_phase3_execute_and_analyze(
@@ -358,5 +358,5 @@ async def run_phase3_execute_and_analyze(
         f"Skipped KPIs (include in report): {skipped}. "
         "Execute all available queries, then produce the full business report."
     )
-    result = await agent.run(prompt, deps=deps)  # ty: ignore[invalid-argument-type]
+    result = await agent.run(prompt, deps=deps)
     return result.output

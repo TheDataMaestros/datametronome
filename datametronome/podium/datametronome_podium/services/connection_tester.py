@@ -66,7 +66,7 @@ class ConnectionTester:
                 }
 
             connection_time = time.time() - start_time
-            result["connection_time"] = connection_time  # ty: ignore[assignment]  # ty:ignore[ignore-comment-unknown-rule, invalid-assignment]
+            result["connection_time"] = connection_time  # ty: ignore[assignment]
 
             return result
 
@@ -181,15 +181,15 @@ class ConnectionTester:
 
                 cursor.execute("SELECT VERSION();")
                 row = cursor.fetchone()
-                version = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
+                version = row[0] if row else None  # ty: ignore[index]
 
                 cursor.execute("SELECT COUNT(*) FROM information_schema.schemata;")
                 row = cursor.fetchone()
-                schema_count = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
+                schema_count = row[0] if row else None  # ty: ignore[index]
 
                 cursor.execute("SELECT COUNT(*) FROM information_schema.tables;")
                 row = cursor.fetchone()
-                table_count = row[0] if row else None  # ty: ignore[index]  # ty:ignore[ignore-comment-unknown-rule, invalid-argument-type]
+                table_count = row[0] if row else None  # ty: ignore[index]
 
                 cursor.close()
                 conn.close()
@@ -433,14 +433,9 @@ class ConnectionTester:
 
                     # If we used a different dataset for listing, add info
                     if dataset_for_listing != dataset and "table_count" in metadata:
-                        if metadata.get("note"):
-                            metadata[
-                                "note"
-                            ] += f" Found {metadata['table_count']} tables."
-                        else:
-                            metadata[
-                                "note"
-                            ] = f"Found {metadata['table_count']} tables."
+                        found = f"Found {metadata['table_count']} tables."
+                        existing = metadata.get("note")
+                        metadata["note"] = f"{existing} {found}" if existing else found
 
                 except Exception as e:
                     error_msg = str(e)
@@ -551,7 +546,7 @@ class ConnectionTester:
         executor to avoid blocking the event loop.
         """
         try:
-            import requests  # type: ignore
+            import requests
 
             config = stave.connection_config
             base_url = config["base_url"]

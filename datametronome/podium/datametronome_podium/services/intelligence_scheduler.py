@@ -2,7 +2,7 @@
 import logging
 
 from celery.schedules import crontab
-from redbeat import RedBeatSchedulerEntry  # ty: ignore[unresolved-import]
+from redbeat import RedBeatSchedulerEntry
 
 from datametronome_podium.core.celery_app import celery_app
 

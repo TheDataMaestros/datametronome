@@ -10,7 +10,7 @@ import logging
 from typing import Any
 
 from google.cloud import bigquery  # type: ignore
-from google.oauth2 import service_account  # type: ignore
+from google.oauth2 import service_account
 from metronome_pulse_bigquery.job_config import build_query_job_config
 from metronome_pulse_core.interfaces import Pulse, Readable
 

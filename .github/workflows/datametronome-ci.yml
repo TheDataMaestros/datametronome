@@ -51,7 +51,10 @@ jobs:
       - name: Install dependencies
         run: |
           uv venv
-          uv pip install pytest pytest-asyncio pytest-cov pytest-mock pytest-timeout ty
+          # ty is pinned: it is pre-1.0, exits non-zero on warnings as well as
+          # errors, and gains new rules between releases. Unpinned, any upstream
+          # release breaks the build on code that has not changed.
+          uv pip install pytest pytest-asyncio pytest-cov pytest-mock pytest-timeout 'ty==0.0.80'
           # Install core first for dependencies
           uv pip install -e ./datametronome/pulse/core
           uv pip install -e ./datametronome/pulse/sqlite

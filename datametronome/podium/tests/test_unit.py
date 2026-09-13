@@ -141,7 +141,7 @@ class TestStaveModelUnit:
             name=str(stave_data["name"]),
             description=str(stave_data["description"]),
             data_source_type=str(stave_data["stave_type"]),
-            connection_config=dict(stave_data["connection_config"]),  # type: ignore
+            connection_config=dict(stave_data["connection_config"]),
             is_active=bool(stave_data["is_active"]),
         )
 
@@ -163,7 +163,7 @@ class TestStaveModelUnit:
             Stave(
                 name=str(stave_data["name"]),
                 data_source_type=str(stave_data["data_source_type"]),
-                connection_config=dict(stave_data["connection_config"]),  # type: ignore
+                connection_config=dict(stave_data["connection_config"]),
             )
 
     def test_stave_config_validation(self):
@@ -179,7 +179,7 @@ class TestStaveModelUnit:
             Stave(
                 name=str(stave_data["name"]),
                 data_source_type=str(stave_data["data_source_type"]),
-                connection_config=dict(stave_data["connection_config"]),  # type: ignore
+                connection_config=dict(stave_data["connection_config"]),
             )
 
     def test_stave_default_values(self):
@@ -218,7 +218,7 @@ class TestClefModelUnit:
             name=str(clef_data["name"]),
             description=str(clef_data["description"]),
             check_type=str(clef_data["check_type"]),
-            config=dict(clef_data["config"]),  # type: ignore
+            config=dict(clef_data["config"]),
             is_active=bool(clef_data["is_active"]),
         )
 
@@ -241,7 +241,7 @@ class TestClefModelUnit:
                 stave_id="test-stave-001",
                 name=str(clef_data["name"]),
                 check_type=str(clef_data["check_type"]),
-                config=dict(clef_data["config"]),  # type: ignore
+                config=dict(clef_data["config"]),
             )
 
     def test_clef_check_config_validation(self):
@@ -258,7 +258,7 @@ class TestClefModelUnit:
                 stave_id="test-stave-001",
                 name=str(clef_data["name"]),
                 check_type=str(clef_data["check_type"]),
-                config=dict(clef_data["config"]),  # type: ignore
+                config=dict(clef_data["config"]),
             )
 
     def test_clef_serialization(self):
@@ -294,8 +294,8 @@ class TestCheckRunModelUnit:
             stave_id=int(check_run_data["stave_id"]),
             clef_id=int(check_run_data["clef_id"]),
             status=str(check_run_data["status"]),
-            started_at=check_run_data["started_at"],  # type: ignore
-            parameters=dict(check_run_data["parameters"]),  # type: ignore
+            started_at=check_run_data["started_at"],
+            parameters=dict(check_run_data["parameters"]),
         )
 
         assert check_run.stave_id == 1
@@ -317,7 +317,7 @@ class TestCheckRunModelUnit:
                 stave_id=int(check_run_data["stave_id"]),
                 clef_id=int(check_run_data["clef_id"]),
                 status=str(check_run_data["status"]),
-                parameters=dict(check_run_data["parameters"]),  # type: ignore
+                parameters=dict(check_run_data["parameters"]),
             )
 
     def test_check_run_status_transitions(self):

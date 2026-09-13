@@ -17,7 +17,7 @@ try:
 
     _WATCHDOG_AVAILABLE = True
 except ModuleNotFoundError:
-    Observer = None  # type: ignore
+    Observer = None
     FileSystemEventHandler = object  # type: ignore
     FileSystemEvent = object  # type: ignore
     _WATCHDOG_AVAILABLE = False
@@ -110,7 +110,7 @@ class YAMLWatcher:
             callback: Function to call when a YAML file changes.
                      Should accept file_path and return ReloadResult.
         """
-        if not _WATCHDOG_AVAILABLE:
+        if not _WATCHDOG_AVAILABLE or Observer is None:
             logger.warning("watchdog is not installed; YAML hot reload is disabled")
             return
 

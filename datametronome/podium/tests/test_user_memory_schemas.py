@@ -22,7 +22,7 @@ def test_memory_response_from_db_row():
         "created_at": "2026-04-06T00:00:00Z",
         "updated_at": "2026-04-06T00:00:00Z",
     }
-    mem = UserMemoryResponse(**row)  # ty:ignore[invalid-argument-type]
+    mem = UserMemoryResponse(**row)
     assert mem.category == "domain_focus"
     assert mem.active is True
 
