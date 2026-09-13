@@ -9,7 +9,7 @@ from datametronome_podium.core.auth import require_admin
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.security import get_password_hash
 from datametronome_podium.core.timestamp_utils import now_utc_iso
-from datametronome_podium.features.users.repo import UserRepo
+from datametronome_podium.features.users.repo import UserRepo, is_duplicate_user_insert
 from datametronome_podium.features.users.schema import (
     AdminUserCreate,
     PasswordReset,
@@ -78,7 +78,14 @@ async def create_user(
         created_at=now,
         updated_at=now,
     )
-    await repo.create(new_user)
+    try:
+        await repo.create(new_user)
+    except Exception as e:
+        # The checks above race with a concurrent create; the unique constraint
+        # is the only thing that actually settles it.
+        if is_duplicate_user_insert(e):
+            raise HTTPException(status_code=409, detail="Username already exists") from e
+        raise
 
     result = new_user.model_dump()
     result.pop("hashed_password", None)

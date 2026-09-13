@@ -1,4 +1,5 @@
 """User data access."""
+import sqlite3
 from typing import Any
 
 from datametronome_podium.core.query import QueryExecutor
@@ -6,6 +7,42 @@ from datametronome_podium.features.users.model import UserRow as User
 
 # Columns safe to return in list/detail views (excludes hashed_password).
 _SAFE_COLUMNS = ["id", "username", "email", "is_active", "role", "created_at", "updated_at"]
+
+
+def _pg_unique_violation(exc: BaseException | None) -> bool:
+    """Postgres unique violation (asyncpg or SQLSTATE 23505)."""
+    if exc is None:
+        return False
+    try:
+        import asyncpg
+
+        if isinstance(exc, asyncpg.exceptions.UniqueViolationError):
+            return True
+    except ImportError:
+        pass
+    if getattr(exc, "sqlstate", None) == "23505":
+        return True
+    return False
+
+
+def is_duplicate_user_insert(exc: BaseException) -> bool:
+    """True if the insert failed only because of a uniqueness constraint.
+
+    Callers check for an existing username before inserting, which leaves a
+    race between the check and the insert. This lets that race surface as a
+    409 rather than a 500.
+    """
+    if _pg_unique_violation(exc):
+        return True
+    bc = exc.__cause__
+    if isinstance(bc, BaseException) and _pg_unique_violation(bc):
+        return True
+    if isinstance(exc, sqlite3.IntegrityError):
+        return "unique" in str(exc).lower()
+    if isinstance(bc, sqlite3.IntegrityError):
+        return "unique" in str(bc).lower()
+    lowered = str(exc).lower()
+    return "unique" in lowered or "duplicate" in lowered
 
 
 class UserRepo:

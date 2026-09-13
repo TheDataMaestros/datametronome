@@ -17,6 +17,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware
 
 from .api.v1.api import api_router
 from .core.config import settings
@@ -172,9 +173,12 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    # Add rate limiting
+    # Add rate limiting. SlowAPIMiddleware is what actually applies the
+    # limiter's default_limits; registering state and the exception handler
+    # alone leaves every route unthrottled.
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)  # type: ignore
+    app.add_middleware(SlowAPIMiddleware)
 
     # Add metrics middleware (first, to track all requests)
     from .core.middleware import MetricsMiddleware

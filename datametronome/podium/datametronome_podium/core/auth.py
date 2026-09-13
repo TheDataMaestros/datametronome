@@ -102,7 +102,21 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    return dict(users[0])
+    user = dict(users[0])
+
+    # Deactivating a user must actually revoke access. Tokens carry no
+    # revocation state, so this lookup is the only place it can be enforced.
+    # Postgres returns a bool here and SQLite returns 0/1; both are falsy when
+    # disabled. A NULL fails closed, which the column's DEFAULT TRUE makes
+    # unreachable through either write path.
+    if not user.get("is_active"):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is disabled",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return user
 
 
 def require_role(*allowed_roles: str):

@@ -292,7 +292,10 @@ async def generate_sample_data(stave_id: str, request: GenerateDataRequest) -> d
         )
 
 
-@router.post("/{stave_id}/preview-data", dependencies=[Depends(get_current_user)])
+# Returns real rows from the stave's underlying database, so it is gated at
+# editor rather than any authenticated user. This narrows who can reach it but
+# not which staves they can reach; per-group scoping is what closes that.
+@router.post("/{stave_id}/preview-data", dependencies=[Depends(require_editor)])
 async def preview_stave_data(stave_id: str, request: GenerateDataRequest) -> dict[str, Any]:
     """Preview rows from a stave table (capped at 500 rows)."""
     try:
@@ -313,7 +316,8 @@ async def preview_stave_data(stave_id: str, request: GenerateDataRequest) -> dic
         )
 
 
-@router.get("/{stave_id}/tables", dependencies=[Depends(get_current_user)])
+# Exposes the source database's schema; same reasoning as preview-data.
+@router.get("/{stave_id}/tables", dependencies=[Depends(require_editor)])
 async def list_stave_tables(
     stave_id: str,
     include_structure: bool = Query(True, description="Include table structure/schema"),
