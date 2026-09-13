@@ -18,6 +18,7 @@ ALLOWED_KEYS = frozenset({
     "ai_router_model",
     "ai_heavy_model",
     "ai_base_url",
+    "alert_webhook_url",
 })
 
 

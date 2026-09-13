@@ -6,8 +6,9 @@ from datametronome_podium.core.query import QueryExecutor
 from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.features.settings.model import AppSettingRow
 
-# Keys that contain secrets and must be encrypted at rest
-SENSITIVE_KEYS = frozenset({"ai_api_key"})
+# Keys that contain secrets and must be encrypted at rest.
+# A webhook URL is a bearer credential — anyone holding it can post as you.
+SENSITIVE_KEYS = frozenset({"ai_api_key", "alert_webhook_url"})
 
 
 class AppSettingsRepo:
