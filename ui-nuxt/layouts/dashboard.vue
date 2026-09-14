@@ -155,7 +155,11 @@
       <!-- User Footer -->
       <div class="dm-sidebar__footer">
         <div class="dm-user" :title="identityTitle">
-          <UAvatar :src="user?.avatar || undefined" :alt="user?.name || 'Signed in user'" size="sm" />
+          <UAvatar
+            :src="user?.avatar || undefined"
+            :alt="user?.name || 'Signed in user'"
+            size="sm"
+          />
           <div class="dm-user__info">
             <!-- No hardcoded fallback identity. Showing "Admin User" when the
                  store has no user makes a dead session look like a live one. -->
@@ -331,13 +335,10 @@ const pageTitle = computed(() => {
   const titles: Record<string, string> = {
     index: 'Dashboard',
     anomalies: 'Anomalies',
-    'ml-anomalies': 'ML Anomalies',
     trends: 'Trends & Patterns',
     staves: 'Data Sources',
     clefs: 'Quality Checks',
     chat: 'Chat History',
-    reports: 'Reports',
-    investigation: 'Investigation',
     insights: 'AI Insights',
     notifications: 'Notifications',
     profile: 'Profile',
@@ -379,12 +380,14 @@ const groupLabel = computed(() => {
 const groupTitle = computed(() => {
   if (isAdmin.value) return 'Admins can edit data sources in every group'
   const names = myGroups.value.map((g) => g.name)
-  if (names.length === 0) return 'You cannot edit any data source until an admin adds you to a group'
+  if (names.length === 0)
+    return 'You cannot edit any data source until an admin adds you to a group'
   return `You can edit data sources owned by: ${names.join(', ')}`
 })
 
 const identityTitle = computed(
-  () => `${user.value?.name || 'Signed in user'} · ${user.value?.role || 'viewer'} · ${groupLabel.value}`,
+  () =>
+    `${user.value?.name || 'Signed in user'} · ${user.value?.role || 'viewer'} · ${groupLabel.value}`,
 )
 const showNotifications = ref(false)
 const showSettings = ref(false)
@@ -431,13 +434,6 @@ const navigationItems = [
   { to: '/staves', icon: 'i-heroicons-server', label: 'Data Sources', badge: null },
   { to: '/clefs', icon: 'i-heroicons-check-circle', label: 'Quality Checks', badge: null },
   { to: '/chat', icon: 'i-heroicons-chat-bubble-left-right', label: 'Chat', badge: null },
-  { to: '/reports', icon: 'i-heroicons-document-chart-bar', label: 'Reports', badge: null },
-  {
-    to: '/investigation',
-    icon: 'i-heroicons-magnifying-glass',
-    label: 'Investigation',
-    badge: null,
-  },
 ]
 
 const adminItems = [
