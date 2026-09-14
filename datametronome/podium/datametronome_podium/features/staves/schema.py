@@ -40,5 +40,8 @@ class StaveResponse(BaseModel):
     connection_config: dict | str
     is_active: bool
     paused: bool = False
+    # Without this the API never tells a client which group owns a stave, so
+    # nothing outside the backend can show or manage ownership.
+    group_id: str | None = None
     created_at: str
     updated_at: str

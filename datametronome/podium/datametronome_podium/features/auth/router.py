@@ -27,7 +27,7 @@ from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.security import get_password_hash, verify_password
 from datametronome_podium.core.rate_limit import limiter
 from datametronome_podium.core.timestamp_utils import now_utc_iso
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -43,15 +43,22 @@ class PatchUserRequest(BaseModel):
 
 @router.post("/login", response_model=Token)
 @limiter.limit("10 per minute")
-async def login(request: Request, user_credentials: UserLogin) -> dict[str, str]:
+async def login(
+    request: Request, response: Response, user_credentials: UserLogin
+) -> dict[str, str]:
     """Authenticate user and return access token.
 
-    Rate limited well below the global default: the global 100/minute still
-    allows password guessing at a useful rate. `request` is unused here but
-    slowapi requires it in the signature to identify the caller.
+    Rate limited well below the global default. The global 100 per minute
+    still allows password guessing at a useful rate.
+
+    `request` and `response` are both unused here and both required by
+    slowapi. It reads the caller from the request, and because the limiter
+    runs with headers_enabled it writes the rate-limit headers into the
+    response. Omitting `response` makes every call to this endpoint raise.
 
     Args:
         request: Incoming request, used by the rate limiter.
+        response: Outgoing response, used by the rate limiter for headers.
         user_credentials: User login credentials.
 
     Returns:
@@ -61,12 +68,21 @@ async def login(request: Request, user_credentials: UserLogin) -> dict[str, str]
         HTTPException: If authentication fails.
     """
     users = await get_executor().query(
-        "SELECT username, hashed_password FROM users WHERE username = ?",
+        "SELECT username, hashed_password, is_active FROM users WHERE username = ?",
         [user_credentials.username],
     )
     user = users[0] if users else None
 
     if not user or not verify_password(user_credentials.password, str(user["hashed_password"])):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
+
+    # get_current_user rejects a disabled account on every later request, but
+    # without this check login still hands out a token and answers 200, which
+    # confirms the password was right.
+    if not user["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
