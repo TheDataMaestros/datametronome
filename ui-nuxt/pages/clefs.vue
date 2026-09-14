@@ -353,6 +353,15 @@
                 </div>
               </div>
 
+              <UAlert
+                v-if="saveError"
+                color="red"
+                variant="soft"
+                icon="i-heroicons-exclamation-triangle"
+                :title="saveError"
+                class="mt-4"
+              />
+
               <div class="flex justify-end gap-3 pt-4 border-t">
                 <UButton color="gray" variant="outline" @click="closeModal"> Cancel </UButton>
                 <UButton type="submit" color="primary" :loading="isSaving">
@@ -619,6 +628,7 @@ const showCreateModal = ref(false)
 const showVisualBuilder = ref(false)
 const editingClef = ref<Clef | null>(null)
 const isSaving = ref(false)
+const saveError = ref<string | null>(null)
 const runningChecks = ref(new Set<string>())
 const showDetailsModal = ref(false)
 const selectedClef = ref<Clef | null>(null)
@@ -1089,6 +1099,7 @@ const runCheck = async (clefId: string) => {
 
 const saveClef = async () => {
   isSaving.value = true
+  saveError.value = null
   try {
     if (editingClef.value) {
       await updateClef(editingClef.value.id, newClef.value)
@@ -1097,11 +1108,29 @@ const saveClef = async () => {
     }
     closeModal()
     await refreshLatestResults()
-  } catch (error) {
+  } catch (error: any) {
+    // Previously this only hit the console, so a rejected create looked like
+    // the button did nothing at all.
+    saveError.value = describeSaveError(error)
     console.error('Failed to save clef:', error)
   } finally {
     isSaving.value = false
   }
+}
+
+/** Turn an API error into something a person can act on. */
+function describeSaveError(error: any): string {
+  const detail = error?.details?.detail ?? error?.message
+  if (Array.isArray(detail)) {
+    // FastAPI validation errors: [{ loc: [...], msg: "..." }]
+    return detail
+      .map((d: any) => {
+        const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : ''
+        return field ? `${field}: ${d.msg}` : d.msg
+      })
+      .join('. ')
+  }
+  return typeof detail === 'string' ? detail : 'Could not save this clef.'
 }
 
 const handleVisualBuilderCreate = async (clefData: CreateClefRequest) => {

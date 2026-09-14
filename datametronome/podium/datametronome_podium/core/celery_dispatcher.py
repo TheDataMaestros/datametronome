@@ -8,7 +8,7 @@ from typing import Any
 
 from celery.result import AsyncResult
 
-from datametronome_podium.core.celery_app import QUEUE_HIGH
+from datametronome_podium.core.celery_app import QUEUE_HIGH, celery_app
 from datametronome_podium.core.check_dispatcher import CheckDispatcher, JobStatus
 from datametronome_podium.tasks.check_tasks import execute_check
 
@@ -46,11 +46,14 @@ class CeleryDispatcher:
         return result.id
 
     async def get_status(self, job_id: str) -> JobStatus:
-        result = AsyncResult(job_id)
+        # Bind to our app. A bare AsyncResult() picks up Celery's default app,
+        # whose backend is DisabledBackend, and reading .state on that raises.
+        # That turned a successful dispatch into a 500 on run-now.
+        result = AsyncResult(job_id, app=celery_app)
         return _STATE_MAP.get(result.state, JobStatus.PENDING)
 
     async def get_result(self, job_id: str) -> dict[str, Any] | None:
-        result = AsyncResult(job_id)
+        result = AsyncResult(job_id, app=celery_app)
         if not result.ready():
             return None
         return result.result

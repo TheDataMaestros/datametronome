@@ -642,14 +642,24 @@ const healthTrend = computed(() => {
   }
 })
 
+// Counted from the same check results as the trend rather than from
+// /metrics/dashboard, whose distribution reports zeros even when checks have
+// run. One source keeps the two charts consistent with each other.
 const anomalyDistribution = computed(() => {
-  const d = dashboardMetrics.value?.distribution
+  const counts = { pass: 0, fail: 0, warn: 0 }
+  for (const check of checkResults.value) {
+    const status = String(check.status)
+    if (status === 'pass') counts.pass += 1
+    else if (status === 'warn' || status === 'warning') counts.warn += 1
+    else counts.fail += 1
+  }
+
   return {
     labels: ['Passed', 'Failed', 'Warning'],
     datasets: [
       {
         label: 'Checks',
-        data: [d?.passed ?? 0, d?.failed ?? 0, d?.warning ?? 0],
+        data: [counts.pass, counts.fail, counts.warn],
         backgroundColor: ['#22c55e', '#ef4444', '#eab308'],
       },
     ],
@@ -935,11 +945,11 @@ async function refreshData() {
 }
 
 async function refreshHealthChart() {
-  await fetchLatestResults(200)
+  await fetchLatestResults(100)
 }
 
 async function refreshAnomalyChart() {
-  await fetchMetrics()
+  await fetchLatestResults(100)
 }
 
 function exportDashboard() {
@@ -965,7 +975,7 @@ onMounted(() => {
   fetchStaves()
   fetchLatest(20)
   fetchMetrics()
-  fetchLatestResults(200)
+  fetchLatestResults(100)
   loadPrefs()
 })
 </script>

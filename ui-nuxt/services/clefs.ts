@@ -82,13 +82,34 @@ class ClefsService {
     }))
   }
 
+  /**
+   * Frontend shape to API shape.
+   *
+   * The reads below already map API `config` to frontend `configuration`, but
+   * the writes did not, so every create posted `configuration` and the API
+   * rejected it with 422 for a missing `config`. An empty schedule is dropped
+   * too: the server's cron validator rejects "" rather than treating it as
+   * "no schedule".
+   */
+  private toApiPayload(clef: CreateClefRequest | UpdateClefRequest) {
+    const { configuration, schedule, ...rest } = clef as CreateClefRequest
+    return {
+      ...rest,
+      ...(configuration !== undefined ? { config: configuration } : {}),
+      ...(schedule ? { schedule } : {}),
+    }
+  }
+
   async create(clef: CreateClefRequest): Promise<Clef> {
-    const response = await apiService.post<Clef>(this.endpoint, clef)
+    const response = await apiService.post<Clef>(this.endpoint, this.toApiPayload(clef))
     return response.data
   }
 
   async update(id: string, updates: UpdateClefRequest): Promise<Clef> {
-    const response = await apiService.put<Clef>(`${this.endpoint}/${id}`, updates)
+    const response = await apiService.put<Clef>(
+      `${this.endpoint}/${id}`,
+      this.toApiPayload(updates),
+    )
     return response.data
   }
 
