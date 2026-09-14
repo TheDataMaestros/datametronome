@@ -51,7 +51,7 @@ def test_outsider_is_refused(method, path, body):
     executor = _executor(stave_group="g1", member_groups=["g2"])
 
     with patch(
-        "datametronome_podium.core.group_access._resolve", return_value=executor
+        "datametronome_podium.core.group_access.get_executor", return_value=executor
     ):
         response = getattr(client, method)(path, **({"json": body} if body else {}))
 
@@ -77,7 +77,7 @@ def test_member_is_allowed_even_as_viewer(method, path, body, service):
     executor = _executor(stave_group="g1", member_groups=["g1"])
 
     with patch(
-        "datametronome_podium.core.group_access._resolve", return_value=executor
+        "datametronome_podium.core.group_access.get_executor", return_value=executor
     ):
         with patch(
             f"datametronome_podium.features.staves.service.{service}",

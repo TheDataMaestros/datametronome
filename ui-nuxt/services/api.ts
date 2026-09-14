@@ -74,6 +74,11 @@ class ApiService {
               ? String((data as any).detail)
               : 'Your session has ended. Please sign in again.'
 
+          // sessionStorage, not the store. useAuthStore() here resolves a
+          // detached Pinia instance, so anything set on it is invisible to the
+          // page. logout() still works because it clears localStorage, which
+          // is global. The route guard uses the store instead, where it runs
+          // inside a real Nuxt context.
           if (typeof window !== 'undefined') {
             try {
               sessionStorage.setItem('auth_end_reason', reason)
@@ -83,7 +88,6 @@ class ApiService {
           }
 
           authStore.logout()
-          // Redirect to login if not already there
           if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
             window.location.href = '/login'
           }

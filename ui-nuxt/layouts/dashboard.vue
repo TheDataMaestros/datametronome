@@ -294,6 +294,7 @@
 <script setup lang="ts">
 import { useAuthStore } from '~/stores/auth'
 import { useNotifications } from '~/composables/useNotifications'
+import { groupsService, type Group } from '~/services/groups'
 import { healthColor } from '~/utils/healthColor'
 
 const authStore = useAuthStore()
@@ -356,7 +357,15 @@ const user = computed(() => authStore.user)
 const isAdmin = computed(() => authStore.user?.role === 'admin')
 
 // ── Which groups am I acting in ──────────────────────────────────────────────
-const { groups: myGroups, fetchMyGroups } = useMyGroups()
+const myGroups = ref<Group[]>([])
+
+async function fetchMyGroups() {
+  try {
+    myGroups.value = await groupsService.getMine()
+  } catch {
+    myGroups.value = []
+  }
+}
 
 const groupLabel = computed(() => {
   // An admin edits across every group, so naming one would be misleading.

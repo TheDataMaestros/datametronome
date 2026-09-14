@@ -90,13 +90,11 @@ async def _resolve_create_group(user: dict, requested: str | None) -> str:
     is inferred, but only when there is exactly one candidate: guessing between
     several groups would silently put a data source somewhere unintended.
     """
-    executor = get_executor()
-
     if requested:
-        await assert_group_membership(requested, user, executor)
+        await assert_group_membership(requested, user)
         return requested
 
-    groups = await user_group_ids(user, executor)
+    groups = await user_group_ids(user)
     if len(groups) == 1:
         return groups[0]
 

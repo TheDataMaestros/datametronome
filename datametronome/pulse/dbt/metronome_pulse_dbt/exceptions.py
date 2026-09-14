@@ -20,10 +20,6 @@ class ArtifactParseError(DbtConnectorError):
 class CloudApiError(DbtConnectorError):
     """Raised when the dbt Cloud API returns an unexpected response.
 
-    status_code carries the HTTP status so callers can distinguish auth
-    failures (401/403) from transient server errors (5xx).
+    The HTTP status is in the message. Nothing branches on it, so it is not
+    carried as a separate attribute.
     """
-
-    def __init__(self, message: str, status_code: int) -> None:
-        super().__init__(message)
-        self.status_code = status_code

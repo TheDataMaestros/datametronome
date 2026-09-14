@@ -252,7 +252,7 @@ async def test_cloud_404_optional_artifacts(mocker):
 
 
 async def test_cloud_auth_failure(mocker):
-    """401 on runs list → CloudApiError with correct status_code."""
+    """401 on runs list → CloudApiError naming the status."""
     mock_client = MagicMock()
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=False)
@@ -265,11 +265,11 @@ async def test_cloud_auth_failure(mocker):
     with pytest.raises(CloudApiError) as exc_info:
         await reader.read_manifest()
 
-    assert exc_info.value.status_code == 401
+    assert "401" in str(exc_info.value)
 
 
 async def test_cloud_auth_failure_403(mocker):
-    """403 on artifact fetch → CloudApiError with status_code 403."""
+    """403 on artifact fetch → CloudApiError naming the status."""
     runs_body = {"data": [{"id": 7}]}
 
     mock_client = MagicMock()
@@ -287,7 +287,7 @@ async def test_cloud_auth_failure_403(mocker):
     with pytest.raises(CloudApiError) as exc_info:
         await reader.read_manifest()
 
-    assert exc_info.value.status_code == 403
+    assert "403" in str(exc_info.value)
 
 
 async def test_cloud_is_available(mocker):

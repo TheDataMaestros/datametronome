@@ -162,12 +162,9 @@ class CloudArtifactReader(ArtifactReader):
             ) from exc
 
     def _raise_for_auth(self, response: httpx.Response) -> None:
-        """Convert 401/403 responses to CloudApiError with the status code."""
+        """Convert 401/403 responses to CloudApiError."""
         if response.status_code in (401, 403):
-            raise CloudApiError(
-                f"dbt Cloud auth failed ({response.status_code})",
-                status_code=response.status_code,
-            )
+            raise CloudApiError(f"dbt Cloud auth failed ({response.status_code})")
 
     async def read_manifest(self) -> dict[str, Any]:
         result = await self._fetch_artifact("manifest.json")

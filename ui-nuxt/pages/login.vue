@@ -171,8 +171,9 @@ onMounted(() => {
   // Explain why the session ended, if the API told us. Landing on a blank
   // login screen looks identical whether the token expired, an admin disabled
   // the account, or something broke.
-  // The guard sets this on the store when it ends a dead session. A full page
-  // reload wipes the store, so fall back to what the API interceptor stashed.
+  // The route guard puts the reason on the store, since it runs in a Nuxt
+  // context. The API interceptor cannot, so it uses sessionStorage and a full
+  // reload. Both paths land here.
   if (authStore.error) {
     errorMessage.value = authStore.error
     authStore.error = null
