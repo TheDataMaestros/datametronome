@@ -43,12 +43,19 @@ async def list_groups(
     return [g.model_dump() for g in await _repo().list_all(limit=limit, offset=offset)]
 
 
-@router.get("/mine", response_model=list[str])
+@router.get("/mine", response_model=list[GroupResponse])
 async def list_my_groups(
     user: dict[str, Any] = Depends(get_current_user),
-) -> list[str]:
-    """Group IDs the caller belongs to, so the UI can preselect one."""
-    return await user_group_ids(user)
+) -> list[dict[str, Any]]:
+    """Groups the caller belongs to.
+
+    Returns whole records rather than ids so a client can show which group it
+    is acting in without a second call to resolve names.
+    """
+    ids = set(await user_group_ids(user))
+    if not ids:
+        return []
+    return [g.model_dump() for g in await _repo().list_all(limit=500) if g.id in ids]
 
 
 @router.get("/{group_id}", response_model=GroupResponse)

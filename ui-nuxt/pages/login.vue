@@ -1,9 +1,17 @@
 <template>
-  <div class="min-h-screen dm-app overflow-hidden flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative">
+  <div
+    class="min-h-screen dm-app overflow-hidden flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative"
+  >
     <!-- Aesthetic Additions -->
     <div class="bg-noise"></div>
-    <div class="ambient-glow" style="top: -20vh; left: -20vw; width: 80vw; height: 80vh; opacity: 0.6;"></div>
-    <div class="ambient-glow-2" style="bottom: -20vh; right: -20vw; width: 80vw; height: 80vh; opacity: 0.4;"></div>
+    <div
+      class="ambient-glow"
+      style="top: -20vh; left: -20vw; width: 80vw; height: 80vh; opacity: 0.6"
+    ></div>
+    <div
+      class="ambient-glow-2"
+      style="bottom: -20vh; right: -20vw; width: 80vw; height: 80vh; opacity: 0.4"
+    ></div>
 
     <div class="max-w-md w-full space-y-8 z-10">
       <!-- Logo and Header -->
@@ -13,14 +21,18 @@
         >
           <Icon name="lucide:music" class="w-10 h-10 text-white" />
         </div>
-        <h2 class="text-5xl animate-stagger-1 font-bold text-white tracking-tight">DataMetronome</h2>
+        <h2 class="text-5xl animate-stagger-1 font-bold text-white tracking-tight">
+          DataMetronome
+        </h2>
         <p class="mt-2 text-lg text-slate-400 animate-stagger-2 mb-8">
           Sign in to your data quality monitoring platform
         </p>
       </div>
 
       <!-- Login Form -->
-      <UCard class="glass-card animate-stagger-3 !border-slate-800/60 !bg-slate-900/40 !backdrop-blur-xl shadow-2xl">
+      <UCard
+        class="glass-card animate-stagger-3 !border-slate-800/60 !bg-slate-900/40 !backdrop-blur-xl shadow-2xl"
+      >
         <UForm :state="form" :schema="schema" class="space-y-6" @submit="handleLogin">
           <UFormGroup label="Username" name="username">
             <UInput
@@ -56,17 +68,25 @@
             icon="i-heroicons-exclamation-triangle"
           />
 
-          <UButton type="submit" color="primary" size="xl" class="text-lg py-3 font-semibold tracking-wide" block :loading="isLoading">
+          <UButton
+            type="submit"
+            color="primary"
+            size="xl"
+            class="text-lg py-3 font-semibold tracking-wide"
+            block
+            :loading="isLoading"
+          >
             Sign In
           </UButton>
         </UForm>
       </UCard>
-
     </div>
 
     <!-- Forgot Password Modal -->
     <UModal v-model="showForgotPassword">
-      <UCard class="glass-card animate-stagger-3 !border-slate-800/60 !bg-slate-900/40 !backdrop-blur-xl shadow-2xl">
+      <UCard
+        class="glass-card animate-stagger-3 !border-slate-800/60 !bg-slate-900/40 !backdrop-blur-xl shadow-2xl"
+      >
         <template #header>
           <div class="flex items-center justify-between">
             <h3 class="text-2xl font-bold text-white">Reset Password</h3>
@@ -145,6 +165,20 @@ async function handleLogin() {
 onMounted(() => {
   if (authStore.isAuthenticated) {
     navigateTo('/')
+    return
+  }
+
+  // Explain why the session ended, if the API told us. Landing on a blank
+  // login screen looks identical whether the token expired, an admin disabled
+  // the account, or something broke.
+  try {
+    const reason = sessionStorage.getItem('auth_end_reason')
+    if (reason) {
+      errorMessage.value = reason
+      sessionStorage.removeItem('auth_end_reason')
+    }
+  } catch {
+    // sessionStorage unavailable — nothing to show
   }
 })
 

@@ -93,7 +93,7 @@ sufficient (see `core/config.py`).
 | `DATAMETRONOME_HOST` | `0.0.0.0` | Server bind address |
 | `DATAMETRONOME_PORT` | `8001` | Server port |
 | `DATAMETRONOME_SECRET_KEY` | (dev default) | JWT signing key -- must be 32+ chars |
-| `DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | JWT TTL in minutes |
+| `DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | JWT TTL in minutes |
 | `DATAMETRONOME_DATABASE_URL` | `postgresql://testuser:testpass@localhost:5432/datametronome_test` | Primary DB URL |
 | `DATAMETRONOME_ALLOWED_ORIGINS` | `["http://localhost:3000","http://localhost:8501"]` | CORS origins |
 | `DATAMETRONOME_SCHEDULER_ENABLED` | `true` | Enable check scheduler |

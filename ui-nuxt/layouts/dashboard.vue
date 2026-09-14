@@ -154,11 +154,21 @@
 
       <!-- User Footer -->
       <div class="dm-sidebar__footer">
-        <div class="dm-user" :title="collapsed ? user?.name || 'Admin User' : undefined">
-          <UAvatar :src="user?.avatar || undefined" :alt="user?.name || 'Admin'" size="sm" />
+        <div class="dm-user" :title="identityTitle">
+          <UAvatar :src="user?.avatar || undefined" :alt="user?.name || 'Signed in user'" size="sm" />
           <div class="dm-user__info">
-            <span class="dm-user__name">{{ user?.name || 'Admin User' }}</span>
-            <span class="dm-user__email">{{ user?.email || 'admin@datametronome.dev' }}</span>
+            <!-- No hardcoded fallback identity. Showing "Admin User" when the
+                 store has no user makes a dead session look like a live one. -->
+            <span class="dm-user__name">{{ user?.name || '—' }}</span>
+            <span class="dm-user__email">{{ user?.email || 'loading…' }}</span>
+            <!-- Role decides what you can do, group decides which data sources
+                 you can do it to, so both belong next to the name. -->
+            <span class="dm-user__scope">
+              <span class="dm-user__role" :class="`dm-user__role--${user?.role || 'viewer'}`">
+                {{ user?.role || 'viewer' }}
+              </span>
+              <span class="dm-user__group" :title="groupTitle">{{ groupLabel }}</span>
+            </span>
           </div>
           <UDropdown :items="userMenuItems">
             <button class="dm-user__menu-btn">
@@ -344,6 +354,29 @@ function isActive(to: string) {
 // ── Auth / user ──────────────────────────────────────────────────────────────
 const user = computed(() => authStore.user)
 const isAdmin = computed(() => authStore.user?.role === 'admin')
+
+// ── Which groups am I acting in ──────────────────────────────────────────────
+const { groups: myGroups, fetchMyGroups } = useMyGroups()
+
+const groupLabel = computed(() => {
+  // An admin edits across every group, so naming one would be misleading.
+  if (isAdmin.value) return 'all groups'
+  const names = myGroups.value.map((g) => g.name)
+  if (names.length === 0) return 'no group'
+  if (names.length === 1) return names[0]
+  return `${names.length} groups`
+})
+
+const groupTitle = computed(() => {
+  if (isAdmin.value) return 'Admins can edit data sources in every group'
+  const names = myGroups.value.map((g) => g.name)
+  if (names.length === 0) return 'You cannot edit any data source until an admin adds you to a group'
+  return `You can edit data sources owned by: ${names.join(', ')}`
+})
+
+const identityTitle = computed(
+  () => `${user.value?.name || 'Signed in user'} · ${user.value?.role || 'viewer'} · ${groupLabel.value}`,
+)
 const showNotifications = ref(false)
 const showSettings = ref(false)
 const isRefreshing = ref(false)
@@ -456,6 +489,7 @@ function pickStave(id: string | null) {
 onMounted(() => {
   fetchStaves()
   fetchMetrics()
+  fetchMyGroups()
 })
 
 async function refreshData() {
