@@ -49,7 +49,7 @@ DATAMETRONOME_DATABASE_URL=sqlite:///./data/datametronome.db
 | Variable | Default | Description |
 | -------- | ------- | ----------- |
 | `DATAMETRONOME_SECRET_KEY` | *(required)* | Secret key for JWT signing. Must be at least 32 characters. Change this in production. |
-| `DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES` | `30` | How long access tokens remain valid, in minutes. |
+| `DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | How long access tokens remain valid, in minutes. There are no refresh tokens, so expiry logs the user out. |
 
 Generate a secure key:
 

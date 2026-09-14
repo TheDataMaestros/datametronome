@@ -70,4 +70,12 @@ export default defineNuxtRouteMiddleware(async (to) => {
     }
     return navigateTo('/login')
   }
+
+  // A stored token is not proof of a live session. Confirm it once per page
+  // load, otherwise a dead token renders the full app with placeholder
+  // identity and no data, which is indistinguishable from the app being broken.
+  const valid = await authStore.ensureSessionValid()
+  if (!valid) {
+    return navigateTo('/login')
+  }
 })

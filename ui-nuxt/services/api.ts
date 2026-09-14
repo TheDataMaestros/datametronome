@@ -62,11 +62,32 @@ class ApiService {
       }
 
       if (!response.ok) {
-        // Handle 401 Unauthorized (expired token)
+        // Handle 401 Unauthorized. Every 401 the API emits means the session is
+        // finished, but the reasons differ: an expired token, a token signed
+        // with an old key, or an account an admin disabled. Carry the reason to
+        // the login page, because "you are back at login with no explanation"
+        // is impossible to tell apart from a bug.
         if (response.status === 401) {
           const authStore = useAuthStore()
+          const reason =
+            data && typeof data === 'object' && 'detail' in data
+              ? String((data as any).detail)
+              : 'Your session has ended. Please sign in again.'
+
+          // sessionStorage, not the store. useAuthStore() here resolves a
+          // detached Pinia instance, so anything set on it is invisible to the
+          // page. logout() still works because it clears localStorage, which
+          // is global. The route guard uses the store instead, where it runs
+          // inside a real Nuxt context.
+          if (typeof window !== 'undefined') {
+            try {
+              sessionStorage.setItem('auth_end_reason', reason)
+            } catch {
+              // sessionStorage unavailable — the reason is best-effort
+            }
+          }
+
           authStore.logout()
-          // Redirect to login if not already there
           if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
             window.location.href = '/login'
           }

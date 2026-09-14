@@ -544,15 +544,6 @@
             Create Quality Check
           </UButton>
           <UButton
-            color="blue"
-            variant="outline"
-            block
-            icon="i-heroicons-document-text"
-            @click="navigateTo('/reports')"
-          >
-            Generate Report
-          </UButton>
-          <UButton
             color="purple"
             variant="outline"
             block

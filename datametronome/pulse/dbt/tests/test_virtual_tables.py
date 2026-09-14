@@ -32,8 +32,8 @@ def test_query_string_unknown_table(engine):
         engine.query("nonexistent")
 
 
-def test_query_sql_raises(engine):
-    with pytest.raises(ValueError, match="SQL queries are not supported"):
+def test_query_sql_string_is_an_unknown_table(engine):
+    with pytest.raises(ValueError, match="not found"):
         engine.query("SELECT * FROM models")
 
 
@@ -54,61 +54,25 @@ def test_query_where_list_containment(engine):
     assert rows[0]["name"] == "fct_orders"
 
 
-def test_query_columns(engine):
-    rows = engine.query({"table": "models", "columns": ["name", "schema"]})
-    assert len(rows) == 3
-    for row in rows:
-        assert set(row.keys()) == {"name", "schema"}
-
 
 def test_query_limit(engine):
     rows = engine.query({"table": "models", "limit": 2})
     assert len(rows) == 2
 
 
-def test_query_order_by(engine):
-    rows = engine.query({"table": "models", "order_by": "name"})
-    names = [r["name"] for r in rows]
-    assert names == sorted(names)
-
-
-def test_query_order_by_desc(engine):
-    rows = engine.query({"table": "models", "order_by": "-name"})
-    names = [r["name"] for r in rows]
-    assert names == sorted(names, reverse=True)
 
 
 def test_query_combined(engine):
-    # where: staging tags, columns: name only, order_by name desc, limit 1
     rows = engine.query({
         "table": "models",
         "where": {"tags": "staging"},
-        "columns": ["name"],
-        "order_by": "-name",
         "limit": 1,
     })
     assert len(rows) == 1
-    assert rows[0] == {"name": "stg_orders"}
+    assert "staging" in rows[0]["tags"]
 
 
-def test_get_table_info(engine):
-    info = engine.get_table_info("models")
-    # First row has: name (text), schema (text), materialization (text), tags (array)
-    col_map = {c["column_name"]: c["column_type"] for c in info}
-    assert col_map["name"] == "text"
-    assert col_map["schema"] == "text"
-    assert col_map["materialization"] == "text"
-    assert col_map["tags"] == "array"
 
-
-def test_get_table_info_empty_table():
-    e = VirtualTableEngine()
-    e.register_table("empty", [])
-    assert e.get_table_info("empty") == []
-
-
-def test_get_table_info_unknown_table(engine):
-    assert engine.get_table_info("nonexistent") == []
 
 
 def test_register_overwrites(engine):

@@ -42,4 +42,9 @@ limiter = Limiter(
     default_limits=["100 per minute", "1000 per hour"],
     storage_uri=_storage_uri,
     headers_enabled=True,  # Add rate limit headers to responses
+    # Without this, an unreachable Redis makes every rate-limited request
+    # raise, which takes down login along with it. Falling back to per-process
+    # counters loses accuracy across workers and keeps the API serving, which
+    # is the better trade for an outage.
+    in_memory_fallback_enabled=True,
 )

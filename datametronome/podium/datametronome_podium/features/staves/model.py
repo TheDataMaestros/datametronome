@@ -34,6 +34,8 @@ class StaveRow(BaseModel):
     connection_config: str  # JSON string
     is_active: bool = True
     paused: bool = False
+    # Owning group. Writes are restricted to its members; reads are not.
+    group_id: str | None = None
     created_at: str
     updated_at: str
 
@@ -68,6 +70,10 @@ class Stave(BaseModel):
     paused: bool = Field(
         default=False,
         description="Circuit breaker: True when stave has too many consecutive failures",
+    )
+    group_id: str | None = Field(
+        default=None,
+        description="Owning group. Writes are restricted to its members; reads are not.",
     )
     created_at: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),

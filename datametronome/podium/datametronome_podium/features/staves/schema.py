@@ -12,6 +12,9 @@ class StaveCreate(BaseModel):
     data_source_type: str
     connection_config: dict
     is_active: bool = True
+    # Owning group. Optional when the caller belongs to exactly one group,
+    # in which case the router fills it in.
+    group_id: str | None = None
 
     @field_validator("data_source_type")
     @classmethod
@@ -37,5 +40,8 @@ class StaveResponse(BaseModel):
     connection_config: dict | str
     is_active: bool
     paused: bool = False
+    # Without this the API never tells a client which group owns a stave, so
+    # nothing outside the backend can show or manage ownership.
+    group_id: str | None = None
     created_at: str
     updated_at: str

@@ -1,14 +1,13 @@
 """
 Authentication endpoints for DataMetronome Podium.
 
-Route handlers only (login, register, /me, PATCH /me).
+Route handlers only (login, /me, PATCH /me, first-run setup).
 Core auth utilities (get_current_user, create_access_token, security) live in
 datametronome_podium.core.auth so all feature routers can import from one place.
 """
 
 import json
 import logging
-import sqlite3
 from typing import Any
 
 from pydantic import BaseModel
@@ -17,7 +16,6 @@ from datametronome_podium.api.schemas.auth import (
     SetupInit,
     SetupStatus,
     Token,
-    UserCreate,
     UserLogin,
 )
 from datametronome_podium.core.auth import (
@@ -27,8 +25,9 @@ from datametronome_podium.core.auth import (
 )
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.security import get_password_hash, verify_password
+from datametronome_podium.core.rate_limit import limiter
 from datametronome_podium.core.timestamp_utils import now_utc_iso
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -42,42 +41,24 @@ class PatchUserRequest(BaseModel):
     dashboard_prefs: DashboardPrefs
 
 
-def _pg_unique_violation(exc: BaseException | None) -> bool:
-    """Postgres unique violation (asyncpg or SQLSTATE 23505)."""
-    if exc is None:
-        return False
-    try:
-        import asyncpg
-
-        if isinstance(exc, asyncpg.exceptions.UniqueViolationError):
-            return True
-    except ImportError:
-        pass
-    if getattr(exc, "sqlstate", None) == "23505":
-        return True
-    return False
-
-
-def _is_duplicate_user_insert(exc: BaseException) -> bool:
-    """True if the insert failed only because of a uniqueness constraint."""
-    if _pg_unique_violation(exc):
-        return True
-    bc = exc.__cause__
-    if isinstance(bc, BaseException) and _pg_unique_violation(bc):
-        return True
-    if isinstance(exc, sqlite3.IntegrityError):
-        return "unique" in str(exc).lower()
-    if isinstance(bc, sqlite3.IntegrityError):
-        return "unique" in str(bc).lower()
-    lowered = str(exc).lower()
-    return "unique" in lowered or "duplicate" in lowered
-
-
 @router.post("/login", response_model=Token)
-async def login(user_credentials: UserLogin) -> dict[str, str]:
+@limiter.limit("10 per minute")
+async def login(
+    request: Request, response: Response, user_credentials: UserLogin
+) -> dict[str, str]:
     """Authenticate user and return access token.
 
+    Rate limited well below the global default. The global 100 per minute
+    still allows password guessing at a useful rate.
+
+    `request` and `response` are both unused here and both required by
+    slowapi. It reads the caller from the request, and because the limiter
+    runs with headers_enabled it writes the rate-limit headers into the
+    response. Omitting `response` makes every call to this endpoint raise.
+
     Args:
+        request: Incoming request, used by the rate limiter.
+        response: Outgoing response, used by the rate limiter for headers.
         user_credentials: User login credentials.
 
     Returns:
@@ -87,12 +68,21 @@ async def login(user_credentials: UserLogin) -> dict[str, str]:
         HTTPException: If authentication fails.
     """
     users = await get_executor().query(
-        "SELECT username, hashed_password FROM users WHERE username = ?",
+        "SELECT username, hashed_password, is_active FROM users WHERE username = ?",
         [user_credentials.username],
     )
     user = users[0] if users else None
 
     if not user or not verify_password(user_credentials.password, str(user["hashed_password"])):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+        )
+
+    # get_current_user rejects a disabled account on every later request, but
+    # without this check login still hands out a token and answers 200, which
+    # confirms the password was right.
+    if not user["is_active"]:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -104,64 +94,10 @@ async def login(user_credentials: UserLogin) -> dict[str, str]:
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.post("/register", response_model=Token)
-async def register(user_data: UserCreate) -> dict[str, str]:
-    """Register a new user.
-
-    Args:
-        user_data: User registration data.
-
-    Returns:
-        Access token for the new user.
-
-    Raises:
-        HTTPException: If registration fails.
-    """
-    existing_users = await get_executor().query(
-        "SELECT 1 FROM users WHERE username = ?", [user_data.username]
-    )
-    if existing_users:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Username already registered",
-        )
-
-    # Create new user
-    hashed_password = get_password_hash(user_data.password)
-    now = now_utc_iso()
-
-    new_user_data = {
-        "id": user_data.username,  # Use username as ID for simplicity
-        "username": user_data.username,
-        "email": user_data.email,
-        "hashed_password": hashed_password,
-        "is_active": True,
-        "created_at": now,
-        "updated_at": now,
-    }
-
-    try:
-        await get_executor().insert("users", new_user_data)
-    except Exception as e:
-        if _is_duplicate_user_insert(e):
-            logger.warning(
-                "Duplicate user registration (constraint): username=%s",
-                user_data.username,
-            )
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Username already registered",
-            ) from e
-        logger.exception("User insert failed for username=%s", user_data.username)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create user",
-        ) from e
-
-    # Generate access token — expires_delta defaults to settings.access_token_expire_minutes
-    access_token = create_access_token(data={"sub": user_data.username})
-
-    return {"access_token": access_token, "token_type": "bearer"}
+# Self-service registration was removed deliberately. It was public, assigned
+# the default 'viewer' role, and gave anyone who could reach the API read
+# access to every stave. Accounts are created by an admin via POST /users/,
+# or by POST /auth/setup/init for the very first account.
 
 
 @router.get("/me", response_model=dict[str, Any])

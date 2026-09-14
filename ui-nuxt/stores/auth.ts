@@ -59,6 +59,9 @@ export const useAuthStore = defineStore('auth', () => {
   // want to keep the session and let the app fetch/derive user details later.)
   const isAuthenticated = computed(() => !!token.value)
 
+  // Whether this page load has confirmed the stored token is still good.
+  const sessionChecked = ref(false)
+
   async function login(credentials: LoginCredentials): Promise<LoginResult> {
     isLoading.value = true
     error.value = null
@@ -109,7 +112,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function logout(): Promise<void> {
+  /**
+   * End the session.
+   *
+   * Pass redirect: false when the caller is already routing somewhere, such as
+   * the auth middleware. Two navigations to /login mount the page twice, and
+   * the first mount consumes the "why were you signed out" message before the
+   * second one can show it.
+   */
+  async function logout({ redirect = true }: { redirect?: boolean } = {}): Promise<void> {
     isLoading.value = true
 
     try {
@@ -125,7 +136,7 @@ export const useAuthStore = defineStore('auth', () => {
       }
 
       // Navigate to login
-      await navigateTo('/login')
+      if (redirect) await navigateTo('/login')
     } catch (err) {
       console.error('Logout error:', err)
     } finally {
@@ -153,6 +164,39 @@ export const useAuthStore = defineStore('auth', () => {
     } finally {
       isLoading.value = false
     }
+  }
+
+  /**
+   * Confirm the stored token still works, once per page load.
+   *
+   * A token in localStorage only means we had a session at some point. It can
+   * be expired, signed with a rotated key, or belong to an account an admin
+   * disabled. Without this check the app renders the whole logged-in shell on
+   * a dead token, shows placeholder identity, loads nothing, and explains
+   * none of it. Returns true when the session is usable.
+   */
+  async function ensureSessionValid(): Promise<boolean> {
+    if (!token.value) return false
+    if (sessionChecked.value) return true
+
+    const profile = await fetchCurrentUser(token.value)
+    sessionChecked.value = true
+
+    if (!profile) {
+      // The middleware does the redirect, so don't navigate here too.
+      await logout({ redirect: false })
+      // Set after logout, which clears error. The store survives the
+      // client-side route change to /login, so the login page can read it
+      // straight off the store with no sessionStorage round trip.
+      error.value = 'Your session has ended. Please sign in again.'
+      return false
+    }
+
+    user.value = profile
+    if (process.client) {
+      localStorage.setItem('user_info', JSON.stringify(profile))
+    }
+    return true
   }
 
   function initializeAuth(): void {
@@ -193,5 +237,7 @@ export const useAuthStore = defineStore('auth', () => {
     logout,
     refreshUserData,
     initializeAuth,
+    ensureSessionValid,
+    sessionChecked,
   }
 })

@@ -29,8 +29,12 @@ class Settings(BaseSettings):
         min_length=32,
     )
     algorithm: str = "HS256"
+    # 30 minutes logged people out mid-session. There are no refresh tokens, so
+    # expiry means a redirect to the login page rather than a silent renewal.
+    # get_current_user checks is_active against the database on every request,
+    # so disabling an account still cuts a live session off immediately.
     access_token_expire_minutes: int = Field(
-        default=30,
+        default=60,
         validation_alias="DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES",
         ge=1,
     )

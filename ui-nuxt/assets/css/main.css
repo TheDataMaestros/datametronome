@@ -380,6 +380,53 @@ body {
   text-overflow: ellipsis;
 }
 
+/* Role and group sit under the email. Role says what you may do, group says
+   which data sources you may do it to. */
+.dm-user__scope {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  min-width: 0;
+}
+
+.dm-user__role {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  border: 1px solid transparent;
+}
+
+.dm-user__role--admin {
+  color: #fca5a5;
+  background: rgb(239 68 68 / 12%);
+  border-color: rgb(239 68 68 / 35%);
+}
+
+.dm-user__role--editor {
+  color: #93c5fd;
+  background: rgb(59 130 246 / 12%);
+  border-color: rgb(59 130 246 / 35%);
+}
+
+.dm-user__role--viewer {
+  color: var(--dm-text-muted);
+  background: rgb(148 163 184 / 12%);
+  border-color: rgb(148 163 184 / 30%);
+}
+
+.dm-user__group {
+  font-size: 11.5px;
+  color: var(--dm-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .dm-user__menu-btn {
   display: flex;
   align-items: center;

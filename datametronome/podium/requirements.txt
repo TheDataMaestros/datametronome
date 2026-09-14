@@ -1,57 +1,71 @@
+# Podium is a deployable application, not a library, so its dependencies are
+# pinned exactly. With >= ranges a fresh CI run resolves whatever is newest on
+# the day, against code that has not changed. That is how pydantic-ai 1.x to
+# 2.x landed mid-branch and removed OpenAIModel, and how FastAPI 0.141 changed
+# include_router to store lazy wrappers.
+#
+# The pulse connector packages stay on ranges. They are libraries, and pinning
+# a library's dependencies pushes conflicts onto whoever installs it.
+#
+# To bump: change the pin, then run `uv run pytest datametronome/podium/tests/`
+# and `uv run ty check`. Use uv run, not the podium venv, because that is what
+# CI resolves.
+
 # Core web framework
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-python-multipart>=0.0.20
+fastapi==0.141.1
+uvicorn[standard]==0.52.4
+python-multipart==0.0.32
 
 # Data validation and settings
-pydantic>=2.5.0
-pydantic-settings>=2.1.0
+pydantic==2.12.5
+pydantic-settings==2.15.0
 
 # Authentication and security
-python-jose[cryptography]>=3.3.0
-passlib>=1.7.4
+python-jose[cryptography]==3.5.0
+passlib==1.7.4
+# Held at 4.0.1: passlib reads bcrypt.__about__, which 4.1 removed.
 bcrypt==4.0.1
-cryptography>=43.0.0
+cryptography==50.0.1
 
 # Scheduling (minimal)
-apscheduler>=3.10.0
+apscheduler==3.11.3
 
 # Task queue (Celery + RabbitMQ + Redis)
-celery[redis]>=5.3.0
-celery-redbeat>=2.0.0
-redis>=5.0.0
-flower>=2.0.0
+celery[redis]==5.6.3
+celery-redbeat==2.4.2
+redis==6.4.0
+flower==2.1.0
 
 # Monitoring and metrics
-prometheus-client>=0.19.0
+prometheus-client==0.26.0
 
 # Structured logging
-python-json-logger>=2.0.7
+python-json-logger==4.2.0
 
 # Rate limiting
-slowapi>=0.1.9
+slowapi==0.1.10
 
 # YAML configuration
-pyyaml>=6.0
+pyyaml==6.0.2
 
 # Faker is used in production by the generate-data endpoint (not just for tests)
-Faker>=22.0.0
-watchdog>=4.0.0
+Faker==40.38.0
+watchdog==6.0.0
 
 # HTTP client (used by existing endpoints)
-httpx>=0.25.0
+httpx==0.28.1
 
 # Pydantic AI for multi-agent orchestration
-pydantic-ai>=1.0.0
+pydantic-ai==2.43.0
 
-# Database connectors (DataPulse)
+# Database connectors (DataPulse). Local workspace package, installed editable,
+# so this stays a floor rather than a pin.
 metronome-pulse-postgres>=0.1.0
 
 # Migrations (Alembic + async drivers for SQLAlchemy)
-alembic>=1.13.0
-sqlalchemy>=2.0.0
-aiosqlite>=0.20.0
+alembic==1.20.0
+sqlalchemy==2.0.43
+aiosqlite==0.22.1
 
 # Observability (tracing, spans, evals) - Pydantic Logfire
-# 4.31+ pulls OpenTelemetry versions compatible with logfire imports (ReadableLogRecord chain)
-logfire[fastapi,httpx]>=4.31.0
+logfire[fastapi,httpx]==5.1.0
