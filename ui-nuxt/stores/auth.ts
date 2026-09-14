@@ -183,22 +183,12 @@ export const useAuthStore = defineStore('auth', () => {
     sessionChecked.value = true
 
     if (!profile) {
-      // fetchCurrentUser swallows the status, so say something generic rather
-      // than guessing between expiry and a disabled account.
-      if (process.client) {
-        try {
-          if (!sessionStorage.getItem('auth_end_reason')) {
-            sessionStorage.setItem(
-              'auth_end_reason',
-              'Your session has ended. Please sign in again.',
-            )
-          }
-        } catch {
-          // sessionStorage unavailable — the reason is best-effort
-        }
-      }
       // The middleware does the redirect, so don't navigate here too.
       await logout({ redirect: false })
+      // Set after logout, which clears error. The store survives the
+      // client-side route change to /login, so the login page can read it
+      // straight off the store with no sessionStorage round trip.
+      error.value = 'Your session has ended. Please sign in again.'
       return false
     }
 
