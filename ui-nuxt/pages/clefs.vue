@@ -697,13 +697,18 @@ const checkTypeConfigs: Record<string, Record<string, any>> = {
 const fetchCheckTypes = async () => {
   try {
     const response = await clefsService.getAvailableTypes()
+    // The API calls the identifier `name` and the human label `display_name`.
+    // Reading ct.type gave undefined for every template, which set check_type
+    // to undefined on click, so the config form (v-if="newClef.check_type")
+    // never rendered and no clef could be created. It also forced the icon and
+    // default config to fall back for every type.
     clefTemplates.value = response.check_types.map((ct) => ({
-      type: ct.type,
-      name: ct.name,
+      type: ct.name,
+      name: ct.display_name || ct.name,
       description: ct.description,
-      icon: checkTypeIcons[ct.type] || 'i-heroicons-musical-note',
+      icon: checkTypeIcons[ct.name] || 'i-heroicons-musical-note',
       tier: ct.tier,
-      config: checkTypeConfigs[ct.type] || {},
+      config: checkTypeConfigs[ct.name] || {},
     }))
   } catch (error) {
     console.error('Failed to fetch check types:', error)

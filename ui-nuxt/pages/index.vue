@@ -425,11 +425,21 @@
             />
           </div>
         </template>
-        <div class="h-64 flex items-center justify-center">
-          <div class="text-center">
-            <Icon name="i-heroicons-chart-bar" class="w-12 h-12 mx-auto text-gray-400 mb-2" />
-            <p class="text-gray-500">Interactive chart coming soon</p>
-            <p class="text-sm text-gray-400 mt-1">Success Rate: {{ systemMetrics.successRate }}%</p>
+        <div class="h-64">
+          <TrendChart
+            v-if="healthTrend.labels.length"
+            :data="healthTrend"
+            type="line"
+            :show-legend="false"
+          />
+          <div v-else class="h-full flex items-center justify-center text-center">
+            <div>
+              <Icon name="i-heroicons-chart-bar" class="w-12 h-12 mx-auto text-gray-400 mb-2" />
+              <p class="text-gray-500">No checks have run yet</p>
+              <p class="text-sm text-gray-400 mt-1">
+                The trend appears once checks start reporting
+              </p>
+            </div>
           </div>
         </div>
       </UCard>
@@ -448,29 +458,17 @@
             />
           </div>
         </template>
-        <div class="h-64 flex items-center justify-center">
-          <div class="text-center">
-            <Icon name="i-heroicons-chart-pie" class="w-12 h-12 mx-auto text-gray-400 mb-2" />
-            <p class="text-gray-500">Distribution chart coming soon</p>
-            <div class="mt-4 space-y-2">
-              <div class="flex items-center justify-between">
-                <span class="text-sm">Passed:</span>
-                <span class="font-medium text-green-600">
-                  {{ dashboardMetrics?.distribution?.passed ?? 0 }}%
-                </span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-sm">Failed:</span>
-                <span class="font-medium text-red-600">
-                  {{ dashboardMetrics?.distribution?.failed ?? 0 }}%
-                </span>
-              </div>
-              <div class="flex items-center justify-between">
-                <span class="text-sm">Warning:</span>
-                <span class="font-medium text-yellow-600">
-                  {{ dashboardMetrics?.distribution?.warning ?? 0 }}%
-                </span>
-              </div>
+        <div class="h-64">
+          <TrendChart
+            v-if="anomalyDistribution.datasets[0].data.some((n) => n > 0)"
+            :data="anomalyDistribution"
+            type="doughnut"
+          />
+          <div v-else class="h-full flex items-center justify-center text-center">
+            <div>
+              <Icon name="i-heroicons-chart-pie" class="w-12 h-12 mx-auto text-gray-400 mb-2" />
+              <p class="text-gray-500">Nothing to distribute yet</p>
+              <p class="text-sm text-gray-400 mt-1">Run a check to populate this</p>
             </div>
           </div>
         </div>
@@ -611,7 +609,52 @@ const { metrics: dashboardMetrics, fetchMetrics } = useDashboard()
 
 const { loadPrefs } = useDashboardPrefs()
 const { selectedStaveId, scopedDashboard, scopedProfile, isScopedLoading, selectStave } = useSelectedStave()
-const { runAllChecks: apiRunAllChecks } = useClefs()
+const { runAllChecks: apiRunAllChecks, checkResults, fetchLatestResults } = useClefs()
+
+// Both charts read data the page already loads. No new endpoint: the trend is
+// derived from recent check results, the distribution from dashboard metrics.
+const healthTrend = computed(() => {
+  const byDay = new Map<string, { passed: number; total: number }>()
+  for (const check of checkResults.value) {
+    const day = String(check.timestamp).slice(0, 10)
+    const bucket = byDay.get(day) ?? { passed: 0, total: 0 }
+    bucket.total += 1
+    if (check.status === 'pass') bucket.passed += 1
+    byDay.set(day, bucket)
+  }
+
+  const days = [...byDay.keys()].sort()
+  return {
+    labels: days,
+    datasets: [
+      {
+        label: 'Pass rate %',
+        data: days.map((day) => {
+          const bucket = byDay.get(day)!
+          return Math.round((bucket.passed / bucket.total) * 100)
+        }),
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34, 197, 94, 0.15)',
+        tension: 0.3,
+        fill: true,
+      },
+    ],
+  }
+})
+
+const anomalyDistribution = computed(() => {
+  const d = dashboardMetrics.value?.distribution
+  return {
+    labels: ['Passed', 'Failed', 'Warning'],
+    datasets: [
+      {
+        label: 'Checks',
+        data: [d?.passed ?? 0, d?.failed ?? 0, d?.warning ?? 0],
+        backgroundColor: ['#22c55e', '#ef4444', '#eab308'],
+      },
+    ],
+  }
+})
 
 const isRunningChecks = ref(false)
 
@@ -892,13 +935,11 @@ async function refreshData() {
 }
 
 async function refreshHealthChart() {
-  // Simulate API call to refresh health chart data
-  await new Promise((resolve) => setTimeout(resolve, 500))
+  await fetchLatestResults(200)
 }
 
 async function refreshAnomalyChart() {
-  // Simulate API call to refresh anomaly chart data
-  await new Promise((resolve) => setTimeout(resolve, 500))
+  await fetchMetrics()
 }
 
 function exportDashboard() {
@@ -924,6 +965,7 @@ onMounted(() => {
   fetchStaves()
   fetchLatest(20)
   fetchMetrics()
+  fetchLatestResults(200)
   loadPrefs()
 })
 </script>
