@@ -2,10 +2,10 @@ name: DataMetronome CI
 
 on:
   push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
+    branches: [main, develop]
+    tags: ["v*"]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   quality-and-test:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.12', '3.13']
+        python-version: ["3.12", "3.13"]
 
     services:
       postgres:
@@ -96,7 +96,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
           cache: npm
           cache-dependency-path: ui-nuxt/package-lock.json
 
@@ -106,12 +106,105 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Test
+        run: npm run test
+
       - name: Build
         run: npm run build
 
+  stack:
+    name: Stack Boots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The unit suites never compose these containers together, so a stack
+      # that cannot start looks green. This is how the API and the worker came
+      # to disagree on SECRET_KEY: each one worked alone, and every check died
+      # with InvalidToken because the Fernet key derives from it.
+      - name: Write a .env with generated keys
+        run: |
+          cp env.example .env
+          {
+            echo "DATAMETRONOME_SECRET_KEY=$(openssl rand -hex 32)"
+            echo "DATAMETRONOME_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+            echo "DATAMETRONOME_DEBUG=true"
+          } >> .env
+
+      - name: Start the stack with workers
+        run: docker compose --profile full --profile worker up -d --build
+
+      - name: Wait for the API to report healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8001/health > /dev/null; then
+              echo "healthy after ${i}0s"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "API never became healthy"
+          docker compose ps -a
+          docker compose logs --tail 100
+          exit 1
+
+      - name: Seed and run a check end to end
+        run: |
+          docker compose exec -T podium sh -c \
+            "cd /app/datametronome/podium && python scripts/seed_dev.py"
+          docker compose exec -T podium python - <<'PY'
+          import asyncio, json, sys, urllib.request, urllib.error, time
+
+          API = "http://localhost:8001/api/v1"
+
+          def call(method, path, token=None, body=None):
+              req = urllib.request.Request(f"{API}{path}", method=method)
+              req.add_header("Content-Type", "application/json")
+              if token:
+                  req.add_header("Authorization", f"Bearer {token}")
+              data = json.dumps(body).encode() if body is not None else None
+              try:
+                  with urllib.request.urlopen(req, data, timeout=60) as r:
+                      return r.status, json.loads(r.read() or b"null")
+              except urllib.error.HTTPError as e:
+                  return e.code, None
+
+          status, payload = call("POST", "/auth/login", body={
+              "username": "demo-admin", "password": "devpassword123"})
+          assert status == 200, f"seeded account cannot sign in: {status}"
+          token = payload["access_token"]
+
+          status, clefs = call("GET", "/clefs/", token)
+          assert clefs, "seed produced no clefs"
+          clef = clefs[0]
+
+          status, _ = call("POST", f"/clefs/{clef['id']}/run-now", token)
+          assert status == 202, f"run-now returned {status}"
+
+          # The worker has to pick it up, execute it, and store a result. That
+          # exercises credential decryption across container boundaries.
+          for _ in range(24):
+              time.sleep(5)
+              _, results = call("GET", "/clefs/results/latest?limit=5", token)
+              if results and results.get("count"):
+                  print("check result:", results["results"][0]["message"])
+                  sys.exit(0)
+
+          print("no check result within 120s", file=sys.stderr)
+          sys.exit(1)
+          PY
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --tail 200
+
+      - name: Tear down
+        if: always()
+        run: docker compose --profile full --profile worker down -v
+
   release:
     name: Build & Release
-    needs: [quality-and-test, frontend]
+    needs: [quality-and-test, frontend, stack]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:

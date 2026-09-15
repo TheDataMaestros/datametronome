@@ -17,7 +17,6 @@ from datametronome_podium.features.clefs.model import SUPPORTED_CHECK_TYPES, Cle
 from datametronome_podium.features.staves.model import SUPPORTED_DATA_SOURCES, Stave
 from datametronome_podium.services.stave_service import (
     create_clef,
-    create_mysql_stave,
     create_null_check,
     create_postgres_stave,
     create_range_check,
@@ -83,39 +82,6 @@ class TestStaveCreationExamples:
         assert stave.data_source_type == "sqlite"
         assert stave.connection_config["path"] == "/data/analytics.db"
         assert stave.is_active is True
-        print(f"\nCreated: {stave}")
-
-    def test_create_mysql_stave_example(self):
-        """Example: Create a MySQL stave."""
-        stave = create_mysql_stave(
-            name="MySQL Application DB",
-            host="mysql.example.com",
-            database="app_db",
-            user="readonly_user",
-            password="password123",
-            port=3306,
-        )
-
-        assert stave.name == "MySQL Application DB"
-        assert stave.data_source_type == "mysql"
-        assert stave.connection_config["host"] == "mysql.example.com"
-        assert stave.connection_config["port"] == 3306
-        print(f"\nCreated: {stave}")
-
-    def test_create_generic_stave_example(self):
-        """Example: Create a stave for any data source type."""
-        # For more control, use the generic create_stave function
-        stave = create_stave(
-            name="Redis Cache",
-            data_source_type="redis",
-            connection_config={"host": "redis.example.com", "port": 6379, "db": 0},
-            description="Production Redis cache",
-            is_active=True,
-        )
-
-        assert stave.name == "Redis Cache"
-        assert stave.data_source_type == "redis"
-        assert stave.connection_config["host"] == "redis.example.com"
         print(f"\nCreated: {stave}")
 
     def test_inactive_stave_example(self):

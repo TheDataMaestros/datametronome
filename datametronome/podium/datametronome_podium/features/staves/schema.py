@@ -1,9 +1,10 @@
 """Stave API DTOs."""
 from pydantic import BaseModel, field_validator
 
-VALID_DATA_SOURCE_TYPES = [
-    "postgres", "mysql", "mongodb", "sqlite", "redis", "snowflake", "bigquery", "dbt"
-]
+# Only types create_connector can actually build. A stave whose type has no
+# connector can be created and can even pass a connection test, but every check
+# against it fails, which is worse than not offering it.
+VALID_DATA_SOURCE_TYPES = ["postgres", "sqlite", "bigquery", "dbt"]
 
 
 class StaveCreate(BaseModel):
