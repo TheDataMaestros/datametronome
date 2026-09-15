@@ -1,6 +1,13 @@
 export default defineNuxtConfig({
   devtools: { enabled: false },
   compatibilityDate: '2025-10-16',
+  // Every page here sits behind a login and reads a token from localStorage,
+  // which the server cannot see. Server rendering therefore produced a
+  // logged-out, empty version of each page first: placeholder identity, zero
+  // counts, "No data sources found", followed by hydration mismatches when the
+  // client corrected it. Rendering purely on the client removes that whole
+  // class of flicker and mismatch. There is nothing public to pre-render.
+  ssr: false,
   modules: ['@nuxt/ui', '@nuxtjs/color-mode', '@pinia/nuxt', '@vueuse/nuxt'],
   css: ['~/assets/css/main.css'],
   colorMode: {

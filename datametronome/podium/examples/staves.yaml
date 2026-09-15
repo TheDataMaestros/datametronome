@@ -25,41 +25,6 @@ staves:
       path: /data/analytics.db
     is_active: true
 
-  # MySQL Database
-  - id: stave-app-mysql-001
-    name: Application MySQL
-    description: MySQL database for application backend
-    data_source_type: mysql
-    connection_config:
-      host: mysql.example.com
-      port: 3306
-      database: app_db
-      user: readonly_user
-      password: ${MYSQL_PASSWORD}
-    is_active: true
-
-  # Redis Cache
-  - id: stave-cache-redis-001
-    name: Production Cache
-    description: Redis cache for session data
-    data_source_type: redis
-    connection_config:
-      host: redis.example.com
-      port: 6379
-      db: 0
-      password: ${REDIS_PASSWORD}
-      ssl: true
-    is_active: true
-
-  # MongoDB
-  - id: stave-docs-mongo-001
-    name: Document Store
-    description: MongoDB for document storage
-    data_source_type: mongodb
-    connection_config:
-      uri: mongodb://user:${MONGO_PASSWORD}@mongo.example.com:27017/
-      database: documents
-    is_active: true
 
 # Clefs (Data Quality Checks)
 clefs:

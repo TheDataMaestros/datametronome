@@ -57,7 +57,10 @@ services:
     ports:
       - "8001:8001"
     environment:
-      - DATAMETRONOME_SECRET_KEY=your-super-secret-key-that-is-at-least-32-characters-long
+      # No SECRET_KEY here on purpose. It comes from .env, which the worker and
+      # beat also read. Setting it only on this service gave the API one key
+      # and the worker another, and since the Fernet key for stave credentials
+      # is derived from it, every check failed with InvalidToken.
       - DATAMETRONOME_DATABASE_URL=postgresql://testuser:testpass@postgres:5432/datametronome_test
       - DATAMETRONOME_DEBUG=true
       - DATAMETRONOME_HOST=0.0.0.0

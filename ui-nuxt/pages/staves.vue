@@ -179,7 +179,7 @@
             <h4 class="font-semibold text-sm">Connection Settings</h4>
 
             <!-- PostgreSQL / MySQL -->
-            <template v-if="['postgres', 'mysql'].includes(newStaveForm.data_source_type)">
+            <template v-if="newStaveForm.data_source_type === 'postgres'">
               <UFormGroup label="Host" name="host" required>
                 <UInput v-model="connectionFields.host" placeholder="localhost" />
               </UFormGroup>
@@ -361,73 +361,8 @@
               </template>
             </template>
 
-            <!-- MongoDB -->
-            <template v-else-if="newStaveForm.data_source_type === 'mongodb'">
-              <UFormGroup label="Connection URI" name="uri" required>
-                <UInput
-                  v-model="connectionFields.uri"
-                  placeholder="mongodb://user:pass@host:27017/"
-                />
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Full MongoDB connection URI
-                </p>
-              </UFormGroup>
-              <UFormGroup label="Database" name="database" required>
-                <UInput v-model="connectionFields.database" placeholder="mydb" />
-              </UFormGroup>
-            </template>
 
-            <!-- Redis -->
-            <template v-else-if="newStaveForm.data_source_type === 'redis'">
-              <UFormGroup label="Host" name="host" required>
-                <UInput v-model="connectionFields.host" placeholder="localhost" />
-              </UFormGroup>
-              <UFormGroup label="Port" name="port">
-                <UInput v-model.number="connectionFields.port" type="number" placeholder="6379" />
-              </UFormGroup>
-              <UFormGroup label="Database Number" name="db">
-                <UInput v-model.number="connectionFields.db" type="number" placeholder="0" />
-              </UFormGroup>
-              <UFormGroup label="Password" name="password">
-                <UInput
-                  v-model="connectionFields.password"
-                  type="password"
-                  placeholder="password (optional)"
-                />
-              </UFormGroup>
-            </template>
 
-            <!-- Snowflake -->
-            <template v-else-if="newStaveForm.data_source_type === 'snowflake'">
-              <UFormGroup label="Account" name="account" required>
-                <UInput v-model="connectionFields.account" placeholder="abc12345.us-east-1" />
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Your Snowflake account identifier
-                </p>
-              </UFormGroup>
-              <UFormGroup label="Username" name="user" required>
-                <UInput v-model="connectionFields.user" placeholder="username" />
-              </UFormGroup>
-              <UFormGroup label="Password" name="password" required>
-                <UInput
-                  v-model="connectionFields.password"
-                  type="password"
-                  placeholder="password"
-                />
-              </UFormGroup>
-              <UFormGroup label="Warehouse" name="warehouse" required>
-                <UInput v-model="connectionFields.warehouse" placeholder="COMPUTE_WH" />
-              </UFormGroup>
-              <UFormGroup label="Database" name="database" required>
-                <UInput v-model="connectionFields.database" placeholder="ANALYTICS" />
-              </UFormGroup>
-              <UFormGroup label="Schema" name="schema">
-                <UInput v-model="connectionFields.schema" placeholder="PUBLIC" />
-              </UFormGroup>
-              <UFormGroup label="Role" name="role">
-                <UInput v-model="connectionFields.role" placeholder="MONITOR_ROLE" />
-              </UFormGroup>
-            </template>
           </div>
 
           <UFormGroup label="Active" name="is_active">
@@ -646,11 +581,7 @@ const selectedStave = ref(null)
 
 const dataSourceTypes = [
   { label: 'PostgreSQL', value: 'postgres' },
-  { label: 'MySQL', value: 'mysql' },
-  { label: 'MongoDB', value: 'mongodb' },
   { label: 'SQLite', value: 'sqlite' },
-  { label: 'Redis', value: 'redis' },
-  { label: 'Snowflake', value: 'snowflake' },
   { label: 'BigQuery', value: 'bigquery' },
   { label: 'dbt', value: 'dbt' },
 ]
@@ -755,11 +686,7 @@ const staveColumns = [
 function getDataSourceTypeColor(type: string) {
   const colors: Record<string, string> = {
     postgres: 'blue',
-    mysql: 'orange',
-    mongodb: 'green',
     sqlite: 'purple',
-    redis: 'red',
-    snowflake: 'cyan',
     bigquery: 'yellow',
     dbt: 'orange',
   }
@@ -826,7 +753,7 @@ function buildConnectionConfig(): Record<string, any> {
   const fields = connectionFields.value
   const config: Record<string, any> = {}
 
-  if (['postgres', 'mysql'].includes(type)) {
+  if (type === 'postgres') {
     config.host = fields.host
     if (fields.port) config.port = Number(fields.port)
     config.database = fields.database
@@ -855,23 +782,7 @@ function buildConnectionConfig(): Record<string, any> {
       config.project_path = fields.project_path
       if (fields.target_path) config.target_path = fields.target_path
     }
-  } else if (type === 'mongodb') {
-    config.uri = fields.uri
-    config.database = fields.database
-  } else if (type === 'redis') {
-    config.host = fields.host
-    if (fields.port) config.port = Number(fields.port)
-    if (fields.db !== undefined) config.db = Number(fields.db)
-    if (fields.password) config.password = fields.password
-  } else if (type === 'snowflake') {
-    config.account = fields.account
-    config.user = fields.user
-    config.password = fields.password
-    config.warehouse = fields.warehouse
-    config.database = fields.database
-    if (fields.schema) config.schema = fields.schema
-    if (fields.role) config.role = fields.role
-  }
+        }
 
   // Remove undefined/null values
   return Object.fromEntries(
@@ -883,7 +794,7 @@ function validateConnectionConfig(): string | null {
   const type = newStaveForm.value.data_source_type
   const fields = connectionFields.value
 
-  if (['postgres', 'mysql'].includes(type)) {
+  if (type === 'postgres') {
     if (!fields.host) return 'Host is required'
     if (!fields.database) return 'Database is required'
     if (!fields.user) return 'Username is required'
@@ -903,18 +814,7 @@ function validateConnectionConfig(): string | null {
     } else if (!fields.project_path) {
       return 'Project path is required for local mode'
     }
-  } else if (type === 'mongodb') {
-    if (!fields.uri) return 'Connection URI is required'
-    if (!fields.database) return 'Database is required'
-  } else if (type === 'redis') {
-    if (!fields.host) return 'Host is required'
-  } else if (type === 'snowflake') {
-    if (!fields.account) return 'Account is required'
-    if (!fields.user) return 'Username is required'
-    if (!fields.password) return 'Password is required'
-    if (!fields.warehouse) return 'Warehouse is required'
-    if (!fields.database) return 'Database is required'
-  }
+        }
 
   return null
 }
