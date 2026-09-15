@@ -181,3 +181,75 @@ class TestLoginEndpoint:
 
         assert response.status_code == 401
         assert "access_token" not in response.json()
+
+
+class TestChangeOwnPassword:
+    """A signed-in user changing their own password."""
+
+    @staticmethod
+    def _client(user):
+        from fastapi import FastAPI
+        from fastapi.testclient import TestClient
+
+        from datametronome_podium.core.auth import get_current_user
+        from datametronome_podium.core.rate_limit import limiter
+        from datametronome_podium.features.auth.router import router
+
+        app = FastAPI()
+        app.state.limiter = limiter
+        app.include_router(router, prefix="/auth")
+        app.dependency_overrides[get_current_user] = lambda: user
+        return TestClient(app)
+
+    @staticmethod
+    def _executor(stored_password):
+        from datametronome_podium.core.security import get_password_hash
+
+        executor = AsyncMock()
+        executor.query = AsyncMock(
+            return_value=[{"hashed_password": get_password_hash(stored_password)}]
+        )
+        executor.execute = AsyncMock()
+        return executor
+
+    def _post(self, body, stored_password="correct-horse", user=None):
+        executor = self._executor(stored_password)
+        client = self._client(user or {"username": "alice", "role": "viewer"})
+        with patch(
+            "datametronome_podium.features.auth.router.get_executor",
+            return_value=executor,
+        ):
+            return client.post("/auth/me/password", json=body), executor
+
+    def test_correct_current_password_updates_the_hash(self):
+        response, executor = self._post(
+            {"current_password": "correct-horse", "new_password": "battery-staple"}
+        )
+
+        assert response.status_code == 200
+        executor.execute.assert_awaited_once()
+
+    def test_wrong_current_password_is_refused(self):
+        """A stolen token alone must not be enough to take over the account."""
+        response, executor = self._post(
+            {"current_password": "guessing", "new_password": "battery-staple"}
+        )
+
+        assert response.status_code == 401
+        executor.execute.assert_not_awaited()
+
+    def test_reusing_the_current_password_is_refused(self):
+        response, executor = self._post(
+            {"current_password": "correct-horse", "new_password": "correct-horse"}
+        )
+
+        assert response.status_code == 400
+        executor.execute.assert_not_awaited()
+
+    def test_short_new_password_is_refused_before_any_write(self):
+        response, executor = self._post(
+            {"current_password": "correct-horse", "new_password": "short"}
+        )
+
+        assert response.status_code == 422
+        executor.execute.assert_not_awaited()

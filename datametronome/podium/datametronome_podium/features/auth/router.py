@@ -13,6 +13,7 @@ from typing import Any
 from pydantic import BaseModel
 
 from datametronome_podium.api.schemas.auth import (
+    PasswordChange,
     SetupInit,
     SetupStatus,
     Token,
@@ -163,6 +164,51 @@ async def patch_current_user(
         "role": current_user.get("role", "viewer"),
         "dashboard_prefs": prefs_to_save,
     }
+
+
+@router.post("/me/password")
+@limiter.limit("5 per minute")
+async def change_own_password(
+    request: Request,
+    response: Response,
+    body: PasswordChange,
+    current_user: dict[str, Any] = Depends(get_current_user),
+) -> dict[str, str]:
+    """Change the signed-in user's own password.
+
+    Requires the current password, so holding a stolen token is not enough to
+    take the account over. Admins can still reset a forgotten one through
+    POST /users/{id}/reset-password.
+
+    `request` and `response` are required by the rate limiter, not used here.
+    """
+    users = await get_executor().query(
+        "SELECT hashed_password FROM users WHERE username = ?",
+        [current_user["username"]],
+    )
+    if not users:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+
+    if not verify_password(body.current_password, str(users[0]["hashed_password"])):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Current password is incorrect",
+        )
+
+    if body.new_password == body.current_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="New password must differ from the current one",
+        )
+
+    await get_executor().execute(
+        "UPDATE users SET hashed_password = ?, updated_at = ? WHERE username = ?",
+        [get_password_hash(body.new_password), now_utc_iso(), current_user["username"]],
+    )
+    logger.info("Password changed for user %s", current_user["username"])
+    return {"message": "Password updated"}
 
 
 @router.get("/setup/status", response_model=SetupStatus)

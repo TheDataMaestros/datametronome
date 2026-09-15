@@ -49,3 +49,10 @@ class SetupInit(BaseModel):
     username: str = Field(..., min_length=3, max_length=100)
     email: str = Field(..., pattern=r"^[^@]+@[^@]+\.[^@]+$")
     password: str = Field(..., min_length=8)
+
+
+class PasswordChange(BaseModel):
+    """Request body for a user changing their own password."""
+
+    current_password: str
+    new_password: str = Field(..., min_length=8)
