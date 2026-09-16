@@ -995,65 +995,6 @@ class ClefExecutor:
         except (ValueError, TypeError):
             return False
 
-    async def _execute_data_profile_drift_check(
-        self, clef: Clef, stave: Stave, db_connector: Any = None
-    ) -> CheckResult:
-        """Execute data profile drift check (TDD Level 3: Advanced Declarative)."""
-        try:
-            # For now, return a mock result since this is a complex ML-based check
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="pass",
-                observed_value=0.05,
-                message="Data profile drift check passed: minimal drift detected",
-                metadata={
-                    "check_type": "data_profile_drift",
-                    "drift_score": 0.05,
-                    "threshold": 0.1,
-                    "note": "Mock implementation - would use ML models in production",
-                },
-            )
-        except Exception as e:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Data profile drift check failed: {str(e)}",
-                metadata={"error": str(e)},
-            )
-
-    async def _execute_forecast_check(
-        self, clef: Clef, stave: Stave, db_connector: Any = None
-    ) -> CheckResult:
-        """Execute forecast check (TDD Level 2: Intelligent)."""
-        try:
-            # For now, return a mock result since this is a complex ML-based check
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="pass",
-                observed_value=1250,
-                message="Forecast check passed: data volume within expected range",
-                metadata={
-                    "check_type": "forecast",
-                    "predicted_value": 1250,
-                    "actual_value": 1200,
-                    "confidence": 95,
-                    "note": "Mock implementation - would use SARIMA models in production",
-                },
-            )
-        except Exception as e:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Forecast check failed: {str(e)}",
-                metadata={"error": str(e)},
-            )
-
     async def _execute_lookup_validation_check(
         self, clef: Clef, stave: Stave, db_connector: Any = None
     ) -> CheckResult:
