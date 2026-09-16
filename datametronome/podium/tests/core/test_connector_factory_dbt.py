@@ -12,12 +12,18 @@ class TestBuildDbtConnector:
     """Test _build_connector with dst='dbt'."""
 
     def test_dispatches_to_dbt_builder(self):
-        with patch("datametronome_podium.core.connector_factory._build_dbt_connector") as mock_build:
-            mock_build.return_value = MagicMock()
+        # Patch the dispatch table, not the module attribute. BUILDERS holds
+        # the function object, captured at import, so rebinding the name no
+        # longer changes what dispatch calls.
+        from datametronome_podium.core.connector_factory import BUILDERS
+
+        mock_build = MagicMock(return_value=MagicMock())
+        with patch.dict(BUILDERS, {"dbt": mock_build}):
             _build_connector("dbt", {"mode": "local", "project_path": "/tmp"}, read_only=True)
-            mock_build.assert_called_once_with(
-                {"mode": "local", "project_path": "/tmp"}, read_only=True
-            )
+
+        mock_build.assert_called_once_with(
+            {"mode": "local", "project_path": "/tmp"}, read_only=True
+        )
 
     def test_dbt_read_only_false_raises(self):
         with pytest.raises(ValueError, match="read-only"):

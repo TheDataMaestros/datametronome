@@ -64,20 +64,10 @@ def _build_connector(
     Kept separate from create_connector so that unit tests can patch the
     lazy imports or inject mock classes without having to await anything.
     """
-    if dst in ("postgres", "postgresql"):
-        return _build_postgres_connector(config, read_only=read_only)
-    elif dst == "redshift":
-        return _build_redshift_connector(config, read_only=read_only)
-    elif dst == "sqlite":
-        return _build_sqlite_connector(config, read_only=read_only)
-    elif dst == "bigquery":
-        return _build_bigquery_connector(config, read_only=read_only)
-    elif dst == "s3":
-        return _build_s3_connector(config, read_only=read_only)
-    elif dst == "dbt":
-        return _build_dbt_connector(config, read_only=read_only)
-    else:
+    builder = BUILDERS.get(dst)
+    if builder is None:
         raise ValueError(f"Unsupported data source type: {dst!r}")
+    return builder(config, read_only=read_only)
 
 
 def _build_postgres_connector(config: dict[str, Any], *, read_only: bool) -> Any:
@@ -193,3 +183,17 @@ def _build_dbt_connector(config: dict[str, Any], *, read_only: bool) -> Any:
         job_id=config.get("job_id", ""),
         base_url=config.get("base_url", "https://cloud.getdbt.com/api/v2"),
     )
+
+
+# One entry per data source type. Keys must match
+# features.staves.model.SUPPORTED_DATA_SOURCES; test_data_source_coverage.py
+# asserts that, so a type cannot be accepted by the API with no way to connect.
+BUILDERS = {
+    "postgres": _build_postgres_connector,
+    "postgresql": _build_postgres_connector,
+    "redshift": _build_redshift_connector,
+    "sqlite": _build_sqlite_connector,
+    "bigquery": _build_bigquery_connector,
+    "s3": _build_s3_connector,
+    "dbt": _build_dbt_connector,
+}
