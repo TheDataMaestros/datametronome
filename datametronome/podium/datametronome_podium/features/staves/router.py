@@ -24,15 +24,16 @@ from datametronome_podium.core.redis import get_redis_client
 from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.features.staves.model import StaveRow as Stave
 from datametronome_podium.features.staves.repo import StaveRepo
-from datametronome_podium.features.staves.schema import StaveCreate, StaveUpdate, StaveResponse
+from datametronome_podium.features.staves.schema import (
+    VALID_DATA_SOURCE_TYPES,
+    StaveCreate,
+    StaveUpdate,
+    StaveResponse,
+)
 import datametronome_podium.features.staves.service as stave_svc
 
 router = APIRouter()
 
-# Only types create_connector can actually build. A stave whose type has no
-# connector can be created and can even pass a connection test, but every check
-# against it fails, which is worse than not offering it.
-VALID_DATA_SOURCE_TYPES = ["postgres", "sqlite", "bigquery", "dbt"]
 
 
 def _dispatch_auto_scan(stave_id: str) -> None:
@@ -137,6 +138,13 @@ async def get_staves(skip: int = 0, limit: int = 100, _user: dict = Depends(get_
 
 @router.get("/types")
 async def get_stave_types(_user: dict = Depends(get_current_user)):
+    """The types a stave can be created with.
+
+    Served from the schema's list rather than a copy. This endpoint used to
+    keep its own, which drifted: it still advertised only postgres, sqlite,
+    bigquery and dbt after redshift and s3 shipped, so a client building a
+    picker from it could not offer them.
+    """
     return VALID_DATA_SOURCE_TYPES
 
 

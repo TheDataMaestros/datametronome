@@ -8,7 +8,7 @@ them. These tests compare them.
 
 import pytest
 
-from datametronome_podium.core.connector_factory import _build_connector
+from datametronome_podium.core.connector_factory import BUILDERS, _build_connector
 from datametronome_podium.core.sql_dialect import dialect_for
 from datametronome_podium.features.staves.model import SUPPORTED_DATA_SOURCES
 from datametronome_podium.features.staves.schema import VALID_DATA_SOURCE_TYPES
@@ -24,19 +24,31 @@ def test_the_api_accepts_what_the_model_supports():
     assert set(VALID_DATA_SOURCE_TYPES) <= set(SUPPORTED_DATA_SOURCES)
 
 
+def test_the_types_endpoint_advertises_every_type_it_accepts():
+    """GET /staves/types must not keep its own copy of the list.
+
+    It did, and the copy drifted: it still returned postgres, sqlite, bigquery
+    and dbt after redshift and s3 shipped. Creation worked, because the schema
+    gates that, so nothing failed. A client building a picker from the endpoint
+    simply could not offer the new types.
+    """
+    from datametronome_podium.features.staves import router
+
+    assert router.VALID_DATA_SOURCE_TYPES is VALID_DATA_SOURCE_TYPES
+
+
 @pytest.mark.parametrize("source", SUPPORTED_DATA_SOURCES)
 def test_every_supported_source_can_be_built(source):
-    # A missing branch raises ValueError. A missing package raises ImportError
-    # or KeyError for absent config, which both mean the branch exists.
-    try:
-        _build_connector(source, {}, read_only=True)
-    except ValueError as e:
-        if "Unsupported data source type" in str(e):
-            raise AssertionError(
-                f"connector_factory has no branch for {source}"
-            ) from e
-    except (KeyError, ImportError, RuntimeError):
-        pass
+    # Membership, not construction. Building a BigQueryPulse reaches out to the
+    # GCP metadata server for credential discovery, which took 33 seconds and
+    # blew the suite timeout. Whether the factory knows the type is the
+    # question here; the per-connector tests cover config mapping.
+    assert source in BUILDERS, f"connector_factory has no builder for {source}"
+
+
+def test_an_unknown_source_is_rejected():
+    with pytest.raises(ValueError, match="Unsupported data source type"):
+        _build_connector("cassandra", {}, read_only=True)
 
 
 @pytest.mark.parametrize("source", SUPPORTED_DATA_SOURCES)
