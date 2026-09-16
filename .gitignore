@@ -340,3 +340,7 @@ docs/superpowers/
 
 # Superpowers brainstorm artifacts
 .superpowers/
+
+# Claude Code skills plugin state
+.agents/
+skills-lock.json

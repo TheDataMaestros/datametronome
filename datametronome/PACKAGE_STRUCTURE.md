@@ -12,7 +12,6 @@ These are Python libraries that can be installed via `pip install`:
 - **`pulse/sqlite/`** - `metronome-pulse-sqlite` - SQLite connector
 
 ### Database Adapters
-- **`pulse/postgres-sqlalchemy/`** - `metronome-pulse-postgres-sqlalchemy` - SQLAlchemy-based PostgreSQL
 - **`pulse/postgres-psycopg3/`** - `metronome-pulse-postgres-psycopg3` - psycopg3-based PostgreSQL
 
 ## 🏠 Standalone Applications (NOT PyPI Packages)

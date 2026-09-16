@@ -29,9 +29,10 @@ import datametronome_podium.features.staves.service as stave_svc
 
 router = APIRouter()
 
-VALID_DATA_SOURCE_TYPES = [
-    "postgres", "mysql", "mongodb", "sqlite", "redis", "snowflake", "bigquery", "dbt"
-]
+# Only types create_connector can actually build. A stave whose type has no
+# connector can be created and can even pass a connection test, but every check
+# against it fails, which is worse than not offering it.
+VALID_DATA_SOURCE_TYPES = ["postgres", "sqlite", "bigquery", "dbt"]
 
 
 def _dispatch_auto_scan(stave_id: str) -> None:

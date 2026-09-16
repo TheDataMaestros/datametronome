@@ -42,7 +42,6 @@ dev = [
 [tool.ty.environment]
 extra-paths = [
     "datametronome/pulse/core",
-    "datametronome/pulse/postgres-sqlalchemy",
     "datametronome/pulse/bigquery",
     "datametronome/pulse/sqlite",
     "datametronome/pulse/postgres",

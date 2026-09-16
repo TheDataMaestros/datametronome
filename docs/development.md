@@ -17,7 +17,6 @@ datametronome/
 │   │   ├── sqlite/             #   SQLite connector
 │   │   ├── postgres/           #   PostgreSQL connector (asyncpg)
 │   │   ├── postgres-psycopg3/  #   PostgreSQL connector (psycopg3)
-│   │   ├── postgres-sqlalchemy/#   PostgreSQL connector (SQLAlchemy)
 │   │   ├── bigquery/           #   BigQuery connector
 │   │   └── api/                #   API-based connector
 │   ├── podium/                 # FastAPI backend (main application)

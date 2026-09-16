@@ -12,7 +12,9 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "postinstall": "nuxt prepare",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.69",
@@ -23,7 +25,8 @@
     "eslint": "^9.0.0",
     "nuxt": "^3.8.0",
     "prettier": "^3.0.0",
-    "typescript": "^5.2.2"
+    "typescript": "^5.2.2",
+    "vitest": "^2.1.9"
   },
   "dependencies": {
     "@nuxtjs/color-mode": "^3.3.0",

@@ -159,6 +159,5 @@ clefs:
 
 ## 📚 More Information
 
-- Full integration guide: `BIGQUERY_INTEGRATION.md`
-- YAML examples: `example_bigquery_quality_check.yaml`
-- API documentation: `datametronome/podium/API_IMPORT_GUIDE.md`
+- YAML examples: `datametronome/podium/examples/`
+- API docs: `http://localhost:8001/docs` when Podium is running

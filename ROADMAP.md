@@ -29,7 +29,7 @@ developer experience.
 
 ### Connectors (Pulse)
 - `core` — shared protocol and base classes
-- `postgres`, `postgres-psycopg3`, `postgres-sqlalchemy`
+- `postgres` (asyncpg), `postgres-psycopg3` (Redshift), `s3` (DuckDB)
 - `sqlite`
 - `bigquery`
 - `dbt` — read-only, reads manifest/run_results from a local project or dbt Cloud
@@ -64,13 +64,13 @@ severity thresholds, retry and dedupe, and first-class Slack/email/PagerDuty
 channels.
 
 ### Test depth where it is thin
-- No frontend tests at all — CI runs lint and build only
-- `pulse/bigquery` ships no tests
-- `pulse/api` ships no tests
+- Frontend coverage is two service specs. CI still only lints and builds the UI.
+- `pulse/bigquery` ships fixtures, not tests that hit BigQuery.
 
 ### More connectors
-MySQL/MariaDB, MongoDB, Snowflake and Redis have UI forms but no Pulse
-connector behind them. Either implement them or remove them from the picker.
+The picker only offers types the factory can build: postgres, redshift,
+sqlite, bigquery, s3, dbt. MySQL, MongoDB, Snowflake and Redis are not
+offered. Add them as Pulse packages when someone needs them.
 
 ### Packaging
 Only `pulse/core` and `pulse/sqlite` carry a CHANGELOG. The rest need one

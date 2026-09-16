@@ -15,11 +15,18 @@ WORKDIR /app
 # Copy the entire project context
 COPY . .
 
-# Install dependencies using uv (monorepo editable installs)
+# Install dependencies using uv (monorepo editable installs).
+# Every connector the factory can build has to be here. A missing one shows up
+# only at runtime, as "Required connector package is not installed" on a stave
+# the API happily accepted.
 RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/core
 RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/sqlite
 RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/postgres
+# Redshift runs on psycopg3; asyncpg cannot connect to it.
+RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/postgres-psycopg3
 RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/bigquery
+RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/s3
+RUN uv pip install --system --no-cache-dir -e ./datametronome/pulse/dbt
 RUN uv pip install --system --no-cache-dir -e ./datametronome/brain/base
 RUN uv pip install --system --no-cache-dir -e ./datametronome/podium
 RUN uv pip install --system --no-cache-dir 'logfire[fastapi,httpx]>=0.20.0'

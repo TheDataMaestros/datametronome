@@ -11,6 +11,7 @@ import pytest
 from datametronome_podium.features.clefs.model import Clef
 from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.services.stave_yaml_loader import (
+    import_staves_from_yaml,
     load_single_stave_yaml,
     load_staves_from_yaml,
     validate_yaml_config,
@@ -314,22 +315,88 @@ class TestRealExampleFiles:
         for stave in staves:
             print(f"   - {stave.name} ({stave.data_source_type})")
 
-    def test_load_example_production_db_yaml(self):
-        """Example: Load the single-stave example file."""
-        example_file = Path(__file__).parent.parent / "examples" / "production-db.yaml"
 
-        if not example_file.exists():
-            pytest.skip("Example file not found")  # ty: ignore
+class _FakeDb:
+    """write() returns None, matching Writable.write."""
 
-        # Load the example
-        stave, clefs = load_single_stave_yaml(example_file, resolve_env=False)
+    def __init__(self, existing=None):
+        self.existing = existing or []
+        self.writes = []
+        self.executes = []
 
-        assert stave is not None
-        assert len(clefs) > 0
+    async def query(self, _config):
+        return self.existing
 
-        print(f"\n✅ Loaded example file: {example_file.name}")
-        print(f"   Stave: {stave.name}")
-        print(f"   Clefs: {len(clefs)}")
+    async def write(self, data, destination, config=None):
+        self.writes.append((data, destination))
+        return None
 
-        for clef in clefs:
-            print(f"   - {clef.name} ({clef.check_type})")
+    async def execute(self, sql, params=None):
+        self.executes.append((sql, params))
+
+
+class TestImportStavesFromYaml:
+    @pytest.mark.asyncio
+    async def test_counts_success_when_write_returns_none(self, tmp_path):
+        yaml_file = tmp_path / "staves.yaml"
+        yaml_file.write_text(
+            """
+staves:
+  - id: stave-001
+    name: Test DB
+    data_source_type: sqlite
+    connection_config:
+      path: /tmp/test.db
+clefs:
+  - id: clef-001
+    stave_id: stave-001
+    name: Row count
+    check_type: row_count
+    config:
+      table: users
+"""
+        )
+        db = _FakeDb()
+        counts = await import_staves_from_yaml(yaml_file, db, resolve_env=False)
+
+        assert counts == {"staves": 1, "clefs": 1}
+        assert [dest for _, dest in db.writes] == ["staves", "clefs"]
+        assert db.executes == []
+        for rows, _dest in db.writes:
+            assert "table" not in rows[0]
+
+    @pytest.mark.asyncio
+    async def test_overwrite_updates_instead_of_inserting(self, tmp_path):
+        yaml_file = tmp_path / "staves.yaml"
+        yaml_file.write_text(
+            """
+staves:
+  - id: stave-001
+    name: Test DB
+    data_source_type: sqlite
+    connection_config:
+      path: /tmp/test.db
+clefs:
+  - id: clef-001
+    stave_id: stave-001
+    name: Row count
+    check_type: row_count
+    config:
+      table: users
+"""
+        )
+        db = _FakeDb(existing=[{"id": "stave-001"}])
+        counts = await import_staves_from_yaml(
+            yaml_file, db, resolve_env=False, overwrite=True
+        )
+
+        assert counts == {"staves": 1, "clefs": 1}
+        assert db.writes == []
+        assert len(db.executes) == 2
+        for sql, params in db.executes:
+            assert sql.startswith("UPDATE ")
+            assert " WHERE id = ?" in sql
+            assert params[-1] in {"stave-001", "clef-001"}
+            assert "group_id" not in sql
+            assert "paused" not in sql
+

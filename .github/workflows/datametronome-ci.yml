@@ -2,10 +2,10 @@ name: DataMetronome CI
 
 on:
   push:
-    branches: [ main, develop ]
-    tags: [ 'v*' ]
+    branches: [main, develop]
+    tags: ["v*"]
   pull_request:
-    branches: [ main, develop ]
+    branches: [main, develop]
 
 jobs:
   quality-and-test:
@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ['3.12', '3.13']
+        python-version: ["3.12", "3.13"]
 
     services:
       postgres:
@@ -42,6 +42,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The s3 connector's unit tests substitute local paths for S3 URIs, so
+      # they never load httpfs, issue CREATE SECRET, or resolve an s3:// URI.
+      # Those are the parts that break. MinIO gives them something to talk to.
+      # Not a services: block, because that cannot pass a server command.
+      - name: Start MinIO
+        run: |
+          # quay.io, not docker.io: the Docker Hub minio/minio repo is not
+          # publicly pullable and bitnami/minio no longer exists.
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            quay.io/minio/minio:latest server /data
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live > /dev/null; then
+              echo "minio up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "MinIO never became healthy"
+          docker logs minio
+          exit 1
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
@@ -55,13 +78,20 @@ jobs:
           # errors, and gains new rules between releases. Unpinned, any upstream
           # release breaks the build on code that has not changed.
           uv pip install pytest pytest-asyncio pytest-cov pytest-mock pytest-timeout 'ty==0.0.80'
+          # boto3 creates the MinIO bucket in the s3 integration tests. The
+          # connector itself never uses it; DuckDB's httpfs speaks S3 directly.
+          uv pip install boto3
           # Install core first for dependencies
           uv pip install -e ./datametronome/pulse/core
           uv pip install -e ./datametronome/pulse/sqlite
           uv pip install -e ./datametronome/pulse/postgres-psycopg3
-          uv pip install -e ./datametronome/pulse/postgres-sqlalchemy
           uv pip install -e ./datametronome/pulse/postgres
           uv pip install -e ./datametronome/pulse/dbt
+          uv pip install -e ./datametronome/pulse/s3
+          # bigquery is built and published by the release job, so it has to be
+          # importable here. Without it the factory's bigquery branch is only
+          # ever reached as an ImportError.
+          uv pip install -e ./datametronome/pulse/bigquery
           uv pip install -e ./datametronome/brain/base
           uv pip install -e ./datametronome/podium
           # Install runtime deps not covered by -e
@@ -78,9 +108,15 @@ jobs:
           uv run pytest datametronome/pulse/core/tests/ -v --timeout=60
           uv run pytest datametronome/pulse/postgres/tests/ -v --timeout=60
           uv run pytest datametronome/pulse/postgres-psycopg3/tests/ -v --timeout=60
-          uv run pytest datametronome/pulse/postgres-sqlalchemy/tests/ -v --timeout=60
           uv run pytest datametronome/pulse/sqlite/tests/ -v --timeout=60
           uv run pytest datametronome/pulse/dbt/tests/ -v --timeout=60 --ignore=datametronome/pulse/dbt/tests/test_real_artifacts.py
+          uv run pytest datametronome/pulse/s3/tests/ -v --timeout=120
+        env:
+          # Turns on the MinIO integration tests, which are skipped without it.
+          S3_TEST_ENDPOINT: http://localhost:9000
+          S3_TEST_BUCKET: test-bucket
+          S3_TEST_KEY_ID: minioadmin
+          S3_TEST_SECRET: minioadmin
 
       - name: Run Podium Tests
         run: uv run pytest datametronome/podium/tests/ -v --timeout=60
@@ -96,7 +132,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: "20"
           cache: npm
           cache-dependency-path: ui-nuxt/package-lock.json
 
@@ -106,12 +142,105 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Test
+        run: npm run test
+
       - name: Build
         run: npm run build
 
+  stack:
+    name: Stack Boots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # The unit suites never compose these containers together, so a stack
+      # that cannot start looks green. This is how the API and the worker came
+      # to disagree on SECRET_KEY: each one worked alone, and every check died
+      # with InvalidToken because the Fernet key derives from it.
+      - name: Write a .env with generated keys
+        run: |
+          cp env.example .env
+          {
+            echo "DATAMETRONOME_SECRET_KEY=$(openssl rand -hex 32)"
+            echo "DATAMETRONOME_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+            echo "DATAMETRONOME_DEBUG=true"
+          } >> .env
+
+      - name: Start the stack with workers
+        run: docker compose --profile full --profile worker up -d --build
+
+      - name: Wait for the API to report healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8001/health > /dev/null; then
+              echo "healthy after ${i}0s"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "API never became healthy"
+          docker compose ps -a
+          docker compose logs --tail 100
+          exit 1
+
+      - name: Seed and run a check end to end
+        run: |
+          docker compose exec -T podium sh -c \
+            "cd /app/datametronome/podium && python scripts/seed_dev.py"
+          docker compose exec -T podium python - <<'PY'
+          import asyncio, json, sys, urllib.request, urllib.error, time
+
+          API = "http://localhost:8001/api/v1"
+
+          def call(method, path, token=None, body=None):
+              req = urllib.request.Request(f"{API}{path}", method=method)
+              req.add_header("Content-Type", "application/json")
+              if token:
+                  req.add_header("Authorization", f"Bearer {token}")
+              data = json.dumps(body).encode() if body is not None else None
+              try:
+                  with urllib.request.urlopen(req, data, timeout=60) as r:
+                      return r.status, json.loads(r.read() or b"null")
+              except urllib.error.HTTPError as e:
+                  return e.code, None
+
+          status, payload = call("POST", "/auth/login", body={
+              "username": "demo-admin", "password": "devpassword123"})
+          assert status == 200, f"seeded account cannot sign in: {status}"
+          token = payload["access_token"]
+
+          status, clefs = call("GET", "/clefs/", token)
+          assert clefs, "seed produced no clefs"
+          clef = clefs[0]
+
+          status, _ = call("POST", f"/clefs/{clef['id']}/run-now", token)
+          assert status == 202, f"run-now returned {status}"
+
+          # The worker has to pick it up, execute it, and store a result. That
+          # exercises credential decryption across container boundaries.
+          for _ in range(24):
+              time.sleep(5)
+              _, results = call("GET", "/clefs/results/latest?limit=5", token)
+              if results and results.get("count"):
+                  print("check result:", results["results"][0]["message"])
+                  sys.exit(0)
+
+          print("no check result within 120s", file=sys.stderr)
+          sys.exit(1)
+          PY
+
+      - name: Show logs on failure
+        if: failure()
+        run: docker compose logs --tail 200
+
+      - name: Tear down
+        if: always()
+        run: docker compose --profile full --profile worker down -v
+
   release:
     name: Build & Release
-    needs: [quality-and-test, frontend]
+    needs: [quality-and-test, frontend, stack]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
@@ -124,7 +253,7 @@ jobs:
       - name: Build pulse packages
         run: |
           mkdir -p dist
-          for pkg in core postgres postgres-psycopg3 postgres-sqlalchemy sqlite bigquery dbt; do
+          for pkg in core postgres postgres-psycopg3 sqlite bigquery dbt s3; do
             echo "::group::build $pkg"
             uv build "datametronome/pulse/$pkg" --out-dir dist
             echo "::endgroup::"

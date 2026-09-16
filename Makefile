@@ -1,4 +1,4 @@
-.PHONY: help up up-workers down test migrate logs
+.PHONY: help up up-workers down test migrate seed logs
 
 help: ## Show available commands
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $$1, $$2}'
@@ -17,6 +17,9 @@ test: ## Run tests locally via .venv (fast, uses SQLite)
 
 migrate: ## Run Alembic migrations inside Docker
 	docker-compose exec podium sh -c "cd /app/datametronome/podium && DATABASE_URL=\$$DATAMETRONOME_DATABASE_URL alembic upgrade head"
+
+seed: ## Seed a dev database with demo users, a stave and a clef (idempotent)
+	docker-compose exec podium sh -c "cd /app/datametronome/podium && python scripts/seed_dev.py"
 
 logs: ## Tail docker-compose logs (use ARGS=podium to filter)
 	docker-compose logs -f $(ARGS)

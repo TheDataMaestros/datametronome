@@ -178,16 +178,26 @@
           >
             <h4 class="font-semibold text-sm">Connection Settings</h4>
 
-            <!-- PostgreSQL / MySQL -->
-            <template v-if="['postgres', 'mysql'].includes(newStaveForm.data_source_type)">
+            <!-- PostgreSQL and Redshift take the same connection fields.
+                 Redshift adds sslmode, since clusters refuse plaintext. -->
+            <template
+              v-if="['postgres', 'redshift'].includes(newStaveForm.data_source_type)"
+            >
               <UFormGroup label="Host" name="host" required>
-                <UInput v-model="connectionFields.host" placeholder="localhost" />
+                <UInput
+                  v-model="connectionFields.host"
+                  :placeholder="
+                    newStaveForm.data_source_type === 'redshift'
+                      ? 'my-cluster.abc123.eu-west-1.redshift.amazonaws.com'
+                      : 'localhost'
+                  "
+                />
               </UFormGroup>
               <UFormGroup label="Port" name="port">
                 <UInput
                   v-model.number="connectionFields.port"
                   type="number"
-                  :placeholder="newStaveForm.data_source_type === 'postgres' ? '5432' : '3306'"
+                  :placeholder="newStaveForm.data_source_type === 'redshift' ? '5439' : '5432'"
                 />
               </UFormGroup>
               <UFormGroup label="Database" name="database" required>
@@ -202,6 +212,69 @@
                   type="password"
                   placeholder="password (optional)"
                 />
+              </UFormGroup>
+              <UFormGroup
+                v-if="newStaveForm.data_source_type === 'redshift'"
+                label="SSL mode"
+                name="sslmode"
+              >
+                <USelect v-model="connectionFields.sslmode" :options="sslModes" />
+              </UFormGroup>
+              <UFormGroup
+                v-else
+                label="SSL mode"
+                name="ssl"
+              >
+                <USelect v-model="connectionFields.ssl" :options="pgSslModes" />
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  RDS and Aurora instances with rds.force_ssl=1 need "require".
+                </p>
+              </UFormGroup>
+            </template>
+
+            <!-- S3: files become tables, one per line -->
+            <template v-else-if="newStaveForm.data_source_type === 's3'">
+              <UFormGroup label="Bucket" name="bucket" required>
+                <UInput v-model="connectionFields.bucket" placeholder="analytics-prod" />
+              </UFormGroup>
+              <UFormGroup label="Region" name="region" required>
+                <UInput v-model="connectionFields.region" placeholder="eu-west-1" />
+              </UFormGroup>
+
+              <UFormGroup label="Tables" name="tables" required>
+                <UTextarea
+                  v-model="connectionFields.tables"
+                  :rows="4"
+                  placeholder="users = users/*.parquet&#10;orders = orders/dt=*/*.parquet&#10;signups = raw/signups.csv.gz"
+                />
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  One per line, <code>name = path</code>. The name is what checks
+                  refer to. Parquet, CSV and JSON are detected by extension.
+                </p>
+              </UFormGroup>
+
+              <UFormGroup label="Access Key ID" name="access_key_id">
+                <UInput v-model="connectionFields.access_key_id" placeholder="optional" />
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  Leave both key fields empty to use the instance role or the
+                  AWS environment. Prefer that: no long-lived key is stored.
+                </p>
+              </UFormGroup>
+              <UFormGroup label="Secret Access Key" name="secret_access_key">
+                <UInput
+                  v-model="connectionFields.secret_access_key"
+                  type="password"
+                  placeholder="optional, stored encrypted"
+                />
+              </UFormGroup>
+              <UFormGroup label="Endpoint URL" name="endpoint_url">
+                <UInput
+                  v-model="connectionFields.endpoint_url"
+                  placeholder="optional, e.g. http://minio:9000"
+                />
+                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  For MinIO or another S3-compatible store.
+                </p>
               </UFormGroup>
             </template>
 
@@ -361,73 +434,8 @@
               </template>
             </template>
 
-            <!-- MongoDB -->
-            <template v-else-if="newStaveForm.data_source_type === 'mongodb'">
-              <UFormGroup label="Connection URI" name="uri" required>
-                <UInput
-                  v-model="connectionFields.uri"
-                  placeholder="mongodb://user:pass@host:27017/"
-                />
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Full MongoDB connection URI
-                </p>
-              </UFormGroup>
-              <UFormGroup label="Database" name="database" required>
-                <UInput v-model="connectionFields.database" placeholder="mydb" />
-              </UFormGroup>
-            </template>
 
-            <!-- Redis -->
-            <template v-else-if="newStaveForm.data_source_type === 'redis'">
-              <UFormGroup label="Host" name="host" required>
-                <UInput v-model="connectionFields.host" placeholder="localhost" />
-              </UFormGroup>
-              <UFormGroup label="Port" name="port">
-                <UInput v-model.number="connectionFields.port" type="number" placeholder="6379" />
-              </UFormGroup>
-              <UFormGroup label="Database Number" name="db">
-                <UInput v-model.number="connectionFields.db" type="number" placeholder="0" />
-              </UFormGroup>
-              <UFormGroup label="Password" name="password">
-                <UInput
-                  v-model="connectionFields.password"
-                  type="password"
-                  placeholder="password (optional)"
-                />
-              </UFormGroup>
-            </template>
 
-            <!-- Snowflake -->
-            <template v-else-if="newStaveForm.data_source_type === 'snowflake'">
-              <UFormGroup label="Account" name="account" required>
-                <UInput v-model="connectionFields.account" placeholder="abc12345.us-east-1" />
-                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Your Snowflake account identifier
-                </p>
-              </UFormGroup>
-              <UFormGroup label="Username" name="user" required>
-                <UInput v-model="connectionFields.user" placeholder="username" />
-              </UFormGroup>
-              <UFormGroup label="Password" name="password" required>
-                <UInput
-                  v-model="connectionFields.password"
-                  type="password"
-                  placeholder="password"
-                />
-              </UFormGroup>
-              <UFormGroup label="Warehouse" name="warehouse" required>
-                <UInput v-model="connectionFields.warehouse" placeholder="COMPUTE_WH" />
-              </UFormGroup>
-              <UFormGroup label="Database" name="database" required>
-                <UInput v-model="connectionFields.database" placeholder="ANALYTICS" />
-              </UFormGroup>
-              <UFormGroup label="Schema" name="schema">
-                <UInput v-model="connectionFields.schema" placeholder="PUBLIC" />
-              </UFormGroup>
-              <UFormGroup label="Role" name="role">
-                <UInput v-model="connectionFields.role" placeholder="MONITOR_ROLE" />
-              </UFormGroup>
-            </template>
           </div>
 
           <UFormGroup label="Active" name="is_active">
@@ -622,6 +630,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useStaves } from '~/composables/useStaves'
+import { parseS3Tables } from '~/services/staves'
 
 // Use middleware for authentication
 definePageMeta({
@@ -646,13 +655,26 @@ const selectedStave = ref(null)
 
 const dataSourceTypes = [
   { label: 'PostgreSQL', value: 'postgres' },
-  { label: 'MySQL', value: 'mysql' },
-  { label: 'MongoDB', value: 'mongodb' },
+  { label: 'Amazon Redshift', value: 'redshift' },
+  { label: 'Amazon S3', value: 's3' },
   { label: 'SQLite', value: 'sqlite' },
-  { label: 'Redis', value: 'redis' },
-  { label: 'Snowflake', value: 'snowflake' },
   { label: 'BigQuery', value: 'bigquery' },
   { label: 'dbt', value: 'dbt' },
+]
+
+// psycopg's sslmode values. Redshift clusters refuse plaintext, so the
+// default is require rather than prefer.
+const sslModes = [
+  { label: 'require', value: 'require' },
+  { label: 'verify-ca', value: 'verify-ca' },
+  { label: 'verify-full', value: 'verify-full' },
+]
+
+// asyncpg's ssl values for plain PostgreSQL. Empty leaves negotiation alone.
+const pgSslModes = [
+  { label: 'default (negotiate)', value: '' },
+  { label: 'require', value: 'require' },
+  { label: 'verify-full', value: 'verify-full' },
 ]
 
 const dbtModes = [
@@ -675,7 +697,16 @@ function resetConnectionFields(type?: string) {
   // Reset connection fields when data source type changes. The select passes
   // the new type in, so this does not depend on v-model having applied yet.
   const next = type ?? newStaveForm.value.data_source_type
-  connectionFields.value = next === 'dbt' ? { mode: 'local' } : {}
+  if (next === 'dbt') {
+    connectionFields.value = { mode: 'local' }
+  } else if (next === 'redshift') {
+    // Redshift listens on 5439 and refuses plaintext connections.
+    connectionFields.value = { port: 5439, sslmode: 'require' }
+  } else if (next === 's3') {
+    connectionFields.value = { region: 'eu-west-1', tables: '' }
+  } else {
+    connectionFields.value = {}
+  }
 }
 
 function handleCredentialsFileUpload(event: Event) {
@@ -755,11 +786,9 @@ const staveColumns = [
 function getDataSourceTypeColor(type: string) {
   const colors: Record<string, string> = {
     postgres: 'blue',
-    mysql: 'orange',
-    mongodb: 'green',
+    redshift: 'red',
+    s3: 'green',
     sqlite: 'purple',
-    redis: 'red',
-    snowflake: 'cyan',
     bigquery: 'yellow',
     dbt: 'orange',
   }
@@ -826,12 +855,26 @@ function buildConnectionConfig(): Record<string, any> {
   const fields = connectionFields.value
   const config: Record<string, any> = {}
 
-  if (['postgres', 'mysql'].includes(type)) {
+  if (type === 'postgres' || type === 'redshift') {
     config.host = fields.host
     if (fields.port) config.port = Number(fields.port)
     config.database = fields.database
     config.user = fields.user
     if (fields.password) config.password = fields.password
+    // psycopg spells it sslmode, asyncpg spells it ssl.
+    if (type === 'redshift') {
+      config.sslmode = fields.sslmode || 'require'
+    } else if (fields.ssl) {
+      config.ssl = fields.ssl
+    }
+  } else if (type === 's3') {
+    config.bucket = fields.bucket
+    config.region = fields.region
+    const parsed = parseS3Tables(fields.tables)
+    if ('tables' in parsed) config.tables = parsed.tables
+    if (fields.access_key_id) config.access_key_id = fields.access_key_id
+    if (fields.secret_access_key) config.secret_access_key = fields.secret_access_key
+    if (fields.endpoint_url) config.endpoint_url = fields.endpoint_url
   } else if (type === 'sqlite') {
     config.path = fields.path
   } else if (type === 'bigquery') {
@@ -855,23 +898,7 @@ function buildConnectionConfig(): Record<string, any> {
       config.project_path = fields.project_path
       if (fields.target_path) config.target_path = fields.target_path
     }
-  } else if (type === 'mongodb') {
-    config.uri = fields.uri
-    config.database = fields.database
-  } else if (type === 'redis') {
-    config.host = fields.host
-    if (fields.port) config.port = Number(fields.port)
-    if (fields.db !== undefined) config.db = Number(fields.db)
-    if (fields.password) config.password = fields.password
-  } else if (type === 'snowflake') {
-    config.account = fields.account
-    config.user = fields.user
-    config.password = fields.password
-    config.warehouse = fields.warehouse
-    config.database = fields.database
-    if (fields.schema) config.schema = fields.schema
-    if (fields.role) config.role = fields.role
-  }
+        }
 
   // Remove undefined/null values
   return Object.fromEntries(
@@ -883,10 +910,15 @@ function validateConnectionConfig(): string | null {
   const type = newStaveForm.value.data_source_type
   const fields = connectionFields.value
 
-  if (['postgres', 'mysql'].includes(type)) {
+  if (type === 'postgres' || type === 'redshift') {
     if (!fields.host) return 'Host is required'
     if (!fields.database) return 'Database is required'
     if (!fields.user) return 'Username is required'
+  } else if (type === 's3') {
+    if (!fields.bucket) return 'Bucket is required'
+    if (!fields.region) return 'Region is required'
+    const parsed = parseS3Tables(fields.tables)
+    if ('error' in parsed) return parsed.error
   } else if (type === 'sqlite') {
     if (!fields.path) return 'Database path is required'
   } else if (type === 'bigquery') {
@@ -903,18 +935,7 @@ function validateConnectionConfig(): string | null {
     } else if (!fields.project_path) {
       return 'Project path is required for local mode'
     }
-  } else if (type === 'mongodb') {
-    if (!fields.uri) return 'Connection URI is required'
-    if (!fields.database) return 'Database is required'
-  } else if (type === 'redis') {
-    if (!fields.host) return 'Host is required'
-  } else if (type === 'snowflake') {
-    if (!fields.account) return 'Account is required'
-    if (!fields.user) return 'Username is required'
-    if (!fields.password) return 'Password is required'
-    if (!fields.warehouse) return 'Warehouse is required'
-    if (!fields.database) return 'Database is required'
-  }
+        }
 
   return null
 }

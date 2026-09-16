@@ -20,11 +20,15 @@ from cryptography.fernet import Fernet
 # Per data-source-type overrides
 SENSITIVE_FIELDS: dict[str, list[str]] = {
     "postgres": ["password"],
+    "redshift": ["password"],
     "mysql": ["password"],
     "redis": ["password"],
     "mongodb": ["password"],
     "snowflake": ["password", "private_key"],
     "bigquery": ["credentials_json"],
+    # An s3 stave with no keys uses the instance role, which is the better
+    # arrangement; these are for the cases that cannot.
+    "s3": ["secret_access_key", "session_token"],
     "dbt": ["api_token"],
 }
 

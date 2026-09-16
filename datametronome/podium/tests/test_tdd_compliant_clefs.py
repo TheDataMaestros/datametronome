@@ -10,7 +10,6 @@ from datetime import datetime
 import pytest
 from datametronome_podium.features.clefs.model import (
     CHECK_LEVEL_MAPPING,
-    LEGACY_CHECK_MAPPING,
     LEVEL_1_CHECKS,
     LEVEL_2_CHECKS,
     LEVEL_3_CHECKS,
@@ -187,26 +186,24 @@ class TestTDDCompliantClefs:
             assert result.severity == expected_severity
             assert result.severity.icon == expected_icon
 
-    def test_legacy_check_mapping(self):
-        """Test backward compatibility with legacy check types."""
-        print(f"\n🎵 LEGACY CHECK MAPPING (BACKWARD COMPATIBILITY)")
-
-        legacy_tests = [
-            ("volume_check", "row_count"),
-            ("freshness_check", "freshness"),
-            ("null_check", "column_values"),
-            ("range_check", "column_values"),
-            ("pattern_check", "column_values"),
-            ("uniqueness_check", "column_values"),
-            ("drift_detection", "data_profile_drift"),
-            ("custom_python", "python"),
-        ]
-
-        for legacy_type, tdd_type in legacy_tests:
-            print(f"   📝 {legacy_type} → {tdd_type}")
-            assert LEGACY_CHECK_MAPPING[legacy_type] == tdd_type
-
-        print(f"   ✅ All {len(legacy_tests)} legacy mappings verified")
+    def test_old_check_types_are_rejected(self):
+        for old_type in (
+            "volume_check",
+            "freshness_check",
+            "null_check",
+            "range_check",
+            "pattern_check",
+            "uniqueness_check",
+            "drift_detection",
+            "custom_python",
+        ):
+            with pytest.raises(ValueError, match="Unsupported check type"):
+                Clef(
+                    stave_id="test",
+                    name="old type",
+                    check_type=old_type,
+                    config={"table": "users"},
+                )
 
     def test_tdd_level_1_declarative_checks(self):
         """Test Level 1 Declarative Checks examples."""
@@ -521,4 +518,3 @@ class TestTDDCompliantClefs:
         )
         print(f"      • Standardized condition string syntax")
         print(f"      • Proper level organization per TDD specification")
-        print(f"      • Backward compatibility with legacy check types")

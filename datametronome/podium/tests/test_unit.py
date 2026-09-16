@@ -208,7 +208,7 @@ class TestClefModelUnit:
             "check_type": "column_values",
             "config": {
                 "table_name": "users",
-                "checks": [{"type": "null_check", "column": "email", "threshold": 0}],
+                "checks": [{"type": "if_null", "column": "email"}],
             },
             "is_active": True,
         }

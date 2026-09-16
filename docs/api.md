@@ -159,28 +159,6 @@ connector = Psycopg3Connector(
 )
 ```
 
-### PostgreSQL Connector (SQLAlchemy)
-
-**Package**: `metronome-pulse-postgres-sqlalchemy`
-
-ORM-based connector with SQLAlchemy:
-
-```python
-from metronome_pulse_postgres_sqlalchemy import SQLAlchemyConnector
-
-connector = SQLAlchemyConnector(
-    connection_string="postgresql+asyncpg://user:pass@localhost/mydb"
-)
-
-# Use with SQLAlchemy models
-from sqlalchemy import select
-from your_models import User
-
-async with connector.session() as session:
-    result = await session.execute(select(User).where(User.age > 25))
-    users = result.scalars().all()
-```
-
 ### SQLite Connector
 
 **Package**: `metronome-pulse-sqlite`
@@ -341,23 +319,26 @@ Content-Type: application/json
 {
   "stave_id": "123e4567-e89b-12d3-a456-426614174000",
   "name": "Check for NULL emails",
-  "type": "null_check",
+  "check_type": "column_values",
   "config": {
     "table": "users",
     "column": "email",
-    "threshold": 0.01
+    "condition": "if_null"
   },
+  "fail": "if_null > 0%",
   "schedule": "0 * * * *",
-  "enabled": true
+  "is_active": true
 }
 ```
 
 **Clef Types:**
-- `null_check` - Check for NULL values
-- `uniqueness_check` - Check for duplicate values
-- `range_check` - Check if values are within range
-- `pattern_check` - Check against regex pattern
-- `custom_sql` - Custom SQL query
+- `column_values` - NULL, uniqueness, and allowed-value checks on a column
+- `row_count` - Monitor table volume
+- `freshness` - Check data recency
+- `forecast` - ML-based anomaly detection
+- `data_profile_drift` - Detect distribution drift
+- `lookup_validation` - Cross-table reference checks
+- `python` - Custom Python check
 
 #### Get a Clef
 
@@ -606,8 +587,8 @@ async def main():
     clef = await client.create_clef(
         stave_id=stave["id"],
         name="NULL check",
-        type="null_check",
-        config={"table": "users", "column": "email"}
+        check_type="column_values",
+        config={"table": "users", "column": "email", "condition": "if_null"},
     )
 
     # View check runs

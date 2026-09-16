@@ -19,7 +19,7 @@ The codebase uses musical metaphors throughout. You must understand these to nav
 - **Clef** = Quality check definition (a rule attached to a stave)
 - **Check** = Execution result of a clef (pass/warn/fail)
 - **Podium** = The FastAPI backend API server
-- **Pulse** = Database connector library (postgres, sqlite, bigquery adapters)
+- **Pulse** = Database connector library (postgres, redshift, sqlite, bigquery, s3, dbt adapters)
 - **Brain** = ML/statistics engine (SARIMA forecasting, drift detection, isolation forest)
 - **Orchestrator** = AI chat router that classifies intent and dispatches to sub-agents
 
@@ -53,7 +53,7 @@ datametronome/
       archetypes/                    # Domain classification YAML templates
     alembic/                         # Database migrations
     tests/                           # pytest tests
-  datametronome/pulse/               # Database connectors (core, postgres, sqlite, bigquery, postgres-psycopg3, postgres-sqlalchemy)
+  datametronome/pulse/               # Database connectors (core, postgres, postgres-psycopg3, sqlite, bigquery, s3, dbt)
   datametronome/brain/               # ML models
   ui-nuxt/                           # Nuxt 3 frontend
   docker-compose.yml                 # Full stack: postgres + rabbitmq + redis + podium + worker + beat + UI
@@ -93,6 +93,7 @@ sufficient (see `core/config.py`).
 | `DATAMETRONOME_HOST` | `0.0.0.0` | Server bind address |
 | `DATAMETRONOME_PORT` | `8001` | Server port |
 | `DATAMETRONOME_SECRET_KEY` | (dev default) | JWT signing key -- must be 32+ chars |
+| `DATAMETRONOME_ENCRYPTION_KEY` | (falls back to `SECRET_KEY`) | Encrypts stave credentials at rest. Set it separately, see below |
 | `DATAMETRONOME_ACCESS_TOKEN_EXPIRE_MINUTES` | `60` | JWT TTL in minutes |
 | `DATAMETRONOME_DATABASE_URL` | `postgresql://testuser:testpass@localhost:5432/datametronome_test` | Primary DB URL |
 | `DATAMETRONOME_ALLOWED_ORIGINS` | `["http://localhost:3000","http://localhost:8501"]` | CORS origins |
@@ -117,11 +118,21 @@ sufficient (see `core/config.py`).
 | `DATAMETRONOME_AI_BASE_URL` | `null` | Custom base URL (required for Ollama: `http://localhost:11434/v1`) |
 | `OLLAMA_API_BASE` | `http://localhost:11434` | Ollama base URL (legacy compat) |
 
-For production, always set `DATAMETRONOME_SECRET_KEY` to a random 32+ char string:
+Set `DATAMETRONOME_SECRET_KEY` and `DATAMETRONOME_ENCRYPTION_KEY` to random
+32+ char strings. `.env.example` has the full list.
 
 ```bash
 openssl rand -hex 32
 ```
+
+Set them separately. The Fernet key that encrypts stave credentials derives
+from `ENCRYPTION_KEY` when present and falls back to `SECRET_KEY` when not, so
+leaving it unset means rotating the JWT key silently makes every stored
+credential undecryptable and every check fails with `InvalidToken`.
+
+Do not set `SECRET_KEY` per service in `docker-compose.yml`. The API, the
+worker and beat all need the same value, and overriding it on one service only
+is exactly how they drift apart.
 
 ## Key Conventions
 

@@ -1,6 +1,14 @@
 import { apiService } from './api'
 import type { Check } from './checks'
 
+/** One entry from GET /clefs/types. `name` is the identifier, e.g. row_count. */
+export interface CheckTypeInfo {
+  name: string
+  display_name: string
+  description: string
+  tier: number
+}
+
 export interface Clef {
   id: string
   name: string
@@ -74,13 +82,34 @@ class ClefsService {
     }))
   }
 
+  /**
+   * Frontend shape to API shape.
+   *
+   * The reads below already map API `config` to frontend `configuration`, but
+   * the writes did not, so every create posted `configuration` and the API
+   * rejected it with 422 for a missing `config`. An empty schedule is dropped
+   * too: the server's cron validator rejects "" rather than treating it as
+   * "no schedule".
+   */
+  private toApiPayload(clef: CreateClefRequest | UpdateClefRequest) {
+    const { configuration, schedule, ...rest } = clef as CreateClefRequest
+    return {
+      ...rest,
+      ...(configuration !== undefined ? { config: configuration } : {}),
+      ...(schedule ? { schedule } : {}),
+    }
+  }
+
   async create(clef: CreateClefRequest): Promise<Clef> {
-    const response = await apiService.post<Clef>(this.endpoint, clef)
+    const response = await apiService.post<Clef>(this.endpoint, this.toApiPayload(clef))
     return response.data
   }
 
   async update(id: string, updates: UpdateClefRequest): Promise<Clef> {
-    const response = await apiService.put<Clef>(`${this.endpoint}/${id}`, updates)
+    const response = await apiService.put<Clef>(
+      `${this.endpoint}/${id}`,
+      this.toApiPayload(updates),
+    )
     return response.data
   }
 
@@ -113,31 +142,21 @@ class ClefsService {
   }
 
   async getAvailableTypes(): Promise<{
-    check_types: Array<{
-      type: string
-      name: string
-      description: string
-      tier: number
-    }>
+    check_types: CheckTypeInfo[]
     by_tier: {
-      '1': Array<{ type: string; name: string; description: string; tier: number }>
-      '2': Array<{ type: string; name: string; description: string; tier: number }>
-      '3': Array<{ type: string; name: string; description: string; tier: number }>
-      '4': Array<{ type: string; name: string; description: string; tier: number }>
+      '1': CheckTypeInfo[]
+      '2': CheckTypeInfo[]
+      '3': CheckTypeInfo[]
+      '4': CheckTypeInfo[]
     }
   }> {
     const response = await apiService.get<{
-      check_types: Array<{
-        type: string
-        name: string
-        description: string
-        tier: number
-      }>
+      check_types: CheckTypeInfo[]
       by_tier: {
-        '1': Array<{ type: string; name: string; description: string; tier: number }>
-        '2': Array<{ type: string; name: string; description: string; tier: number }>
-        '3': Array<{ type: string; name: string; description: string; tier: number }>
-        '4': Array<{ type: string; name: string; description: string; tier: number }>
+        '1': CheckTypeInfo[]
+        '2': CheckTypeInfo[]
+        '3': CheckTypeInfo[]
+        '4': CheckTypeInfo[]
       }
     }>('/clefs/types')
     return response.data

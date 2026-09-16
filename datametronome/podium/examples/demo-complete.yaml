@@ -186,11 +186,12 @@ clefs:
     stave_id: stave-demo-bigquery
     name: 🌐 BigQuery Email NULL Check
     description: Ensures BigQuery user emails are never null
-    check_type: null_check
+    check_type: column_values
     config:
       table: users
       column: email
-      threshold: 0.0
+      condition: if_null
+    fail: "if_null > 0%"
     schedule: "0 */6 * * *"  # Every 6 hours
     is_active: true  # ✅ ENABLED
 
@@ -206,30 +207,29 @@ clefs:
     schedule: "0 */1 * * *"  # Hourly
     is_active: false
 
-  - id: clef-bigquery-orders-range
+  - id: clef-bigquery-orders-amount-present
     stave_id: stave-demo-bigquery
-    name: 🌐 BigQuery Order Amount Range
-    description: Validates BigQuery order amounts are within expected range
-    check_type: range_check
+    name: 🌐 BigQuery Order Amount Present
+    description: Ensures BigQuery order amounts are not null
+    check_type: column_values
     config:
       table: orders
       column: amount
-      min_value: 0
-      max_value: 100000
-      threshold: 0.01
+      condition: if_null
+    fail: "if_null > 0%"
     schedule: "0 */4 * * *"  # Every 4 hours
     is_active: false
 
-  - id: clef-bigquery-email-pattern
+  - id: clef-bigquery-email-unique
     stave_id: stave-demo-bigquery
-    name: 🌐 BigQuery Email Pattern Check
-    description: Validates email format using BigQuery REGEXP_CONTAINS
-    check_type: pattern_check
+    name: 🌐 BigQuery Email Uniqueness
+    description: Ensures BigQuery user emails are unique
+    check_type: column_values
     config:
       table: users
       column: email
-      pattern: "^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$"
-      threshold: 0.02
+      condition: if_not_unique
+    fail: "if_not_unique > 0"
     schedule: "0 8 * * *"  # Daily at 8 AM
     is_active: false
 

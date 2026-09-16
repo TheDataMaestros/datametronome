@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "metronome-pulse-s3"
+dynamic = ["version"]
+description = "Read-only S3 connector for DataPulse - query Parquet, CSV and JSON objects as SQL tables via DuckDB"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [
+    {name = "DataMetronome Team", email = "team@datametronome.dev"}
+]
+keywords = ["s3", "aws", "duckdb", "parquet", "connector", "async", "data-quality"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Database",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Framework :: AsyncIO",
+]
+requires-python = ">=3.12"
+dependencies = [
+    "metronome-pulse-core>=0.1.0",
+    "duckdb>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/TheDataMaestros/datametronome"
+Repository = "https://github.com/TheDataMaestros/datametronome"
+Issues = "https://github.com/TheDataMaestros/datametronome/issues"
+
+[tool.hatch.version]
+path = "metronome_pulse_s3/__init__.py"

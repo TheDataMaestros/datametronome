@@ -39,7 +39,6 @@ This document outlines the complete setup for publishing DataPulse packages to P
 ### **Future Connectors** (Ready for setup)
 - **SQLite**: `metronome-pulse-sqlite`
 - **PostgreSQL (psycopg3)**: `metronome-pulse-postgres-psycopg3`
-- **PostgreSQL (SQLAlchemy)**: `metronome-pulse-postgres-sqlalchemy`
 - **MongoDB**: `metronome-pulse-mongodb`
 - **Redis**: `metronome-pulse-redis`
 

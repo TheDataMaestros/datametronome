@@ -158,78 +158,6 @@ def create_sqlite_stave(
     )
 
 
-def create_mysql_stave(
-    name: str,
-    host: str,
-    database: str,
-    user: str,
-    password: str | None = None,
-    port: int = 3306,
-    description: str | None = None,
-    **kwargs,
-) -> Stave:
-    """
-    Create a MySQL Stave with sensible defaults.
-
-    Example:
-        >>> stave = create_mysql_stave(
-        ...     name="MySQL DB",
-        ...     host="mysql.example.com",
-        ...     database="app",
-        ...     user="monitor"
-        ... )
-    """
-    config = {
-        "host": host,
-        "port": port,
-        "database": database,
-        "user": user,
-    }
-    if password:
-        config["password"] = password
-    config.update(kwargs)
-
-    return create_stave(
-        name=name,
-        data_source_type="mysql",
-        connection_config=config,
-        description=description,
-    )
-
-
-def create_redis_stave(
-    name: str,
-    host: str,
-    port: int = 6379,
-    password: str | None = None,
-    db: int = 0,
-    description: str | None = None,
-    **kwargs,
-) -> Stave:
-    """
-    Create a Redis Stave.
-
-    Example:
-        >>> stave = create_redis_stave(
-        ...     name="Cache",
-        ...     host="redis.example.com"
-        ... )
-    """
-    config = {
-        "host": host,
-        "port": port,
-        "db": db,
-    }
-    if password:
-        config["password"] = password
-    config.update(kwargs)
-
-    return create_stave(
-        name=name,
-        data_source_type="redis",
-        connection_config=config,
-        description=description,
-    )
 
 
 # =============================================================================
@@ -254,7 +182,7 @@ def create_clef(
     Args:
         stave_id: ID of the Stave this check belongs to
         name: Human-readable name for the check
-        check_type: Type of check (null_check, range_check, etc.)
+        check_type: Type of check (column_values, row_count, freshness, etc.)
         config: Check configuration parameters
         description: Optional description
         schedule: Optional cron expression for scheduling
@@ -267,8 +195,9 @@ def create_clef(
         >>> clef = create_clef(
         ...     stave_id="stave-123",
         ...     name="Email NULL Check",
-        ...     check_type="null_check",
-        ...     config={"table": "users", "column": "email", "threshold": 0.01}
+        ...     check_type="column_values",
+        ...     config={"table": "users", "column": "email", "condition": "if_null"},
+        ...     fail="if_null > 0%",
         ... )
     """
     return Clef(

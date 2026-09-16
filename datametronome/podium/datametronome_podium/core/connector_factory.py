@@ -66,10 +66,14 @@ def _build_connector(
     """
     if dst in ("postgres", "postgresql"):
         return _build_postgres_connector(config, read_only=read_only)
+    elif dst == "redshift":
+        return _build_redshift_connector(config, read_only=read_only)
     elif dst == "sqlite":
         return _build_sqlite_connector(config, read_only=read_only)
     elif dst == "bigquery":
         return _build_bigquery_connector(config, read_only=read_only)
+    elif dst == "s3":
+        return _build_s3_connector(config, read_only=read_only)
     elif dst == "dbt":
         return _build_dbt_connector(config, read_only=read_only)
     else:
@@ -82,12 +86,63 @@ def _build_postgres_connector(config: dict[str, Any], *, read_only: bool) -> Any
     else:
         from metronome_pulse_postgres import PostgresPulse as PulseClass  # type: ignore[assignment]
 
+    # RDS and Aurora with rds.force_ssl=1 reject plaintext, so a stave against
+    # one needs "ssl": "require". Omitted when unset, since ssl=None would
+    # override asyncpg's own negotiation.
+    ssl = config.get("ssl")
+
     return PulseClass(
         host=config["host"],
         port=config.get("port", 5432),
         database=config["database"],
         user=config["user"],
         password=config.get("password", ""),
+        **({"ssl": ssl} if ssl else {}),
+    )
+
+
+def _build_redshift_connector(config: dict[str, Any], *, read_only: bool) -> Any:
+    """Redshift runs on psycopg3, not asyncpg.
+
+    asyncpg cannot connect to Redshift at all: Redshift forked from PostgreSQL
+    8.0 and does not answer the catalog queries asyncpg issues during
+    handshake. This is not a preference between drivers.
+    """
+    if read_only:
+        from metronome_pulse_postgres_psycopg3 import (
+            PostgresPsycopg3ReadOnlyPulse as PulseClass,
+        )
+    else:
+        from metronome_pulse_postgres_psycopg3 import (  # type: ignore[assignment]
+            PostgresPsycopg3Pulse as PulseClass,
+        )
+
+    return PulseClass(
+        host=config["host"],
+        port=config.get("port", 5439),
+        database=config["database"],
+        user=config["user"],
+        password=config.get("password", ""),
+        # Redshift clusters terminate plaintext connections, and psycopg
+        # spells this sslmode rather than asyncpg's ssl.
+        sslmode=config.get("sslmode", "require"),
+    )
+
+
+def _build_s3_connector(config: dict[str, Any], *, read_only: bool) -> Any:
+    if not read_only:
+        raise ValueError("s3 connector is read-only. Set read_only=True.")
+
+    from metronome_pulse_s3 import S3ReadonlyPulse
+
+    return S3ReadonlyPulse(
+        bucket=config["bucket"],
+        tables=config.get("tables") or {},
+        region=config.get("region", "us-east-1"),
+        access_key_id=config.get("access_key_id", ""),
+        secret_access_key=config.get("secret_access_key", ""),
+        session_token=config.get("session_token", ""),
+        endpoint_url=config.get("endpoint_url", ""),
     )
 
 

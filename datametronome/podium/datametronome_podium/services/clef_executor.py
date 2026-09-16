@@ -19,22 +19,25 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 from datametronome_podium.features.checks.model import (
-    CheckRun,
-    SeverityConfig,
     SeverityLevel,
-    SeverityThreshold,
-    evaluate_severity,
 )
 from datametronome_podium.features.clefs.model import Clef
 from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.core.query import quote_identifier as _quote_ident
+from datametronome_podium.core.sql_dialect import dialect_for
 from datametronome_podium.core.connector_factory import create_connector
 
 
 def _qi(name: str, stave: Stave) -> str:
-    """Quote identifier using the correct dialect for the stave's data source."""
-    dialect = "bigquery" if stave.data_source_type == "bigquery" else "ansi"
-    return _quote_ident(name, dialect=dialect)
+    """Quote identifier using the correct dialect for the stave's data source.
+
+    For checks that emit the same SQL everywhere and so never look the dialect
+    up themselves.
+    """
+    dialect = dialect_for(stave.data_source_type)
+    style = dialect.quote_style if dialect else "ansi"
+    return _quote_ident(name, dialect=style)
+
 
 try:
     from datametronome_brain_base.forecasting import SarimaForecaster  # type: ignore
@@ -110,6 +113,24 @@ class CheckResult:
         self.metadata = value or {}
 
 
+def _unsupported(clef: Clef, stave: Stave, check: str) -> CheckResult:
+    """The one place a check declines a data source it cannot query.
+
+    Each check used to carry its own copy of this, and they disagreed: some
+    returned status "error", others "fail", with the same meaning.
+    """
+    return CheckResult(
+        clef_id=clef.id,
+        stave_id=stave.id,
+        status="error",
+        observed_value=None,
+        message=f"{check} not supported for {stave.data_source_type}",
+        metadata={"error": "unsupported_data_source"},
+        execution_time=0.0,
+        timestamp=datetime.now(timezone.utc),
+    )
+
+
 class ClefExecutor:
     """
     Executes data quality checks (clefs) against data sources (staves).
@@ -164,8 +185,6 @@ class ClefExecutor:
 
             logger.info(f"Executing clef '{clef.name}' on stave '{stave.name}'")
 
-            # Route to appropriate check handler
-            # TDD-compliant check types (new)
             if clef.check_type == "column_values":
                 result = await self._execute_column_values_check(clef, stave, connector)
             elif clef.check_type == "row_count":
@@ -182,25 +201,6 @@ class ClefExecutor:
                 result = await self._execute_lookup_validation_check(
                     clef, stave, connector
                 )
-            # Legacy check types (for backward compatibility)
-            elif clef.check_type == "null_check":
-                result = await self._execute_null_check(clef, stave, connector)
-            elif clef.check_type == "uniqueness_check":
-                result = await self._execute_uniqueness_check(clef, stave, connector)
-            elif clef.check_type == "range_check":
-                result = await self._execute_range_check(clef, stave, connector)
-            elif clef.check_type == "pattern_check":
-                result = await self._execute_pattern_check(clef, stave, connector)
-            elif clef.check_type == "freshness_check":
-                result = await self._execute_freshness_check(clef, stave, connector)
-            elif clef.check_type == "volume_check":
-                result = await self._execute_volume_check(clef, stave, connector)
-            elif clef.check_type == "custom_sql":
-                result = await self._execute_custom_sql_check(clef, stave, connector)
-            elif clef.check_type == "schema_check":
-                result = await self._execute_schema_check(clef, stave, connector)
-            elif clef.check_type == "referential_check":
-                result = await self._execute_referential_check(clef, stave, connector)
             else:
                 result = CheckResult(
                     clef_id=clef.id,
@@ -248,654 +248,6 @@ class ClefExecutor:
         self._update_stats(result)
         logger.info(f"Clef '{clef.name}' completed: {result.severity}")
         return result
-
-    async def _execute_null_check(
-        self, clef: Clef, stave: Stave, db_connector: Any
-    ) -> CheckResult:
-        """Execute a NULL value check."""
-        config = clef.config
-        table = config["table"]
-        column = config["column"]
-        threshold = config.get("threshold", 0.0)
-
-        # Build SQL query to count NULLs
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
-        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT({qc}) as non_null_rows,
-                COUNT(*) - COUNT({qc}) as null_rows
-            FROM {qt}
-            """
-        elif stave.data_source_type == "sqlite":
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT({qc}) as non_null_rows,
-                COUNT(*) - COUNT({qc}) as null_rows
-            FROM {qt}
-            """
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"NULL check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        # Execute query
-        result_rows = await db_connector.query({"sql": sql})
-
-        if not result_rows:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message="Query returned no results",
-                metadata={"error": "empty_result"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        row = result_rows[0]
-        total_rows = row["total_rows"]
-        null_rows = row["null_rows"]
-
-        if total_rows == 0:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="warn",
-                observed_value=None,
-                message="Table is empty",
-                metadata={"total_rows": 0, "null_rows": 0, "null_percentage": 0.0},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        null_percentage = null_rows / total_rows
-
-        # Evaluate result using severity system
-        severity = self._evaluate_null_check_severity(clef, null_percentage)
-
-        # Generate appropriate message
-        if severity == SeverityLevel.HARMONY:
-            message = f"NULL check passed: {null_percentage:.2%} NULLs (threshold: {threshold:.2%})"
-        elif severity == SeverityLevel.DISSONANCE:
-            message = f"NULL check warning: {null_percentage:.2%} NULLs exceeds warning threshold"
-        else:  # CACOPHONY
-            message = f"NULL check failed: {null_percentage:.2%} NULLs exceeds critical threshold {threshold:.2%}"
-
-        return CheckResult(
-            clef_id=clef.id,
-            stave_id=stave.id,
-            status=severity.value.lower(),
-            observed_value=null_percentage,
-            message=message,
-            metadata={
-                "total_rows": total_rows,
-                "null_rows": null_rows,
-                "null_percentage": null_percentage,
-                "threshold": threshold,
-                "table": table,
-                "column": column,
-            },
-            execution_time=0.0,
-            timestamp=datetime.now(timezone.utc),
-            anomalies_count=null_rows if severity != SeverityLevel.HARMONY else 0,
-        )
-
-    async def _execute_range_check(
-        self, clef: Clef, stave: Stave, db_connector: Any
-    ) -> CheckResult:
-        """Execute a range validation check."""
-        config = clef.config
-        table = config["table"]
-        column = config["column"]
-        min_val = config.get("min")
-        max_val = config.get("max")
-
-        if min_val is None and max_val is None:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message="Range check requires at least min or max value",
-                metadata={"error": "invalid_config"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        # Build SQL query to check values outside range
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
-        conditions = []
-        if min_val is not None:
-            conditions.append(f"{qc} < {min_val}")
-        if max_val is not None:
-            conditions.append(f"{qc} > {max_val}")
-
-        where_clause = " OR ".join(conditions)
-
-        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {where_clause} THEN 1 END) as out_of_range_rows,
-                MIN({qc}) as min_value,
-                MAX({qc}) as max_value
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        elif stave.data_source_type == "sqlite":
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {where_clause} THEN 1 END) as out_of_range_rows,
-                MIN({qc}) as min_value,
-                MAX({qc}) as max_value
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message=f"Range check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        # Execute query
-        result_rows = await db_connector.query({"sql": sql})
-
-        if not result_rows:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message="Query returned no results",
-                metadata={"error": "empty_result"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        row = result_rows[0]
-        total_rows = row["total_rows"]
-        out_of_range_rows = row["out_of_range_rows"]
-        actual_min = row["min_value"]
-        actual_max = row["max_value"]
-
-        if total_rows == 0:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="warn",
-                message="No non-null values found",
-                metadata={"total_rows": 0, "out_of_range_rows": 0},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        # Evaluate result
-        if out_of_range_rows == 0:
-            status = "pass"
-            message = (
-                f"Range check passed: all values within range [{min_val}, {max_val}]"
-            )
-        else:
-            status = "fail"
-            message = f"Range check failed: {out_of_range_rows} values outside range [{min_val}, {max_val}]"
-
-        return CheckResult(
-            clef_id=clef.id,
-            stave_id=stave.id,
-            status=status,
-            message=message,
-            metadata={
-                "total_rows": total_rows,
-                "out_of_range_rows": out_of_range_rows,
-                "expected_range": {"min": min_val, "max": max_val},
-                "actual_range": {"min": actual_min, "max": actual_max},
-                "table": table,
-                "column": column,
-            },
-            execution_time=0.0,
-            timestamp=datetime.now(timezone.utc),
-            anomalies_count=out_of_range_rows if status == "fail" else 0,
-        )
-
-    async def _execute_volume_check(
-        self, clef: Clef, stave: Stave, db_connector: Any
-    ) -> CheckResult:
-        """Execute a row count (volume) check."""
-        config = clef.config
-        table = config["table"]
-        expected_min = config.get("expected_min")
-        expected_max = config.get("expected_max")
-
-        if expected_min is None and expected_max is None:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message="Volume check requires at least expected_min or expected_max",
-                metadata={"error": "invalid_config"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        # Build SQL query to count rows
-        if stave.data_source_type in ["postgres", "postgresql", "mysql", "sqlite"]:
-            sql = f"SELECT COUNT(*) as row_count FROM {_qi(table, stave)}"
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message=f"Volume check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        # Execute query
-        result_rows = await db_connector.query({"sql": sql})
-
-        if not result_rows:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message="Query returned no results",
-                metadata={"error": "empty_result"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        actual_count = result_rows[0]["row_count"]
-
-        # Evaluate result
-        issues = []
-        if expected_min is not None and actual_count < expected_min:
-            issues.append(f"too few rows ({actual_count} < {expected_min})")
-        if expected_max is not None and actual_count > expected_max:
-            issues.append(f"too many rows ({actual_count} > {expected_max})")
-
-        if not issues:
-            status = "pass"
-            message = f"Volume check passed: {actual_count} rows within expected range [{expected_min}, {expected_max}]"
-        else:
-            status = "fail"
-            message = f"Volume check failed: {', '.join(issues)}"
-
-        return CheckResult(
-            clef_id=clef.id,
-            stave_id=stave.id,
-            status=status,
-            message=message,
-            metadata={
-                "actual_count": actual_count,
-                "expected_range": {"min": expected_min, "max": expected_max},
-                "table": table,
-            },
-            execution_time=0.0,
-            timestamp=datetime.now(timezone.utc),
-            anomalies_count=1 if status == "fail" else 0,
-        )
-
-    async def _execute_custom_sql_check(
-        self, clef: Clef, stave: Stave, db_connector: Any
-    ) -> CheckResult:
-        """Execute a custom SQL check."""
-        config = clef.config
-        sql = config["query"]
-        expected_result = config.get("expected_result")
-        expected_min = config.get("expected_min")
-        expected_max = config.get("expected_max")
-
-        if not sql:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message="Custom SQL check requires a query",
-                metadata={"error": "missing_query"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        # Execute custom SQL
-        try:
-            result_rows = await db_connector.query({"sql": sql})
-
-            if not result_rows:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="warn",
-                    message="Custom SQL returned no results",
-                    metadata={"query": sql, "results": []},
-                    execution_time=0.0,
-                    timestamp=datetime.now(timezone.utc),
-                )
-
-            # Get the first result (assuming single value queries)
-            result_value = result_rows[0]
-
-            # Evaluate against expectations
-            if expected_result is not None:
-                if result_value == expected_result:
-                    status = "pass"
-                    message = f"Custom SQL check passed: result {result_value} matches expected {expected_result}"
-                else:
-                    status = "fail"
-                    message = f"Custom SQL check failed: result {result_value} does not match expected {expected_result}"
-            elif expected_min is not None or expected_max is not None:
-                # Convert to numeric if possible
-                try:
-                    numeric_value = float(result_value)
-                    if expected_min is not None and numeric_value < expected_min:
-                        status = "fail"
-                        message = f"Custom SQL check failed: result {numeric_value} below minimum {expected_min}"
-                    elif expected_max is not None and numeric_value > expected_max:
-                        status = "fail"
-                        message = f"Custom SQL check failed: result {numeric_value} above maximum {expected_max}"
-                    else:
-                        status = "pass"
-                        message = f"Custom SQL check passed: result {numeric_value} within range [{expected_min}, {expected_max}]"
-                except (ValueError, TypeError):
-                    status = "error"
-                    message = f"Custom SQL check failed: cannot convert result to numeric for range comparison"
-            else:
-                # No specific expectations, just report the result
-                status = "pass"
-                message = f"Custom SQL check completed: {result_value}"
-
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status=status,
-                message=message,
-                metadata={
-                    "query": sql,
-                    "result": result_value,
-                    "expected_result": expected_result,
-                    "expected_range": {"min": expected_min, "max": expected_max},
-                    "all_results": result_rows,
-                },
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-                anomalies_count=1 if status == "fail" else 0,
-            )
-
-        except Exception as e:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Custom SQL execution failed: {str(e)}",
-                metadata={"error": str(e), "query": sql},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-    async def _execute_uniqueness_check(
-        self, clef: Clef, stave: Stave, db_connector: Any
-    ) -> CheckResult:
-        """Execute a uniqueness check."""
-        config = clef.config
-        table = config["table"]
-        column = config["column"]
-
-        # Build SQL query to find duplicates
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
-        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
-            sql = f"""
-            SELECT
-                {qc},
-                COUNT(*) as duplicate_count
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            GROUP BY {qc}
-            HAVING COUNT(*) > 1
-            ORDER BY duplicate_count DESC
-            LIMIT 10
-            """
-        elif stave.data_source_type == "sqlite":
-            sql = f"""
-            SELECT
-                {qc},
-                COUNT(*) as duplicate_count
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            GROUP BY {qc}
-            HAVING COUNT(*) > 1
-            ORDER BY duplicate_count DESC
-            LIMIT 10
-            """
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message=f"Uniqueness check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        # Execute query
-        duplicate_rows = await db_connector.query({"sql": sql})
-
-        # Evaluate result
-        if not duplicate_rows:
-            status = "pass"
-            message = f"Uniqueness check passed: no duplicate values found in {column}"
-        else:
-            status = "fail"
-            total_duplicates = sum(row["duplicate_count"] for row in duplicate_rows)
-            message = f"Uniqueness check failed: {len(duplicate_rows)} duplicate values found ({total_duplicates} total duplicate rows)"
-
-        return CheckResult(
-            clef_id=clef.id,
-            stave_id=stave.id,
-            status=status,
-            message=message,
-            metadata={
-                "table": table,
-                "column": column,
-                "duplicate_count": len(duplicate_rows),
-                "duplicates": duplicate_rows[:5],  # Show first 5 duplicates
-            },
-            execution_time=0.0,
-            timestamp=datetime.now(timezone.utc),
-            anomalies_count=len(duplicate_rows) if status == "fail" else 0,
-        )
-
-    async def _execute_pattern_check(
-        self, clef: Clef, stave: Stave, db_connector: Any
-    ) -> CheckResult:
-        """Execute a pattern/regex check."""
-        config = clef.config
-        table = config["table"]
-        column = config["column"]
-        pattern = config["pattern"]
-
-        # Build SQL query to find non-matching patterns
-        # Note: SQL regex support varies by database
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
-        if stave.data_source_type in ["postgres", "postgresql"]:
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {qc} ~ '{pattern}' THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN {qc} !~ '{pattern}' THEN 1 END) as non_matching_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        elif stave.data_source_type == "bigquery":
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN REGEXP_CONTAINS({qc}, r'{pattern}') THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN NOT REGEXP_CONTAINS({qc}, r'{pattern}') THEN 1 END) as non_matching_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        elif stave.data_source_type == "mysql":
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {qc} REGEXP '{pattern}' THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN {qc} NOT REGEXP '{pattern}' THEN 1 END) as non_matching_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        elif stave.data_source_type == "sqlite":
-            # SQLite has limited regex support, use LIKE as fallback
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="warn",
-                message="Pattern check not fully supported in SQLite",
-                metadata={"error": "limited_regex_support"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message=f"Pattern check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        # Execute query
-        result_rows = await db_connector.query({"sql": sql})
-
-        if not result_rows:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message="Query returned no results",
-                metadata={"error": "empty_result"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        row = result_rows[0]
-        total_rows = row["total_rows"]
-        non_matching_rows = row["non_matching_rows"]
-
-        if total_rows == 0:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="warn",
-                message="No non-null values found",
-                metadata={"total_rows": 0, "non_matching_rows": 0},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
-
-        # Evaluate result
-        if non_matching_rows == 0:
-            status = "pass"
-            message = f"Pattern check passed: all values match pattern '{pattern}'"
-        else:
-            status = "fail"
-            message = f"Pattern check failed: {non_matching_rows} values do not match pattern '{pattern}'"
-
-        return CheckResult(
-            clef_id=clef.id,
-            stave_id=stave.id,
-            status=status,
-            message=message,
-            metadata={
-                "total_rows": total_rows,
-                "non_matching_rows": non_matching_rows,
-                "pattern": pattern,
-                "table": table,
-                "column": column,
-            },
-            execution_time=0.0,
-            timestamp=datetime.now(timezone.utc),
-            anomalies_count=non_matching_rows if status == "fail" else 0,
-        )
-
-    async def _execute_schema_check(
-        self, clef: Clef, stave: Stave, db_connector: Any
-    ) -> CheckResult:
-        """Execute a schema validation check."""
-        # This would check if the table schema matches expectations
-        # Implementation depends on database type and specific requirements
-        return CheckResult(
-            clef_id=clef.id,
-            stave_id=stave.id,
-            status="info",
-            message="Schema check not yet implemented",
-            metadata={
-                "note": "Schema validation requires database-specific metadata queries"
-            },
-            execution_time=0.0,
-            timestamp=datetime.now(timezone.utc),
-        )
-
-    async def _execute_referential_check(
-        self, clef: Clef, stave: Stave, db_connector: Any
-    ) -> CheckResult:
-        """Execute a referential integrity check."""
-        # This would check foreign key relationships
-        # Implementation depends on database type and specific requirements
-        return CheckResult(
-            clef_id=clef.id,
-            stave_id=stave.id,
-            status="info",
-            message="Referential check not yet implemented",
-            metadata={
-                "note": "Referential integrity requires database-specific constraint queries"
-            },
-            execution_time=0.0,
-            timestamp=datetime.now(timezone.utc),
-        )
-
-    def _evaluate_null_check_severity(
-        self, clef: Clef, null_percentage: float
-    ) -> SeverityLevel:
-        """Evaluate severity for a null check based on configured thresholds."""
-        # Get severity configuration from clef
-        severity_config = clef.severity_config
-
-        if not severity_config:
-            # Use default threshold logic
-            config = clef.config
-            threshold = config.get("threshold", 0.0)
-
-            if null_percentage <= threshold:
-                return SeverityLevel.HARMONY
-            else:
-                return SeverityLevel.CACOPHONY
-
-        # Use configured severity thresholds
-        threshold = SeverityConfig.parse_from_yaml_config(severity_config)
-        return threshold.evaluate(null_percentage)
 
     def _update_stats(self, result: CheckResult):
         """Update execution statistics."""
@@ -1249,11 +601,13 @@ class ClefExecutor:
         parsed: Dict[str, Any],
     ) -> CheckResult:
         """Execute if_not_unique condition check - finds duplicate values."""
-        # Build SQL to find duplicates
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
-        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
-            sql = f"""
+        dialect = dialect_for(stave.data_source_type)
+        if dialect is None:
+            return _unsupported(clef, stave, "Uniqueness check")
+
+        qt = dialect.quote(table)
+        qc = dialect.quote(column)
+        sql = f"""
             SELECT
                 COUNT(*) as total_rows,
                 COUNT(DISTINCT {qc}) as unique_values,
@@ -1261,24 +615,6 @@ class ClefExecutor:
             FROM {qt}
             WHERE {qc} IS NOT NULL
             """
-        elif stave.data_source_type == "sqlite":
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(DISTINCT {qc}) as unique_values,
-                COUNT(*) - COUNT(DISTINCT {qc}) as duplicate_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Uniqueness check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-            )
 
         results = await db_connector.query({"sql": sql})
 
@@ -1372,58 +708,21 @@ class ClefExecutor:
                 metadata={"error": "missing_allowed_values"},
             )
 
-        # Build SQL to count values not in allowed list
-        # Escape values for SQL injection safety
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
-        if stave.data_source_type in ["postgres", "postgresql"]:
-            # Use array syntax for PostgreSQL
-            values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
-            sql = f"""
+        dialect = dialect_for(stave.data_source_type)
+        if dialect is None:
+            return _unsupported(clef, stave, "if_not_in check")
+
+        qt = dialect.quote(table)
+        qc = dialect.quote(column)
+        not_in_list = dialect.counted(f"NOT {dialect.in_list(qc, allowed_values)}")
+
+        sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
+                {not_in_list} as not_in_list_rows
             FROM {qt}
             WHERE {qc} IS NOT NULL
             """
-        elif stave.data_source_type == "mysql":
-            values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        elif stave.data_source_type == "sqlite":
-            values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        elif stave.data_source_type == "bigquery":
-            # BigQuery uses different syntax
-            escaped_values = [str(v).replace("'", "''") for v in allowed_values]
-            values_list = ", ".join(f"'{v}'" for v in escaped_values)
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNTIF({qc} NOT IN ({values_list})) as not_in_list_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"if_not_in check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-            )
 
         results = await db_connector.query({"sql": sql})
 
@@ -1695,65 +994,6 @@ class ClefExecutor:
             return observed_value == threshold
         except (ValueError, TypeError):
             return False
-
-    async def _execute_data_profile_drift_check(
-        self, clef: Clef, stave: Stave, db_connector: Any = None
-    ) -> CheckResult:
-        """Execute data profile drift check (TDD Level 3: Advanced Declarative)."""
-        try:
-            # For now, return a mock result since this is a complex ML-based check
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="pass",
-                observed_value=0.05,
-                message="Data profile drift check passed: minimal drift detected",
-                metadata={
-                    "check_type": "data_profile_drift",
-                    "drift_score": 0.05,
-                    "threshold": 0.1,
-                    "note": "Mock implementation - would use ML models in production",
-                },
-            )
-        except Exception as e:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Data profile drift check failed: {str(e)}",
-                metadata={"error": str(e)},
-            )
-
-    async def _execute_forecast_check(
-        self, clef: Clef, stave: Stave, db_connector: Any = None
-    ) -> CheckResult:
-        """Execute forecast check (TDD Level 2: Intelligent)."""
-        try:
-            # For now, return a mock result since this is a complex ML-based check
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="pass",
-                observed_value=1250,
-                message="Forecast check passed: data volume within expected range",
-                metadata={
-                    "check_type": "forecast",
-                    "predicted_value": 1250,
-                    "actual_value": 1200,
-                    "confidence": 95,
-                    "note": "Mock implementation - would use SARIMA models in production",
-                },
-            )
-        except Exception as e:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Forecast check failed: {str(e)}",
-                metadata={"error": str(e)},
-            )
 
     async def _execute_lookup_validation_check(
         self, clef: Clef, stave: Stave, db_connector: Any = None

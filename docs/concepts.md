@@ -63,13 +63,13 @@ DataMetronome uses musical terminology to make data quality monitoring more intu
 - Detects anomalies, null values, duplicates, etc.
 
 **Check Types**:
-- `null_check` - Find NULL values in columns
-- `uniqueness_check` - Find duplicate values
-- `range_check` - Find values outside expected range
-- `pattern_check` - Match against regex patterns
-- `freshness_check` - Check data recency
-- `volume_check` - Monitor row counts
-- `custom_sql` - Custom SQL queries
+- `column_values` - NULL, uniqueness, and allowed-value checks on a column
+- `row_count` - Monitor table volume
+- `freshness` - Check data recency
+- `forecast` - ML-based anomaly detection
+- `data_profile_drift` - Detect distribution drift
+- `lookup_validation` - Cross-table reference checks
+- `python` - Custom Python check
 
 **Example**:
 ```json
@@ -77,12 +77,13 @@ DataMetronome uses musical terminology to make data quality monitoring more intu
   "id": "clef-001",
   "stave_id": "stave-001",
   "name": "Check for NULL emails",
-  "check_type": "null_check",
+  "check_type": "column_values",
   "config": {
     "table": "users",
     "column": "email",
-    "threshold": 0.01
+    "condition": "if_null"
   },
+  "fail": "if_null > 0%",
   "schedule": "0 * * * *",
   "is_active": true
 }
@@ -222,13 +223,15 @@ stave = {
 clefs = [
     {
         "name": "Ensure all orders have valid amounts",
-        "check_type": "range_check",
-        "config": {"table": "orders", "column": "amount", "min": 0}
+        "check_type": "column_values",
+        "config": {"table": "orders", "column": "amount", "condition": "if_null"},
+        "fail": "if_null > 0%",
     },
     {
         "name": "Check for duplicate order IDs",
-        "check_type": "uniqueness_check",
-        "config": {"table": "orders", "column": "order_id"}
+        "check_type": "column_values",
+        "config": {"table": "orders", "column": "order_id", "condition": "if_not_unique"},
+        "fail": "if_not_unique > 0",
     }
 ]
 

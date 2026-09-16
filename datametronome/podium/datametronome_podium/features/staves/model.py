@@ -5,18 +5,17 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 # Supported data source types
+# Only types create_connector can actually build. A stave whose type has no
+# connector can be created and can even pass a connection test, but every check
+# against it fails, which is worse than not offering it.
 SUPPORTED_DATA_SOURCES = [
     "postgres",
     "postgresql",
-    "mysql",
+    "redshift",
     "sqlite",
-    "mongodb",
-    "redis",
-    "snowflake",
     "bigquery",
+    "s3",
     "dbt",
-    "api",
-    "http",
 ]
 
 

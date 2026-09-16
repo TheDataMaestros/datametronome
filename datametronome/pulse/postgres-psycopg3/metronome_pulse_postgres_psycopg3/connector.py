@@ -16,6 +16,7 @@ except ImportError:
 
     AsyncConnectionPool = pool.AsyncConnectionPool
 
+from .pool import open_pool
 from .sql_builder import PostgresPsycopgSQLBuilder
 
 
@@ -55,10 +56,10 @@ class PostgresPsycopg3Pulse(Pulse, Readable, Writable):
 
     async def connect(self):
         """Establish connection pool to PostgreSQL using psycopg3."""
-        self._pool = await AsyncConnectionPool.connect(  # ty: ignore[unresolved-attribute]
+        self._pool = await open_pool(
             host=self._host,
             port=self._port,
-            dbname=self._database,
+            database=self._database,
             user=self._user,
             password=self._password,
             **self._kwargs,

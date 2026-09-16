@@ -121,10 +121,12 @@ def load_staves_from_yaml(
           - id: clef-001
             stave_id: stave-001
             name: "Email Check"
-            check_type: null_check
+            check_type: column_values
             config:
               table: users
               column: email
+              condition: if_null
+            fail: "if_null > 0%"
     """
     yaml_path = Path(yaml_path)
 
@@ -211,9 +213,12 @@ def load_single_stave_yaml(
             host: localhost
         clefs:
           - name: "Email Check"
-            check_type: null_check
+            check_type: column_values
             config:
               table: users
+              column: email
+              condition: if_null
+            fail: "if_null > 0%"
     """
     yaml_path = Path(yaml_path)
 
@@ -301,49 +306,46 @@ async def import_staves_from_yaml(
     staves_imported = 0
     clefs_imported = 0
 
-    # Import staves
     for stave in staves:
-        # Check if exists
-        existing = await db.query(
-            {"sql": "SELECT id FROM staves WHERE id = ?", "params": [stave.id]}
-        )
-
-        if existing and not overwrite:
-            print(f"⚠️  Skipping existing stave: {stave.name} (id={stave.id})")
-            continue
-
-        # Serialize and save
-        stave_data = serialize_stave(stave)
-        success = await db.write([{"table": "staves", **stave_data}], "staves")
-
-        if success:
+        if await _put_row(db, "staves", serialize_stave(stave), overwrite=overwrite):
             staves_imported += 1
             print(f"✅ Imported stave: {stave.name}")
         else:
-            print(f"❌ Failed to import stave: {stave.name}")
+            print(f"⚠️  Skipping existing stave: {stave.name} (id={stave.id})")
 
-    # Import clefs
     for clef in clefs:
-        # Check if exists
-        existing = await db.query(
-            {"sql": "SELECT id FROM clefs WHERE id = ?", "params": [clef.id]}
-        )
-
-        if existing and not overwrite:
-            print(f"⚠️  Skipping existing clef: {clef.name} (id={clef.id})")
-            continue
-
-        # Serialize and save
-        clef_data = serialize_clef(clef)
-        success = await db.write([{"table": "clefs", **clef_data}], "clefs")
-
-        if success:
+        if await _put_row(db, "clefs", serialize_clef(clef), overwrite=overwrite):
             clefs_imported += 1
             print(f"✅ Imported clef: {clef.name}")
         else:
-            print(f"❌ Failed to import clef: {clef.name}")
+            print(f"⚠️  Skipping existing clef: {clef.name} (id={clef.id})")
 
     return {"staves": staves_imported, "clefs": clefs_imported}
+
+
+async def _put_row(db, table: str, row: dict, *, overwrite: bool) -> bool:
+    """Insert, or UPDATE in place when overwrite is set.
+
+    DELETE+INSERT would trip clefs.stave_id (no ON DELETE CASCADE).
+    """
+    found = await db.query(
+        {"sql": f"SELECT id FROM {table} WHERE id = ?", "params": [row["id"]]}
+    )
+    if found and not overwrite:
+        return False
+    if found:
+        # YAML does not own tenancy or the circuit breaker.
+        data = {
+            k: v for k, v in row.items() if k not in {"id", "group_id", "paused"}
+        }
+        assignments = ", ".join(f"{k} = ?" for k in data)
+        await db.execute(
+            f"UPDATE {table} SET {assignments} WHERE id = ?",
+            [*data.values(), row["id"]],
+        )
+    else:
+        await db.write([row], table)
+    return True
 
 
 def validate_yaml_config(yaml_path: str | Path) -> dict[str, Any]:

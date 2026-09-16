@@ -134,34 +134,52 @@ sequenceDiagram
 
 ## Quick Start
 
-### Docker Compose (recommended)
+### First run
 
 ```bash
 git clone https://github.com/datametronome/datametronome.git
 cd datametronome
 cp env.example .env
+```
 
-# Start the full stack (API + PostgreSQL + Redis + RabbitMQ + UI)
-make up
+Generate the two keys and put them in `.env`. Both, not just the first:
+
+```bash
+openssl rand -hex 32   # DATAMETRONOME_SECRET_KEY
+openssl rand -hex 32   # DATAMETRONOME_ENCRYPTION_KEY
+```
+
+`SECRET_KEY` signs sessions. `ENCRYPTION_KEY` encrypts the database passwords
+you give your staves. When `ENCRYPTION_KEY` is empty it is derived from
+`SECRET_KEY`, which means changing the signing key later makes every stored
+credential undecryptable and every check fails with `InvalidToken`. Setting
+both now avoids that.
+
+Then start it. Use `up-workers`, not `up`, if you want checks to actually run:
+
+```bash
+make up-workers   # full stack + Celery worker + Beat scheduler
+make up           # stack only; checks queue but nothing executes them
 ```
 
 - **API:** http://localhost:8001
 - **UI:** http://localhost:3000
-- **Login:** `admin` / `admin`
+
+Open the UI. On a completely fresh database it shows a setup wizard that
+creates the first admin account. There is no default login; self-service
+registration is deliberately disabled, and every account after the first is
+created by an admin under **Users**.
 
 ```bash
-# Start with Celery workers (adds worker + Beat scheduler containers)
-make up-workers
-
-# Run database migrations
-make migrate
-
-# View logs
-make logs
-
-# Stop everything
-make down
+make seed      # create demo users, a data source and a check (dev only)
+make migrate   # run Alembic migrations inside Docker
+make logs      # tail logs, ARGS=podium to filter
+make down      # stop everything
 ```
+
+If port 3000 or 8001 is already taken on your machine, the UI or API container
+will fail to bind and the rest of the stack will look healthy while one piece
+is missing. `docker-compose ps -a` shows a container stuck in `created`.
 
 ### Create Your First Check
 
@@ -186,7 +204,7 @@ staves:
 
       - id: "email-quality"
         name: "Email Completeness"
-        check_type: "null_percentage"
+        check_type: "column_values"
         config:
           table: "users"
           column: "email"

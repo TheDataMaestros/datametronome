@@ -1,23 +1,30 @@
 # Single Stave Configuration
 # Example: One production database with its checks
+#
+# Import with:  python scripts/import_staves.py examples/production-db.yaml
+#
+# ${VAR} is read from the environment at import time. ${VAR:-default} falls
+# back when the variable is unset.
 
-stave:
-  id: stave-prod-001
-  name: Production Database
-  description: Main production PostgreSQL database
-  data_source_type: postgres
-  connection_config:
-    host: ${DB_HOST}
-    port: ${DB_PORT:-5432}  # Default to 5432 if not set
-    database: ${DB_NAME}
-    user: ${DB_USER}
-    password: ${DB_PASSWORD}
-    ssl_mode: require
-    connect_timeout: 30
-  is_active: true
+staves:
+  - id: stave-prod-001
+    name: Production Database
+    description: Main production PostgreSQL database
+    data_source_type: postgres
+    connection_config:
+      host: ${DB_HOST}
+      port: ${DB_PORT:-5432}
+      database: ${DB_NAME}
+      user: ${DB_USER}
+      password: ${DB_PASSWORD}
+      # RDS and Aurora with rds.force_ssl=1 reject plaintext connections.
+      ssl: require
+    is_active: true
 
 clefs:
-  - name: User Email Check
+  - id: clef-prod-users-email-null
+    stave_id: stave-prod-001
+    name: User Email Check
     check_type: column_values
     config:
       table: users
@@ -25,8 +32,11 @@ clefs:
       condition: if_null
     fail: if_null > 0%
     schedule: "@hourly"
+    is_active: true
 
-  - name: User Age Range
+  - id: clef-prod-users-age-range
+    stave_id: stave-prod-001
+    name: User Age Range
     check_type: column_values
     config:
       table: users
@@ -34,11 +44,15 @@ clefs:
       min: 0
       max: 150
     schedule: "@daily"
+    is_active: true
 
-  - name: Daily User Volume
+  - id: clef-prod-users-volume
+    stave_id: stave-prod-001
+    name: Daily User Volume
     check_type: row_count
     config:
       table: users
     warn: "> 50000"
     fail: "< 1000"
     schedule: "0 8 * * *"
+    is_active: true
