@@ -5,9 +5,10 @@ Ported from api/schemas/clef.py — preserves all existing validators.
 from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
+# "python" is deliberately absent; see LEVEL_4_CHECKS in model.py.
 VALID_CHECK_TYPES = [
     "row_count", "freshness", "column_values", "forecast",
-    "data_profile_drift", "lookup_validation", "python",
+    "data_profile_drift", "lookup_validation",
 ]
 
 

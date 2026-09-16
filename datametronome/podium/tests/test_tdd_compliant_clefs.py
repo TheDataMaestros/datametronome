@@ -331,36 +331,6 @@ class TestTDDCompliantClefs:
         assert lookup_clef.level == 3
         assert lookup_clef.level_description == "Advanced Declarative Checks"
 
-    def test_tdd_level_4_custom_code(self):
-        """Test Level 4 Custom Code examples."""
-        print(f"\n🎵 LEVEL 4: CUSTOM CODE EXAMPLES")
-
-        # Python custom script check
-        python_clef = Clef(
-            id="clef-python",
-            stave_id="stave-users",
-            name="Complex User Business Rules Validation",
-            check_type="python",
-            config={
-                "script_path": "datametronome_scripts/user_business_rules.py",
-                "params": {
-                    "min_age": 18,
-                    "required_fields": ["email", "name", "phone"],
-                    "business_rules": "premium_user_validation",
-                    "compliance_threshold": 0.95,
-                },
-            },
-            warn="> 0",
-            fail="> 10",
-            schedule="@daily",
-        )
-
-        print(
-            f"   ✅ {python_clef.name}: {python_clef.check_type} (Level {python_clef.level})"
-        )
-        assert python_clef.level == 4
-        assert python_clef.level_description == "Custom Code"
-
     def test_condition_string_examples(self):
         """Test various condition string formats per TDD specification."""
         print(f"\n🎵 CONDITION STRING EXAMPLES (TDD SPECIFICATION)")
@@ -473,15 +443,17 @@ class TestTDDCompliantClefs:
                 fail="> 20%",
                 schedule="@hourly",
             ),
-            # Level 4: Custom Code
+            # Level 3: Advanced Declarative
             Clef(
                 id="clef-orders-business",
                 stave_id=stave.id,
-                name="Order Business Rules Validation",
-                check_type="python",
+                name="Order Currency Validation",
+                check_type="lookup_validation",
                 config={
-                    "script_path": "business_rules/order_validation.py",
-                    "params": {"min_amount": 0.01, "max_amount": 100000},
+                    "table": "orders",
+                    "column": "currency",
+                    "lookup_table": "currencies",
+                    "lookup_column": "code",
                 },
                 warn="> 0",
                 fail="> 5",

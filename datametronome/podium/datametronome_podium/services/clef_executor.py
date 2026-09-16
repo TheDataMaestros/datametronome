@@ -113,21 +113,55 @@ class CheckResult:
         self.metadata = value or {}
 
 
-def _unsupported(clef: Clef, stave: Stave, check: str) -> CheckResult:
-    """The one place a check declines a data source it cannot query.
+def _cannot_run(
+    clef: Clef,
+    stave: Stave,
+    message: str,
+    *,
+    error: str,
+    status: str = "fail",
+    **metadata: Any,
+) -> CheckResult:
+    """A check that never got as far as producing a value.
 
-    Each check used to carry its own copy of this, and they disagreed: some
-    returned status "error", others "fail", with the same meaning.
+    Bad config, no connector, a query that came back empty. Every check spelled
+    this out in full, nineteen times, and they disagreed on details: some set
+    status "error" and others "fail" for the same condition, some passed
+    execution_time=0.0 and a timestamp, most left both to __post_init__.
+
+    That repetition is not only noise. It is what let two mock implementations
+    sit shadowed in this file, each reading as plausible on its own.
     """
     return CheckResult(
         clef_id=clef.id,
         stave_id=stave.id,
-        status="error",
+        status=status,
         observed_value=None,
-        message=f"{check} not supported for {stave.data_source_type}",
-        metadata={"error": "unsupported_data_source"},
-        execution_time=0.0,
-        timestamp=datetime.now(timezone.utc),
+        message=message,
+        metadata={"error": error, **metadata},
+    )
+
+
+def _no_rows(clef: Clef, stave: Stave, sql: str) -> CheckResult:
+    """The query ran and came back empty.
+
+    The SQL goes in the metadata because it is the only thing that explains an
+    empty result. Three of the four sites passed it and the fourth did not,
+    which is the one you would have had to debug blind.
+    """
+    return _cannot_run(
+        clef, stave, "Query returned no results", error="empty_result", sql=sql
+    )
+
+
+def _unsupported(clef: Clef, stave: Stave, check: str) -> CheckResult:
+    """The one place a check declines a data source it cannot query."""
+    return _cannot_run(
+        clef,
+        stave,
+        f"{check} not supported for {stave.data_source_type}",
+        error="unsupported_data_source",
+        status="error",
     )
 
 
@@ -185,32 +219,16 @@ class ClefExecutor:
 
             logger.info(f"Executing clef '{clef.name}' on stave '{stave.name}'")
 
-            if clef.check_type == "column_values":
-                result = await self._execute_column_values_check(clef, stave, connector)
-            elif clef.check_type == "row_count":
-                result = await self._execute_row_count_check(clef, stave, connector)
-            elif clef.check_type == "freshness":
-                result = await self._execute_freshness_check(clef, stave, connector)
-            elif clef.check_type == "forecast":
-                result = await self._execute_forecast_check(clef, stave, connector)
-            elif clef.check_type == "data_profile_drift":
-                result = await self._execute_data_profile_drift_check(
-                    clef, stave, connector
-                )
-            elif clef.check_type == "lookup_validation":
-                result = await self._execute_lookup_validation_check(
-                    clef, stave, connector
+            runner = self._RUNNERS.get(clef.check_type)
+            if runner is None:
+                result = _cannot_run(
+                    clef,
+                    stave,
+                    f"Unknown check type: {clef.check_type}",
+                    error="unsupported_check_type",
                 )
             else:
-                result = CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message=f"Unknown check type: {clef.check_type}",
-                    metadata={"error": "unsupported_check_type"},
-                    timestamp=start_time,
-                )
+                result = await runner(self, clef, stave, connector)
 
         except Exception as e:
             logger.error(f"Error executing clef '{clef.name}': {e}")
@@ -399,13 +417,11 @@ class ClefExecutor:
         """
         try:
             if db_connector is None:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message="Column values check requires a connected data source",
-                    metadata={"error": "missing_connector"},
+                return _cannot_run(
+                    clef,
+                    stave,
+                    "Column values check requires a connected data source",
+                    error="missing_connector",
                 )
 
             config = clef.config
@@ -413,25 +429,21 @@ class ClefExecutor:
             column = config.get("column")
 
             if not table or not column:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message="Missing table or column in column_values check config",
-                    metadata={"error": "missing_config"},
+                return _cannot_run(
+                    clef,
+                    stave,
+                    "Missing table or column in column_values check config",
+                    error="missing_config",
                 )
 
             # Get condition from fail field (per TDD spec) or warn field
             condition_str = clef.fail or clef.warn
             if not condition_str:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message="Column values check requires a condition in 'fail' or 'warn' field",
-                    metadata={"error": "missing_condition"},
+                return _cannot_run(
+                    clef,
+                    stave,
+                    "Column values check requires a condition in 'fail' or 'warn' field",
+                    error="missing_condition",
                 )
 
             # Parse the condition
@@ -439,17 +451,13 @@ class ClefExecutor:
             condition_type = parsed.get("type")
 
             if condition_type == "unknown":
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message=f"Failed to parse condition: {condition_str}. Error: {parsed.get('error', 'unknown')}",
-                    metadata={
-                        "error": "condition_parse_error",
-                        "condition": condition_str,
-                        "parsed": parsed,
-                    },
+                return _cannot_run(
+                    clef,
+                    stave,
+                    f"Failed to parse condition: {condition_str}. Error: {parsed.get('error', 'unknown')}",
+                    error="condition_parse_error",
+                    condition=condition_str,
+                    parsed=parsed,
                 )
 
             # Execute appropriate check based on condition type
@@ -466,28 +474,23 @@ class ClefExecutor:
                     clef, stave, db_connector, table, column, parsed
                 )
             else:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message=f"Unsupported condition type: {condition_type}",
-                    metadata={
-                        "error": "unsupported_condition_type",
-                        "condition": condition_str,
-                        "parsed": parsed,
-                    },
+                return _cannot_run(
+                    clef,
+                    stave,
+                    f"Unsupported condition type: {condition_type}",
+                    error="unsupported_condition_type",
+                    condition=condition_str,
+                    parsed=parsed,
                 )
 
         except Exception as e:
             logger.exception(f"Error in column_values check: {e}")
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Column values check failed: {str(e)}",
-                metadata={"error": str(e), "exception_type": type(e).__name__},
+            return _cannot_run(
+                clef,
+                stave,
+                f"Column values check failed: {str(e)}",
+                error=str(e),
+                exception_type=type(e).__name__,
             )
 
     async def _execute_column_values_if_null(
@@ -513,14 +516,7 @@ class ClefExecutor:
         results = await db_connector.query({"sql": sql})
 
         if not results:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message="Query returned no results",
-                metadata={"error": "empty_result", "sql": sql},
-            )
+            return _no_rows(clef, stave, sql)
 
         row = results[0]
         total_rows = row.get("total_rows", 0)
@@ -619,14 +615,7 @@ class ClefExecutor:
         results = await db_connector.query({"sql": sql})
 
         if not results:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message="Query returned no results",
-                metadata={"error": "empty_result", "sql": sql},
-            )
+            return _no_rows(clef, stave, sql)
 
         row = results[0]
         total_rows = row.get("total_rows", 0)
@@ -699,13 +688,11 @@ class ClefExecutor:
         """Execute if_not_in condition check - finds values not in allowed list."""
         allowed_values = parsed.get("values", [])
         if not allowed_values:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message="if_not_in condition requires a list of allowed values",
-                metadata={"error": "missing_allowed_values"},
+            return _cannot_run(
+                clef,
+                stave,
+                "if_not_in condition requires a list of allowed values",
+                error="missing_allowed_values",
             )
 
         dialect = dialect_for(stave.data_source_type)
@@ -727,14 +714,7 @@ class ClefExecutor:
         results = await db_connector.query({"sql": sql})
 
         if not results:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message="Query returned no results",
-                metadata={"error": "empty_result", "sql": sql},
-            )
+            return _no_rows(clef, stave, sql)
 
         row = results[0]
         total_rows = row.get("total_rows", 0)
@@ -801,52 +781,39 @@ class ClefExecutor:
         """Execute row count check (TDD Level 1: Simple Declarative)."""
         try:
             if db_connector is None:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message="Row count check requires a connected data source",
-                    metadata={"error": "missing_connector"},
+                return _cannot_run(
+                    clef,
+                    stave,
+                    "Row count check requires a connected data source",
+                    error="missing_connector",
                 )
 
             config = clef.config
             table = config.get("table")
 
             if not table:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message="Missing table in row_count check config",
-                    metadata={"error": "missing_table"},
+                return _cannot_run(
+                    clef,
+                    stave,
+                    "Missing table in row_count check config",
+                    error="missing_table",
                 )
 
             sql = f"SELECT COUNT(*) as row_count FROM {_qi(table, stave)}"
             results = await db_connector.query({"sql": sql})
 
             if not results:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message="Query returned no results",
-                    metadata={"error": "empty_result"},
-                )
+                return _no_rows(clef, stave, sql)
 
             row = results[0]
             row_count = row.get("row_count")
 
             if row_count is None:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message="Row count query did not return 'row_count' column",
-                    metadata={"error": "missing_row_count"},
+                return _cannot_run(
+                    clef,
+                    stave,
+                    "Row count query did not return 'row_count' column",
+                    error="missing_row_count",
                 )
 
             # Evaluate conditions - fail takes precedence over warn
@@ -885,13 +852,11 @@ class ClefExecutor:
             )
 
         except Exception as e:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Row count check failed: {str(e)}",
-                metadata={"error": str(e)},
+            return _cannot_run(
+                clef,
+                stave,
+                f"Row count check failed: {str(e)}",
+                error=str(e),
             )
 
     def _evaluate_condition(self, observed_value: Any, condition_str: str) -> bool:
@@ -1016,13 +981,11 @@ class ClefExecutor:
                 },
             )
         except Exception as e:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Lookup validation check failed: {str(e)}",
-                metadata={"error": str(e)},
+            return _cannot_run(
+                clef,
+                stave,
+                f"Lookup validation check failed: {str(e)}",
+                error=str(e),
             )
 
     async def _execute_freshness_check(
@@ -1031,13 +994,11 @@ class ClefExecutor:
         """Execute freshness check (TDD Level 1: Simple Declarative)."""
         try:
             if db_connector is None:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message="Freshness check requires a connected data source",
-                    metadata={"error": "missing_connector"},
+                return _cannot_run(
+                    clef,
+                    stave,
+                    "Freshness check requires a connected data source",
+                    error="missing_connector",
                 )
 
             def _parse_duration_to_hours(value):
@@ -1087,13 +1048,11 @@ class ClefExecutor:
             column = config.get("column", "updated_at")
 
             if not table:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="fail",
-                    observed_value=None,
-                    message="Missing table in freshness check config",
-                    metadata={"error": "missing_table"},
+                return _cannot_run(
+                    clef,
+                    stave,
+                    "Missing table in freshness check config",
+                    error="missing_table",
                 )
 
             max_age_input = config.get("max_age_hours", config.get("max_age", 24))
@@ -1185,13 +1144,11 @@ class ClefExecutor:
             )
 
         except Exception as e:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Freshness check failed: {str(e)}",
-                metadata={"error": str(e)},
+            return _cannot_run(
+                clef,
+                stave,
+                f"Freshness check failed: {str(e)}",
+                error=str(e),
             )
 
     async def _execute_forecast_check(
@@ -1204,14 +1161,12 @@ class ClefExecutor:
         timestamp_column = config.get("timestamp_column", "timestamp")
 
         if not query:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
+            return _cannot_run(
+                clef,
+                stave,
+                "Forecast check requires a 'query' configuration",
+                error="missing_query",
                 status="error",
-                observed_value=None,
-                message="Forecast check requires a 'query' configuration",
-                metadata={"error": "missing_query"},
-                timestamp=datetime.now(timezone.utc),
             )
 
         try:
@@ -1388,14 +1343,11 @@ class ClefExecutor:
 
         except Exception as e:
             logger.error(f"Forecast check failed: {e}", exc_info=True)
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Forecast analysis failed: {str(e)}",
-                metadata={"error": str(e)},
-                timestamp=datetime.now(timezone.utc),
+            return _cannot_run(
+                clef,
+                stave,
+                f"Forecast analysis failed: {str(e)}",
+                error=str(e),
             )
 
     async def _execute_data_profile_drift_check(
@@ -1412,28 +1364,21 @@ class ClefExecutor:
         critical_p_value = config.get("critical_p_value", 0.05)
 
         if DriftDetector is None:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message="Drift check requires optional dependency (scipy). Install it or disable Level 2/3 drift checks.",
-                metadata={
-                    "error": "missing_optional_dependency",
-                    "dependencies": ["scipy"],
-                },
-                timestamp=datetime.now(timezone.utc),
+            return _cannot_run(
+                clef,
+                stave,
+                "Drift check requires optional dependency (scipy). Install it or disable Level 2/3 drift checks.",
+                error="missing_optional_dependency",
+                dependencies=["scipy"],
             )
 
         if not table or not column:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
+            return _cannot_run(
+                clef,
+                stave,
+                "Drift check requires 'table' and 'column'",
+                error="missing_config",
                 status="error",
-                observed_value=None,
-                message="Drift check requires 'table' and 'column'",
-                metadata={"error": "missing_config"},
-                timestamp=datetime.now(timezone.utc),
             )
 
         try:
@@ -1476,14 +1421,12 @@ class ClefExecutor:
                 baseline_floats = [float(x) for x in baseline_values]
                 current_floats = [float(x) for x in current_values]
             except (ValueError, TypeError):
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
+                return _cannot_run(
+                    clef,
+                    stave,
+                    "Drift check currently only supports numeric columns for KS test",
+                    error="non_numeric_data",
                     status="error",
-                    observed_value=None,
-                    message="Drift check currently only supports numeric columns for KS test",
-                    metadata={"error": "non_numeric_data"},
-                    timestamp=datetime.now(timezone.utc),
                 )
 
             drift_result = detector.kolmogorov_smirnov_test(
@@ -1519,16 +1462,26 @@ class ClefExecutor:
 
         except Exception as e:
             logger.error(f"Drift check failed: {e}", exc_info=True)
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Drift analysis failed: {str(e)}",
-                metadata={"error": str(e)},
-                timestamp=datetime.now(timezone.utc),
+            return _cannot_run(
+                clef,
+                stave,
+                f"Drift analysis failed: {str(e)}",
+                error=str(e),
             )
 
+
+
+    # One entry per check type. Keys must match
+    # features.clefs.model.SUPPORTED_CHECK_TYPES; test_check_type_coverage.py
+    # asserts that, so a clef cannot be created with a type nothing runs.
+    _RUNNERS = {
+        "column_values": _execute_column_values_check,
+        "row_count": _execute_row_count_check,
+        "freshness": _execute_freshness_check,
+        "forecast": _execute_forecast_check,
+        "data_profile_drift": _execute_data_profile_drift_check,
+        "lookup_validation": _execute_lookup_validation_check,
+    }
 
 # =============================================================================
 # Module-level helper functions (backward compatible API)
