@@ -11,8 +11,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 SUPPORTED_DATA_SOURCES = [
     "postgres",
     "postgresql",
+    "redshift",
     "sqlite",
     "bigquery",
+    "s3",
     "dbt",
 ]
 

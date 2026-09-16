@@ -42,6 +42,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # The s3 connector's unit tests substitute local paths for S3 URIs, so
+      # they never load httpfs, issue CREATE SECRET, or resolve an s3:// URI.
+      # Those are the parts that break. MinIO gives them something to talk to.
+      # Not a services: block, because that cannot pass a server command.
+      - name: Start MinIO
+        run: |
+          # quay.io, not docker.io: the Docker Hub minio/minio repo is not
+          # publicly pullable and bitnami/minio no longer exists.
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            quay.io/minio/minio:latest server /data
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:9000/minio/health/live > /dev/null; then
+              echo "minio up after ${i}s"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "MinIO never became healthy"
+          docker logs minio
+          exit 1
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
@@ -55,13 +78,16 @@ jobs:
           # errors, and gains new rules between releases. Unpinned, any upstream
           # release breaks the build on code that has not changed.
           uv pip install pytest pytest-asyncio pytest-cov pytest-mock pytest-timeout 'ty==0.0.80'
+          # boto3 creates the MinIO bucket in the s3 integration tests. The
+          # connector itself never uses it; DuckDB's httpfs speaks S3 directly.
+          uv pip install boto3
           # Install core first for dependencies
           uv pip install -e ./datametronome/pulse/core
           uv pip install -e ./datametronome/pulse/sqlite
           uv pip install -e ./datametronome/pulse/postgres-psycopg3
-          uv pip install -e ./datametronome/pulse/postgres-sqlalchemy
           uv pip install -e ./datametronome/pulse/postgres
           uv pip install -e ./datametronome/pulse/dbt
+          uv pip install -e ./datametronome/pulse/s3
           uv pip install -e ./datametronome/brain/base
           uv pip install -e ./datametronome/podium
           # Install runtime deps not covered by -e
@@ -78,9 +104,15 @@ jobs:
           uv run pytest datametronome/pulse/core/tests/ -v --timeout=60
           uv run pytest datametronome/pulse/postgres/tests/ -v --timeout=60
           uv run pytest datametronome/pulse/postgres-psycopg3/tests/ -v --timeout=60
-          uv run pytest datametronome/pulse/postgres-sqlalchemy/tests/ -v --timeout=60
           uv run pytest datametronome/pulse/sqlite/tests/ -v --timeout=60
           uv run pytest datametronome/pulse/dbt/tests/ -v --timeout=60 --ignore=datametronome/pulse/dbt/tests/test_real_artifacts.py
+          uv run pytest datametronome/pulse/s3/tests/ -v --timeout=120
+        env:
+          # Turns on the MinIO integration tests, which are skipped without it.
+          S3_TEST_ENDPOINT: http://localhost:9000
+          S3_TEST_BUCKET: test-bucket
+          S3_TEST_KEY_ID: minioadmin
+          S3_TEST_SECRET: minioadmin
 
       - name: Run Podium Tests
         run: uv run pytest datametronome/podium/tests/ -v --timeout=60
@@ -217,7 +249,7 @@ jobs:
       - name: Build pulse packages
         run: |
           mkdir -p dist
-          for pkg in core postgres postgres-psycopg3 postgres-sqlalchemy sqlite bigquery dbt; do
+          for pkg in core postgres postgres-psycopg3 sqlite bigquery dbt s3; do
             echo "::group::build $pkg"
             uv build "datametronome/pulse/$pkg" --out-dir dist
             echo "::endgroup::"

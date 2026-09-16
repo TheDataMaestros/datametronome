@@ -28,13 +28,20 @@ from datametronome_podium.features.checks.model import (
 from datametronome_podium.features.clefs.model import Clef
 from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.core.query import quote_identifier as _quote_ident
+from datametronome_podium.core.sql_dialect import dialect_for
 from datametronome_podium.core.connector_factory import create_connector
 
 
 def _qi(name: str, stave: Stave) -> str:
-    """Quote identifier using the correct dialect for the stave's data source."""
-    dialect = "bigquery" if stave.data_source_type == "bigquery" else "ansi"
-    return _quote_ident(name, dialect=dialect)
+    """Quote identifier using the correct dialect for the stave's data source.
+
+    For checks that emit the same SQL everywhere and so never look the dialect
+    up themselves.
+    """
+    dialect = dialect_for(stave.data_source_type)
+    style = dialect.quote_style if dialect else "ansi"
+    return _quote_ident(name, dialect=style)
+
 
 try:
     from datametronome_brain_base.forecasting import SarimaForecaster  # type: ignore
@@ -108,6 +115,24 @@ class CheckResult:
     @details.setter
     def details(self, value: Dict[str, Any]):
         self.metadata = value or {}
+
+
+def _unsupported(clef: Clef, stave: Stave, check: str) -> CheckResult:
+    """The one place a check declines a data source it cannot query.
+
+    Each check used to carry its own copy of this, and they disagreed: some
+    returned status "error", others "fail", with the same meaning.
+    """
+    return CheckResult(
+        clef_id=clef.id,
+        stave_id=stave.id,
+        status="error",
+        observed_value=None,
+        message=f"{check} not supported for {stave.data_source_type}",
+        metadata={"error": "unsupported_data_source"},
+        execution_time=0.0,
+        timestamp=datetime.now(timezone.utc),
+    )
 
 
 class ClefExecutor:
@@ -258,36 +283,19 @@ class ClefExecutor:
         column = config["column"]
         threshold = config.get("threshold", 0.0)
 
-        # Build SQL query to count NULLs
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
-        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
-            sql = f"""
+        dialect = dialect_for(stave.data_source_type)
+        if dialect is None:
+            return _unsupported(clef, stave, "NULL check")
+
+        qt = dialect.quote(table)
+        qc = dialect.quote(column)
+        sql = f"""
             SELECT
                 COUNT(*) as total_rows,
                 COUNT({qc}) as non_null_rows,
                 COUNT(*) - COUNT({qc}) as null_rows
             FROM {qt}
             """
-        elif stave.data_source_type == "sqlite":
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT({qc}) as non_null_rows,
-                COUNT(*) - COUNT({qc}) as null_rows
-            FROM {qt}
-            """
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"NULL check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
 
         # Execute query
         result_rows = await db_connector.query({"sql": sql})
@@ -373,47 +381,29 @@ class ClefExecutor:
                 timestamp=datetime.now(timezone.utc),
             )
 
-        # Build SQL query to check values outside range
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
+        dialect = dialect_for(stave.data_source_type)
+        if dialect is None:
+            return _unsupported(clef, stave, "Range check")
+
+        qt = dialect.quote(table)
+        qc = dialect.quote(column)
         conditions = []
         if min_val is not None:
             conditions.append(f"{qc} < {min_val}")
         if max_val is not None:
             conditions.append(f"{qc} > {max_val}")
 
-        where_clause = " OR ".join(conditions)
+        out_of_range = dialect.counted(" OR ".join(conditions))
 
-        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
-            sql = f"""
+        sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {where_clause} THEN 1 END) as out_of_range_rows,
+                {out_of_range} as out_of_range_rows,
                 MIN({qc}) as min_value,
                 MAX({qc}) as max_value
             FROM {qt}
             WHERE {qc} IS NOT NULL
             """
-        elif stave.data_source_type == "sqlite":
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {where_clause} THEN 1 END) as out_of_range_rows,
-                MIN({qc}) as min_value,
-                MAX({qc}) as max_value
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message=f"Range check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
 
         # Execute query
         result_rows = await db_connector.query({"sql": sql})
@@ -494,19 +484,11 @@ class ClefExecutor:
                 timestamp=datetime.now(timezone.utc),
             )
 
-        # Build SQL query to count rows
-        if stave.data_source_type in ["postgres", "postgresql", "mysql", "sqlite"]:
-            sql = f"SELECT COUNT(*) as row_count FROM {_qi(table, stave)}"
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message=f"Volume check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
+        dialect = dialect_for(stave.data_source_type)
+        if dialect is None:
+            return _unsupported(clef, stave, "Volume check")
+
+        sql = f"SELECT COUNT(*) as row_count FROM {dialect.quote(table)}"
 
         # Execute query
         result_rows = await db_connector.query({"sql": sql})
@@ -658,11 +640,13 @@ class ClefExecutor:
         table = config["table"]
         column = config["column"]
 
-        # Build SQL query to find duplicates
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
-        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
-            sql = f"""
+        dialect = dialect_for(stave.data_source_type)
+        if dialect is None:
+            return _unsupported(clef, stave, "Uniqueness check")
+
+        qt = dialect.quote(table)
+        qc = dialect.quote(column)
+        sql = f"""
             SELECT
                 {qc},
                 COUNT(*) as duplicate_count
@@ -673,28 +657,6 @@ class ClefExecutor:
             ORDER BY duplicate_count DESC
             LIMIT 10
             """
-        elif stave.data_source_type == "sqlite":
-            sql = f"""
-            SELECT
-                {qc},
-                COUNT(*) as duplicate_count
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            GROUP BY {qc}
-            HAVING COUNT(*) > 1
-            ORDER BY duplicate_count DESC
-            LIMIT 10
-            """
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message=f"Uniqueness check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
 
         # Execute query
         duplicate_rows = await db_connector.query({"sql": sql})
@@ -733,58 +695,36 @@ class ClefExecutor:
         column = config["column"]
         pattern = config["pattern"]
 
-        # Build SQL query to find non-matching patterns
-        # Note: SQL regex support varies by database
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
-        if stave.data_source_type in ["postgres", "postgresql"]:
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {qc} ~ '{pattern}' THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN {qc} !~ '{pattern}' THEN 1 END) as non_matching_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        elif stave.data_source_type == "bigquery":
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN REGEXP_CONTAINS({qc}, r'{pattern}') THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN NOT REGEXP_CONTAINS({qc}, r'{pattern}') THEN 1 END) as non_matching_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        elif stave.data_source_type == "mysql":
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {qc} REGEXP '{pattern}' THEN 1 END) as matching_rows,
-                COUNT(CASE WHEN {qc} NOT REGEXP '{pattern}' THEN 1 END) as non_matching_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        elif stave.data_source_type == "sqlite":
-            # SQLite has limited regex support, use LIKE as fallback
+        dialect = dialect_for(stave.data_source_type)
+        if dialect is None:
+            return _unsupported(clef, stave, "Pattern check")
+
+        if not dialect.supports_regex:
+            # SQLite's REGEXP is an optional extension and is normally absent.
             return CheckResult(
                 clef_id=clef.id,
                 stave_id=stave.id,
                 status="warn",
-                message="Pattern check not fully supported in SQLite",
+                message=f"Pattern check not fully supported in {stave.data_source_type}",
                 metadata={"error": "limited_regex_support"},
                 execution_time=0.0,
                 timestamp=datetime.now(timezone.utc),
             )
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="error",
-                message=f"Pattern check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-                execution_time=0.0,
-                timestamp=datetime.now(timezone.utc),
-            )
+
+        qt = dialect.quote(table)
+        qc = dialect.quote(column)
+        matches = dialect.matches(qc, pattern)
+        matching = dialect.counted(matches)
+        non_matching = dialect.counted(f"NOT {matches}")
+
+        sql = f"""
+            SELECT
+                COUNT(*) as total_rows,
+                {matching} as matching_rows,
+                {non_matching} as non_matching_rows
+            FROM {qt}
+            WHERE {qc} IS NOT NULL
+            """
 
         # Execute query
         result_rows = await db_connector.query({"sql": sql})
@@ -1249,11 +1189,13 @@ class ClefExecutor:
         parsed: Dict[str, Any],
     ) -> CheckResult:
         """Execute if_not_unique condition check - finds duplicate values."""
-        # Build SQL to find duplicates
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
-        if stave.data_source_type in ["postgres", "postgresql", "mysql", "bigquery"]:
-            sql = f"""
+        dialect = dialect_for(stave.data_source_type)
+        if dialect is None:
+            return _unsupported(clef, stave, "Uniqueness check")
+
+        qt = dialect.quote(table)
+        qc = dialect.quote(column)
+        sql = f"""
             SELECT
                 COUNT(*) as total_rows,
                 COUNT(DISTINCT {qc}) as unique_values,
@@ -1261,24 +1203,6 @@ class ClefExecutor:
             FROM {qt}
             WHERE {qc} IS NOT NULL
             """
-        elif stave.data_source_type == "sqlite":
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(DISTINCT {qc}) as unique_values,
-                COUNT(*) - COUNT(DISTINCT {qc}) as duplicate_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Uniqueness check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-            )
 
         results = await db_connector.query({"sql": sql})
 
@@ -1372,58 +1296,21 @@ class ClefExecutor:
                 metadata={"error": "missing_allowed_values"},
             )
 
-        # Build SQL to count values not in allowed list
-        # Escape values for SQL injection safety
-        qt = _qi(table, stave)
-        qc = _qi(column, stave)
-        if stave.data_source_type in ["postgres", "postgresql"]:
-            # Use array syntax for PostgreSQL
-            values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
-            sql = f"""
+        dialect = dialect_for(stave.data_source_type)
+        if dialect is None:
+            return _unsupported(clef, stave, "if_not_in check")
+
+        qt = dialect.quote(table)
+        qc = dialect.quote(column)
+        not_in_list = dialect.counted(f"NOT {dialect.in_list(qc, allowed_values)}")
+
+        sql = f"""
             SELECT
                 COUNT(*) as total_rows,
-                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
+                {not_in_list} as not_in_list_rows
             FROM {qt}
             WHERE {qc} IS NOT NULL
             """
-        elif stave.data_source_type == "mysql":
-            values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        elif stave.data_source_type == "sqlite":
-            values_list = "', '".join(str(v).replace("'", "''") for v in allowed_values)
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNT(CASE WHEN {qc} NOT IN ('{values_list}') THEN 1 END) as not_in_list_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        elif stave.data_source_type == "bigquery":
-            # BigQuery uses different syntax
-            escaped_values = [str(v).replace("'", "''") for v in allowed_values]
-            values_list = ", ".join(f"'{v}'" for v in escaped_values)
-            sql = f"""
-            SELECT
-                COUNT(*) as total_rows,
-                COUNTIF({qc} NOT IN ({values_list})) as not_in_list_rows
-            FROM {qt}
-            WHERE {qc} IS NOT NULL
-            """
-        else:
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"if_not_in check not supported for {stave.data_source_type}",
-                metadata={"error": "unsupported_data_source"},
-            )
 
         results = await db_connector.query({"sql": sql})
 

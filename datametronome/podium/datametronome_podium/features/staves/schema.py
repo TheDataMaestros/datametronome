@@ -4,7 +4,14 @@ from pydantic import BaseModel, field_validator
 # Only types create_connector can actually build. A stave whose type has no
 # connector can be created and can even pass a connection test, but every check
 # against it fails, which is worse than not offering it.
-VALID_DATA_SOURCE_TYPES = ["postgres", "sqlite", "bigquery", "dbt"]
+VALID_DATA_SOURCE_TYPES = [
+    "postgres",
+    "redshift",
+    "sqlite",
+    "bigquery",
+    "s3",
+    "dbt",
+]
 
 
 class StaveCreate(BaseModel):

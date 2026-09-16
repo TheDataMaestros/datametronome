@@ -19,7 +19,7 @@ The codebase uses musical metaphors throughout. You must understand these to nav
 - **Clef** = Quality check definition (a rule attached to a stave)
 - **Check** = Execution result of a clef (pass/warn/fail)
 - **Podium** = The FastAPI backend API server
-- **Pulse** = Database connector library (postgres, sqlite, bigquery adapters)
+- **Pulse** = Database connector library (postgres, redshift, sqlite, bigquery, s3, dbt adapters)
 - **Brain** = ML/statistics engine (SARIMA forecasting, drift detection, isolation forest)
 - **Orchestrator** = AI chat router that classifies intent and dispatches to sub-agents
 
@@ -53,7 +53,7 @@ datametronome/
       archetypes/                    # Domain classification YAML templates
     alembic/                         # Database migrations
     tests/                           # pytest tests
-  datametronome/pulse/               # Database connectors (core, postgres, sqlite, bigquery, postgres-psycopg3, postgres-sqlalchemy)
+  datametronome/pulse/               # Database connectors (core, postgres, postgres-psycopg3, sqlite, bigquery, s3, dbt)
   datametronome/brain/               # ML models
   ui-nuxt/                           # Nuxt 3 frontend
   docker-compose.yml                 # Full stack: postgres + rabbitmq + redis + podium + worker + beat + UI

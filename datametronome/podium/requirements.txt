@@ -58,9 +58,14 @@ httpx==0.28.1
 # Pydantic AI for multi-agent orchestration
 pydantic-ai==2.43.0
 
-# Database connectors (DataPulse). Local workspace package, installed editable,
-# so this stays a floor rather than a pin.
+# Database connectors (DataPulse). Local workspace packages, installed
+# editable, so these stay floors rather than pins.
 metronome-pulse-postgres>=0.1.0
+# Redshift. asyncpg cannot connect to Redshift, so this is not an alternative
+# PostgreSQL driver, it is the only one that works there.
+metronome-pulse-postgres-psycopg3>=0.1.0
+# S3 objects as SQL tables, via DuckDB.
+metronome-pulse-s3>=0.1.0
 
 # Migrations (Alembic + async drivers for SQLAlchemy)
 alembic==1.20.0
