@@ -21,7 +21,6 @@ This guide covers deploying DataMetronome in various environments, from local de
    pip install -e ./datametronome/pulse/core
    pip install -e ./datametronome/pulse/sqlite
    pip install -e ./datametronome/pulse/postgres
-   pip install -e ./datametronome/pulse/postgres-sqlalchemy
    pip install -e ./datametronome/pulse/postgres-psycopg3
 
    # Install Podium API

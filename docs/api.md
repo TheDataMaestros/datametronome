@@ -159,28 +159,6 @@ connector = Psycopg3Connector(
 )
 ```
 
-### PostgreSQL Connector (SQLAlchemy)
-
-**Package**: `metronome-pulse-postgres-sqlalchemy`
-
-ORM-based connector with SQLAlchemy:
-
-```python
-from metronome_pulse_postgres_sqlalchemy import SQLAlchemyConnector
-
-connector = SQLAlchemyConnector(
-    connection_string="postgresql+asyncpg://user:pass@localhost/mydb"
-)
-
-# Use with SQLAlchemy models
-from sqlalchemy import select
-from your_models import User
-
-async with connector.session() as session:
-    result = await session.execute(select(User).where(User.age > 25))
-    users = result.scalars().all()
-```
-
 ### SQLite Connector
 
 **Package**: `metronome-pulse-sqlite`

@@ -191,7 +191,6 @@ ruff check metronome_pulse_core tests
 
 - **PostgreSQL**: `metronome-pulse-postgres` - High-performance async PostgreSQL
 - **PostgreSQL (psycopg3)**: `metronome-pulse-postgres-psycopg3` - Modern psycopg3 driver
-- **PostgreSQL (SQLAlchemy)**: `metronome-pulse-postgres-sqlalchemy` - SQLAlchemy integration
 - **SQLite**: `metronome-pulse-sqlite` - Lightweight SQLite support
 - **MongoDB**: `metronome-pulse-mongodb` - Document database support
 - **Redis**: `metronome-pulse-redis` - In-memory data store

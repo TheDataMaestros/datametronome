@@ -135,7 +135,7 @@ Import the configuration:
 
 ```bash
 cd datametronome/podium
-python scripts/import_yaml.py --file bigquery-stave.yaml
+python scripts/import_staves.py bigquery-stave.yaml
 ```
 
 ### Method 3: REST API

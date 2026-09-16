@@ -323,7 +323,6 @@ checks:
 # Install specific connector
 pip install metronome-pulse-postgres  # PostgreSQL (asyncpg)
 pip install metronome-pulse-postgres-psycopg3  # PostgreSQL (psycopg3)
-pip install metronome-pulse-postgres-sqlalchemy  # PostgreSQL (SQLAlchemy)
 pip install metronome-pulse-sqlite  # SQLite
 
 # Or install from source

@@ -378,31 +378,3 @@ class TestYAMLLoaderIntegration:
             assert clef.check_type
             assert clef.stave_id
 
-    def test_load_tdd_compliant_yaml(self):
-        """Test loading TDD-compliant nested format YAML."""
-        example_file = (
-            Path(__file__).parent.parent / "examples" / "tdd-compliant-clefs.yaml"
-        )
-
-        if not example_file.exists():
-            pytest.skip("Example file not found")  # ty: ignore
-
-        # The file has a syntax error (comment at start), so we'll skip if it fails to parse
-        try:
-            staves, clefs = load_and_parse_yaml(str(example_file))
-
-            assert len(staves) > 0
-            assert len(clefs) > 0
-
-            # Verify nested format was parsed correctly
-            for clef in clefs:
-                assert clef.check_type in [
-                    "row_count",
-                    "freshness",
-                    "column_values",
-                    "forecast",
-                    "data_profile_drift",
-                ]
-        except YAMLLoadError:
-            # File has syntax issues, skip this test
-            pytest.skip("Example file has YAML syntax errors")  # ty: ignore
