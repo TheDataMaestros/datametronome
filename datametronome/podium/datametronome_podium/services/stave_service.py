@@ -182,7 +182,7 @@ def create_clef(
     Args:
         stave_id: ID of the Stave this check belongs to
         name: Human-readable name for the check
-        check_type: Type of check (null_check, range_check, etc.)
+        check_type: Type of check (column_values, row_count, freshness, etc.)
         config: Check configuration parameters
         description: Optional description
         schedule: Optional cron expression for scheduling
@@ -195,8 +195,9 @@ def create_clef(
         >>> clef = create_clef(
         ...     stave_id="stave-123",
         ...     name="Email NULL Check",
-        ...     check_type="null_check",
-        ...     config={"table": "users", "column": "email", "threshold": 0.01}
+        ...     check_type="column_values",
+        ...     config={"table": "users", "column": "email", "condition": "if_null"},
+        ...     fail="if_null > 0%",
         ... )
     """
     return Clef(

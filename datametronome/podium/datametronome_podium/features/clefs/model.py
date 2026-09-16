@@ -35,17 +35,6 @@ CHECK_LEVEL_MAPPING = {
     **{check: 4 for check in LEVEL_4_CHECKS},
 }
 
-LEGACY_CHECK_MAPPING = {
-    "volume_check": "row_count",
-    "freshness_check": "freshness",
-    "null_check": "column_values",
-    "range_check": "column_values",
-    "pattern_check": "column_values",
-    "uniqueness_check": "column_values",
-    "drift_detection": "data_profile_drift",
-    "custom_python": "python",
-}
-
 
 class ClefRow(BaseModel):
     """Minimal DB row DTO — fields map 1:1 to the clefs table columns.
@@ -86,10 +75,6 @@ class Clef(BaseModel):
     config: dict[str, Any] = Field(default_factory=dict)
     warn: str | None = None
     fail: str | None = None
-    severity_config: dict[str, Any] = Field(
-        default_factory=dict,
-        description="Legacy severity configuration (deprecated, use warn/fail instead)",
-    )
     schedule: str | None = None
     retry_config: dict[str, Any] | None = None
     is_active: bool = Field(default=True)
@@ -121,20 +106,6 @@ class Clef(BaseModel):
                 "config cannot be empty. "
                 "Provide configuration parameters for the check."
             )
-        return v
-
-    @field_validator("severity_config")
-    @classmethod
-    def validate_severity_config(cls, v: dict[str, Any]) -> dict[str, Any]:
-        if not v:
-            return v
-        valid_keys = {"warn", "fail", "pass", "dissonance", "cacophony", "harmony"}
-        for key in v.keys():
-            if key not in valid_keys:
-                raise ValueError(
-                    f"Invalid severity config key: '{key}'. "
-                    f"Valid keys: {', '.join(valid_keys)}"
-                )
         return v
 
     @field_validator("name")
@@ -190,13 +161,3 @@ class Clef(BaseModel):
             4: "Custom Code",
         }
         return level_descriptions.get(self.level, "Unknown")
-
-    @property
-    def tier(self) -> int:
-        """Legacy alias for level."""
-        return self.level
-
-    @property
-    def tier_description(self) -> str:
-        """Legacy alias for level_description."""
-        return self.level_description

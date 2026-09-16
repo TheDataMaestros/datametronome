@@ -66,7 +66,6 @@ DIALECTS: dict[str, Dialect] = {
     "postgresql": Dialect("postgresql"),
     # Redshift forked from PostgreSQL 8.0 and kept the ~ operator.
     "redshift": Dialect("redshift"),
-    "mysql": Dialect("mysql", regex="{col} REGEXP {pattern}"),
     # SQLite's REGEXP is an optional extension that is usually absent.
     "sqlite": Dialect("sqlite", regex=None),
     "bigquery": Dialect(

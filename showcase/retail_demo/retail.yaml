@@ -13,7 +13,7 @@ clefs:
 
   - name: "User Email Integrity"
     stave_id: retail-db-001
-    check_type: "column_values"  # Replaces legacy null_check
+    check_type: "column_values"
     schedule: "*/10 * * * *"
     warn: "if_null > 5%"
     fail: "if_null > 10%"

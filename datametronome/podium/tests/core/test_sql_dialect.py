@@ -85,9 +85,6 @@ class TestRegex:
         expr = d("bigquery").matches("`c`", r"\d+")
         assert expr == "REGEXP_CONTAINS(`c`, r'\\d+')"
 
-    def test_mysql_uses_the_regexp_keyword(self):
-        assert d("mysql").matches("`c`", "^a") == "`c` REGEXP '^a'"
-
     def test_sqlite_declares_no_regex_support(self):
         assert d("sqlite").supports_regex is False
         with pytest.raises(ValueError, match="no regular expression support"):

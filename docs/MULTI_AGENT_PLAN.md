@@ -124,6 +124,5 @@ make docker-migrate      # Run migrations (if DB exists in ./data)
 - **Sub-agents config**: `datametronome_podium/services/sub_agents.py`
 - **Orchestrator**: `datametronome_podium/services/orchestrator.py`
 - **Tracing service**: `datametronome_podium/services/agent_tracing.py`
-- **Traces table**: `agent_traces` (migration 003)
-- **Migration script**: `datametronome/podium/scripts/migrate_agent_traces.py`
+- **Traces table**: `agent_traces` (created by Alembic `001_initial_schema`)
 - **Config**: `DATAMETRONOME_ADK_MODEL_QUICK` (optional fast model for quick intent)

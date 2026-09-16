@@ -341,8 +341,8 @@ class ConfigurationValidator:
 
             # Check if clef type is appropriate for stave type
             if stave.data_source_type == "redis" and clef.check_type in [
-                "null_check",
-                "range_check",
+                "column_values",
+                "freshness",
             ]:
                 self.issues.append(
                     ConfigurationIssue(
@@ -350,13 +350,13 @@ class ConfigurationValidator:
                         issue_type="inconsistent",
                         message=f"Clef '{clef.name}' uses '{clef.check_type}' on Redis stave '{stave.name}'",
                         affected_items=[clef.name, stave.name],
-                        suggestion="Redis checks should use volume_check or custom_sql instead",
+                        suggestion="Redis checks should use row_count instead",
                     )
                 )
 
             if (
                 stave.data_source_type == "sqlite"
-                and clef.check_type == "freshness_check"
+                and clef.check_type == "freshness"
             ):
                 self.issues.append(
                     ConfigurationIssue(
@@ -364,14 +364,14 @@ class ConfigurationValidator:
                         issue_type="inconsistent",
                         message=f"Freshness checks on SQLite may not be meaningful",
                         affected_items=[clef.name, stave.name],
-                        suggestion="Consider if freshness_check is appropriate for SQLite databases",
+                        suggestion="Consider if freshness is appropriate for SQLite databases",
                     )
                 )
 
     def _check_check_configuration_conflicts(self):
         """Check for conflicts in check configurations."""
         for clef in self.clefs_by_id.values():
-            if clef.check_type == "range_check":
+            if clef.check_type == "column_values":
                 config = clef.config
                 min_val = config.get("min")
                 max_val = config.get("max")
@@ -381,13 +381,13 @@ class ConfigurationValidator:
                         ConfigurationIssue(
                             severity="error",
                             issue_type="conflict",
-                            message=f"Range check '{clef.name}' has min > max: {min_val} > {max_val}",
+                            message=f"Column values check '{clef.name}' has min > max: {min_val} > {max_val}",
                             affected_items=[clef.name],
                             suggestion="Ensure min value is less than or equal to max value",
                         )
                     )
 
-            elif clef.check_type == "volume_check":
+            elif clef.check_type == "row_count":
                 config = clef.config
                 min_vol = config.get("expected_min")
                 max_vol = config.get("expected_max")
@@ -397,24 +397,9 @@ class ConfigurationValidator:
                         ConfigurationIssue(
                             severity="error",
                             issue_type="conflict",
-                            message=f"Volume check '{clef.name}' has expected_min > expected_max: {min_vol} > {max_vol}",
+                            message=f"Row count check '{clef.name}' has expected_min > expected_max: {min_vol} > {max_vol}",
                             affected_items=[clef.name],
                             suggestion="Ensure expected_min is less than or equal to expected_max",
-                        )
-                    )
-
-            elif clef.check_type == "null_check":
-                config = clef.config
-                threshold = config.get("threshold")
-
-                if threshold is not None and (threshold < 0 or threshold > 1):
-                    self.issues.append(
-                        ConfigurationIssue(
-                            severity="error",
-                            issue_type="conflict",
-                            message=f"Null check '{clef.name}' has invalid threshold: {threshold} (should be 0-1)",
-                            affected_items=[clef.name],
-                            suggestion="Threshold should be between 0 and 1 (0 = no nulls, 1 = all nulls allowed)",
                         )
                     )
 

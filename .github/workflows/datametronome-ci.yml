@@ -88,6 +88,10 @@ jobs:
           uv pip install -e ./datametronome/pulse/postgres
           uv pip install -e ./datametronome/pulse/dbt
           uv pip install -e ./datametronome/pulse/s3
+          # bigquery is built and published by the release job, so it has to be
+          # importable here. Without it the factory's bigquery branch is only
+          # ever reached as an ImportError.
+          uv pip install -e ./datametronome/pulse/bigquery
           uv pip install -e ./datametronome/brain/base
           uv pip install -e ./datametronome/podium
           # Install runtime deps not covered by -e

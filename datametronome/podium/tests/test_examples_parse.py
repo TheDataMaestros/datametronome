@@ -14,12 +14,16 @@ from pathlib import Path
 
 import pytest
 
-from datametronome_podium.services.yaml_loader import load_and_parse_yaml
-
-EXAMPLES = sorted((Path(__file__).parent.parent / "examples").glob("*.yaml"))
+from datametronome_podium.services.stave_yaml_loader import load_staves_from_yaml
 
 # Deliberately invalid: the loader's conflict-detection tests import it.
 KNOWN_INVALID = {"conflicting-config.yaml"}
+
+EXAMPLES = sorted(
+    p
+    for p in (Path(__file__).parent.parent / "examples").glob("*.yaml")
+    if p.name not in KNOWN_INVALID
+)
 
 
 def test_there_are_examples_to_check():
@@ -29,10 +33,7 @@ def test_there_are_examples_to_check():
 
 @pytest.mark.parametrize("path", EXAMPLES, ids=lambda p: p.name)
 def test_example_parses(path):
-    if path.name in KNOWN_INVALID:
-        pytest.skip(reason="intentionally invalid fixture")
-
-    staves, clefs = load_and_parse_yaml(str(path))
+    staves, clefs = load_staves_from_yaml(path, resolve_env=False)
 
     assert staves, f"{path.name} declares no staves"
     for clef in clefs:

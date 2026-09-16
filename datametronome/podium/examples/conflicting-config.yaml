@@ -84,7 +84,7 @@ clefs:
   - id: clef-001
     stave_id: stave-999  # Doesn't exist!
     name: Missing Stave Check
-    check_type: null_check
+    check_type: column_values
     config:
       table: users
       column: email
@@ -93,7 +93,7 @@ clefs:
   - id: clef-002
     stave_id: stave-001
     name: Invalid Range Check
-    check_type: range_check
+    check_type: column_values
     config:
       table: users
       column: age
@@ -104,7 +104,7 @@ clefs:
   - id: clef-003
     stave_id: stave-001
     name: Invalid Null Check
-    check_type: null_check
+    check_type: column_values
     config:
       table: users
       column: email
@@ -114,7 +114,7 @@ clefs:
   - id: clef-004
     stave_id: stave-005
     name: Redis Null Check
-    check_type: null_check  # Not appropriate for Redis
+    check_type: column_values  # Not appropriate for Redis
     config:
       table: users
       column: email
@@ -123,7 +123,7 @@ clefs:
   - id: clef-005
     stave_id: stave-001
     name: Email Check
-    check_type: null_check
+    check_type: column_values
     config:
       table: users
       column: email
@@ -131,7 +131,7 @@ clefs:
   - id: clef-006
     stave_id: stave-001
     name: Email Check  # Duplicate name!
-    check_type: pattern_check
+    check_type: column_values
     config:
       table: users
       column: email
@@ -141,7 +141,7 @@ clefs:
   - id: clef-007
     stave_id: stave-001
     name: Hourly Check 1
-    check_type: volume_check
+    check_type: row_count
     config:
       table: users
     schedule: "@hourly"
@@ -149,7 +149,7 @@ clefs:
   - id: clef-008
     stave_id: stave-001
     name: Hourly Check 2
-    check_type: volume_check
+    check_type: row_count
     config:
       table: orders
     schedule: "@hourly"
@@ -157,7 +157,7 @@ clefs:
   - id: clef-009
     stave_id: stave-001
     name: Hourly Check 3
-    check_type: volume_check
+    check_type: row_count
     config:
       table: products
     schedule: "@hourly"
@@ -165,7 +165,7 @@ clefs:
   - id: clef-010
     stave_id: stave-001
     name: Hourly Check 4
-    check_type: volume_check
+    check_type: row_count
     config:
       table: categories
     schedule: "@hourly"
@@ -173,7 +173,7 @@ clefs:
   - id: clef-011
     stave_id: stave-001
     name: Hourly Check 5
-    check_type: volume_check
+    check_type: row_count
     config:
       table: reviews
     schedule: "@hourly"
@@ -182,7 +182,7 @@ clefs:
   - id: clef-012
     stave_id: stave-001
     name: Hourly Check 6
-    check_type: volume_check
+    check_type: row_count
     config:
       table: payments
     schedule: "@hourly"
@@ -190,7 +190,7 @@ clefs:
   - id: clef-013
     stave_id: stave-001
     name: Hourly Check 7
-    check_type: volume_check
+    check_type: row_count
     config:
       table: invoices
     schedule: "@hourly"
@@ -198,7 +198,7 @@ clefs:
   - id: clef-014
     stave_id: stave-001
     name: Hourly Check 8
-    check_type: volume_check
+    check_type: row_count
     config:
       table: customers
     schedule: "@hourly"
@@ -206,7 +206,7 @@ clefs:
   - id: clef-015
     stave_id: stave-001
     name: Hourly Check 9
-    check_type: volume_check
+    check_type: row_count
     config:
       table: suppliers
     schedule: "@hourly"
@@ -214,7 +214,7 @@ clefs:
   - id: clef-016
     stave_id: stave-001
     name: Hourly Check 10
-    check_type: volume_check
+    check_type: row_count
     config:
       table: inventory
     schedule: "@hourly"
@@ -222,7 +222,7 @@ clefs:
   - id: clef-017
     stave_id: stave-001
     name: Hourly Check 11
-    check_type: volume_check
+    check_type: row_count
     config:
       table: shipments
     schedule: "@hourly"

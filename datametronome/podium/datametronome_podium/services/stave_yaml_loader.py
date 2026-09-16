@@ -121,10 +121,12 @@ def load_staves_from_yaml(
           - id: clef-001
             stave_id: stave-001
             name: "Email Check"
-            check_type: null_check
+            check_type: column_values
             config:
               table: users
               column: email
+              condition: if_null
+            fail: "if_null > 0%"
     """
     yaml_path = Path(yaml_path)
 
@@ -211,9 +213,12 @@ def load_single_stave_yaml(
             host: localhost
         clefs:
           - name: "Email Check"
-            check_type: null_check
+            check_type: column_values
             config:
               table: users
+              column: email
+              condition: if_null
+            fail: "if_null > 0%"
     """
     yaml_path = Path(yaml_path)
 

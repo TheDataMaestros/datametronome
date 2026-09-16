@@ -458,11 +458,13 @@ async def api_example():
         check_data = {
             "stave_id": stave["id"],
             "name": "Check for NULL emails",
-            "type": "null_check",
+            "check_type": "column_values",
             "config": {
                 "table": "users",
-                "column": "email"
-            }
+                "column": "email",
+                "condition": "if_null"
+            },
+            "fail": "if_null > 0%",
         }
 
         response = await client.post(

@@ -189,7 +189,6 @@ class TestClefCreationExamples:
         assert check.fail == "if_null > 0%"
         assert check.schedule == "@hourly"
         print(f"\nCreated: {check}")
-        # Output: 🟢 Active Email NULL Check (null_check, scheduled: @hourly)
 
     def test_create_range_check_example(self):
         """Example: Check if values are within an expected range."""

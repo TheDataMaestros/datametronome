@@ -7,11 +7,8 @@ none of which have a connector or pass stave validation, so those arms could
 not be reached.
 """
 
-import asyncio
 import logging
-import sqlite3
 import time
-from datetime import datetime
 from typing import Any, cast
 
 from datametronome_podium.features.staves.model import Stave
@@ -26,9 +23,6 @@ class ConnectionTester:
     This class provides methods to test connectivity to different types of
     data sources based on stave configurations.
     """
-
-    def __init__(self):
-        self.timeout = 10  # seconds
 
     async def test_connection(self, stave: Stave) -> dict[str, Any]:
         """
