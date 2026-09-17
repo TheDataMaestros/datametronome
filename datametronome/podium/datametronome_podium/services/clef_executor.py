@@ -113,47 +113,6 @@ class CheckResult:
         self.metadata = value or {}
 
 
-def _cannot_run(
-    clef: Clef,
-    stave: Stave,
-    message: str,
-    *,
-    error: str,
-    status: str = "fail",
-    **metadata: Any,
-) -> CheckResult:
-    """A check that never got as far as producing a value.
-
-    Bad config, no connector, a query that came back empty. Every check spelled
-    this out in full, nineteen times, and they disagreed on details: some set
-    status "error" and others "fail" for the same condition, some passed
-    execution_time=0.0 and a timestamp, most left both to __post_init__.
-
-    That repetition is not only noise. It is what let two mock implementations
-    sit shadowed in this file, each reading as plausible on its own.
-    """
-    return CheckResult(
-        clef_id=clef.id,
-        stave_id=stave.id,
-        status=status,
-        observed_value=None,
-        message=message,
-        metadata={"error": error, **metadata},
-    )
-
-
-def _no_rows(clef: Clef, stave: Stave, sql: str) -> CheckResult:
-    """The query ran and came back empty.
-
-    The SQL goes in the metadata because it is the only thing that explains an
-    empty result. Three of the four sites passed it and the fourth did not,
-    which is the one you would have had to debug blind.
-    """
-    return _cannot_run(
-        clef, stave, "Query returned no results", error="empty_result", sql=sql
-    )
-
-
 def _result(
     clef: Clef,
     stave: Stave,
@@ -164,12 +123,7 @@ def _result(
     anomalies: int = 0,
     **metadata: Any,
 ) -> CheckResult:
-    """A check that ran and produced a verdict.
-
-    The counterpart to _cannot_run. Nine checks repeated the clef_id, stave_id
-    and field order by hand; only the status, message, observed value and
-    metadata ever differ.
-    """
+    """The one CheckResult constructor. Everything else here delegates to it."""
     return CheckResult(
         clef_id=clef.id,
         stave_id=stave.id,
@@ -181,21 +135,25 @@ def _result(
     )
 
 
-def _nothing_to_check(
-    clef: Clef, stave: Stave, message: str, **metadata: Any
+def _cannot_run(
+    clef: Clef,
+    stave: Stave,
+    message: str,
+    *,
+    error: str,
+    status: str = "fail",
+    **metadata: Any,
 ) -> CheckResult:
-    """The query succeeded but there were no rows to evaluate.
+    """A check that never got as far as producing a value: bad config, no
+    connector, an empty query result."""
+    return _result(clef, stave, status, message, error=error, **metadata)
 
-    A warn, not a fail: an empty table is not a violated rule, but it is not
-    evidence the rule holds either.
-    """
-    return CheckResult(
-        clef_id=clef.id,
-        stave_id=stave.id,
-        status="warn",
-        observed_value=0,
-        message=message,
-        metadata=metadata,
+
+def _no_rows(clef: Clef, stave: Stave, sql: str) -> CheckResult:
+    """The query ran and came back empty. The SQL is the only thing that
+    explains that, so it goes in the metadata."""
+    return _cannot_run(
+        clef, stave, "Query returned no results", error="empty_result", sql=sql
     )
 
 
@@ -264,7 +222,10 @@ class ClefExecutor:
 
             logger.info(f"Executing clef '{clef.name}' on stave '{stave.name}'")
 
-            runner = self._RUNNERS.get(clef.check_type)
+            # One runner per check type, by name. test_check_type_coverage.py
+            # asserts the set matches features.clefs.model.SUPPORTED_CHECK_TYPES,
+            # so a clef cannot be created with a type nothing runs.
+            runner = getattr(self, f"_execute_{clef.check_type}_check", None)
             if runner is None:
                 result = _cannot_run(
                     clef,
@@ -273,7 +234,7 @@ class ClefExecutor:
                     error="unsupported_check_type",
                 )
             else:
-                result = await runner(self, clef, stave, connector)
+                result = await runner(clef, stave, connector)
 
         except Exception as e:
             logger.error(f"Error executing clef '{clef.name}': {e}")
@@ -569,10 +530,12 @@ class ClefExecutor:
         non_null_rows = row.get("non_null_rows", 0)
 
         if total_rows == 0:
-            return _nothing_to_check(
+            return _result(
                 clef,
                 stave,
+                "warn",
                 f"Table '{table}' returned no rows to evaluate",
+                0,
                 table=table,
                 column=column,
                 total_rows=0,
@@ -645,10 +608,12 @@ class ClefExecutor:
         duplicate_rows = row.get("duplicate_rows", 0)
 
         if total_rows == 0:
-            return _nothing_to_check(
+            return _result(
                 clef,
                 stave,
+                "warn",
                 f"Table '{table}' has no non-null values to check for uniqueness",
+                0,
                 table=table,
                 column=column,
                 total_rows=0,
@@ -725,10 +690,12 @@ class ClefExecutor:
         not_in_list_rows = row.get("not_in_list_rows", 0)
 
         if total_rows == 0:
-            return _nothing_to_check(
+            return _result(
                 clef,
                 stave,
+                "warn",
                 f"Table '{table}' has no non-null values to check",
+                0,
                 table=table,
                 column=column,
                 total_rows=0,
@@ -851,13 +818,8 @@ class ClefExecutor:
     ) -> Optional[Tuple[str, str]]:
         """Rank an observed value: fail first, then warn, then the condition.
 
-        Returns (status, message), or None when nothing triggered and the
-        caller should supply its own pass message. The pass wording is the one
-        part that genuinely differs per check, so it stays with the caller.
-
-        Three checks carried this ladder verbatim. A fix to the ordering, or to
-        what "condition met with no fail set" should mean, had to be made in
-        three places or it was made in one.
+        Returns (status, message), or None when nothing tripped and the caller
+        should supply its own pass message.
         """
         if clef.fail and self._evaluate_condition(observed, clef.fail):
             return "fail", f"{subject} violates fail condition ({clef.fail})"
@@ -977,28 +939,23 @@ class ClefExecutor:
     async def _execute_lookup_validation_check(
         self, clef: Clef, stave: Stave, db_connector: Any = None
     ) -> CheckResult:
-        """Execute lookup validation check (TDD Level 3: Advanced Declarative)."""
-        try:
-            # For now, return a mock result since this is a complex multi-source check
-            return _result(
-                clef,
-                stave,
-                "pass",
-                "Lookup validation check passed: 98% of lookups successful",
-                0.98,
-                check_type="lookup_validation",
-                success_rate=0.98,
-                total_lookups=1000,
-                failed_lookups=20,
-                note="Mock implementation - would validate cross-source references",
-            )
-        except Exception as e:
-            return _cannot_run(
-                clef,
-                stave,
-                f"Lookup validation check failed: {str(e)}",
-                error=str(e),
-            )
+        """Cross-source reference validation. Not implemented.
+
+        This returned a hardcoded pass with invented numbers (98%, 1000
+        lookups) without querying anything. On a data quality tool a check
+        that always reports green is worse than one that refuses: the fake
+        rate reached the checks table, trends, reports and the agents.
+
+        It declines instead, like _unsupported does. Implementing it needs a
+        cross-source query, which is a feature, not a fix.
+        """
+        return _cannot_run(
+            clef,
+            stave,
+            "Lookup validation is not implemented yet",
+            error="not_implemented",
+            status="error",
+        )
 
     async def _execute_freshness_check(
         self, clef: Clef, stave: Stave, db_connector: Any = None
@@ -1477,19 +1434,6 @@ class ClefExecutor:
                 error=str(e),
             )
 
-
-
-    # One entry per check type. Keys must match
-    # features.clefs.model.SUPPORTED_CHECK_TYPES; test_check_type_coverage.py
-    # asserts that, so a clef cannot be created with a type nothing runs.
-    _RUNNERS = {
-        "column_values": _execute_column_values_check,
-        "row_count": _execute_row_count_check,
-        "freshness": _execute_freshness_check,
-        "forecast": _execute_forecast_check,
-        "data_profile_drift": _execute_data_profile_drift_check,
-        "lookup_validation": _execute_lookup_validation_check,
-    }
 
 # =============================================================================
 # Module-level helper functions (backward compatible API)

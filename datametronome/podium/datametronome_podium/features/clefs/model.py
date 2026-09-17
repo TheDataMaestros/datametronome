@@ -20,11 +20,8 @@ LEVEL_3_CHECKS = [
     "lookup_validation",
 ]
 
-# Level 4 is user-supplied Python. Nothing executes it: ClefExecutor has no
-# runner for it, so a clef created with this type failed every run with
-# "Unknown check type". Running arbitrary user code is a real feature with real
-# security questions, not something to leave stubbed. Add the type back here
-# and to VALID_CHECK_TYPES when a runner exists.
+# Level 4 is user-supplied Python. No runner exists, so the type is not
+# offered. Add it back here and in VALID_CHECK_TYPES when one does.
 LEVEL_4_CHECKS: list[str] = []
 
 SUPPORTED_CHECK_TYPES = (
