@@ -78,9 +78,9 @@ class Settings(BaseSettings):
     worker_pool_size: int = Field(default=4, validation_alias="DATAMETRONOME_WORKER_POOL_SIZE", ge=1)
 
     # Celery / Worker
-    dispatch_mode: Literal["inline", "celery", "remote"] = Field(
+    dispatch_mode: Literal["inline", "celery"] = Field(
         default="inline",
-        description="Check dispatch mode: inline | celery | remote",
+        description="Check dispatch mode: inline | celery",
         validation_alias="DATAMETRONOME_DISPATCH_MODE",
     )
     celery_broker_url: str = Field(

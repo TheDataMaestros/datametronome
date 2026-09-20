@@ -61,49 +61,28 @@ http_requests_in_progress = Gauge(
 # Database Metrics
 # =============================================================================
 
-database_connections = Gauge(
-    "database_connections",
-    "Number of active database connections",
-    ["state"],  # 'active', 'idle'
-    registry=registry,
-)
-
-database_query_duration_seconds = Histogram(
-    "database_query_duration_seconds",
-    "Database query duration in seconds",
-    ["operation"],  # 'read', 'write', 'execute'
-    registry=registry,
-)
-
-database_queries_total = Counter(
-    "database_queries_total",
-    "Total database queries",
-    ["operation", "status"],  # operation: read/write, status: success/error
-    registry=registry,
-)
-
 # =============================================================================
 # Check Run Metrics
 # =============================================================================
 
+# Labelled by status only. clef_id would be unbounded cardinality: one time
+# series per check definition, forever, including deleted ones.
 check_runs_total = Counter(
     "check_runs_total",
     "Total data quality check runs",
-    ["clef_id", "status"],  # status: success, failed, error
+    ["status"],  # pass, warn, fail, error
     registry=registry,
 )
 
 check_run_duration_seconds = Histogram(
     "check_run_duration_seconds",
     "Check run duration in seconds",
-    ["clef_id"],
     registry=registry,
 )
 
 anomalies_detected_total = Counter(
     "anomalies_detected_total",
-    "Total anomalies detected",
-    ["clef_id", "severity"],  # severity: low, medium, high, critical
+    "Total anomalous rows found by checks",
     registry=registry,
 )
 

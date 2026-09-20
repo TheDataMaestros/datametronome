@@ -213,79 +213,38 @@ class ConfigurationValidator:
                         )
                     )
 
+    # Default port per host-based data source. Sources not listed here (sqlite,
+    # s3, dbt) have no host/port to collide on.
+    _DEFAULT_PORTS = {"postgres": 5432, "postgresql": 5432, "redshift": 5439}
+
     def _check_connection_conflicts(self):
-        """Check for conflicting connection configurations."""
-        # Group staves by connection type
-        by_type = defaultdict(list)
+        """Warn when several staves point at the same database.
+
+        This was three copies of one loop, one per data source, differing only
+        in the default port -- and two of them covered data sources the
+        platform has no connector for and the API schema rejects.
+        """
+        connections = defaultdict(list)
         for stave in self.staves_by_id.values():
-            by_type[stave.data_source_type].append(stave)
-
-        # Check for conflicting connection configs
-        for data_type, staves in by_type.items():
-            if data_type == "postgres":
-                self._check_postgres_conflicts(staves)
-            elif data_type == "mysql":
-                self._check_mysql_conflicts(staves)
-            elif data_type == "redis":
-                self._check_redis_conflicts(staves)
-
-    def _check_postgres_conflicts(self, staves: List[Stave]):
-        """Check for PostgreSQL-specific conflicts."""
-        # Check for same host/port/database combinations
-        connections = defaultdict(list)
-        for stave in staves:
+            port = self._DEFAULT_PORTS.get(stave.data_source_type)
+            if port is None:
+                continue
             config = stave.connection_config
-            key = (config.get("host"), config.get("port", 5432), config.get("database"))
+            key = (
+                stave.data_source_type,
+                config.get("host"),
+                config.get("port", port),
+                config.get("database"),
+            )
             connections[key].append(stave)
 
-        for (host, port, db), staves_list in connections.items():
+        for (dst, host, port, db), staves_list in connections.items():
             if len(staves_list) > 1 and all(v is not None for v in (host, port, db)):
                 self.issues.append(
                     ConfigurationIssue(
                         severity="warning",
                         issue_type="conflict",
-                        message=f"Multiple staves connect to same PostgreSQL database: {host}:{port}/{db}",
-                        affected_items=[s.name for s in staves_list],
-                        suggestion="Consider if you need separate staves or if they should be merged",
-                    )
-                )
-
-    def _check_mysql_conflicts(self, staves: List[Stave]):
-        """Check for MySQL-specific conflicts."""
-        # Similar logic for MySQL
-        connections = defaultdict(list)
-        for stave in staves:
-            config = stave.connection_config
-            key = (config.get("host"), config.get("port", 3306), config.get("database"))
-            connections[key].append(stave)
-
-        for (host, port, db), staves_list in connections.items():
-            if len(staves_list) > 1 and all(v is not None for v in (host, port, db)):
-                self.issues.append(
-                    ConfigurationIssue(
-                        severity="warning",
-                        issue_type="conflict",
-                        message=f"Multiple staves connect to same MySQL database: {host}:{port}/{db}",
-                        affected_items=[s.name for s in staves_list],
-                        suggestion="Consider if you need separate staves or if they should be merged",
-                    )
-                )
-
-    def _check_redis_conflicts(self, staves: List[Stave]):
-        """Check for Redis-specific conflicts."""
-        connections = defaultdict(list)
-        for stave in staves:
-            config = stave.connection_config
-            key = (config.get("host"), config.get("port", 6379), config.get("db", 0))
-            connections[key].append(stave)
-
-        for (host, port, db), staves_list in connections.items():
-            if len(staves_list) > 1 and all(v is not None for v in (host, port, db)):
-                self.issues.append(
-                    ConfigurationIssue(
-                        severity="warning",
-                        issue_type="conflict",
-                        message=f"Multiple staves connect to same Redis instance: {host}:{port}/{db}",
+                        message=f"Multiple staves connect to same {dst} database: {host}:{port}/{db}",
                         affected_items=[s.name for s in staves_list],
                         suggestion="Consider if you need separate staves or if they should be merged",
                     )
@@ -339,20 +298,6 @@ class ConfigurationValidator:
 
             stave = self.staves_by_id[clef.stave_id]
 
-            # Check if clef type is appropriate for stave type
-            if stave.data_source_type == "redis" and clef.check_type in [
-                "column_values",
-                "freshness",
-            ]:
-                self.issues.append(
-                    ConfigurationIssue(
-                        severity="warning",
-                        issue_type="inconsistent",
-                        message=f"Clef '{clef.name}' uses '{clef.check_type}' on Redis stave '{stave.name}'",
-                        affected_items=[clef.name, stave.name],
-                        suggestion="Redis checks should use row_count instead",
-                    )
-                )
 
             if (
                 stave.data_source_type == "sqlite"

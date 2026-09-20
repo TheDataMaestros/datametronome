@@ -26,6 +26,11 @@ from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.core.query import quote_identifier as _quote_ident
 from datametronome_podium.core.sql_dialect import dialect_for
 from datametronome_podium.core.connector_factory import create_connector
+from datametronome_podium.core.metrics import (
+    anomalies_detected_total,
+    check_run_duration_seconds,
+    check_runs_total,
+)
 
 
 def _qi(name: str, stave: Stave) -> str:
@@ -215,7 +220,6 @@ class ClefExecutor:
                 connector = await create_connector(
                     stave.data_source_type or "",
                     stave.connection_config or {},
-                    read_only=True,
                 )
                 managed_connector = True
 
@@ -260,9 +264,18 @@ class ClefExecutor:
         return result
 
     def _update_stats(self, result: CheckResult):
-        """Update execution statistics."""
+        """Update execution statistics, in-process and in Prometheus.
+
+        Every check reaches here, so it is the one place the check metrics can
+        be recorded without sprinkling counters through the runners.
+        """
         self.execution_stats["total_checks"] += 1
         self.execution_stats["total_time"] += result.execution_time
+
+        check_runs_total.labels(status=result.status).inc()
+        check_run_duration_seconds.observe(result.execution_time)
+        if result.anomalies_count:
+            anomalies_detected_total.inc(result.anomalies_count)
 
         status = result.status
         if status == "pass":
@@ -1399,7 +1412,6 @@ async def execute_stave_clefs(
         connector = await create_connector(
             stave.data_source_type or "",
             stave.connection_config or {},
-            read_only=True,
         )
         managed_connector = True
 

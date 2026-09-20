@@ -19,15 +19,9 @@ class TestBuildDbtConnector:
 
         mock_build = MagicMock(return_value=MagicMock())
         with patch.dict(BUILDERS, {"dbt": mock_build}):
-            _build_connector("dbt", {"mode": "local", "project_path": "/tmp"}, read_only=True)
+            _build_connector("dbt", {"mode": "local", "project_path": "/tmp"})
 
-        mock_build.assert_called_once_with(
-            {"mode": "local", "project_path": "/tmp"}, read_only=True
-        )
-
-    def test_dbt_read_only_false_raises(self):
-        with pytest.raises(ValueError, match="read-only"):
-            _build_connector("dbt", {"mode": "local", "project_path": "/tmp"}, read_only=False)
+        mock_build.assert_called_once_with({"mode": "local", "project_path": "/tmp"})
 
     def test_dbt_local_mode(self):
         """Verify local config keys are forwarded correctly."""
@@ -41,7 +35,6 @@ class TestBuildDbtConnector:
             try:
                 _build_dbt_connector(
                     {"mode": "local", "project_path": "/my/dbt", "target_path": "build"},
-                    read_only=True,
                 )
             except ImportError:
                 pytest.skip("metronome_pulse_dbt not installed")  # ty: ignore[too-many-positional-arguments]
@@ -63,7 +56,6 @@ class TestBuildDbtConnector:
                         "account_id": "123",
                         "job_id": "456",
                     },
-                    read_only=True,
                 )
             except ImportError:
                 pytest.skip("metronome_pulse_dbt not installed")  # ty: ignore[too-many-positional-arguments]

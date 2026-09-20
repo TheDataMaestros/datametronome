@@ -186,7 +186,7 @@ async def list_stave_tables(
         stave = deserialize_stave(row.model_dump())
 
         tester = ConnectionTester()
-        connector = await tester.get_connector(stave, read_only=True)
+        connector = await tester.get_connector(stave)
 
         if not hasattr(connector, "list_tables"):
             return {
@@ -262,7 +262,7 @@ async def get_table_sample(
         stave = deserialize_stave(row.model_dump())
 
         tester = ConnectionTester()
-        connector = await tester.get_connector(stave, read_only=True)
+        connector = await tester.get_connector(stave)
 
         config = stave.connection_config if isinstance(stave.connection_config, dict) else {}
         if stave.data_source_type == "bigquery":
@@ -358,7 +358,7 @@ async def suggest_quality_checks(
         stave = deserialize_stave(row.model_dump())
 
         tester = ConnectionTester()
-        connector = await tester.get_connector(stave, read_only=True)
+        connector = await tester.get_connector(stave)
 
         if table_name:
             tables_to_analyze = [table_name]

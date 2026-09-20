@@ -27,7 +27,7 @@ BASE = {"host": "db.eu-west-1.rds.amazonaws.com", "database": "app", "user": "ap
 def test_factory_forwards_ssl_to_the_connector(monkeypatch):
     _patched(monkeypatch)
 
-    conn = _build_postgres_connector({**BASE, "ssl": "verify-full"}, read_only=True)
+    conn = _build_postgres_connector({**BASE, "ssl": "verify-full"})
     assert conn.kwargs["ssl"] == "verify-full"
     assert conn.kwargs["host"] == BASE["host"]
 
@@ -36,11 +36,11 @@ def test_factory_omits_ssl_when_not_configured(monkeypatch):
     # asyncpg negotiates on its own; passing ssl=None would override that.
     _patched(monkeypatch)
 
-    assert "ssl" not in _build_postgres_connector(BASE, read_only=False).kwargs
+    assert "ssl" not in _build_postgres_connector(BASE).kwargs
 
 
 def test_empty_ssl_is_treated_as_unset(monkeypatch):
     _patched(monkeypatch)
 
-    conn = _build_postgres_connector({**BASE, "ssl": ""}, read_only=True)
+    conn = _build_postgres_connector({**BASE, "ssl": ""})
     assert "ssl" not in conn.kwargs

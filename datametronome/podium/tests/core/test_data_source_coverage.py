@@ -48,7 +48,7 @@ def test_every_supported_source_can_be_built(source):
 
 def test_an_unknown_source_is_rejected():
     with pytest.raises(ValueError, match="Unsupported data source type"):
-        _build_connector("cassandra", {}, read_only=True)
+        _build_connector("cassandra", {})
 
 
 @pytest.mark.parametrize("source", SUPPORTED_DATA_SOURCES)

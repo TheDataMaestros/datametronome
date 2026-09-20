@@ -33,7 +33,6 @@ def test_config_reaches_the_connector(patched):
             "dataset": "analytics",
             "location": "EU",
         },
-        read_only=True,
     )
 
     assert conn.kwargs["project_id"] == "my-gcp-project"
@@ -43,7 +42,7 @@ def test_config_reaches_the_connector(patched):
 
 
 def test_location_defaults_to_us(patched):
-    conn = _build_bigquery_connector({"project_id": "p"}, read_only=True)
+    conn = _build_bigquery_connector({"project_id": "p"})
     assert conn.kwargs["location"] == "US"
 
 
@@ -51,4 +50,4 @@ def test_missing_project_id_is_reported_as_a_missing_field(patched):
     # create_connector turns this KeyError into "Missing required connection
     # field: 'project_id'" rather than a bare traceback.
     with pytest.raises(KeyError, match="project_id"):
-        _build_bigquery_connector({"dataset": "analytics"}, read_only=True)
+        _build_bigquery_connector({"dataset": "analytics"})

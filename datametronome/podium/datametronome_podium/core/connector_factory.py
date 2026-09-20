@@ -3,6 +3,10 @@
 All connector creation goes through this module. No other file should
 branch on data_source_type to instantiate connectors.
 
+Every connector built here is read-only. Staves are things we observe, not
+things we write to; the app's own database goes through core.database, which
+does not use this module.
+
 Imports are kept lazy (inside the function body) to avoid circular imports
 with the optional Pulse packages that may not be installed.
 """
@@ -18,15 +22,12 @@ logger = logging.getLogger(__name__)
 async def create_connector(
     data_source_type: str,
     connection_config: dict[str, Any],
-    *,
-    read_only: bool = False,
 ) -> Any:
-    """Create and connect the appropriate Pulse connector from config.
+    """Create and connect the appropriate read-only Pulse connector from config.
 
     Args:
-        data_source_type: One of 'postgres', 'postgresql', 'sqlite', 'bigquery'
+        data_source_type: A key of BUILDERS below
         connection_config: Connection parameters dict (keys vary by type)
-        read_only: If True, use the read-only connector variant
 
     Returns:
         A connected Pulse connector instance. Caller is responsible for
@@ -41,7 +42,7 @@ async def create_connector(
     config = connection_config or {}
 
     try:
-        connector = _build_connector(dst, config, read_only=read_only)
+        connector = _build_connector(dst, config)
     except KeyError as exc:
         raise RuntimeError(f"Missing required connection field: {exc}") from exc
     except ImportError as exc:
@@ -53,12 +54,7 @@ async def create_connector(
     return connector
 
 
-def _build_connector(
-    dst: str,
-    config: dict[str, Any],
-    *,
-    read_only: bool,
-) -> Any:
+def _build_connector(dst: str, config: dict[str, Any]) -> Any:
     """Instantiate (but do not connect) the correct Pulse connector.
 
     Kept separate from create_connector so that unit tests can patch the
@@ -67,21 +63,18 @@ def _build_connector(
     builder = BUILDERS.get(dst)
     if builder is None:
         raise ValueError(f"Unsupported data source type: {dst!r}")
-    return builder(config, read_only=read_only)
+    return builder(config)
 
 
-def _build_postgres_connector(config: dict[str, Any], *, read_only: bool) -> Any:
-    if read_only:
-        from metronome_pulse_postgres import PostgresReadOnlyPulse as PulseClass
-    else:
-        from metronome_pulse_postgres import PostgresPulse as PulseClass  # type: ignore[assignment]
+def _build_postgres_connector(config: dict[str, Any]) -> Any:
+    from metronome_pulse_postgres import PostgresReadOnlyPulse
 
     # RDS and Aurora with rds.force_ssl=1 reject plaintext, so a stave against
     # one needs "ssl": "require". Omitted when unset, since ssl=None would
     # override asyncpg's own negotiation.
     ssl = config.get("ssl")
 
-    return PulseClass(
+    return PostgresReadOnlyPulse(
         host=config["host"],
         port=config.get("port", 5432),
         database=config["database"],
@@ -91,23 +84,16 @@ def _build_postgres_connector(config: dict[str, Any], *, read_only: bool) -> Any
     )
 
 
-def _build_redshift_connector(config: dict[str, Any], *, read_only: bool) -> Any:
+def _build_redshift_connector(config: dict[str, Any]) -> Any:
     """Redshift runs on psycopg3, not asyncpg.
 
     asyncpg cannot connect to Redshift at all: Redshift forked from PostgreSQL
     8.0 and does not answer the catalog queries asyncpg issues during
     handshake. This is not a preference between drivers.
     """
-    if read_only:
-        from metronome_pulse_postgres_psycopg3 import (
-            PostgresPsycopg3ReadOnlyPulse as PulseClass,
-        )
-    else:
-        from metronome_pulse_postgres_psycopg3 import (  # type: ignore[assignment]
-            PostgresPsycopg3Pulse as PulseClass,
-        )
+    from metronome_pulse_postgres_psycopg3 import PostgresPsycopg3ReadOnlyPulse
 
-    return PulseClass(
+    return PostgresPsycopg3ReadOnlyPulse(
         host=config["host"],
         port=config.get("port", 5439),
         database=config["database"],
@@ -119,10 +105,7 @@ def _build_redshift_connector(config: dict[str, Any], *, read_only: bool) -> Any
     )
 
 
-def _build_s3_connector(config: dict[str, Any], *, read_only: bool) -> Any:
-    if not read_only:
-        raise ValueError("s3 connector is read-only. Set read_only=True.")
-
+def _build_s3_connector(config: dict[str, Any]) -> Any:
     from metronome_pulse_s3 import S3ReadonlyPulse
 
     return S3ReadonlyPulse(
@@ -136,7 +119,7 @@ def _build_s3_connector(config: dict[str, Any], *, read_only: bool) -> Any:
     )
 
 
-def _build_sqlite_connector(config: dict[str, Any], *, read_only: bool) -> Any:
+def _build_sqlite_connector(config: dict[str, Any]) -> Any:
     # Accepts either 'database_path' or 'path' to locate the SQLite file.
     db_path = config.get("database_path") or config.get("path")
     if not db_path:
@@ -144,21 +127,15 @@ def _build_sqlite_connector(config: dict[str, Any], *, read_only: bool) -> Any:
             "SQLite connection requires 'database_path' or 'path' in connection_config"
         )
 
-    if read_only:
-        from metronome_pulse_sqlite import SQLiteReadonlyPulse as PulseClass
-    else:
-        from metronome_pulse_sqlite import SQLitePulse as PulseClass  # type: ignore[assignment]
+    from metronome_pulse_sqlite import SQLiteReadonlyPulse
 
-    return PulseClass(db_path)
+    return SQLiteReadonlyPulse(db_path)
 
 
-def _build_bigquery_connector(config: dict[str, Any], *, read_only: bool) -> Any:
-    if read_only:
-        from metronome_pulse_bigquery import BigQueryReadonlyPulse as PulseClass  # type: ignore[import-untyped]
-    else:
-        from metronome_pulse_bigquery import BigQueryPulse as PulseClass  # type: ignore[import-untyped, assignment]
+def _build_bigquery_connector(config: dict[str, Any]) -> Any:
+    from metronome_pulse_bigquery import BigQueryReadonlyPulse  # type: ignore[import-untyped]
 
-    return PulseClass(
+    return BigQueryReadonlyPulse(
         project_id=config["project_id"],
         credentials_path=config.get("credentials_path"),
         credentials_json=config.get("credentials_json"),
@@ -167,10 +144,7 @@ def _build_bigquery_connector(config: dict[str, Any], *, read_only: bool) -> Any
     )
 
 
-def _build_dbt_connector(config: dict[str, Any], *, read_only: bool) -> Any:
-    if not read_only:
-        raise ValueError("dbt connector is read-only. Set read_only=True.")
-
+def _build_dbt_connector(config: dict[str, Any]) -> Any:
     from metronome_pulse_dbt import DbtReadonlyPulse
 
     mode = config.get("mode", "local")

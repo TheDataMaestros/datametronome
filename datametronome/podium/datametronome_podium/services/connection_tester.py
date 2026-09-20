@@ -62,7 +62,7 @@ class ConnectionTester:
                 "metadata": {},
             }
 
-    async def get_connector(self, stave: Stave, read_only: bool = True):
+    async def get_connector(self, stave: Stave):
         """
         Return a connected DataPulse connector for the given stave.
 
@@ -71,9 +71,7 @@ class ConnectionTester:
         from datametronome_podium.core.connector_factory import create_connector
 
         return await create_connector(
-            stave.data_source_type or "",
-            stave.connection_config or {},
-            read_only=read_only,
+            stave.data_source_type or "", stave.connection_config or {}
         )
 
     async def _test_postgres_connection(self, stave: Stave) -> dict[str, Any]:
@@ -90,7 +88,7 @@ class ConnectionTester:
         default_port = 5439 if stave.data_source_type == "redshift" else 5432
 
         try:
-            connector = await self.get_connector(stave, read_only=True)
+            connector = await self.get_connector(stave)
         except Exception as e:
             return {
                 "success": False,
@@ -143,7 +141,7 @@ class ConnectionTester:
         config = stave.connection_config
 
         try:
-            connector = await self.get_connector(stave, read_only=True)
+            connector = await self.get_connector(stave)
         except Exception as e:
             return {
                 "success": False,

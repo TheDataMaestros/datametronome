@@ -6,6 +6,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from datametronome_podium.core.database import get_executor
+from datametronome_podium.core.metrics import set_component_health
 from datametronome_podium.core.query import QueryExecutor
 from fastapi import APIRouter, HTTPException, status
 
@@ -51,6 +52,11 @@ async def get_system_health() -> dict:
             (passed_count / total_checks * 100) if total_checks > 0 else 100.0
         )
 
+        # The /metrics gauge and this endpoint disagreed for as long as nothing
+        # published the gauge: Grafana's system_health panel was always empty.
+        set_component_health("database", True)
+        set_component_health("checks", overall_score >= 80)
+
         return {
             "overall_score": round(overall_score, 1),
             "total_checks": total_checks,
@@ -62,6 +68,7 @@ async def get_system_health() -> dict:
         }
 
     except Exception as e:
+        set_component_health("database", False)
         logger.error("Failed to fetch system health: %s", e, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

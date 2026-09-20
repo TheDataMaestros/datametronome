@@ -103,7 +103,7 @@ sufficient (see `core/config.py`).
 | `DATAMETRONOME_SCHEDULER_MAX_WORKERS` | `10` | Thread pool for scheduler |
 | `DATAMETRONOME_JOB_QUEUE_SIZE` | `1000` | In-memory job queue size |
 | `DATAMETRONOME_WORKER_POOL_SIZE` | `4` | Worker pool threads |
-| `DATAMETRONOME_DISPATCH_MODE` | `inline` | Check dispatch: `inline` / `celery` / `remote` |
+| `DATAMETRONOME_DISPATCH_MODE` | `inline` | Check dispatch: `inline` / `celery` |
 | `DATAMETRONOME_CELERY_BROKER_URL` | `amqp://guest:guest@rabbitmq:5672//` | RabbitMQ URL |
 | `DATAMETRONOME_CELERY_RESULT_BACKEND` | `redis://redis:6379/0` | Redis result backend |
 | `DATAMETRONOME_REDIS_URL` | `redis://redis:6379/0` | Redis URL (circuit breaker + cache) |

@@ -298,8 +298,8 @@ async def delete_stave(stave_id: str, force: bool = False, user: dict = Depends(
 # Stave action endpoints (migrated from api/v1/endpoints/stave_actions.py)
 # ---------------------------------------------------------------------------
 
-class GenerateDataRequest(BaseModel):
-    """Request body shared by generate-data and preview-data endpoints."""
+class PreviewDataRequest(BaseModel):
+    """Request body for the preview-data endpoint."""
     table_name: str
     count: int = Field(default=100, ge=1, le=500_000)
 
@@ -330,36 +330,9 @@ async def test_stave_connection(
         )
 
 
-@router.post("/{stave_id}/generate-data")
-async def generate_sample_data(
-    stave_id: str, request: GenerateDataRequest, user: dict = Depends(require_editor)
-) -> dict[str, Any]:
-    """Generate and optionally insert sample data for a stave table.
-
-    Group-guarded: this inserts rows into the owning team's database.
-    """
-    await assert_stave_group_access(stave_id, user)
-    try:
-        return await stave_svc.generate_data(stave_id, request.table_name, request.count)
-    except LookupError as exc:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
-    except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
-    except Exception as exc:
-        import logging
-        logging.getLogger(__name__).error(
-            "Data generation failed for stave %s, table %s: %s",
-            stave_id, request.table_name, exc, exc_info=True,
-        )
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Data generation failed",
-        )
-
-
 @router.post("/{stave_id}/preview-data")
 async def preview_stave_data(
-    stave_id: str, request: GenerateDataRequest, user: dict = Depends(get_current_user)
+    stave_id: str, request: PreviewDataRequest, user: dict = Depends(get_current_user)
 ) -> dict[str, Any]:
     """Preview rows from a stave table (capped at 500 rows).
 

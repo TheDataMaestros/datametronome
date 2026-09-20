@@ -51,7 +51,7 @@ class InsightPipelineService:
 
         stave = deserialize_stave(stave_rows[0])
         tester = ConnectionTester()
-        connector = await tester.get_connector(stave, read_only=True)
+        connector = await tester.get_connector(stave)
 
         try:
             table_names = await _list_tables_for_stave(connector, stave)
@@ -308,7 +308,7 @@ class InsightPipelineService:
 
             model = build_heavy_model_from_settings()
             tester = ConnectionTester()
-            connector = await tester.get_connector(stave, read_only=True)
+            connector = await tester.get_connector(stave)
 
             plan_skipped: list[dict[str, str]] = []
 

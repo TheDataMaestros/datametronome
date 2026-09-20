@@ -23,8 +23,6 @@ def get_dispatcher() -> CheckDispatcher:
     elif mode == "celery":
         from datametronome_podium.core.celery_dispatcher import CeleryDispatcher
         _dispatcher = CeleryDispatcher()
-    elif mode == "remote":
-        raise NotImplementedError("RemoteDispatcher not yet implemented")
     else:
         raise ValueError(f"Unknown dispatch_mode: {mode!r}")
 
