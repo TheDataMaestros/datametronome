@@ -100,11 +100,18 @@ jobs:
       - name: Type check with ty
         run: uv run ty check --output-format github
 
-      # One invocation: --import-mode=importlib in the root pytest config is
-      # what makes same-named test modules across packages collectable together.
+      # One invocation per package: every pulse tests/ dir is a package named
+      # `tests`, so two of their conftest.py files in a single run collide
+      # under the same module name.
       - name: Run Pulse Tests
-        run: uv run pytest datametronome/pulse --timeout=120 -v
-          --ignore=datametronome/pulse/dbt/tests/test_real_artifacts.py
+        run: |
+          uv run pytest datametronome/pulse/core/tests -v --timeout=60
+          uv run pytest datametronome/pulse/postgres/tests -v --timeout=60
+          uv run pytest datametronome/pulse/postgres-psycopg3/tests -v --timeout=60
+          uv run pytest datametronome/pulse/sqlite/tests -v --timeout=60
+          uv run pytest datametronome/pulse/bigquery/tests -v --timeout=60
+          uv run pytest datametronome/pulse/dbt/tests -v --timeout=60 --ignore=datametronome/pulse/dbt/tests/test_real_artifacts.py
+          uv run pytest datametronome/pulse/s3/tests -v --timeout=120
 
       - name: Run Podium Tests
         run: uv run pytest datametronome/podium/tests/ -v --timeout=60

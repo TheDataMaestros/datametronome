@@ -35,12 +35,17 @@ dev = [
     "redis>=4.5.0",
 ]
 [tool.pytest.ini_options]
-# One config for the pulse packages, which used to carry a pytest.ini each --
+# Shared config for the pulse packages, which used to carry a pytest.ini each --
 # and four of the five wrote [tool:pytest], a section name only valid in
-# setup.cfg/tox.ini, so pytest silently ignored them. importlib import mode is
-# what lets every package be collected in a single run; without it, same-named
-# test modules across packages collide with ImportPathMismatchError.
-addopts = "--import-mode=importlib --strict-markers"
+# setup.cfg/tox.ini, so pytest ignored them wholesale.
+#
+# Deliberately no --import-mode=importlib, and CI still runs one pytest per
+# package. Every pulse tests/ dir is a package named `tests`, so collecting two
+# of them together makes their conftest.py files collide under one module name;
+# importlib fixes that for test modules but not for conftest. Deleting the
+# __init__.py files resolves the collision and breaks local runs instead, since
+# that is what puts the package root on sys.path when it is not pip-installed.
+# Six invocations is the cheaper trade.
 asyncio_mode = "auto"
 markers = ["unit: Unit tests", "integration: Integration tests", "slow: Slow running tests"]
 
