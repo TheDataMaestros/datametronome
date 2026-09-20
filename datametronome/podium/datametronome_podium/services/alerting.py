@@ -22,6 +22,7 @@ from urllib.parse import urljoin
 import httpx
 
 from datametronome_podium.core.query import QueryExecutor
+from datametronome_podium.features.checks.model import SeverityLevel
 from datametronome_podium.features.checks.repo import CheckRepo
 from datametronome_podium.features.settings.repo import AppSettingsRepo
 
@@ -145,10 +146,13 @@ def build_payload(
     recovered: bool = False,
 ) -> dict[str, Any]:
     """Build the Slack webhook body. Pure, so it is testable without a network."""
+    # The colour stripe is invisible in a push notification; `text` is all the
+    # phone gets. The icon is the only severity signal that reaches it.
+    icon = _icon(SeverityLevel.HARMONY.value if recovered else severity)
     headline = (
-        f"Recovered: {stave_name} / {clef_name}"
+        f"{icon} Recovered: {stave_name} / {clef_name}"
         if recovered
-        else f"[{severity}] {stave_name} / {clef_name}: {status}"
+        else f"{icon} {stave_name} / {clef_name}: {status}"
     )
     detail = (message or "").strip()
 
@@ -202,6 +206,14 @@ def build_payload(
         "message": message,
         "recovered": recovered,
     }
+
+
+def _icon(severity: str) -> str:
+    """Reuse the icons the severity enum already defines, not a second set."""
+    try:
+        return SeverityLevel(severity).icon
+    except ValueError:
+        return "❓"
 
 
 def _check_url(base_url: str | None, check_id: str) -> str | None:

@@ -29,10 +29,15 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmqctl", "status"]
+      # `rabbitmqctl status` gathers full node stats and regularly overran the
+      # 5s timeout on a cold start, leaving the broker permanently unhealthy
+      # and everything that depends_on it stuck in Created. ping is the
+      # documented liveness probe and answers in a fraction of the time.
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
       interval: 10s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 30s
 
   # Redis (cache + Celery result backend + RedBeat)
   redis:
