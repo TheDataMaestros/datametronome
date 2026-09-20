@@ -45,7 +45,7 @@ class CheckDispatcher(Protocol):
 
 
 from datametronome_podium.core.database import get_executor
-from datametronome_podium.services.alerting import notify_check_failure
+from datametronome_podium.services.alerting import notify_check_result
 from datametronome_podium.services.clef_executor import ClefExecutor
 from datametronome_podium.services.stave_service import deserialize_clef, deserialize_stave
 
@@ -112,7 +112,7 @@ class InlineDispatcher:
                 "severity": result.severity.value,
             })
 
-            await notify_check_failure(
+            await notify_check_result(
                 executor,
                 check_id=check_id,
                 clef_id=clef.id,

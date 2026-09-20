@@ -20,7 +20,7 @@ from datametronome_podium.core.query import QueryExecutor
 from datametronome_podium.core.redis import get_redis_client
 from datametronome_podium.core.timestamp_utils import now_utc_iso
 from datametronome_podium.core.worker_db import worker_db_session
-from datametronome_podium.services.alerting import notify_check_failure
+from datametronome_podium.services.alerting import notify_check_result
 from datametronome_podium.services.clef_executor import ClefExecutor
 from datametronome_podium.services.stave_service import deserialize_clef, deserialize_stave
 
@@ -109,7 +109,7 @@ async def _execute_check_async(
     logger.info("Check completed: clef=%s status=%s severity=%s",
                 clef_id, result.status, result.severity.value)
 
-    await notify_check_failure(
+    await notify_check_result(
         executor,
         check_id=check_id,
         clef_id=clef.id,

@@ -19,6 +19,8 @@ ALLOWED_KEYS = frozenset({
     "ai_heavy_model",
     "ai_base_url",
     "alert_webhook_url",
+    "alert_on_warn",
+    "podium_base_url",
 })
 
 
