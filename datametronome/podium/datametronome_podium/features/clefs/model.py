@@ -20,19 +20,15 @@ LEVEL_3_CHECKS = [
     "lookup_validation",
 ]
 
-# Level 4 is user-supplied Python. No runner exists, so the type is not
-# offered. Add it back here and in VALID_CHECK_TYPES when one does.
-LEVEL_4_CHECKS: list[str] = []
+# Level 4 would be user-supplied Python. No runner exists, so the type is not
+# offered: add a LEVEL_4_CHECKS list here when one does.
 
-SUPPORTED_CHECK_TYPES = (
-    LEVEL_1_CHECKS + LEVEL_2_CHECKS + LEVEL_3_CHECKS + LEVEL_4_CHECKS
-)
+SUPPORTED_CHECK_TYPES = LEVEL_1_CHECKS + LEVEL_2_CHECKS + LEVEL_3_CHECKS
 
 CHECK_LEVEL_MAPPING = {
     **{check: 1 for check in LEVEL_1_CHECKS},
     **{check: 2 for check in LEVEL_2_CHECKS},
     **{check: 3 for check in LEVEL_3_CHECKS},
-    **{check: 4 for check in LEVEL_4_CHECKS},
 }
 
 

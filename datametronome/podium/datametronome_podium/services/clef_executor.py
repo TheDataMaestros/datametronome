@@ -12,11 +12,11 @@ Example Usage:
     results = await execute_stave_clefs(stave, db_connector)
 """
 
-import asyncio
 import logging
+import statistics
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, Optional
 
 from datametronome_podium.features.checks.model import (
     SeverityLevel,
@@ -209,7 +209,6 @@ class ClefExecutor:
         start_time = datetime.now(timezone.utc)
         connector = db_connector
         managed_connector = False
-        result: CheckResult | None = None
 
         try:
             if connector is None:
@@ -238,14 +237,12 @@ class ClefExecutor:
 
         except Exception as e:
             logger.error(f"Error executing clef '{clef.name}': {e}")
-            result = CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message=f"Execution failed: {str(e)}",
-                metadata={"error": str(e), "exception_type": type(e).__name__},
-                timestamp=start_time,
+            result = _cannot_run(
+                clef,
+                stave,
+                f"Execution failed: {str(e)}",
+                error=str(e),
+                exception_type=type(e).__name__,
             )
 
         finally:
@@ -256,17 +253,6 @@ class ClefExecutor:
                     logger.warning(
                         f"Failed to close connector for stave '{stave.name}': {close_error}"
                     )
-
-        if result is None:
-            result = CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status="fail",
-                observed_value=None,
-                message="Clef execution did not produce a result",
-                metadata={"error": "no_result"},
-                timestamp=start_time,
-            )
 
         result.execution_time = (datetime.now(timezone.utc) - start_time).total_seconds()
         self._update_stats(result)
@@ -768,25 +754,9 @@ class ClefExecutor:
                     error="missing_row_count",
                 )
 
-            # Evaluate conditions - fail takes precedence over warn
-            fail_condition_met = clef.fail and self._evaluate_condition_numeric(
-                row_count, clef.fail
-            )
-            warn_condition_met = clef.warn and self._evaluate_condition_numeric(
-                row_count, clef.warn
-            )
-
-            if fail_condition_met:
-                status = "fail"
-                message = f"Row count {row_count} violates fail condition ({clef.fail})"
-            elif warn_condition_met:
-                status = "warn"
-                message = (
-                    f"Row count {row_count} triggers warning condition ({clef.warn})"
-                )
-            else:
-                status = "pass"
-                message = f"Row count {row_count} within acceptable range"
+            status, message = self._grade(
+                clef, row_count, None, f"Row count {row_count}"
+            ) or ("pass", f"Row count {row_count} within acceptable range")
 
             return _result(
                 clef,
@@ -813,19 +783,24 @@ class ClefExecutor:
         self,
         clef: Clef,
         observed: Any,
-        parsed: Dict[str, Any],
+        parsed: dict[str, Any] | None,
         subject: str,
-    ) -> Optional[Tuple[str, str]]:
+    ) -> tuple[str, str] | None:
         """Rank an observed value: fail first, then warn, then the condition.
 
-        Returns (status, message), or None when nothing tripped and the caller
-        should supply its own pass message.
+        `parsed` is the condition read out of the check config; pass None for
+        checks that only have warn/fail to grade against. Returns
+        (status, message), or None when nothing tripped and the caller should
+        supply its own pass message.
         """
         if clef.fail and self._evaluate_condition(observed, clef.fail):
             return "fail", f"{subject} violates fail condition ({clef.fail})"
 
         if clef.warn and self._evaluate_condition(observed, clef.warn):
             return "warn", f"{subject} breaches warning condition ({clef.warn})"
+
+        if parsed is None:
+            return None
 
         operator = parsed.get("operator", ">")
         threshold = parsed.get("value", 0)
@@ -1139,14 +1114,13 @@ class ClefExecutor:
             rows = await db_connector.query({"sql": query})
 
             if not rows or len(rows) < 10:  # Need explicit history
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="warn",
-                    observed_value=len(rows) if rows else 0,
-                    message=f"Insufficient data for forecasting (got {len(rows)} rows, need 10+)",
-                    metadata={"row_count": len(rows)},
-                    timestamp=datetime.now(timezone.utc),
+                return _result(
+                    clef,
+                    stave,
+                    "warn",
+                    f"Insufficient data for forecasting (got {len(rows)} rows, need 10+)",
+                    len(rows) if rows else 0,
+                    row_count=len(rows),
                 )
 
             # 2. Extract numeric time series
@@ -1163,14 +1137,13 @@ class ClefExecutor:
                     continue
 
             if len(ts_values) < 10:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="warn",
-                    observed_value=len(ts_values),
-                    message="Insufficient non-null values for forecasting",
-                    metadata={"valid_count": len(ts_values)},
-                    timestamp=datetime.now(timezone.utc),
+                return _result(
+                    clef,
+                    stave,
+                    "warn",
+                    "Insufficient non-null values for forecasting",
+                    len(ts_values),
+                    valid_count=len(ts_values),
                 )
 
             # Split: Train on all except last, test on last
@@ -1188,14 +1161,13 @@ class ClefExecutor:
                     df[timestamp_column] = pd.to_datetime(df[timestamp_column])
                     df = df.sort_values(by=timestamp_column)
                 if value_column not in df.columns:
-                    return CheckResult(
-                        clef_id=clef.id,
-                        stave_id=stave.id,
-                        status="error",
-                        observed_value=observed_value,
-                        message=f"Value column '{value_column}' not found in query results",
-                        metadata={"columns": list(df.columns)},
-                        timestamp=datetime.now(timezone.utc),
+                    return _result(
+                        clef,
+                        stave,
+                        "error",
+                        f"Value column '{value_column}' not found in query results",
+                        observed_value,
+                        columns=list(df.columns),
                     )
                 ts_values_model = df[value_column].dropna().tolist()
                 train_model = ts_values_model[:-1]
@@ -1214,66 +1186,41 @@ class ClefExecutor:
                     f"(Expected range: [{result.lower_bound:.2f}, {result.upper_bound:.2f}])"
                 )
 
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status=status,
-                    observed_value=observed_model,
-                    message=message,
-                    metadata={
-                        "method": "sarima",
-                        "lower_bound": result.lower_bound,
-                        "upper_bound": result.upper_bound,
-                        "confidence_level": result.confidence_level,
-                        "p_value": result.p_value,
-                        "model_info": result.model_info,
-                    },
-                    timestamp=datetime.now(timezone.utc),
+                return _result(
+                    clef,
+                    stave,
+                    status,
+                    message,
+                    observed_model,
+                    method="sarima",
+                    lower_bound=result.lower_bound,
+                    upper_bound=result.upper_bound,
+                    confidence_level=result.confidence_level,
+                    p_value=result.p_value,
+                    model_info=result.model_info,
                 )
 
-            # Fallback: mean ± k*std over recent window, accounting for trend
+            # ponytail: flat mean ± k*std over the recent window, no trend term.
+            # Deliberately crude — it only runs when statsmodels is missing, and
+            # SARIMA is the path that models trend and seasonality properly.
             window = train_data[-30:] if len(train_data) > 30 else train_data
             n = len(window)
             if n == 0:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="warn",
-                    observed_value=observed_value,
-                    message="Insufficient history for forecasting baseline window",
-                    metadata={"window_size": 0},
-                    timestamp=datetime.now(timezone.utc),
+                return _result(
+                    clef,
+                    stave,
+                    "warn",
+                    "Insufficient history for forecasting baseline window",
+                    observed_value,
+                    window_size=0,
                 )
 
-            # Calculate mean and std
-            mean = sum(window) / n
-            variance = sum((x - mean) ** 2 for x in window) / n
-            std = variance**0.5
+            mean = statistics.fmean(window)
+            std = statistics.pstdev(window, mu=mean)
 
-            # Account for trend: if data is growing, adjust expected value upward
-            # Simple linear trend detection: compare first half vs second half
-            trend_adjustment = 0.0
-            if n >= 10:
-                first_half = window[: n // 2]
-                second_half = window[n // 2 :]
-                first_mean = sum(first_half) / len(first_half)
-                second_mean = sum(second_half) / len(second_half)
-                trend = (
-                    (second_mean - first_mean) / len(second_half)
-                    if len(second_half) > 0
-                    else 0
-                )
-                # Project trend forward by 1 step (for the next observation)
-                trend_adjustment = trend
-
-            # Adjust mean for trend
-            adjusted_mean = mean + trend_adjustment
-
-            k = float(
-                config.get("fallback_sigma", 2.5)
-            )  # Slightly wider default (2.5 instead of 2.0)
-            lower = adjusted_mean - (k * std)
-            upper = adjusted_mean + (k * std)
+            k = float(config.get("fallback_sigma", 2.5))
+            lower = mean - (k * std)
+            upper = mean + (k * std)
             is_anomaly = observed_value <= lower or observed_value >= upper
 
             status = "fail" if is_anomaly else "pass"
@@ -1287,23 +1234,20 @@ class ClefExecutor:
                 f"(Expected range: [{lower:.2f}, {upper:.2f}])"
             )
 
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status=status,
-                observed_value=observed_value,
-                message=message,
-                metadata={
-                    "method": "fallback_band",
-                    "window_size": n,
-                    "mean": mean,
-                    "std": std,
-                    "k": k,
-                    "lower_bound": lower,
-                    "upper_bound": upper,
-                    "note": "Install statsmodels+pandas to enable SARIMA forecasting",
-                },
-                timestamp=datetime.now(timezone.utc),
+            return _result(
+                clef,
+                stave,
+                status,
+                message,
+                observed_value,
+                method="fallback_band",
+                window_size=n,
+                mean=mean,
+                std=std,
+                k=k,
+                lower_bound=lower,
+                upper_bound=upper,
+                note="Install statsmodels+pandas to enable SARIMA forecasting",
             )
 
         except Exception as e:
@@ -1362,17 +1306,13 @@ class ClefExecutor:
             current_values = [r["val"] for r in current_rows if r["val"] is not None]
 
             if len(baseline_values) < 20 or len(current_values) < 20:
-                return CheckResult(
-                    clef_id=clef.id,
-                    stave_id=stave.id,
-                    status="warn",
-                    observed_value=None,
-                    message=f"Insufficient data for drift detection (baseline: {len(baseline_values)}, current: {len(current_values)})",
-                    metadata={
-                        "baseline_count": len(baseline_values),
-                        "current_count": len(current_values),
-                    },
-                    timestamp=datetime.now(timezone.utc),
+                return _result(
+                    clef,
+                    stave,
+                    "warn",
+                    f"Insufficient data for drift detection (baseline: {len(baseline_values)}, current: {len(current_values)})",
+                    baseline_count=len(baseline_values),
+                    current_count=len(current_values),
                 )
 
             # 3. Perform Drift Detection using Brain Library
@@ -1409,20 +1349,17 @@ class ClefExecutor:
             )
             message = f"{msg_prefix}p-value {drift_result.p_value:.4f} (Threshold: {critical_p_value})"
 
-            return CheckResult(
-                clef_id=clef.id,
-                stave_id=stave.id,
-                status=status,
-                observed_value=drift_result.p_value,  # The metric is the p-value
-                message=message,
-                metadata={
-                    "test_statistic": drift_result.test_statistic,
-                    "p_value": drift_result.p_value,
-                    "baseline_size": drift_result.baseline_size,
-                    "current_size": drift_result.current_size,
-                    "stats_metadata": drift_result.metadata,
-                },
-                timestamp=datetime.now(timezone.utc),
+            return _result(
+                clef,
+                stave,
+                status,
+                message,
+                drift_result.p_value,  # The metric is the p-value
+                test_statistic=drift_result.test_statistic,
+                p_value=drift_result.p_value,
+                baseline_size=drift_result.baseline_size,
+                current_size=drift_result.current_size,
+                stats_metadata=drift_result.metadata,
             )
 
         except Exception as e:

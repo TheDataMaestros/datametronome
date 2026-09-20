@@ -7,7 +7,6 @@ so a clef created with it failed every run with "Unknown check type".
 import pytest
 
 from datametronome_podium.features.clefs.model import Clef, SUPPORTED_CHECK_TYPES
-from datametronome_podium.features.clefs.schema import VALID_CHECK_TYPES
 from datametronome_podium.features.staves.model import Stave
 from datametronome_podium.services.clef_executor import ClefExecutor
 
@@ -18,10 +17,6 @@ def _runners() -> set[str]:
         for name in dir(ClefExecutor)
         if name.startswith("_execute_") and name.endswith("_check")
     }
-
-
-def test_the_api_accepts_what_the_model_supports():
-    assert sorted(VALID_CHECK_TYPES) == sorted(SUPPORTED_CHECK_TYPES)
 
 
 def test_every_accepted_check_type_has_a_runner_and_no_runner_is_unreachable():

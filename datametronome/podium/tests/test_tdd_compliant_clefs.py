@@ -13,7 +13,6 @@ from datametronome_podium.features.clefs.model import (
     LEVEL_1_CHECKS,
     LEVEL_2_CHECKS,
     LEVEL_3_CHECKS,
-    LEVEL_4_CHECKS,
     Clef,
 )
 from datametronome_podium.features.checks.model import SeverityLevel
@@ -83,22 +82,6 @@ class TestTDDCompliantClefs:
             )
             print(f"      ✅ {check_type}: {clef.level_description}")
             assert clef.level == 3
-
-        # Level 4: Custom Code
-        print(f"   📊 Level 4 - Custom Code:")
-        for check_type in LEVEL_4_CHECKS:
-            # Provide minimal config for python
-            config = {"script_path": "test.py"}
-
-            clef = Clef(
-                id="temp",
-                stave_id="temp",
-                name="Example",
-                check_type=check_type,
-                config=config,
-            )
-            print(f"      ✅ {check_type}: {clef.level_description}")
-            assert clef.level == 4
 
     def test_tdd_compliant_clef_structure(self):
         """Test TDD-compliant Clef structure with warn/fail conditions."""

@@ -5,11 +5,11 @@ Ported from api/schemas/clef.py — preserves all existing validators.
 from typing import Any
 from pydantic import BaseModel, Field, field_validator
 
-# "python" is deliberately absent; see LEVEL_4_CHECKS in model.py.
-VALID_CHECK_TYPES = [
-    "row_count", "freshness", "column_values", "forecast",
-    "data_profile_drift", "lookup_validation",
-]
+from datametronome_podium.features.clefs.model import SUPPORTED_CHECK_TYPES
+
+# The API accepts exactly what the model supports. One list, not two that a
+# test has to keep agreeing.
+VALID_CHECK_TYPES = SUPPORTED_CHECK_TYPES
 
 
 class ClefBase(BaseModel):
