@@ -27,18 +27,28 @@ packages = ["datametronome"]
 dev = [
     "pytest>=7.4.0",
     "pytest-asyncio>=0.21.0",
-    "pytest-cov>=4.1.0",
     "pytest-mock>=3.10.0",
-    "black>=23.0.0",
-    "isort>=5.12.0",
-    "flake8>=6.0.0",
-    "mypy>=1.5.0",
     "httpx>=0.24.0",
     "sqlalchemy>=2.0.0",
     "psycopg[binary]>=3.0.0",
     "asyncpg>=0.28.0",
     "redis>=4.5.0",
 ]
+[tool.pytest.ini_options]
+# One config for the pulse packages, which used to carry a pytest.ini each --
+# and four of the five wrote [tool:pytest], a section name only valid in
+# setup.cfg/tox.ini, so pytest silently ignored them. importlib import mode is
+# what lets every package be collected in a single run; without it, same-named
+# test modules across packages collide with ImportPathMismatchError.
+addopts = "--import-mode=importlib --strict-markers"
+asyncio_mode = "auto"
+markers = ["unit: Unit tests", "integration: Integration tests", "slow: Slow running tests"]
+
+[tool.ruff.lint]
+# What the flake8 hook selected: syntax/name errors only. Style is ruff-format's
+# job, and a POC does not need a lint backlog.
+select = ["E9", "F63", "F7", "F82"]
+
 [tool.ty.environment]
 extra-paths = [
     "datametronome/pulse/core",

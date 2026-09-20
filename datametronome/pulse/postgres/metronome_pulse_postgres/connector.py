@@ -473,11 +473,6 @@ class PostgresPulse(Pulse, Readable, Writable):
         await self.close()
 
     @property
-    def is_connected(self) -> bool:
-        """Check if the connector is connected to the database."""
-        return self._pool is not None
-
-    @property
     def pool_size(self) -> int | None:
         """Get the current pool size if connected."""
         if self._pool:

@@ -12,27 +12,13 @@ repos:
     hooks:
       - id: detect-secrets
 
-  - repo: https://github.com/psf/black
-    rev: 23.9.1
+  # ruff covers what black, isort and flake8 did between them, in one tool.
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.4
     hooks:
-      - id: black
-
-  - repo: https://github.com/pycqa/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
-        args: ["--profile", "black"]
-
-  - repo: https://github.com/pycqa/flake8
-    rev: 6.1.0
-    hooks:
-      - id: flake8
-        additional_dependencies: [flake8-bugbear]
-        args:
-          - --count
-          - --select=E9,F63,F7,F82
-          - --show-source
-          - --statistics
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
 
   - repo: local
     hooks:
