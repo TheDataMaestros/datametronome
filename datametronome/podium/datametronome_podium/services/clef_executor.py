@@ -12,7 +12,9 @@ Example Usage:
     results = await execute_stave_clefs(stave, db_connector)
 """
 
+import ast
 import logging
+import re
 import statistics
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -308,106 +310,58 @@ class ClefExecutor:
 
         return stats
 
+    # "if_null > 5%", "if_not_unique > 0", "if_not_in: ['A','B'] > 0".
+    # The list and the comparison are both optional: "if_null" alone means
+    # "> 0". Was three near-identical branches with their own nested
+    # fallbacks; one pattern covers all of them.
+    _CONDITION = re.compile(
+        r"""^(?P<type>if_null|if_not_unique|if_not_in)
+             (?:\s*:\s*(?P<values>\[[^\]]*\]))?
+             (?:\s*(?P<operator>[<>=!]+)?\s*(?P<value>[\d.]+)\s*(?P<pct>%)?)?$""",
+        re.VERBOSE,
+    )
+
     def _parse_column_values_condition(self, condition_str: str) -> Dict[str, Any]:
-        """
-        Parse column_values condition strings per TDD specification.
+        """Parse a column_values condition string per the TDD specification.
 
         Examples:
-            "if_null > 5%" -> {"type": "if_null", "operator": ">", "value": 0.05, "is_percentage": True}
-            "if_not_unique > 0" -> {"type": "if_not_unique", "operator": ">", "value": 0}
-            "if_not_in: ['A', 'B', 'C'] > 0" -> {"type": "if_not_in", "values": ['A','B','C'], "operator": ">", "value": 0}
+            "if_null > 5%"              -> type if_null, operator >, value 0.05, is_percentage
+            "if_not_unique > 0"         -> type if_not_unique, operator >, value 0.0
+            "if_not_in: ['A','B'] > 0"  -> type if_not_in, values ['A','B'], operator >, value 0.0
         """
-        import ast
-        import re
-
         if not condition_str:
             return {"type": "unknown", "error": "empty_condition"}
 
-        condition_str = condition_str.strip()
+        match = self._CONDITION.match(condition_str.strip())
+        if not match:
+            return {
+                "type": "unknown",
+                "error": f"unrecognized_condition_format: {condition_str}",
+            }
 
-        # Parse if_not_in: ['val1', 'val2'] > 0
-        if_not_in_match = re.match(
-            r"if_not_in:\s*(\[[^\]]+\])\s*([<>=!]+)\s*(.+)", condition_str
-        )
-        if if_not_in_match:
-            try:
-                values_list_str = if_not_in_match.group(1)
-                operator = if_not_in_match.group(2)
-                threshold_str = if_not_in_match.group(3).strip()
-                values = ast.literal_eval(values_list_str)
-                threshold = float(threshold_str)
-                return {
-                    "type": "if_not_in",
-                    "values": values,
-                    "operator": operator,
-                    "value": threshold,
-                }
-            except (ValueError, SyntaxError) as e:
+        parsed: Dict[str, Any] = {
+            "type": match["type"],
+            # No comparison written means "any at all", i.e. "> 0".
+            "operator": match["operator"] or ">",
+            "value": float(match["value"] or 0),
+        }
+
+        if match["pct"]:
+            parsed["value"] /= 100.0
+            parsed["is_percentage"] = True
+
+        if match["type"] == "if_not_in":
+            if not match["values"]:
                 return {
                     "type": "unknown",
-                    "error": f"failed_to_parse_if_not_in: {str(e)}",
+                    "error": "failed_to_parse_if_not_in: no value list",
                 }
+            try:
+                parsed["values"] = ast.literal_eval(match["values"])
+            except (ValueError, SyntaxError) as e:
+                return {"type": "unknown", "error": f"failed_to_parse_if_not_in: {e}"}
 
-        # Parse if_not_unique > 0
-        if condition_str.startswith("if_not_unique"):
-            parts = condition_str.split(" ", 1)
-            if len(parts) > 1:
-                operator_value = parts[1].strip()
-                op_match = re.match(r"([<>=!]+)\s*(.+)", operator_value)
-                if op_match:
-                    operator = op_match.group(1)
-                    threshold = float(op_match.group(2))
-                    return {
-                        "type": "if_not_unique",
-                        "operator": operator,
-                        "value": threshold,
-                    }
-                else:
-                    threshold = float(operator_value)
-                    return {
-                        "type": "if_not_unique",
-                        "operator": ">",
-                        "value": threshold,
-                    }
-            return {"type": "if_not_unique", "operator": ">", "value": 0}
-
-        # Parse if_null > 5% or if_null > 0.05
-        if condition_str.startswith("if_null"):
-            parts = condition_str.split(" ", 1)
-            if len(parts) > 1:
-                operator_value = parts[1].strip()
-                # Check for percentage
-                pct_match = re.match(r"([<>=!]+)\s*(\d+(\.\d+)?)\s*%", operator_value)
-                if pct_match:
-                    operator = pct_match.group(1)
-                    threshold_pct = float(pct_match.group(2))
-                    threshold = threshold_pct / 100.0
-                    return {
-                        "type": "if_null",
-                        "operator": operator,
-                        "value": threshold,
-                        "is_percentage": True,
-                    }
-                else:
-                    # Regular numeric
-                    op_match = re.match(r"([<>=!]+)\s*(.+)", operator_value)
-                    if op_match:
-                        operator = op_match.group(1)
-                        threshold = float(op_match.group(2))
-                        return {
-                            "type": "if_null",
-                            "operator": operator,
-                            "value": threshold,
-                        }
-                    else:
-                        threshold = float(operator_value)
-                        return {"type": "if_null", "operator": ">", "value": threshold}
-            return {"type": "if_null", "operator": ">", "value": 0.0}
-
-        return {
-            "type": "unknown",
-            "error": f"unrecognized_condition_format: {condition_str}",
-        }
+        return parsed
 
     async def _execute_column_values_check(
         self, clef: Clef, stave: Stave, db_connector: Any = None

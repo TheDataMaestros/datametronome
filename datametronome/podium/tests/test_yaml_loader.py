@@ -71,13 +71,11 @@ clefs:
         assert clefs[0].name == "Email NULL Check"
         assert clefs[0].check_type == "column_values"
 
-        print(f"\n✅ Loaded {len(staves)} staves:")
         for stave in staves:
-            print(f"   - {stave}")
+            pass
 
-        print(f"\n✅ Loaded {len(clefs)} clefs:")
         for clef in clefs:
-            print(f"   - {clef}")
+            pass
 
     def test_load_single_stave_yaml(self, tmp_path):
         """Example: Load a single stave with its clefs."""
@@ -129,10 +127,8 @@ clefs:
         for clef in clefs:
             assert clef.stave_id == stave.id
 
-        print(f"\n✅ Loaded stave: {stave}")
-        print(f"✅ Loaded {len(clefs)} clefs:")
         for clef in clefs:
-            print(f"   - {clef}")
+            pass
 
     def test_yaml_with_env_vars(self, tmp_path, monkeypatch):
         """Example: YAML with environment variable substitution."""
@@ -165,10 +161,6 @@ stave:
         assert stave.connection_config["password"] == "secret123"
         assert stave.connection_config["ssl_mode"] == "require"  # Default value
 
-        print(f"\n✅ Environment variables resolved:")
-        print(f"   host: {stave.connection_config['host']}")
-        print(f"   port: {stave.connection_config['port']}")
-        print(f"   ssl_mode: {stave.connection_config['ssl_mode']} (default)")
 
     def test_auto_generated_ids(self, tmp_path):
         """Example: IDs are auto-generated if not provided."""
@@ -211,10 +203,6 @@ clefs:
         assert clefs[0].id is not None
         assert clefs[0].id.startswith("clef-")
 
-        print(f"\n✅ Auto-generated IDs:")
-        print(f"   Stave 1: {staves[0].id}")
-        print(f"   Stave 2: {staves[1].id}")
-        print(f"   Clef 1:  {clefs[0].id}")
 
     def test_validate_yaml(self, tmp_path):
         """Example: Validate YAML configuration."""
@@ -248,11 +236,9 @@ clefs:
         assert result["valid"] is True
         assert len(result["issues"]) == 0
 
-        print(f"\n{result['summary']}")
         if result.get("warnings"):
-            print("Warnings:")
             for warning in result["warnings"]:
-                print(f"  - {warning}")
+                pass
 
     def test_validate_yaml_with_errors(self, tmp_path):
         """Example: Validation catches errors."""
@@ -285,10 +271,8 @@ clefs:
         assert result["valid"] is False
         assert len(result["issues"]) > 0
 
-        print(f"\n{result['summary']}")
-        print("Issues:")
         for issue in result["issues"]:
-            print(f"  - {issue}")
+            pass
 
 
 class TestRealExampleFiles:
@@ -308,12 +292,9 @@ class TestRealExampleFiles:
         assert len(staves) > 0
         assert len(clefs) > 0
 
-        print(f"\n✅ Loaded example file: {example_file.name}")
-        print(f"   Staves: {len(staves)}")
-        print(f"   Clefs:  {len(clefs)}")
 
         for stave in staves:
-            print(f"   - {stave.name} ({stave.data_source_type})")
+            pass
 
 
 class _FakeDb:

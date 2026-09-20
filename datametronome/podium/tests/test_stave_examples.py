@@ -67,7 +67,6 @@ class TestStaveCreationExamples:
         assert isinstance(stave.created_at, datetime)
 
         # You can print it for debugging
-        print(f"\nCreated: {stave}")
         # Output: 🟢 Active Production Database (postgres)
 
     def test_create_sqlite_stave_example(self):
@@ -82,7 +81,6 @@ class TestStaveCreationExamples:
         assert stave.data_source_type == "sqlite"
         assert stave.connection_config["path"] == "/data/analytics.db"
         assert stave.is_active is True
-        print(f"\nCreated: {stave}")
 
     def test_inactive_stave_example(self):
         """Example: Create an inactive stave (monitoring paused)."""
@@ -91,7 +89,6 @@ class TestStaveCreationExamples:
         stave.is_active = False
 
         assert stave.is_active is False
-        print(f"\nCreated: {stave}")
         # Output: 🔴 Inactive Old Test DB (sqlite)
 
 
@@ -188,7 +185,6 @@ class TestClefCreationExamples:
         assert check.config["condition"] == "if_null"
         assert check.fail == "if_null > 0%"
         assert check.schedule == "@hourly"
-        print(f"\nCreated: {check}")
 
     def test_create_range_check_example(self):
         """Example: Check if values are within an expected range."""
@@ -207,7 +203,6 @@ class TestClefCreationExamples:
         assert check.check_type == "column_values"
         assert check.config["min"] == 0
         assert check.config["max"] == 150
-        print(f"\nCreated: {check}")
 
     def test_create_volume_check_example(self):
         """Example: Check if table has expected number of rows."""
@@ -225,7 +220,6 @@ class TestClefCreationExamples:
         assert check.check_type == "row_count"
         assert check.config["expected_min"] == 1000
         assert check.config["expected_max"] == 100000
-        print(f"\nCreated: {check}")
 
     def test_create_custom_check_example(self):
         """Example: Create a custom check with specific config."""
@@ -246,7 +240,6 @@ class TestClefCreationExamples:
         assert check.name == "Email Format Check"
         assert check.check_type == "column_values"
         assert "pattern" in check.config
-        print(f"\nCreated: {check}")
 
 
 class TestSerializationExamples:
@@ -273,8 +266,6 @@ class TestSerializationExamples:
         assert isinstance(db_data["updated_at"], str)
 
         # You can now insert this into the database
-        print("\nDatabase row data:")
-        print(json.dumps(db_data, indent=2))
 
         # The connection_config is a JSON string
         config_dict = json.loads(db_data["connection_config"])
@@ -310,7 +301,6 @@ class TestSerializationExamples:
         assert stave.connection_config["host"] == "db.example.com"
         assert isinstance(stave.created_at, datetime)
 
-        print(f"\nDeserialized: {stave}")
 
     def test_serialize_clef_for_database_example(self):
         """Example: Prepare a clef for database storage."""
@@ -325,8 +315,6 @@ class TestSerializationExamples:
         assert isinstance(db_data["config"], str)
         assert isinstance(db_data["created_at"], str)
 
-        print("\nDatabase row data:")
-        print(json.dumps(db_data, indent=2))
 
     def test_roundtrip_serialization_example(self):
         """Example: Full roundtrip - create, save, load."""
@@ -349,8 +337,6 @@ class TestSerializationExamples:
         assert loaded.data_source_type == original.data_source_type
         assert loaded.connection_config == original.connection_config
 
-        print(f"\nOriginal: {original}")
-        print(f"Loaded:   {loaded}")
 
 
 class TestHelperFunctionsExamples:
@@ -372,10 +358,6 @@ class TestHelperFunctionsExamples:
         id3 = generate_clef_id()
         assert id3.startswith("clef-")
 
-        print(f"\nGenerated IDs:")
-        print(f"  Stave 1: {id1}")
-        print(f"  Stave 2: {id2}")
-        print(f"  Clef 1:  {id3}")
 
     def test_validation_helpers_example(self):
         """Example: Check if types are supported."""
@@ -388,8 +370,6 @@ class TestHelperFunctionsExamples:
         assert is_valid_check_type("custom_check") is False
 
         # Get all supported types
-        print("\nSupported data sources:", SUPPORTED_DATA_SOURCES)
-        print("Supported check types:", SUPPORTED_CHECK_TYPES)
 
 
 class TestEncryptionRoundtripExamples:
@@ -458,7 +438,6 @@ class TestRealWorldScenarioExamples:
             description="Main production database storing user accounts and profiles",
         )
 
-        print(f"\n📊 Created stave: {stave}")
 
         # Step 2: Create checks for critical columns
         checks = []
@@ -499,9 +478,8 @@ class TestRealWorldScenarioExamples:
             )
         )
 
-        print(f"\n✅ Created {len(checks)} checks:")
         for check in checks:
-            print(f"  - {check}")
+            pass
 
         # Step 3: Serialize everything for database storage
         stave_data = serialize_stave(stave)
@@ -511,6 +489,3 @@ class TestRealWorldScenarioExamples:
         assert stave_data["id"] == stave.id
         assert len(checks_data) == 3
 
-        print(f"\n💾 Ready to save to database:")
-        print(f"  - 1 stave")
-        print(f"  - {len(checks_data)} clefs")

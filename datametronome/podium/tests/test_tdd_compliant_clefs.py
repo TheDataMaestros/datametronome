@@ -25,10 +25,8 @@ class TestTDDCompliantClefs:
 
     def test_tdd_check_types_alignment(self):
         """Test that our check types match the TDD specification."""
-        print(f"\n🎵 TDD CHECK TYPES ALIGNMENT")
 
         # Level 1: Declarative Checks
-        print(f"   📊 Level 1 - Declarative Checks:")
         for check_type in LEVEL_1_CHECKS:
             # Provide minimal config for each check type
             config = {"table": "test_table"}
@@ -44,11 +42,9 @@ class TestTDDCompliantClefs:
                 check_type=check_type,
                 config=config,
             )
-            print(f"      ✅ {check_type}: {clef.level_description}")
             assert clef.level == 1
 
         # Level 2: Intelligent Checks
-        print(f"   📊 Level 2 - Intelligent Checks:")
         for check_type in LEVEL_2_CHECKS:
             # Provide minimal config for each check type
             config = {"metric": "test_metric"}
@@ -62,11 +58,9 @@ class TestTDDCompliantClefs:
                 check_type=check_type,
                 config=config,
             )
-            print(f"      ✅ {check_type}: {clef.level_description}")
             assert clef.level == 2
 
         # Level 3: Advanced Declarative Checks
-        print(f"   📊 Level 3 - Advanced Declarative Checks:")
         for check_type in LEVEL_3_CHECKS:
             # Provide minimal config for lookup_validation
             config = {
@@ -80,12 +74,10 @@ class TestTDDCompliantClefs:
                 check_type=check_type,
                 config=config,
             )
-            print(f"      ✅ {check_type}: {clef.level_description}")
             assert clef.level == 3
 
     def test_tdd_compliant_clef_structure(self):
         """Test TDD-compliant Clef structure with warn/fail conditions."""
-        print(f"\n🎵 TDD-COMPLIANT CLEF STRUCTURE")
 
         # Create a TDD-compliant clef
         clef = Clef(
@@ -99,10 +91,6 @@ class TestTDDCompliantClefs:
             schedule="@hourly",
         )
 
-        print(f"   ✅ TDD-Compliant Clef: {clef}")
-        print(f"      Warn condition: {clef.warn}")
-        print(f"      Fail condition: {clef.fail}")
-        print(f"      Level: {clef.level} ({clef.level_description})")
 
         # Verify structure
         assert clef.check_type == "row_count"
@@ -113,7 +101,6 @@ class TestTDDCompliantClefs:
 
     def test_tdd_checkresult_structure(self):
         """Test TDD-compliant CheckResult structure."""
-        print(f"\n🎵 TDD-COMPLIANT CHECKRESULT STRUCTURE")
 
         # Create TDD-compliant CheckResult
         result = CheckResult(
@@ -131,11 +118,6 @@ class TestTDDCompliantClefs:
             anomalies_count=0,
         )
 
-        print(f"   ✅ TDD-Compliant CheckResult: {result}")
-        print(f"      Status: {result.status}")
-        print(f"      Observed Value: {result.observed_value}")
-        print(f"      Severity: {result.severity}")
-        print(f"      Message: {result.message}")
 
         # Verify TDD compliance
         assert result.status == "pass"
@@ -147,7 +129,6 @@ class TestTDDCompliantClefs:
 
     def test_severity_mapping_tdd_compliance(self):
         """Test that status maps correctly to severity levels per TDD."""
-        print(f"\n🎵 SEVERITY MAPPING TDD COMPLIANCE")
 
         # Test all status mappings
         test_cases = [
@@ -165,7 +146,6 @@ class TestTDDCompliantClefs:
                 message=f"Test {status} result",
             )
 
-            print(f"   {expected_icon} Status '{status}' → {result.severity}")
             assert result.severity == expected_severity
             assert result.severity.icon == expected_icon
 
@@ -190,7 +170,6 @@ class TestTDDCompliantClefs:
 
     def test_tdd_level_1_declarative_checks(self):
         """Test Level 1 Declarative Checks examples."""
-        print(f"\n🎵 LEVEL 1: DECLARATIVE CHECKS EXAMPLES")
 
         # Row count check
         row_count_clef = Clef(
@@ -230,13 +209,11 @@ class TestTDDCompliantClefs:
         clefs = [row_count_clef, freshness_clef, column_values_clef]
 
         for clef in clefs:
-            print(f"   ✅ {clef.name}: {clef.check_type} (Level {clef.level})")
             assert clef.level == 1
             assert clef.level_description == "Declarative Checks"
 
     def test_tdd_level_2_intelligent_checks(self):
         """Test Level 2 Intelligent Checks examples."""
-        print(f"\n🎵 LEVEL 2: INTELLIGENT CHECKS EXAMPLES")
 
         # Forecast check
         forecast_clef = Clef(
@@ -276,13 +253,11 @@ class TestTDDCompliantClefs:
         clefs = [forecast_clef, drift_clef]
 
         for clef in clefs:
-            print(f"   ✅ {clef.name}: {clef.check_type} (Level {clef.level})")
             assert clef.level == 2
             assert clef.level_description == "Intelligent Checks"
 
     def test_tdd_level_3_advanced_declarative_checks(self):
         """Test Level 3 Advanced Declarative Checks examples."""
-        print(f"\n🎵 LEVEL 3: ADVANCED DECLARATIVE CHECKS EXAMPLES")
 
         # Lookup validation check
         lookup_clef = Clef(
@@ -308,15 +283,11 @@ class TestTDDCompliantClefs:
             schedule="@hourly",
         )
 
-        print(
-            f"   ✅ {lookup_clef.name}: {lookup_clef.check_type} (Level {lookup_clef.level})"
-        )
         assert lookup_clef.level == 3
         assert lookup_clef.level_description == "Advanced Declarative Checks"
 
     def test_condition_string_examples(self):
         """Test various condition string formats per TDD specification."""
-        print(f"\n🎵 CONDITION STRING EXAMPLES (TDD SPECIFICATION)")
 
         # Test various condition string formats
         condition_examples = [
@@ -356,13 +327,11 @@ class TestTDDCompliantClefs:
         ]
 
         for condition, description in condition_examples:
-            print(f"   📝 '{condition}': {description}")
+            pass
 
-        print(f"   ✅ All {len(condition_examples)} condition string formats documented")
 
     def test_complete_tdd_workflow_example(self):
         """Test a complete TDD-compliant workflow example."""
-        print(f"\n🎵 COMPLETE TDD WORKFLOW EXAMPLE")
 
         # Create a stave
         stave = Stave(
@@ -444,17 +413,12 @@ class TestTDDCompliantClefs:
             ),
         ]
 
-        print(f"   🎼 Complete TDD-Compliant E-commerce Data Quality Pipeline:")
-        print(f"      Stave: {stave}")
-        print(f"      Total Clefs: {len(tdd_clefs)}")
 
         # Group by level
         level_counts = {1: 0, 2: 0, 3: 0, 4: 0}
         for clef in tdd_clefs:
             level_counts[clef.level] += 1
-            print(f"      ✅ Level {clef.level} ({clef.level_description}): {clef.name}")
 
-        print(f"   📊 Level Distribution:")
         for level, count in level_counts.items():
             if count > 0:
                 level_desc = [
@@ -464,12 +428,4 @@ class TestTDDCompliantClefs:
                     "Advanced Declarative",
                     "Custom Code",
                 ][level]
-                print(f"      Level {level} ({level_desc}): {count} checks")
 
-        print(f"   🎯 TDD Compliance Benefits:")
-        print(f"      • Consistent structure across all check types")
-        print(
-            f"      • Clear severity mapping (pass/warn/fail → Harmony/Dissonance/Cacophony)"
-        )
-        print(f"      • Standardized condition string syntax")
-        print(f"      • Proper level organization per TDD specification")
