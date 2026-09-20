@@ -193,14 +193,7 @@ async def list_stave_tables(
                 "error": f"list_tables not available for {stave.data_source_type} connector"
             }
 
-        if stave.data_source_type == "bigquery":
-            dataset = stave.connection_config.get("dataset")
-            table_names = await connector.list_tables(dataset)
-        elif stave.data_source_type in ["postgres", "postgresql"]:
-            schema = stave.connection_config.get("schema", "public")
-            table_names = await connector.list_tables(schema)
-        else:
-            table_names = await connector.list_tables()
+        table_names = await stave_svc.list_connector_tables(connector, stave)
 
         tables = []
         for table_name in table_names:
@@ -331,14 +324,7 @@ async def suggest_quality_checks(
                     "error": f"list_tables not available for {stave.data_source_type} connector"
                 }
 
-            if stave.data_source_type == "bigquery":
-                dataset = stave.connection_config.get("dataset")
-                tables_to_analyze = await connector.list_tables(dataset)
-            elif stave.data_source_type in ["postgres", "postgresql"]:
-                schema = stave.connection_config.get("schema", "public")
-                tables_to_analyze = await connector.list_tables(schema)
-            else:
-                tables_to_analyze = await connector.list_tables()
+            tables_to_analyze = await stave_svc.list_connector_tables(connector, stave)
 
         suggestions = []
 

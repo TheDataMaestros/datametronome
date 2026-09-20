@@ -79,3 +79,42 @@ class PostgresPsycopg3ReadOnlyPulse(Pulse, Readable):
                 rows = await cur.fetchall()
                 columns = [desc.name for desc in cur.description]
                 return [dict(zip(columns, row)) for row in rows]
+
+    async def list_tables(self, schema: str = "public") -> list[str]:
+        """Base tables in a schema, alphabetically.
+
+        Redshift keeps information_schema from its PostgreSQL 8.0 ancestry, so
+        the same query serves both. Views are excluded: a check that counts
+        rows in a view measures the view's definition, not stored data.
+        """
+        rows = await self.query(
+            {
+                "sql": (
+                    "SELECT table_name FROM information_schema.tables "
+                    "WHERE table_schema = %s AND table_type = 'BASE TABLE' "
+                    "ORDER BY table_name"
+                ),
+                "params": [schema],
+            }
+        )
+        return [row["table_name"] for row in rows]
+
+    async def get_table_info(self, table_name: str) -> list[dict]:
+        """Columns of a table, in declaration order.
+
+        Returns a bare column list like the S3 and BigQuery connectors do, so
+        callers need no per-source unwrapping. Deliberately no size or row
+        count: the read-write connector computes those by interpolating the
+        table name into SQL, which is an injection waiting to happen, and
+        nothing in Podium reads them.
+        """
+        return await self.query(
+            {
+                "sql": (
+                    "SELECT column_name, data_type, is_nullable, column_default "
+                    "FROM information_schema.columns "
+                    "WHERE table_name = %s ORDER BY ordinal_position"
+                ),
+                "params": [table_name],
+            }
+        )

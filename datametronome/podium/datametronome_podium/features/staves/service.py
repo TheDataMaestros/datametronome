@@ -59,7 +59,7 @@ async def list_tables(stave_id: str, *, include_structure: bool = True) -> dict[
                 f"list_tables not available for {stave.data_source_type} connector"
             )
 
-        table_names = await _call_list_tables(connector, stave)
+        table_names = await list_connector_tables(connector, stave)
         tables = await _build_table_list(connector, stave, table_names, include_structure)
     finally:
         try:
@@ -78,16 +78,24 @@ async def list_tables(stave_id: str, *, include_structure: bool = True) -> dict[
     }
 
 
-async def _call_list_tables(connector: Any, stave: Stave) -> list[str]:
-    """Dispatch list_tables with the correct arguments per connector type."""
+#: Sources whose list_tables takes a schema. Redshift is one: it is PostgreSQL
+#: underneath and has the same information_schema.
+_SCHEMA_SCOPED = ("postgres", "postgresql", "redshift")
+
+
+async def list_connector_tables(connector: Any, stave: Stave) -> list[str]:
+    """Dispatch list_tables with the correct arguments per connector type.
+
+    Public because agent_tools listed tables too, in two more copies of this
+    same branch -- and all three had drifted: none of them knew about Redshift,
+    so a Redshift stave asked its connector for every table in the database.
+    """
     if stave.data_source_type == "bigquery":
-        dataset = stave.connection_config.get("dataset")
-        return await connector.list_tables(dataset)
-    if stave.data_source_type in ("postgres", "postgresql"):
-        schema = stave.connection_config.get("schema", "public")
-        return await connector.list_tables(schema)
-    if stave.data_source_type == "dbt":
-        return await connector.list_tables()
+        return await connector.list_tables(stave.connection_config.get("dataset"))
+    if stave.data_source_type in _SCHEMA_SCOPED:
+        return await connector.list_tables(
+            stave.connection_config.get("schema", "public")
+        )
     return await connector.list_tables()
 
 
@@ -222,6 +230,36 @@ async def fetch_sample_rows(stave: Stave, table_name: str, limit: int) -> list[d
             qtbl = quote_identifier(table_name)
             return await connector.query_with_params(
                 f"SELECT * FROM {qtbl} LIMIT $1", [limit]
+            )
+        finally:
+            await connector.close()
+
+    if dst == "s3":
+        # DuckDB behind the scenes; table names are the aliases declared in
+        # connection_config["tables"], already quoted the same way the
+        # connection test quotes them.
+        connector = await create_connector(dst, config)
+        try:
+            return await connector.query(
+                {
+                    "sql": f'SELECT * FROM {quote_identifier(table_name)} LIMIT ?',
+                    "params": [limit],
+                }
+            )
+        finally:
+            await connector.close()
+
+    if dst == "redshift":
+        # Redshift runs on psycopg3, which spells placeholders %s, not asyncpg's
+        # $1 -- so it cannot share the postgres branch above even though the
+        # rest of the SQL is identical.
+        connector = await create_connector(dst, config)
+        try:
+            return await connector.query(
+                {
+                    "sql": f"SELECT * FROM {quote_identifier(table_name)} LIMIT %s",
+                    "params": [limit],
+                }
             )
         finally:
             await connector.close()
