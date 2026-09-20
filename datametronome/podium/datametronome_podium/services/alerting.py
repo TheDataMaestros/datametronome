@@ -176,12 +176,12 @@ def build_payload(
             {"type": "section", "text": {"type": "mrkdwn", "text": detail}}
         )
 
-    link = _clefs_url(base_url)
+    link = _check_url(base_url, check_id)
     if link:
         blocks.append(
             {
                 "type": "context",
-                "elements": [{"type": "mrkdwn", "text": f"<{link}|Open DataMetronome>"}],
+                "elements": [{"type": "mrkdwn", "text": f"<{link}|View check>"}],
             }
         )
 
@@ -217,14 +217,13 @@ def _icon(severity: str) -> str:
         return "❓"
 
 
-def _clefs_url(base_url: str | None) -> str | None:
-    """Link to the clefs page, when a base URL is configured.
+def _check_url(base_url: str | None, check_id: str) -> str | None:
+    """Deep link to this check, when a base URL is configured.
 
-    Deliberately not /checks/<id>: the UI has no such route, so the link this
-    used to build 404'd everywhere. /clefs is the page that actually lists
-    checks and their results. A deep link needs a page that does not exist yet.
+    Served by ui-nuxt/pages/checks/[id].vue, which reads the id from the route
+    and fetches it via checksService.getById.
     """
     base = (base_url or "").strip()
     if not base:
         return None
-    return urljoin(base.rstrip("/") + "/", "clefs")
+    return urljoin(base.rstrip("/") + "/", f"checks/{check_id}")

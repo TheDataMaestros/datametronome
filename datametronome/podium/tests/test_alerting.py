@@ -172,16 +172,16 @@ def test_a_recovery_is_green_whatever_the_status_colour_would_be():
 
 def test_no_base_url_means_no_link_block():
     payload = build_payload(status="fail", recovered=False, **ARGS)
-    assert "Open DataMetronome" not in str(payload["attachments"][0]["blocks"])
+    assert "View check" not in str(payload["attachments"][0]["blocks"])
 
 
 @pytest.mark.parametrize("base", ["https://dm.example.com", "https://dm.example.com/"])
-def test_a_base_url_links_to_a_page_that_exists(base):
-    """Trailing slash or not, same URL -- and it points at /clefs, which the
-    Nuxt app actually serves. /checks/<id> is not a route and 404'd."""
+def test_a_base_url_deep_links_to_the_check(base):
+    """Trailing slash or not, same URL. The route is served by
+    ui-nuxt/pages/checks/[id].vue -- if that page goes, this link 404s."""
     payload = build_payload(status="fail", recovered=False, base_url=base, **ARGS)
     link = payload["attachments"][0]["blocks"][-1]["elements"][0]["text"]
-    assert link == "<https://dm.example.com/clefs|Open DataMetronome>"
+    assert link == "<https://dm.example.com/checks/check-1|View check>"
 
 
 def test_an_empty_message_does_not_add_an_empty_block():
