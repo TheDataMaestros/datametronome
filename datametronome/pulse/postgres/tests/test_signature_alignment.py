@@ -1,5 +1,5 @@
 import inspect
-from metronome_pulse_postgres import PostgresPulse, PostgresWriteOnlyPulse, PostgresReadOnlyPulse
+from metronome_pulse_postgres import PostgresPulse, PostgresReadOnlyPulse
 
 
 class TestExecuteSignature:
@@ -19,14 +19,6 @@ class TestExecuteSignature:
         sig = inspect.signature(PostgresPulse.execute)
         assert sig.return_annotation is int
 
-    def test_writeonly_execute_signature(self):
-        sig = inspect.signature(PostgresWriteOnlyPulse.execute)
-        params = list(sig.parameters.keys())
-        assert params == ["self", "sql", "params"]
-        assert sig.return_annotation is int
-
-
-class TestQueryWithParamsSignature:
     def test_accepts_params_list(self):
         sig = inspect.signature(PostgresPulse.query_with_params)
         params = list(sig.parameters.keys())
@@ -52,13 +44,6 @@ class TestExecuteManySignature:
         params = list(sig.parameters.keys())
         assert params == ["self", "sql", "params_list"]
 
-    def test_writeonly_execute_many_param_name(self):
-        sig = inspect.signature(PostgresWriteOnlyPulse.execute_many)
-        params = list(sig.parameters.keys())
-        assert params == ["self", "sql", "params_list"]
-
-
-class TestTransactionMethods:
     def test_begin_transaction_exists(self):
         assert hasattr(PostgresPulse, "begin_transaction")
         sig = inspect.signature(PostgresPulse.begin_transaction)
@@ -72,19 +57,4 @@ class TestTransactionMethods:
     def test_rollback_transaction_exists(self):
         assert hasattr(PostgresPulse, "rollback_transaction")
         sig = inspect.signature(PostgresPulse.rollback_transaction)
-        assert sig.return_annotation is None
-
-    def test_writeonly_begin_transaction_exists(self):
-        assert hasattr(PostgresWriteOnlyPulse, "begin_transaction")
-        sig = inspect.signature(PostgresWriteOnlyPulse.begin_transaction)
-        assert sig.return_annotation is None
-
-    def test_writeonly_commit_transaction_exists(self):
-        assert hasattr(PostgresWriteOnlyPulse, "commit_transaction")
-        sig = inspect.signature(PostgresWriteOnlyPulse.commit_transaction)
-        assert sig.return_annotation is None
-
-    def test_writeonly_rollback_transaction_exists(self):
-        assert hasattr(PostgresWriteOnlyPulse, "rollback_transaction")
-        sig = inspect.signature(PostgresWriteOnlyPulse.rollback_transaction)
         assert sig.return_annotation is None

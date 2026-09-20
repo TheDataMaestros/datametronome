@@ -64,5 +64,3 @@ unused-type-ignore-comment = "ignore"
 ignore-comment-unknown-rule = "ignore"
 # Stdlib functions slated for removal in 3.16, mostly inside test fixtures.
 deprecated = "ignore"
-# Defensive checks that are provably dead given the annotations, but harmless.
-redundant-condition = "ignore"

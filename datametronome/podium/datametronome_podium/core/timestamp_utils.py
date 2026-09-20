@@ -4,7 +4,7 @@ Timestamp utilities for consistent UTC handling and locale display.
 
 import re
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Optional
 
 
 def now_utc() -> datetime:
@@ -106,13 +106,3 @@ def format_timestamp_z(raw: "str | datetime | None") -> "str | None":
     if dt is None:
         return None
     return dt.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def add_timezone_info_to_response(response_data: dict[str, Any]) -> dict[str, Any]:
-    """Add timezone metadata to API response data."""
-    response_data["_timezone_info"] = {
-        "backend_timezone": "UTC",
-        "timestamp_format": "ISO 8601 with Z suffix (e.g., 2025-10-08T22:30:00Z)",
-        "note": "All timestamps are stored and processed in UTC. Convert to local timezone for display.",
-    }
-    return response_data

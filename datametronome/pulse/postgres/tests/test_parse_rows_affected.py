@@ -1,6 +1,6 @@
 """Unit tests for _parse_rows_affected across asyncpg status formats."""
 import pytest
-from metronome_pulse_postgres.writeonly_connector import PostgresWriteOnlyPulse
+from metronome_pulse_postgres import PostgresPulse
 
 
 class TestParseRowsAffected:
@@ -19,4 +19,4 @@ class TestParseRowsAffected:
         ("", 0),
     ])
     def test_parse_rows_affected(self, status: str, expected: int):
-        assert PostgresWriteOnlyPulse._parse_rows_affected(status) == expected
+        assert PostgresPulse._parse_rows_affected(status) == expected
