@@ -428,10 +428,10 @@ async def test_bi_invalidates_plan_on_fingerprint_mismatch():
          patch("datametronome_podium.services.agents.business_intelligence.run_phase1_schema_overview", new_callable=AsyncMock, return_value=schema_interp), \
          patch("datametronome_podium.services.agents.business_intelligence.run_phase2_generate_and_validate", new_callable=AsyncMock, return_value=generated_plan), \
          patch("datametronome_podium.services.agents.business_intelligence.run_phase3_execute_and_analyze", new_callable=AsyncMock, return_value=bi_report), \
-         patch("datametronome_podium.services.connection_tester.ConnectionTester") as mock_tester_cls:
+         patch("datametronome_podium.services.connection_tester.get_connector", new_callable=AsyncMock) as mock_get_connector:
         mock_connector = AsyncMock()
         mock_connector.close = AsyncMock()
-        mock_tester_cls.return_value.get_connector = AsyncMock(return_value=mock_connector)
+        mock_get_connector.return_value = mock_connector
 
         service = InsightPipelineService.__new__(InsightPipelineService)
         service.executor = mock_executor
@@ -500,10 +500,10 @@ async def test_bi_reuses_existing_plan_when_fingerprint_matches():
          patch("datametronome_podium.services.agents.business_intelligence.run_phase1_schema_overview", new_callable=AsyncMock) as mock_p1, \
          patch("datametronome_podium.services.agents.business_intelligence.run_phase2_generate_and_validate", new_callable=AsyncMock) as mock_p2, \
          patch("datametronome_podium.services.agents.business_intelligence.run_phase3_execute_and_analyze", new_callable=AsyncMock, return_value=bi_report), \
-         patch("datametronome_podium.services.connection_tester.ConnectionTester") as mock_tester_cls:
+         patch("datametronome_podium.services.connection_tester.get_connector", new_callable=AsyncMock) as mock_get_connector:
         mock_connector = AsyncMock()
         mock_connector.close = AsyncMock()
-        mock_tester_cls.return_value.get_connector = AsyncMock(return_value=mock_connector)
+        mock_get_connector.return_value = mock_connector
 
         service = InsightPipelineService.__new__(InsightPipelineService)
         service.executor = mock_executor
@@ -575,10 +575,10 @@ async def test_bi_reuses_plan_passes_skipped_to_phase3():
     with patch("datametronome_podium.features.insights.service.load_archetype", return_value=archetype_with_kpis), \
          patch("datametronome_podium.services.agent_factory.build_heavy_model_from_settings", return_value=MagicMock()), \
          patch("datametronome_podium.services.agents.business_intelligence.run_phase3_execute_and_analyze", new_callable=AsyncMock, return_value=bi_report) as mock_p3, \
-         patch("datametronome_podium.services.connection_tester.ConnectionTester") as mock_tester_cls:
+         patch("datametronome_podium.services.connection_tester.get_connector", new_callable=AsyncMock) as mock_get_connector:
         mock_connector = AsyncMock()
         mock_connector.close = AsyncMock()
-        mock_tester_cls.return_value.get_connector = AsyncMock(return_value=mock_connector)
+        mock_get_connector.return_value = mock_connector
 
         service = InsightPipelineService.__new__(InsightPipelineService)
         service.executor = mock_executor
@@ -624,10 +624,10 @@ async def test_bi_returns_none_on_demand_with_no_existing_plan():
 
     with patch("datametronome_podium.features.insights.service.load_archetype", return_value=archetype_with_kpis), \
          patch("datametronome_podium.services.agent_factory.build_heavy_model_from_settings", return_value=MagicMock()), \
-         patch("datametronome_podium.services.connection_tester.ConnectionTester") as mock_tester_cls:
+         patch("datametronome_podium.services.connection_tester.get_connector", new_callable=AsyncMock) as mock_get_connector:
         mock_connector = AsyncMock()
         mock_connector.close = AsyncMock()
-        mock_tester_cls.return_value.get_connector = AsyncMock(return_value=mock_connector)
+        mock_get_connector.return_value = mock_connector
 
         service = InsightPipelineService.__new__(InsightPipelineService)
         service.executor = mock_executor
@@ -678,10 +678,10 @@ async def test_bi_phase3_failure_invalidates_plan():
     with patch("datametronome_podium.features.insights.service.load_archetype", return_value=archetype_with_kpis), \
          patch("datametronome_podium.services.agent_factory.build_heavy_model_from_settings", return_value=MagicMock()), \
          patch("datametronome_podium.services.agents.business_intelligence.run_phase3_execute_and_analyze", new_callable=AsyncMock, side_effect=RuntimeError("column does not exist")), \
-         patch("datametronome_podium.services.connection_tester.ConnectionTester") as mock_tester_cls:
+         patch("datametronome_podium.services.connection_tester.get_connector", new_callable=AsyncMock) as mock_get_connector:
         mock_connector = AsyncMock()
         mock_connector.close = AsyncMock()
-        mock_tester_cls.return_value.get_connector = AsyncMock(return_value=mock_connector)
+        mock_get_connector.return_value = mock_connector
 
         service = InsightPipelineService.__new__(InsightPipelineService)
         service.executor = mock_executor

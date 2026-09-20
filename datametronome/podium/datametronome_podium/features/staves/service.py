@@ -14,7 +14,7 @@ from datametronome_podium.core.connector_factory import create_connector
 from datametronome_podium.core.database import get_executor
 from datametronome_podium.core.query import quote_identifier
 from datametronome_podium.features.staves.model import Stave
-from datametronome_podium.services.connection_tester import ConnectionTester
+from datametronome_podium.services import connection_tester
 from datametronome_podium.services.stave_service import deserialize_stave
 
 logger = logging.getLogger(__name__)
@@ -38,8 +38,7 @@ async def load_stave(stave_id: str) -> Stave:
 async def test_connection(stave_id: str) -> dict[str, Any]:
     """Test connectivity for the named stave. Returns the tester result dict."""
     stave = await load_stave(stave_id)
-    tester = ConnectionTester()
-    result = await tester.test_connection(stave)
+    result = await connection_tester.test_connection(stave)
     logger.info("Connection test for stave %s: %s", stave_id, result["success"])
     return result
 
@@ -53,8 +52,7 @@ async def list_tables(stave_id: str, *, include_structure: bool = True) -> dict[
     stave = await load_stave(stave_id)
     logger.info("Listing tables for stave %s (%s)", stave_id, stave.data_source_type)
 
-    tester = ConnectionTester()
-    connector = await tester.get_connector(stave)
+    connector = await connection_tester.get_connector(stave)
     try:
         if not hasattr(connector, "list_tables"):
             raise ValueError(
@@ -161,7 +159,7 @@ async def preview_data(stave_id: str, table_name: str, count: int) -> dict[str, 
     logger.info("Previewing data from stave %s, table %s, limit %d", stave_id, table_name, limit)
 
     try:
-        data = await _fetch_preview_data(stave, table_name, limit)
+        data = await fetch_sample_rows(stave, table_name, limit)
     except Exception as exc:
         if "no such table" in str(exc).lower():
             return {
@@ -189,8 +187,13 @@ async def preview_data(stave_id: str, table_name: str, count: int) -> dict[str, 
     }
 
 
-async def _fetch_preview_data(stave: Stave, table_name: str, limit: int) -> list[dict[str, Any]]:
-    """Dispatch preview query to the correct connector type."""
+async def fetch_sample_rows(stave: Stave, table_name: str, limit: int) -> list[dict[str, Any]]:
+    """Read up to `limit` rows from a stave table, dialect-correct and bound.
+
+    Public because agent_tools samples tables too, and previously hand-built
+    this SQL for three of the seven source types with the limit interpolated
+    into the string.
+    """
     dst = stave.data_source_type
     config = stave.connection_config
 

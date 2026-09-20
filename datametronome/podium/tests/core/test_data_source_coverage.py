@@ -12,7 +12,7 @@ from datametronome_podium.core.connector_factory import BUILDERS, _build_connect
 from datametronome_podium.core.sql_dialect import dialect_for
 from datametronome_podium.features.staves.model import SUPPORTED_DATA_SOURCES
 from datametronome_podium.features.staves.schema import VALID_DATA_SOURCE_TYPES
-from datametronome_podium.services.connection_tester import ConnectionTester
+from datametronome_podium.services.connection_tester import TESTERS
 
 # dbt reads build artifacts rather than querying a database, so it has a
 # connector and a tester but no SQL dialect.
@@ -53,7 +53,7 @@ def test_an_unknown_source_is_rejected():
 
 @pytest.mark.parametrize("source", SUPPORTED_DATA_SOURCES)
 def test_every_supported_source_has_a_connection_tester(source):
-    assert source in ConnectionTester._TESTERS, (
+    assert source in TESTERS, (
         f"{source} staves can be created but their connection cannot be tested"
     )
 
@@ -69,5 +69,5 @@ def test_every_sql_source_has_a_dialect(source):
 
 
 def test_the_tester_has_no_entry_for_a_source_that_cannot_be_created():
-    orphans = set(ConnectionTester._TESTERS) - set(SUPPORTED_DATA_SOURCES)
+    orphans = set(TESTERS) - set(SUPPORTED_DATA_SOURCES)
     assert not orphans, f"unreachable connection testers: {sorted(orphans)}"

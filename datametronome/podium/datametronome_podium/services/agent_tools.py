@@ -176,7 +176,8 @@ async def list_stave_tables(
     """
     connector = None
     try:
-        from datametronome_podium.services.connection_tester import ConnectionTester
+        from datametronome_podium.features.staves import service as stave_svc
+        from datametronome_podium.services import connection_tester
         from datametronome_podium.services.stave_service import deserialize_stave
 
         row = await StaveRepo(get_executor()).get(stave_id)
@@ -185,8 +186,7 @@ async def list_stave_tables(
 
         stave = deserialize_stave(row.model_dump())
 
-        tester = ConnectionTester()
-        connector = await tester.get_connector(stave)
+        connector = await connection_tester.get_connector(stave)
 
         if not hasattr(connector, "list_tables"):
             return {
@@ -248,11 +248,11 @@ async def get_table_sample(
         limit: Number of rows to sample (default: 100, max recommended: 1000)
 
     Returns:
-        Dictionary with sample data, column information, and data analysis
+        Dictionary with sample data and column information
     """
-    connector = None
     try:
-        from datametronome_podium.services.connection_tester import ConnectionTester
+        from datametronome_podium.features.staves import service as stave_svc
+        from datametronome_podium.services import connection_tester
         from datametronome_podium.services.stave_service import deserialize_stave
 
         row = await StaveRepo(get_executor()).get(stave_id)
@@ -261,40 +261,10 @@ async def get_table_sample(
 
         stave = deserialize_stave(row.model_dump())
 
-        tester = ConnectionTester()
-        connector = await tester.get_connector(stave)
-
-        config = stave.connection_config if isinstance(stave.connection_config, dict) else {}
-        if stave.data_source_type == "bigquery":
-            # BigQuery uses backtick quoting; escape backticks in the identifier
-            safe_table = table_name.replace("`", "")
-            query = f"SELECT * FROM `{safe_table}` LIMIT {limit}"
-        elif stave.data_source_type in ["postgres", "postgresql"]:
-            pg_schema = config.get("schema", "public")
-            query = (
-                f"SELECT * FROM {_quote_identifier(pg_schema)}.{_quote_identifier(table_name)}"
-                f" LIMIT {limit}"
-            )
-        else:
-            query = f"SELECT * FROM {_quote_identifier(table_name)} LIMIT {limit}"
-
-        sample_data = await connector.query({"sql": query})
-
-        if not sample_data:
-            return {
-                "success": True,
-                "stave_id": stave_id,
-                "table_name": table_name,
-                "row_count": 0,
-                "sample_data": [],
-                "columns": [],
-                "analysis": {
-                    "message": "Table is empty or query returned no results",
-                    "important_fields": [],
-                },
-            }
-
-        analysis = _analyze_sample_data(sample_data)
+        # fetch_sample_rows already samples every supported source with the
+        # right dialect and bound parameters. This used to hand-build the SQL
+        # for three of them and string-interpolate the limit.
+        sample_data = await stave_svc.fetch_sample_rows(stave, table_name, limit)
 
         return {
             "success": True,
@@ -306,7 +276,6 @@ async def get_table_sample(
             "limit": limit,
             "columns": list(sample_data[0].keys()) if sample_data else [],
             "sample_data": sample_data[:10],
-            "analysis": analysis,
         }
     except Exception as e:
         logger.error(
@@ -314,12 +283,6 @@ async def get_table_sample(
             table_name, stave_id, e, exc_info=True,
         )
         return {"error": f"Failed to get sample data: {str(e)}"}
-    finally:
-        if connector:
-            try:
-                await connector.close()
-            except Exception:
-                pass
 
 
 async def suggest_quality_checks(
@@ -348,7 +311,8 @@ async def suggest_quality_checks(
     """
     connector = None
     try:
-        from datametronome_podium.services.connection_tester import ConnectionTester
+        from datametronome_podium.features.staves import service as stave_svc
+        from datametronome_podium.services import connection_tester
         from datametronome_podium.services.stave_service import deserialize_stave
 
         row = await StaveRepo(get_executor()).get(stave_id)
@@ -357,8 +321,7 @@ async def suggest_quality_checks(
 
         stave = deserialize_stave(row.model_dump())
 
-        tester = ConnectionTester()
-        connector = await tester.get_connector(stave)
+        connector = await connection_tester.get_connector(stave)
 
         if table_name:
             tables_to_analyze = [table_name]
@@ -396,59 +359,36 @@ async def suggest_quality_checks(
                 if not columns:
                     continue
 
-                sample_analysis = None
+                # The sample goes to the model as rows. This used to run them
+                # through a hand-written scoring engine (+10 if all values are
+                # unique, +7 if the name contains "id", +6 if it contains
+                # "created") and hand-build the sampling SQL per dialect. The
+                # caller of this tool is an LLM: reading a sample is the thing
+                # it is better at than a table of magic numbers.
+                sample_rows: list[dict] = []
                 if use_sample_data:
                     try:
-                        if stave.data_source_type == "bigquery":
-                            dataset = stave.connection_config.get("dataset")
-                            if dataset:
-                                if "." in dataset:
-                                    qualified_table = f"`{dataset}.{tbl_name}`"
-                                else:
-                                    project_id = stave.connection_config.get("project_id")
-                                    if project_id:
-                                        qualified_table = f"`{project_id}.{dataset}.{tbl_name}`"
-                                    else:
-                                        qualified_table = f"`{dataset}.{tbl_name}`"
-                            else:
-                                qualified_table = f"`{tbl_name}`"
-                            sample_query = f"SELECT * FROM {qualified_table} LIMIT {sample_limit}"
-                        elif stave.data_source_type in ["postgres", "postgresql"]:
-                            sample_query = f'SELECT * FROM "{tbl_name}" LIMIT {sample_limit}'
-                        else:
-                            sample_query = f"SELECT * FROM {tbl_name} LIMIT {sample_limit}"
-
-                        sample_data = await connector.query({"sql": sample_query})
-                        if sample_data:
-                            sample_analysis = _analyze_sample_data(sample_data)
+                        sample_rows = await stave_svc.fetch_sample_rows(
+                            stave, tbl_name, sample_limit
+                        )
                     except Exception as e:
                         logger.warning("Could not get sample data for table %s: %s", tbl_name, e)
-                        sample_analysis = None
 
                 table_suggestions = _analyze_table_structure(
                     tbl_name, columns, stave.data_source_type
                 )
 
-                if sample_analysis and sample_analysis.get("important_fields"):
-                    table_suggestions = _enhance_suggestions_with_data(
-                        table_suggestions, sample_analysis, tbl_name
-                    )
-
                 if table_suggestions:
-                    reasoning = f"Analyzed {len(columns)} columns"
-                    if sample_analysis:
-                        reasoning += f" and {sample_analysis.get('message', 'sample data')}"
-                    reasoning += f" - suggested {len(table_suggestions)} quality checks"
-
                     suggestions.append(
                         {
                             "table": tbl_name,
                             "suggested_clefs": table_suggestions,
-                            "reasoning": reasoning,
-                            "data_analysis_used": sample_analysis is not None,
-                            "important_fields": sample_analysis.get("important_fields", [])[:5]
-                            if sample_analysis
-                            else [],
+                            "reasoning": (
+                                f"Analyzed {len(columns)} columns"
+                                f" - suggested {len(table_suggestions)} quality checks"
+                            ),
+                            "columns": columns,
+                            "sample_rows": sample_rows,
                         }
                     )
             except Exception as e:
@@ -697,124 +637,6 @@ async def get_quality_report(days: int = 7) -> dict[str, object]:
 # ---------------------------------------------------------------------------
 
 
-def _analyze_sample_data(sample_data: list[dict]) -> dict:
-    """Analyze sample data to identify important fields and patterns."""
-    if not sample_data:
-        return {"message": "No data to analyze", "important_fields": [], "patterns": {}}
-
-    important_fields: list[dict[str, Any]] = []
-    patterns = {}
-    field_stats = {}
-
-    columns = list(sample_data[0].keys()) if sample_data else []
-
-    for col in columns:
-        col_values = [row.get(col) for row in sample_data if col in row]
-        non_null_values = [v for v in col_values if v is not None]
-        null_count = len(col_values) - len(non_null_values)
-        null_percentage = (null_count / len(col_values) * 100) if col_values else 0
-
-        stats = {
-            "total_values": len(col_values),
-            "non_null_count": len(non_null_values),
-            "null_count": null_count,
-            "null_percentage": round(null_percentage, 2),
-            "unique_count": len(set(non_null_values)) if non_null_values else 0,
-        }
-
-        importance_score = 0
-        importance_reasons = []
-
-        if (
-            stats["unique_count"] == stats["non_null_count"]
-            and stats["non_null_count"] > 0
-        ):
-            importance_score += 10
-            importance_reasons.append("All values are unique (potential key)")
-
-        if null_percentage < 5:
-            importance_score += 5
-            importance_reasons.append("Very few NULL values")
-
-        if null_percentage > 50:
-            importance_score += 3
-            importance_reasons.append("High NULL percentage (data quality concern)")
-
-        if non_null_values:
-            unique_ratio = stats["unique_count"] / stats["non_null_count"]
-            if unique_ratio < 0.1 and stats["non_null_count"] > 10:
-                unique_values = list(set(non_null_values))[:20]
-                patterns[col] = {
-                    "type": "enum_like",
-                    "unique_values": unique_values,
-                    "unique_count": stats["unique_count"],
-                }
-                importance_score += 4
-                importance_reasons.append("Appears to be an enum/category field")
-
-        numeric_values = []
-        for v in non_null_values:
-            try:
-                if isinstance(v, (int, float)):
-                    numeric_values.append(float(v))
-                elif isinstance(v, str) and v.replace(".", "").replace("-", "").isdigit():
-                    numeric_values.append(float(v))
-            except (ValueError, TypeError):
-                pass
-
-        if numeric_values:
-            stats["is_numeric"] = True
-            stats["min"] = min(numeric_values)
-            stats["max"] = max(numeric_values)
-            stats["avg"] = sum(numeric_values) / len(numeric_values)
-            stats["numeric_count"] = len(numeric_values)
-
-            if stats["min"] >= 0 and stats["max"] <= 100 and "percent" in col.lower():
-                importance_score += 3
-                importance_reasons.append("Numeric field with percentage-like range")
-
-        timestamp_indicators = ["created", "updated", "modified", "date", "time", "at"]
-        if any(indicator in col.lower() for indicator in timestamp_indicators):
-            importance_score += 6
-            importance_reasons.append("Appears to be a timestamp field")
-
-        id_indicators = ["id", "uuid", "key", "pk"]
-        if any(indicator in col.lower() for indicator in id_indicators):
-            importance_score += 7
-            importance_reasons.append("Appears to be an ID/key field")
-
-        if "email" in col.lower() and non_null_values:
-            email_like = sum(
-                1
-                for v in non_null_values[:10]
-                if isinstance(v, str) and "@" in v and "." in v
-            )
-            if email_like > 0:
-                importance_score += 5
-                importance_reasons.append("Contains email-like values")
-
-        field_stats[col] = stats
-
-        if importance_score >= 5:
-            important_fields.append(
-                {
-                    "field": col,
-                    "importance_score": importance_score,
-                    "reasons": importance_reasons,
-                    "stats": stats,
-                }
-            )
-
-    important_fields.sort(key=lambda x: x["importance_score"], reverse=True)
-
-    return {
-        "message": f"Analyzed {len(sample_data)} rows and {len(columns)} columns",
-        "important_fields": important_fields[:10],
-        "patterns": patterns,
-        "field_stats": {k: v for k, v in list(field_stats.items())[:20]},
-    }
-
-
 def _analyze_table_structure(
     table_name: str, columns: list[dict], data_source_type: str
 ) -> list[dict]:
@@ -1024,114 +846,6 @@ def _analyze_table_structure(
                 break
 
     return suggestions
-
-
-def _enhance_suggestions_with_data(
-    schema_suggestions: list[dict],
-    data_analysis: dict,
-    table_name: str,
-) -> list[dict]:
-    """Enhance schema-based suggestions with insights from actual data analysis."""
-    enhanced = list(schema_suggestions)
-    important_fields = data_analysis.get("important_fields", [])
-    patterns = data_analysis.get("patterns", {})
-    field_stats = data_analysis.get("field_stats", {})
-
-    columns_with_suggestions = set()
-    for sug in schema_suggestions:
-        config = sug.get("config", {})
-        if "column" in config:
-            columns_with_suggestions.add(config["column"])
-
-    for field_info in important_fields:
-        field_name = field_info["field"]
-        if field_name in columns_with_suggestions:
-            continue
-
-        importance_score = field_info.get("importance_score", 0)
-        stats = field_info.get("stats", {})
-
-        if importance_score >= 8:
-            if field_name in patterns:
-                pattern_info = patterns[field_name]
-                if pattern_info.get("type") == "enum_like":
-                    allowed_values = pattern_info.get("unique_values", [])
-                    enhanced.append(
-                        {
-                            "name": f"{table_name}.{field_name} Allowed Values Check",
-                            "description": f"Validate {field_name} contains only expected values",
-                            "check_type": "column_values",
-                            "config": {
-                                "table": table_name,
-                                "column": field_name,
-                                "allowed_values": allowed_values[:50],
-                            },
-                            "warn": "if_not_in: [] > 1%",
-                            "fail": "if_not_in: [] > 5%",
-                            "schedule": "@daily",
-                            "priority": "high",
-                            "reasoning": f"Data analysis shows this field has {pattern_info.get('unique_count')} distinct values (enum-like pattern).",
-                        }
-                    )
-
-            elif (
-                stats.get("is_numeric")
-                and stats.get("min") is not None
-                and stats.get("max") is not None
-            ):
-                min_val = stats.get("min", 0)
-                max_val = stats.get("max", 100)
-                if max_val - min_val < 10000:
-                    enhanced.append(
-                        {
-                            "name": f"{table_name}.{field_name} Range Check",
-                            "description": f"Validate {field_name} is within observed data range",
-                            "check_type": "column_values",
-                            "config": {
-                                "table": table_name,
-                                "column": field_name,
-                                "min": min_val,
-                                "max": max_val,
-                            },
-                            "warn": "if_out_of_range > 1%",
-                            "fail": "if_out_of_range > 5%",
-                            "schedule": "@daily",
-                            "priority": "high",
-                            "reasoning": f"Data analysis shows values range from {min_val} to {max_val}.",
-                        }
-                    )
-
-        if (
-            stats.get("null_percentage", 0) > 0
-            and stats.get("null_percentage", 0) < 50
-        ):
-            if importance_score >= 6:
-                enhanced.append(
-                    {
-                        "name": f"{table_name}.{field_name} NULL Check",
-                        "description": f"Monitor NULL values in {field_name}",
-                        "check_type": "column_values",
-                        "config": {"table": table_name, "column": field_name},
-                        "warn": f"if_null > {min(10, stats.get('null_percentage', 5) + 2)}%",
-                        "fail": f"if_null > {min(20, stats.get('null_percentage', 10) + 5)}%",
-                        "schedule": "@daily",
-                        "priority": "medium",
-                        "reasoning": f"Data analysis shows {stats.get('null_percentage', 0):.1f}% NULL values.",
-                    }
-                )
-
-    def get_priority(sug):
-        priority_map = {"high": 3, "medium": 2, "low": 1}
-        return priority_map.get(sug.get("priority", "medium"), 2)
-
-    enhanced.sort(key=get_priority, reverse=True)
-
-    return enhanced
-
-
-# ---------------------------------------------------------------------------
-# Intelligence-specific tools
-# ---------------------------------------------------------------------------
 
 
 async def get_stave_intelligence(stave_id: str) -> dict[str, object]:

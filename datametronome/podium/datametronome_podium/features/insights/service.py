@@ -37,10 +37,10 @@ class InsightPipelineService:
     async def _discover_schema(self, stave_id: str) -> dict[str, Any]:
         """Discover tables, columns, and sample data for a stave.
 
-        Uses the stave's connection config via ConnectionTester to query
+        Uses the stave's connection config via connection_tester to query
         the data source directly.
         """
-        from datametronome_podium.services.connection_tester import ConnectionTester
+        from datametronome_podium.services import connection_tester
         from datametronome_podium.services.stave_service import deserialize_stave
 
         stave_rows = await self.executor.query(
@@ -50,8 +50,7 @@ class InsightPipelineService:
             raise ValueError(f"Stave not found: {stave_id}")
 
         stave = deserialize_stave(stave_rows[0])
-        tester = ConnectionTester()
-        connector = await tester.get_connector(stave)
+        connector = await connection_tester.get_connector(stave)
 
         try:
             table_names = await _list_tables_for_stave(connector, stave)
@@ -260,7 +259,7 @@ class InsightPipelineService:
             run_phase2_generate_and_validate,
             run_phase3_execute_and_analyze,
         )
-        from datametronome_podium.services.connection_tester import ConnectionTester
+        from datametronome_podium.services import connection_tester
         from datametronome_podium.services.stave_service import deserialize_stave
 
         archetype = load_archetype(profile.domain_type)
@@ -307,8 +306,7 @@ class InsightPipelineService:
             # On-demand (discovery=None): always use existing plan; no generation
 
             model = build_heavy_model_from_settings()
-            tester = ConnectionTester()
-            connector = await tester.get_connector(stave)
+            connector = await connection_tester.get_connector(stave)
 
             plan_skipped: list[dict[str, str]] = []
 
