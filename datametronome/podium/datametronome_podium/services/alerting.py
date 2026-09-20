@@ -3,10 +3,10 @@
 A single webhook URL is read from app settings (`alert_webhook_url`). When it
 is unset, alerting is off -- the default for a fresh install.
 
-The payload is Slack's incoming-webhook shape: a top-level `text` fallback
-(what push notifications and screen readers get) plus one coloured attachment
-carrying Block Kit blocks. Any non-Slack consumer can read `text` and the
-structured fields alongside it.
+The payload is one coloured Slack attachment carrying Block Kit blocks, with
+`fallback` for notifications. There is no top-level `text`: Slack renders that
+as the message body and the attachment underneath it, which printed every
+headline twice. Non-Slack consumers read the structured fields alongside.
 
 ponytail: one global webhook, fire-and-forget, one extra query per alert to
 find the previous status. Per-stave routing, retries and dedupe belong in a
@@ -176,22 +176,23 @@ def build_payload(
             {"type": "section", "text": {"type": "mrkdwn", "text": detail}}
         )
 
-    link = _check_url(base_url, check_id)
+    link = _clefs_url(base_url)
     if link:
         blocks.append(
             {
                 "type": "context",
-                "elements": [{"type": "mrkdwn", "text": f"<{link}|View check>"}],
+                "elements": [{"type": "mrkdwn", "text": f"<{link}|Open DataMetronome>"}],
             }
         )
 
     return {
-        # Fallback for notifications and clients that ignore blocks. Slack warns
-        # when it is missing, so it is not optional.
-        "text": f"{headline}\n{detail}".strip(),
+        # No top-level `text`: Slack renders it as the message body *and* then
+        # renders the attachment below, so the headline appeared twice. The
+        # attachment's `fallback` is what notifications use instead.
         "attachments": [
             {
                 "color": _COLOURS.get("pass" if recovered else status, "#6b7280"),
+                "fallback": f"{headline}\n{detail}".strip(),
                 "blocks": blocks,
             }
         ],
@@ -216,9 +217,14 @@ def _icon(severity: str) -> str:
         return "❓"
 
 
-def _check_url(base_url: str | None, check_id: str) -> str | None:
-    """Link to the check in the UI, when a base URL is configured."""
+def _clefs_url(base_url: str | None) -> str | None:
+    """Link to the clefs page, when a base URL is configured.
+
+    Deliberately not /checks/<id>: the UI has no such route, so the link this
+    used to build 404'd everywhere. /clefs is the page that actually lists
+    checks and their results. A deep link needs a page that does not exist yet.
+    """
     base = (base_url or "").strip()
     if not base:
         return None
-    return urljoin(base.rstrip("/") + "/", f"checks/{check_id}")
+    return urljoin(base.rstrip("/") + "/", "clefs")

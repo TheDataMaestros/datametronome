@@ -119,7 +119,7 @@ async def test_a_pass_after_a_failure_posts_a_recovery():
     client.post.assert_awaited_once()
     payload = client.post.await_args.kwargs["json"]
     assert payload["recovered"] is True
-    assert "Recovered" in payload["text"]
+    assert "Recovered" in payload["attachments"][0]["fallback"]
 
 
 @pytest.mark.asyncio
@@ -146,11 +146,16 @@ async def test_unreadable_history_does_not_invent_a_recovery():
 # --- payload shape ----------------------------------------------------------
 
 
-def test_payload_carries_a_text_fallback():
-    """Slack uses `text` for push notifications and warns when it is absent."""
-    payload = build_payload(status="fail", recovered=False, **ARGS)
-    assert "orders" in payload["text"]
-    assert "row count" in payload["text"]
+def test_payload_carries_a_notification_fallback():
+    """`fallback` is what push notifications show when blocks cannot render."""
+    fallback = build_payload(status="fail", recovered=False, **ARGS)["attachments"][0]["fallback"]
+    assert "orders" in fallback
+    assert "row count" in fallback
+
+
+def test_payload_has_no_top_level_text():
+    """Slack renders top-level `text` AND the attachment, printing it twice."""
+    assert "text" not in build_payload(status="fail", recovered=False, **ARGS)
 
 
 def test_payload_is_one_coloured_attachment_of_blocks():
@@ -167,16 +172,16 @@ def test_a_recovery_is_green_whatever_the_status_colour_would_be():
 
 def test_no_base_url_means_no_link_block():
     payload = build_payload(status="fail", recovered=False, **ARGS)
-    rendered = str(payload["attachments"][0]["blocks"])
-    assert "View check" not in rendered
+    assert "Open DataMetronome" not in str(payload["attachments"][0]["blocks"])
 
 
 @pytest.mark.parametrize("base", ["https://dm.example.com", "https://dm.example.com/"])
-def test_a_base_url_adds_a_link_to_the_check(base):
-    """Trailing slash or not, the URL must come out the same."""
+def test_a_base_url_links_to_a_page_that_exists(base):
+    """Trailing slash or not, same URL -- and it points at /clefs, which the
+    Nuxt app actually serves. /checks/<id> is not a route and 404'd."""
     payload = build_payload(status="fail", recovered=False, base_url=base, **ARGS)
     link = payload["attachments"][0]["blocks"][-1]["elements"][0]["text"]
-    assert link == "<https://dm.example.com/checks/check-1|View check>"
+    assert link == "<https://dm.example.com/clefs|Open DataMetronome>"
 
 
 def test_an_empty_message_does_not_add_an_empty_block():
