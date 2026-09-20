@@ -95,9 +95,8 @@ class SarimaForecaster:
         elif not isinstance(data, pd.Series):
             raise ValueError(f"Unsupported data type: {type(data)}")
 
-        # Validate data
-        if not self.order or not self.seasonal_order:
-            raise ValueError("Order and seasonal_order must be set")
+        # order and seasonal_order are non-optional tuples with defaults, so
+        # there is nothing to guard against here -- they cannot be unset.
         if len(data) < max(
             self.order[0] + self.order[2],
             self.seasonal_order[0] + self.seasonal_order[2] + self.seasonal_order[3],

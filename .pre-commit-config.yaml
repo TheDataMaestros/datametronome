@@ -38,7 +38,11 @@ repos:
     hooks:
       - id: ty-check
         name: ty type checking
-        entry: uvx ty check
+        # Pinned to the same version CI installs. Unpinned, uvx resolves to
+        # whatever is newest locally, and the two disagree about which rules
+        # exist -- which is how a suppression for a rule the newer ty had
+        # dropped got deleted as "phantom" and broke the build.
+        entry: uvx ty@0.0.80 check
         language: system
         pass_filenames: false
         always_run: true
