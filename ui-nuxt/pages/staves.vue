@@ -297,7 +297,13 @@
                 </p>
               </UFormGroup>
 
-              <UFormGroup label="Service Account Credentials" name="credentials" required>
+              <UFormGroup label="Service Account Credentials" name="credentials">
+                <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                  Leave this empty to use the workload identity or Application
+                  Default Credentials the app already runs with. Prefer that: no
+                  long-lived private key is stored. Supply a key only when the
+                  app cannot be granted access directly.
+                </p>
                 <div class="space-y-3">
                   <!-- File Upload Option -->
                   <div>
@@ -309,7 +315,7 @@
                       class="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100 dark:file:bg-primary-900 dark:file:text-primary-300 dark:hover:file:bg-primary-800 cursor-pointer"
                     />
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Upload your GCP service account JSON key file
+                      Optional. A service account JSON key file.
                     </p>
                   </div>
 
@@ -336,7 +342,7 @@
                       @blur="parseCredentialsJson"
                     />
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Paste the contents of your service account JSON file
+                      Optional. The contents of a service account JSON file.
                     </p>
                   </div>
 
@@ -923,9 +929,11 @@ function validateConnectionConfig(): string | null {
     if (!fields.path) return 'Database path is required'
   } else if (type === 'bigquery') {
     if (!fields.project_id) return 'Project ID is required'
-    if (!fields.credentials_json && !fields.credentials_path) {
-      return 'Please upload a credentials JSON file or paste the JSON content'
-    }
+    // No credentials check: an empty credential means the connector uses the
+    // Application Default Credentials the app already runs with, which is the
+    // safer configuration. Requiring a key here made the safe path
+    // unreachable from the UI. A wrong or absent grant surfaces on Test
+    // Connection, where it belongs.
   } else if (type === 'dbt') {
     // Mirrors DbtReadonlyPulse, which raises on these same missing fields
     if ((fields.mode || 'local') === 'cloud') {
