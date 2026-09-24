@@ -756,24 +756,12 @@ def _analyze_table_structure(
                 }
             )
 
-        if any(pattern in col_name for pattern in email_patterns):
-            suggestions.append(
-                {
-                    "name": f"{table_name}.{col.get('column_name')} Email Format Check",
-                    "description": f"Validate email format for {col.get('column_name')}",
-                    "check_type": "column_values",
-                    "config": {
-                        "table": table_name,
-                        "column": col.get("column_name"),
-                        "pattern": r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$",
-                    },
-                    "warn": "if_not_matching_pattern > 5%",
-                    "fail": "if_not_matching_pattern > 10%",
-                    "schedule": "@daily",
-                    "priority": "medium",
-                    "reasoning": f"Column '{col.get('column_name')}' appears to contain email addresses",
-                }
-            )
+        # ponytail: no email-format suggestion. It emitted
+        # "if_not_matching_pattern > 5%", which the condition parser does not
+        # recognise, so the check failed to parse rather than running. The SQL
+        # layer can already do this -- Dialect.matches builds the regex
+        # expression per source -- so what is missing is a condition type, not
+        # the capability. Suggest it again when column_values has one.
 
         if is_nullable and not any(pattern in col_name for pattern in id_patterns):
             if any(
@@ -808,44 +796,18 @@ def _analyze_table_structure(
             elif "rating" in col_name or "score" in col_name:
                 max_val = 10
 
-            if max_val is not None:
-                suggestions.append(
-                    {
-                        "name": f"{table_name}.{col.get('column_name')} Range Check",
-                        "description": f"Validate {col.get('column_name')} is within expected range",
-                        "check_type": "column_values",
-                        "config": {
-                            "table": table_name,
-                            "column": col.get("column_name"),
-                            "min": min_val,
-                            "max": max_val,
-                        },
-                        "warn": "if_out_of_range > 1%",
-                        "fail": "if_out_of_range > 5%",
-                        "schedule": "@daily",
-                        "priority": "medium",
-                        "reasoning": f"Column '{col.get('column_name')}' is numeric and suggests a bounded range",
-                    }
-                )
+            # ponytail: no range-check suggestion. It emitted
+            # "if_out_of_range > 5%", which no condition parser has ever
+            # supported, so every accepted suggestion failed with
+            # "Failed to parse condition". Restore it when column_values
+            # grows a real range condition; min/max are already computed here.
+            _ = (min_val, max_val)
 
-        if is_string and col_name in ["status", "state", "type", "category"]:
-            suggestions.append(
-                {
-                    "name": f"{table_name}.{col.get('column_name')} Values Check",
-                    "description": f"Monitor allowed values for {col.get('column_name')}",
-                    "check_type": "column_values",
-                    "config": {
-                        "table": table_name,
-                        "column": col.get("column_name"),
-                    },
-                    "warn": "if_not_in: [] > 1%",
-                    "fail": "if_not_in: [] > 5%",
-                    "schedule": "@daily",
-                    "priority": "low",
-                    "reasoning": f"Column '{col.get('column_name')}' appears to be an enum/category column.",
-                    "note": "You may need to update the config with actual allowed_values after reviewing the data",
-                }
-            )
+        # Nor an enum-values suggestion: it emitted "if_not_in: [] > 5%" with
+        # an empty list, which the executor rejects outright as
+        # missing_allowed_values. Its own note said the user had to fill the
+        # values in afterwards. The sample rows now go to the model, which can
+        # propose the actual values instead of a placeholder that cannot run.
 
     if not has_timestamp:
         for col in columns:
