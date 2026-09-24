@@ -623,6 +623,47 @@ async def get_quality_report(days: int = 7) -> dict[str, object]:
 # ---------------------------------------------------------------------------
 
 
+def _as_information_schema(columns: list) -> list[dict]:
+    """Normalise a connector's column list to information_schema naming.
+
+    The four connectors disagree. Postgres and Redshift query
+    information_schema directly and already use column_name / data_type /
+    is_nullable. BigQuery's client returns name / type / mode, and DuckDB's
+    DESCRIBE returns column_name / column_type / null. Everything downstream
+    reads the information_schema spelling, so a BigQuery stave produced zero
+    check suggestions: every col.get("column_name") came back empty.
+
+    Verified against real BigQuery; the DuckDB mapping is from its DESCRIBE
+    contract, which no test here can exercise without the duckdb package.
+    """
+    normalised = []
+    for col in columns:
+        # Loosely typed on purpose: this is whatever a connector handed back,
+        # and one returning strings must not take the whole tool down.
+        if not isinstance(col, dict):
+            continue
+        name = col.get("column_name") or col.get("name") or ""
+        dtype = col.get("data_type") or col.get("column_type") or col.get("type") or ""
+        if "is_nullable" in col:
+            nullable = col["is_nullable"]
+        elif "mode" in col:
+            # BigQuery: REQUIRED means NOT NULL; NULLABLE and REPEATED do not.
+            nullable = "NO" if str(col["mode"]).upper() == "REQUIRED" else "YES"
+        elif "null" in col:
+            nullable = col["null"]
+        else:
+            nullable = "YES"
+        normalised.append(
+            {
+                **col,
+                "column_name": name,
+                "data_type": dtype,
+                "is_nullable": str(nullable).upper() or "YES",
+            }
+        )
+    return normalised
+
+
 def _analyze_table_structure(
     table_name: str, columns: list[dict], data_source_type: str
 ) -> list[dict]:
@@ -642,7 +683,7 @@ def _analyze_table_structure(
 
     has_timestamp = False
 
-    for col in columns:
+    for col in _as_information_schema(columns):
         col_name = col.get("column_name", "").lower()
         data_type = str(col.get("data_type", "")).lower()
         is_nullable = col.get("is_nullable", "YES").upper() == "YES"
